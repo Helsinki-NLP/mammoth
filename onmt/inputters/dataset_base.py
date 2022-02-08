@@ -4,8 +4,8 @@ from itertools import chain, starmap
 from collections import Counter
 
 import torch
-from torchtext.data import Dataset as TorchtextDataset
-from torchtext.data import Example
+from torchtext.legacy.data import Dataset as TorchtextDataset
+from torchtext.legacy.data import Example
 from torchtext.vocab import Vocab
 
 

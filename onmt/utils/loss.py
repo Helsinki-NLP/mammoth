@@ -12,7 +12,7 @@ from onmt.modules.sparse_activations import LogSparsemax
 from onmt.constants import ModelTask
 
 
-def build_loss_compute(model, tgt_field, opt, train=True):
+def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
     """
     Returns a LossCompute subclass which wraps around an nn.Module subclass
     (such as nn.NLLLoss) which defines the loss criterion. The LossCompute
@@ -39,7 +39,7 @@ def build_loss_compute(model, tgt_field, opt, train=True):
         criterion = LabelSmoothingLoss(
             opt.label_smoothing, len(tgt_field.vocab), ignore_index=padding_idx
         )
-    elif isinstance(model.generator[-1], LogSparsemax):
+    elif isinstance(generator[-1], LogSparsemax): #elif isinstance(model.generator[-1], LogSparsemax):
         criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
     else:
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
@@ -49,7 +49,7 @@ def build_loss_compute(model, tgt_field, opt, train=True):
     # passed to the NMTLossCompute. At the moment, the only supported
     # loss function of this kind is the sparsemax loss.
     use_raw_logits = isinstance(criterion, SparsemaxLoss)
-    loss_gen = model.generator[0] if use_raw_logits else model.generator
+    loss_gen = generator[0] if use_raw_logits else generator #    loss_gen = model.generator[0] if use_raw_logits else model.generator
     if opt.copy_attn:
         if opt.model_task == ModelTask.SEQ2SEQ:
             compute = onmt.modules.CopyGeneratorLossCompute(
@@ -194,7 +194,7 @@ class LossComputeBase(nn.Module):
         batch_stats = onmt.utils.Statistics()
         for shard in shards(shard_state, shard_size):
             loss, stats = self._compute_loss(batch, **shard)
-            loss.div(float(normalization)).backward()
+            loss.div(float(normalization)).backward() #retain_graph=True)
             batch_stats.update(stats)
         return None, batch_stats
 
@@ -454,4 +454,4 @@ def shards(state, shard_size, eval_only=False):
                 variables.extend(zip(torch.split(state[k], shard_size),
                                      [v_chunk.grad for v_chunk in v_split]))
         inputs, grads = zip(*variables)
-        torch.autograd.backward(inputs, grads)
+        torch.autograd.backward(inputs, grads) #, retain_graph=True)

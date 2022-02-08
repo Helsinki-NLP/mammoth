@@ -6,7 +6,7 @@ import math
 from collections import Counter, defaultdict, OrderedDict
 
 import torch
-from torchtext.data import Field, RawField, LabelField
+from torchtext.legacy.data import Field, RawField, LabelField
 from torchtext.vocab import Vocab
 
 from onmt.constants import DefaultTokens, ModelTask
@@ -106,7 +106,7 @@ def get_task_spec_tokens(data_task, pad, bos, eos):
             "tgt": {"pad": pad, "bos": None, "eos": eos},
         }
     else:
-        raise ValueError(f"No task specific tokens defined for {data_task}")
+        raise ValueError("No task specific tokens defined for data_task")
 
 
 def get_fields(
@@ -207,7 +207,7 @@ class IterOnDevice(object):
     """Sent items from `iterable` on `device_id` and yield."""
 
     def __init__(self, iterable, device_id):
-        self.iterable = iterable
+        self.iterable_map = iterable
         self.device_id = device_id
 
     @staticmethod
@@ -231,9 +231,38 @@ class IterOnDevice(object):
                 if hasattr(batch, 'align') else None
 
     def __iter__(self):
-        for batch in self.iterable:
+        ll = list(self.iterable_map.keys())
+        train_iters = {k:
+                    (enumerate(f))
+                    for k, f in self.iterable_map.items()}
+        idx=0
+        first0 = True
+        first1 = True
+        while True:
+            train_enum = train_iters[ll[idx]]
+
+            def next_batch(langPairName):
+                new_batch = next(train_enum)
+                return new_batch[1], langPairName
+        
+            if first0 and idx==0:
+                batch, langPairName = next_batch(ll[idx])
+                first0 = False
+
+            if first1 and idx==1:
+                batch, langPairName = next_batch(ll[idx])
+                first1 = False
+
+            idx+=1
+            if idx==2:
+                idx=0
+            batch, langPairName = next_batch(ll[idx])
             self.batch_to_device(batch, self.device_id)
-            yield batch
+            yield batch, langPairName
+
+#        for batch in self.iterable:
+#            self.batch_to_device(batch, self.device_id)
+#            yield batch
 
 
 def filter_example(ex, use_src_len=True, use_tgt_len=True,
@@ -308,7 +337,7 @@ def _load_vocab(vocab_path, name, counters, min_freq=0):
     else:
         for token_and_count in vocab:
             if len(token_and_count) != 2:
-                logger.info(f'Filtered invalid vocab token {token_and_count}')
+                logger.info('Filtered invalid vocab token token_and_count')
                 continue
             token, count = token_and_count
             counters[name][token] = int(count)
@@ -324,6 +353,7 @@ def _build_fv_from_multifield(multifield, counters, build_fv_kwargs,
             size_multiple=size_multiple,
             **build_fv_kwargs[name])
         logger.info(" * %s vocab size: %d." % (name, len(field.vocab)))
+
 
 
 def _build_fields_vocab(fields, counters, data_type, share_vocab,

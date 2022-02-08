@@ -3,8 +3,9 @@
 import sys
 import torch
 from functools import partial
+import os
+import random
 
-# import onmt.opts as opts
 from onmt.utils.distributed import ErrorHandler, consumer, batch_producer
 from onmt.utils.misc import set_random_seed
 from onmt.modules.embeddings import prepare_pretrained_embeddings
@@ -17,10 +18,12 @@ from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
 from onmt.inputters.corpus import save_transformed_sample
 from onmt.inputters.fields import build_dynamic_fields, save_fields, \
-    load_fields
+    load_fields, build_dynamic_fields_langspec
 from onmt.transforms import make_transforms, save_transforms, \
     get_specials, get_transforms_cls
-
+from collections import OrderedDict
+from onmt.constants import DefaultTokens, ModelTask
+import torch.distributed as dist
 # Set sharing strategy manually instead of default based on the OS.
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -95,50 +98,148 @@ def _init_train(opt):
     return checkpoint, fields, transforms_cls
 
 
+def init_train_prepare_fields_transforms(opt, lang_enc_path, lang_dec_path):
+    """Prepare or dump fields & transforms before training."""
+
+    fields = build_dynamic_fields_langspec(opt, lang_enc_path, lang_dec_path)
+    # TODO: maybe prepare pretrained embeddings, if any, with `prepare_pretrained_embeddings(opt, fields)`
+
+    if opt.dump_fields:
+        save_fields(fields, opt.save_data, overwrite=opt.overwrite)
+    if opt.dump_transforms or opt.n_sample != 0:
+        transforms = make_transforms(opt, transforms_cls, fields)
+    if opt.dump_transforms:
+        save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
+    if opt.n_sample != 0:
+        logger.warning(
+            "`-n_sample` != 0: Training will not be started. "
+            f"Stop after saving {opt.n_sample} samples/corpus.")
+        save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
+        logger.info(
+            "Sample saved, please check it before restart training.")
+        sys.exit()
+
+    # Report src and tgt vocab sizes
+    for side in ['src', 'tgt']:
+        f = fields[side]
+        try:
+            f_iter = iter(f)
+        except TypeError:
+            f_iter = [(side, f)]
+        for sn, sf in f_iter:
+            if sf.use_vocab:
+                logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
+
+    return fields
+
+
 def train(opt):
     init_logger(opt.log_file)
     ArgumentParser.validate_train_opts(opt)
     ArgumentParser.update_model_opts(opt)
     ArgumentParser.validate_model_opts(opt)
-
+    ArgumentParser.validate_prepare_opts(opt)
     set_random_seed(opt.seed, False)
 
-    checkpoint, fields, transforms_cls = _init_train(opt)
-    train_process = partial(
-        single_main,
-        fields=fields,
-        transforms_cls=transforms_cls,
-        checkpoint=checkpoint)
+    # set PyTorch distributed related environment variables
+    current_env = os.environ
+    current_env["MASTER_ADDR"] = opt.master_ip
+    current_env["MASTER_PORT"] = str(opt.master_port)
+    current_env["WORLD_SIZE"] = str(opt.world_size)
+    num_nodes = current_env["SLURM_NNODES"]
+    print(num_nodes)
+    node_rank = int(current_env["SLURM_NODEID"])
+    print(node_rank)
+    """
+    node_name = current_env["SLURMD_NODENAME"]
+    node_rank=0
+    if str(node_name)!=str(opt.master_ip):
+        node_rank=1
+    print("NODE NAME AND RANK")
+    print(node_name)
+    print(node_rank)
+    """ 
+    opt.data_task = ModelTask.SEQ2SEQ
+    transforms_cls = None
+    vocab_paths_enc = {}
+    vocab_paths_dec = {}
+    vocab_paths_file = open(opt.vocab_paths, 'rt')
+    for line in vocab_paths_file:
+        line = line.strip()
+        encodec_lang_path = line.split("\t")
+        if encodec_lang_path[0] == "enc":
+            vocab_paths_enc[encodec_lang_path[1]] = encodec_lang_path[2]
+        if encodec_lang_path[0] == "dec":
+            vocab_paths_dec[encodec_lang_path[1]] = encodec_lang_path[2]
+    vocab_paths_file.close()
+
+    fields_dict = OrderedDict()
+    node_gpu_langs_file = open(opt.node_gpu_langs, 'rt')
+
+    for line in node_gpu_langs_file:
+        lang = line.strip()
+        node_gpu_langs = lang.split(" ")
+        node_id = int(node_gpu_langs[0])
+        gpu_id = int(node_gpu_langs[1])
+        if node_id == node_rank:
+            for src_tgt_lang in node_gpu_langs[2:]:
+                lang_src_tgt = src_tgt_lang.split("-")
+                path_enc_vocab = vocab_paths_enc[lang_src_tgt[0]]
+                path_dec_vocab = vocab_paths_dec[lang_src_tgt[1]]
+                fields = init_train_prepare_fields_transforms(opt, path_enc_vocab, path_dec_vocab)
+                print("==========")
+                print(fields)
+                print("==========")
+                fields_dict[src_tgt_lang] = fields
+                
+    node_gpu_langs_file.close()
 
     nb_gpu = len(opt.gpu_ranks)
+
+    train_process = partial(
+        single_main,
+        Fields_dict=fields_dict
+    )
+
+    print(f"[{os.getpid()}] Initializing process group with: {current_env}")
+    print("DONE")
 
     if opt.world_size > 1:
 
         queues = []
         mp = torch.multiprocessing.get_context('spawn')
+        print(opt.queue_size)
+        print(opt.world_size)
         semaphore = mp.Semaphore(opt.world_size * opt.queue_size)
         # Create a thread to listen for errors in the child processes.
         error_queue = mp.SimpleQueue()
         error_handler = ErrorHandler(error_queue)
         # Train with multiprocessing.
         procs = []
+        producers = []
+
         for device_id in range(nb_gpu):
+            # each process's rank
+            dist_rank = nb_gpu * node_rank + device_id
+            current_env["RANK"] = str(dist_rank)
+            current_env["LOCAL_RANK"] = str(device_id)
+
+            logger.info("UNO logger {} ".format(device_id))
             q = mp.Queue(opt.queue_size)
             queues += [q]
             procs.append(mp.Process(target=consumer, args=(
-                train_process, opt, device_id, error_queue, q, semaphore),
+                train_process, opt, dist_rank, error_queue, q, semaphore, node_rank),
                 daemon=True))
             procs[device_id].start()
             logger.info(" Starting process pid: %d  " % procs[device_id].pid)
             error_handler.add_child(procs[device_id].pid)
-        producers = []
-        # This does not work if we merge with the first loop, not sure why
-        for device_id in range(nb_gpu):
+        # TODO: This does not work if we merge with the first loop, not sure why
+        # for device_id in range(nb_gpu):
             # Get the iterator to generate from
-            train_iter = _build_train_iter(
-                opt, fields, transforms_cls, stride=nb_gpu, offset=device_id)
+            train_iter_map = _build_train_iter(
+                opt, fields_dict, transforms_cls, stride=nb_gpu, offset=device_id, nodeID=node_rank, gpuID=device_id)
             producer = mp.Process(target=batch_producer,
-                                  args=(train_iter, queues[device_id],
+                                  args=(train_iter_map, queues[device_id],
                                         semaphore, opt, device_id),
                                   daemon=True)
             producers.append(producer)
@@ -148,6 +249,7 @@ def train(opt):
             error_handler.add_child(producers[device_id].pid)
 
         for p in procs:
+            logger.info("DD logger")
             p.join()
         # Once training is done, we can terminate the producers
         for p in producers:

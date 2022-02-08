@@ -7,7 +7,7 @@ from onmt.utils.logging import logger
 from copy import deepcopy
 
 
-def build_model_saver(model_opt, opt, model, fields, optim):
+def build_model_saver(model_opt, opt, model, Fields_dict, optim, output_id):
     # _check_save_model_path
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
@@ -15,9 +15,9 @@ def build_model_saver(model_opt, opt, model, fields, optim):
     model_saver = ModelSaver(opt.save_model,
                              model,
                              model_opt,
-                             fields,
+                             Fields_dict,
                              optim,
-                             opt.keep_checkpoint)
+                             opt.keep_checkpoint, output_id)
     return model_saver
 
 
@@ -39,17 +39,18 @@ class ModelSaverBase(object):
     * `_rm_checkpoint
     """
 
-    def __init__(self, base_path, model, model_opt, fields, optim,
-                 keep_checkpoint=-1):
+    def __init__(self, base_path, model, model_opt, Fields_dict, optim,
+                 keep_checkpoint=-1, output_id="0"):
         self.base_path = base_path
         self.model = model
         self.model_opt = model_opt
-        self.fields = fields
+        self.Fields_dict = Fields_dict
         self.optim = optim
         self.last_saved_step = None
         self.keep_checkpoint = keep_checkpoint
         if keep_checkpoint > 0:
             self.checkpoint_queue = deque([], maxlen=keep_checkpoint)
+        self.output_id = output_id
 
     def save(self, step, moving_average=None):
         """Main entry point for model saver
@@ -68,7 +69,7 @@ class ModelSaverBase(object):
                 model_params_data.append(param.data)
                 param.data = avg.data
 
-        chkpt, chkpt_name = self._save(step, save_model)
+        chkpt, chkpt_name = self._save(step, save_model, self.output_id)
         self.last_saved_step = step
 
         if moving_average:
@@ -112,36 +113,37 @@ class ModelSaverBase(object):
 class ModelSaver(ModelSaverBase):
     """Simple model saver to filesystem"""
 
-    def _save(self, step, model):
-        model_state_dict = model.state_dict()
-        model_state_dict = {k: v for k, v in model_state_dict.items()
-                            if 'generator' not in k}
-        generator_state_dict = model.generator.state_dict()
+    def _save(self, step, model, output_id):
+#        model_state_dict = model.state_dict()
+#        model_state_dict = {k: v for k, v in model_state_dict.items()
+#                            if 'generator' not in k}
+#        generator_state_dict = model.generator.state_dict()
 
         # NOTE: We need to trim the vocab to remove any unk tokens that
         # were not originally here.
 
-        vocab = deepcopy(self.fields)
-        for side in ["src", "tgt"]:
-            keys_to_pop = []
-            if hasattr(vocab[side], "fields"):
-                unk_token = vocab[side].fields[0][1].vocab.itos[0]
-                for key, value in vocab[side].fields[0][1].vocab.stoi.items():
-                    if value == 0 and key != unk_token:
-                        keys_to_pop.append(key)
-                for key in keys_to_pop:
-                    vocab[side].fields[0][1].vocab.stoi.pop(key, None)
+#        vocab = deepcopy(self.fields)
+#        for side in ["src", "tgt"]:
+#            keys_to_pop = []
+#            if hasattr(vocab[side], "fields"):
+#                unk_token = vocab[side].fields[0][1].vocab.itos[0]
+#                for key, value in vocab[side].fields[0][1].vocab.stoi.items():
+#                    if value == 0 and key != unk_token:
+#                        keys_to_pop.append(key)
+#                for key in keys_to_pop:
+#                    vocab[side].fields[0][1].vocab.stoi.pop(key, None)
 
         checkpoint = {
-            'model': model_state_dict,
-            'generator': generator_state_dict,
-            'vocab': vocab,
+#            'model': model_state_dict,
+#            'generator': generator_state_dict,
+            'vocab': self.Fields_dict, # vocab,
             'opt': self.model_opt,
-            'optim': self.optim.state_dict(),
+            #'optim': self.optim.state_dict(), #TODO
+            'whole_model': self.model
         }
 
-        logger.info("Saving checkpoint %s_step_%d.pt" % (self.base_path, step))
-        checkpoint_path = '%s_step_%d.pt' % (self.base_path, step)
+        logger.info("Saving checkpoint %s_%s_step_%d.pt" % (self.base_path, output_id, step))
+        checkpoint_path = '%s_%s_step_%d.pt' % (self.base_path, output_id, step)
         torch.save(checkpoint, checkpoint_path)
         return checkpoint, checkpoint_path
 

@@ -25,14 +25,18 @@ class DataOptsCheckerMixin(object):
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
         corpora = yaml.safe_load(opt.data)
-
+        print("PARSE")
         for cname, corpus in corpora.items():
+            print(cname)
+            print(corpus)
             # Check Transforms
             _transforms = corpus.get('transforms', None)
             if _transforms is None:
                 logger.info(f"Missing transforms field for {cname} data, "
                             f"set to default: {default_transforms}.")
                 corpus['transforms'] = default_transforms
+            opt.data_task = ModelTask.SEQ2SEQ
+            """
             # Check path
             path_src = corpus.get('path_src', None)
             path_tgt = corpus.get('path_tgt', None)
@@ -54,6 +58,7 @@ class DataOptsCheckerMixin(object):
                     path_tgt = path_src
                 cls._validate_file(path_src, info=f'{cname}/path_src')
                 cls._validate_file(path_tgt, info=f'{cname}/path_tgt')
+            """
             path_align = corpus.get('path_align', None)
             if path_align is None:
                 if hasattr(opt, 'lambda_align') and opt.lambda_align > 0.0:
@@ -94,6 +99,7 @@ class DataOptsCheckerMixin(object):
                 corpus["src_feats"] = None
 
         logger.info(f"Parsed {len(corpora)} corpora from -data.")
+        print(corpora)
         opt.data = corpora
 
     @classmethod

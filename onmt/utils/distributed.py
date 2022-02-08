@@ -8,39 +8,79 @@ import math
 import pickle
 
 import torch.distributed
-
+#import deepspeed
 from onmt.utils.misc import set_random_seed
 from onmt.utils.logging import init_logger, logger
-
+from collections import OrderedDict
 
 def is_master(opt, device_id):
     return opt.gpu_ranks[device_id] == 0
 
 
 def multi_init(opt, device_id):
+    #print("MULTI INIT2")
+    #print(device_id)
+    #print(opt.master_ip)
+    #print(opt.master_port)
+    #current_env = os.environ.copy()
+    #current_env["RANK"] = str(device_id)
+
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=opt.master_ip,
         master_port=opt.master_port)
+
+    #rank = int(os.environ['SLURM_PROCID'])
+    #gpuz = rank % torch.cuda.device_count()
+
     dist_world_size = opt.world_size
-    torch.distributed.init_process_group(
-        backend=opt.gpu_backend, init_method=dist_init_method,
-        world_size=dist_world_size, rank=opt.gpu_ranks[device_id])
+    #logger.info("dist world size {} ".format(dist_world_size))
+    #logger.info("dist_world_size in distributed : %s ", str(dist_world_size))
+    #print("dist_world_size in distributed : "+str(dist_world_size))
+    #print(rank)
+    #logger.info("GPU RANKS in distributed %s - ", str(device_id))
+    #print("GPU RANKS in distributed "+str(device_id))
+    #print(opt.gpu_ranks[device_id])
+    #dist_world_size
+    #'env://'
+    torch.distributed.init_process_group(backend=opt.gpu_backend, init_method=dist_init_method, rank=device_id, world_size=dist_world_size) # init_method='env://') #dist_init_method, rank=opt.gpu_ranks[device_id], world_size=dist_world_size)
+
+    #deepspeed.init_distributed()
+
     gpu_rank = torch.distributed.get_rank()
-    if not is_master(opt, device_id):
-        logger.disabled = True
+    #logger.info("GPU RANKS in distributed out of torch %s - ", str(gpu_rank))
+    #print("GPU RANKS in distributed out of torch ")#+ str(gpu_rank))
+    #print(str(gpu_rank))
+    #if not is_master(opt, device_id):
+    #    logger.disabled = True
 
     return gpu_rank
 
+def all_reduce_tensors_init(tensors, numtoaverage, group=None):
+    for t in tensors:
+        if group == None:
+            torch.distributed.all_reduce(t, op=torch.distributed.ReduceOp.MAX)
+        else:
+            torch.distributed.all_reduce(t, op=torch.distributed.ReduceOp.MAX, group=group) # 
+        #t.div_(numtoaverage)
 
-def all_reduce_and_rescale_tensors(tensors, rescale_denom,
+"""
+def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None):
+    for t in tensors:
+        if group == None:
+            torch.distributed.all_reduce(t)
+        else:
+            torch.distributed.all_reduce(t, group=group) 
+
+"""
+def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None,
                                    buffer_size=10485760):
-    """All-reduce and rescale tensors in chunks of the specified size.
-
-    Args:
-        tensors: list of Tensors to all-reduce
-        rescale_denom: denominator for rescaling summed Tensors
-        buffer_size: all-reduce chunk size in bytes
-    """
+#    All-reduce and rescale tensors in chunks of the specified size.
+#
+#    Args:
+#        tensors: list of Tensors to all-reduce
+#        rescale_denom: denominator for rescaling summed Tensors
+#        buffer_size: all-reduce chunk size in bytes
+#    
     # buffer size in bytes, determine equiv. # of elements based on data type
     buffer_t = tensors[0].new(
         math.ceil(buffer_size / tensors[0].element_size())).zero_()
@@ -55,7 +95,10 @@ def all_reduce_and_rescale_tensors(tensors, rescale_denom,
             offset += numel
 
         # all-reduce and rescale
-        torch.distributed.all_reduce(buffer_t[:offset])
+        if group == None:
+            torch.distributed.all_reduce(buffer_t[:offset])
+        else:
+            torch.distributed.all_reduce(buffer_t[:offset], group=group)
         buffer_t.div_(rescale_denom)
 
         # copy all-reduced buffer back into tensors
@@ -70,7 +113,10 @@ def all_reduce_and_rescale_tensors(tensors, rescale_denom,
         sz = t.numel() * t.element_size()
         if sz > buffer_size:
             # tensor is bigger than buffer, all-reduce and rescale directly
-            torch.distributed.all_reduce(t)
+            if group == None:
+                torch.distributed.all_reduce(t)
+            else:
+                torch.distributed.all_reduce(t, group=group)
             t.div_(rescale_denom)
         elif filled + sz > buffer_size:
             # buffer is full, all-reduce and replace buffer with grad
@@ -158,11 +204,13 @@ class ErrorHandler(object):
         raise Exception(msg)
 
 
-def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
+def batch_producer(generator_to_serve_map, queue, semaphore, opt, device_id):
     """Produce batches to `queues` from `generator_to_serve`."""
     log_level = "INFO" if opt.verbose or device_id == 0 else "WARNING"
     init_logger(opt.log_file, log_level=log_level)
     set_random_seed(opt.seed, False)
+    logger.info("BATCH PRODUCER")
+    logger.info(generator_to_serve_map)
 
     def pred(x):
         """
@@ -173,40 +221,61 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
             if x[0] % opt.world_size == rank:
                 return True
 
-    generator_to_serve = filter(
-        pred, enumerate(generator_to_serve))
+    #for name, gen in generator_to_serve_map.items():
+    #    generator_to_serve = gen
+    ll = list(generator_to_serve_map.keys())
+    train_iters = {k:
+                (filter(pred, enumerate(f)))
+                for k, f in generator_to_serve_map.items()}
 
-    def next_batch():
-        # NOTE: stride (if needed) is handled at the
-        # generator (train_iter) level
-        new_batch = next(generator_to_serve)
-        semaphore.acquire()
-        return new_batch[1]
-
-    b = next_batch()
-
+    sizeLL = len(ll)
+    #    generator_to_serve = filter(
+    #        pred, enumerate(generator_to_serve))
+    first = True
     while True:
-        b.dataset = None
-        # Move batch to correspond device_id when consumer iterate
+        #            src_lang, tgt_lang = random.choices(langpairweights[0],weights=list(langpairweights[1]))[0]
+        for idx in range(0, sizeLL):
+            train_enum = train_iters[ll[idx]]
+            #print("TRIAN ENUM DIST")
+            #print(train_enum)
+            def next_batch(langPairName):
+                # NOTE: stride (if needed) is handled at the
+                # generator (train_iter) level
+                new_batch = next(train_enum)
+                semaphore.acquire()
+                return new_batch[1], langPairName
+            
+            if first:
+                b, langPairName = next_batch(ll[idx])
+                first = False
+                #print(b)
+                #print(langPairName)
+            #    while True:
+            b.dataset = None
+            # Move batch to correspond device_id when consumer iterate
+    
+            # hack to dodge unpicklable `dict_keys`
+            b.fields = list(b.fields)
+            queue.put((b, langPairName))
+            b, langPairName = next_batch(ll[idx])
 
-        # hack to dodge unpicklable `dict_keys`
-        b.fields = list(b.fields)
-        queue.put(b)
-        b = next_batch()
 
-
-def consumer(process_fn, opt, device_id, error_queue, batch_queue, semaphore):  # noqa: E501
+def consumer(process_fn, opt, device_id, error_queue, batch_queue, semaphore, node_rank):  # noqa: E501
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
+        #print("MULTI INIT")
         gpu_rank = multi_init(opt, device_id)
-        if gpu_rank != opt.gpu_ranks[device_id]:
-            raise AssertionError("An error occurred in \
-                  Distributed initialization")
+        #if gpu_rank != opt.gpu_ranks[device_id]:
+        #    raise AssertionError("An error occurred in \
+        #          Distributed initialization")
+
         process_fn(opt, device_id=device_id,
-                   batch_queue=batch_queue, semaphore=semaphore)
+                   batch_queue=batch_queue, semaphore=semaphore, nodeRank=node_rank)
+
     except KeyboardInterrupt:
         pass  # killed by parent, do nothing
     except Exception:
         # propagate exception to parent process, keeping original traceback
         import traceback
+        #error_queue.put((device_id, traceback.format_exc()))
         error_queue.put((opt.gpu_ranks[device_id], traceback.format_exc()))

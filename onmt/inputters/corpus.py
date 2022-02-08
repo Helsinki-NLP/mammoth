@@ -4,14 +4,14 @@ from onmt.utils.logging import logger
 from onmt.constants import CorpusName
 from onmt.transforms import TransformPipe
 from onmt.inputters.dataset_base import _dynamic_dict
-from torchtext.data import Dataset as TorchtextDataset, \
+from torchtext.legacy.data import Dataset as TorchtextDataset, \
     Example as TorchtextExample
 
 from collections import Counter, defaultdict
 from contextlib import contextmanager
 
 import multiprocessing as mp
-
+import ast
 
 @contextmanager
 def exfile_open(filename, *args, **kwargs):
@@ -174,17 +174,39 @@ class ParallelCorpus(object):
             cls_name, self.src, self.tgt, self.align, self.src_feats)
 
 
-def get_corpora(opts, is_train=False):
-    corpora_dict = {}
+def get_corpora(opts, is_train=False, nodeID=-1, gpuID=-1):
+    corpora_its = []
+#    corpora_dict = {}
     if is_train:
+        print("GET CORPORA")
+        #print(opts.data)
+        print(type(opts.data))
+        print("NOPE")
+        #itz_dict = ast.literal_eval(opts.data)
+        #print(itz_dict)
+        #print(type(itz_dict))
         for corpus_id, corpus_dict in opts.data.items():
+            print("CORPUS ID")
+            print(corpus_id)
+            print(corpus_dict)
             if corpus_id != CorpusName.VALID:
+                #print("CORPUS")
+                #print("path_src_"+str(nodeID)+"_"+str(gpuID))
+                SRCNAME="path_src_"+str(nodeID)+"_"+str(gpuID)
+                TGTNAME="path_tgt_"+str(nodeID)+"_"+str(gpuID)
+                if SRCNAME not in corpus_dict:
+                    continue
+                print("CORPUSz")
+                print(SRCNAME)
+                print(TGTNAME)
+                corpora_dict = {}
                 corpora_dict[corpus_id] = ParallelCorpus(
                     corpus_id,
-                    corpus_dict["path_src"],
-                    corpus_dict["path_tgt"],
-                    corpus_dict["path_align"],
-                    corpus_dict["src_feats"])
+                    corpus_dict[SRCNAME],
+                    corpus_dict[TGTNAME],
+                    None, #corpus_dict["path_align"],
+                    None)#corpus_dict["src_feats"])
+                corpora_its.append(corpora_dict)
     else:
         if CorpusName.VALID in opts.data.keys():
             corpora_dict[CorpusName.VALID] = ParallelCorpus(
@@ -195,7 +217,8 @@ def get_corpora(opts, is_train=False):
                 opts.data[CorpusName.VALID]["src_feats"])
         else:
             return None
-    return corpora_dict
+#    return corpora_dict
+    return corpora_its
 
 
 class ParallelCorpusIterator(object):

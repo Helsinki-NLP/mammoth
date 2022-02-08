@@ -100,7 +100,7 @@ class Statistics(object):
         """ compute elapsed time """
         return time.time() - self.start_time
 
-    def output(self, step, num_steps, learning_rate, start):
+    def output(self, step, num_steps, learning_rate, start, src_tgt):
         """Write out statistics to stdout.
 
         Args:
@@ -110,12 +110,13 @@ class Statistics(object):
         """
         t = self.elapsed_time()
         step_fmt = "%2d" % step
+        src_tgt = src_tgt[0]+"-"+src_tgt[1]
         if num_steps > 0:
             step_fmt = "%s/%5d" % (step_fmt, num_steps)
         logger.info(
-            ("Step %s; acc: %6.2f; ppl: %5.2f; xent: %4.2f; " +
+            ("%s: Step %s; acc: %6.2f; ppl: %5.2f; xent: %4.2f; " +
              "lr: %7.5f; %3.0f/%3.0f tok/s; %6.0f sec")
-            % (step_fmt,
+            % (src_tgt, step_fmt,
                self.accuracy(),
                self.ppl(),
                self.xent(),

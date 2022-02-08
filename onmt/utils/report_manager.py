@@ -49,7 +49,7 @@ class ReportMgrBase(object):
         logger.info(*args, **kwargs)
 
     def report_training(self, step, num_steps, learning_rate, patience,
-                        report_stats, multigpu=False):
+                        report_stats, src_tgt, multigpu=False):
         """
         This is the user-defined batch-level traing progress
         report function.
@@ -67,11 +67,11 @@ class ReportMgrBase(object):
                                 (set 'start_time' or use 'start()'""")
 
         if step % self.report_every == 0:
-            if multigpu:
-                report_stats = \
-                    onmt.utils.Statistics.all_gather_stats(report_stats)
+            #if multigpu:
+            #    report_stats = \
+            #        onmt.utils.Statistics.all_gather_stats(report_stats)
             self._report_training(
-                step, num_steps, learning_rate, patience, report_stats)
+                step, num_steps, learning_rate, patience, report_stats, src_tgt)
             return onmt.utils.Statistics()
         else:
             return report_stats
@@ -122,12 +122,12 @@ class ReportMgr(ReportMgrBase):
                 prefix, self.tensorboard_writer, learning_rate, patience, step)
 
     def _report_training(self, step, num_steps, learning_rate, patience,
-                         report_stats):
+                         report_stats, src_tgt):
         """
         See base class method `ReportMgrBase.report_training`.
         """
         report_stats.output(step, num_steps,
-                            learning_rate, self.start_time)
+                            learning_rate, self.start_time, src_tgt)
 
         self.maybe_log_tensorboard(report_stats,
                                    "progress",

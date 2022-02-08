@@ -132,6 +132,9 @@ def _add_dynamic_fields_opts(parser, build_vocab_only=False):
     group.add("-share_vocab", "--share_vocab", action="store_true",
               help="Share source and target vocabulary.")
 
+    group.add("-vocab_paths", "--vocab_paths",  default=None,
+              help="file name with ENCorDEC TAB language name TAB path of the vocab.")
+
     group.add("-src_feats_vocab", "--src_feats_vocab",
               help=("List of paths to save"
                     if build_vocab_only
@@ -262,6 +265,11 @@ def model_opts(parser):
         help="Type of task for the model either seq2seq or lm",
     )
 
+    group.add("--target_langs", "-target_langs", default=None,
+              help="path filename to get target languages")
+    group.add("--node_gpu_langs", "-node_gpu_langs", default=None,
+              help="path filename to nodeidx gpuidx and langs")
+
     # Encoder-Decoder Options
     group = parser.add_argument_group('Model- Encoder-Decoder')
     group.add('--model_type', '-model_type', default='text',
@@ -272,6 +280,11 @@ def model_opts(parser):
     group.add('--model_dtype', '-model_dtype', default='fp32',
               choices=['fp32', 'fp16'],
               help='Data type of the model.')
+
+    group.add('--hidden_ab_size', '-hidden_ab_size', type=int, default=2048,
+            help="""Size of attention bridge hidden states""")
+    group.add('--attention_heads', '-attention_heads', type=int, default=50,
+            help="""Number of attention heads in attention bridge""")
 
     group.add('--encoder_type', '-encoder_type', type=str, default='rnn',
               choices=['rnn', 'brnn', 'ggnn', 'mean', 'transformer', 'cnn',
@@ -754,10 +767,15 @@ def translate_opts(parser):
                    "the log probabilities will be averaged directly. "
                    "Necessary for models whose output layers can assign "
                    "zero probability.")
+    group.add('--lang_pair', '-lang_pair', 
+              help="language pair to translate")
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",
               help="Type of the source input. Options: [text].")
+
+#    group.add('--lang_pair', '-lang_pair', 
+#              help="language pair to translate")
 
     group.add('--src', '-src', required=True,
               help="Source sequence to decode (one line per "

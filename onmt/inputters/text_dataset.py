@@ -2,7 +2,7 @@
 from functools import partial
 
 import torch
-from torchtext.data import Field, RawField
+from torchtext.legacy.data import Field, RawField
 
 from onmt.constants import DefaultTokens
 from onmt.inputters.datareader_base import DataReaderBase

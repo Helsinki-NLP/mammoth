@@ -26,7 +26,7 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
 
     load_test_model = (
         onmt.decoders.ensemble.load_test_model
-        if len(opt.models) > 1
+        if len(opt.models) > 3
         else onmt.model_builder.load_test_model
     )
     fields, model, model_opt = load_test_model(opt)
@@ -55,7 +55,7 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
             out_file=out_file,
             report_align=opt.report_align,
             report_score=report_score,
-            logger=logger,
+            logger=logger, langpair=opt.lang_pair,
         )
     return translator
 
@@ -151,8 +151,16 @@ class Inference(object):
         report_align=False,
         report_score=True,
         logger=None,
-        seed=-1,
+        seed=-1, langpair = None,
     ):
+        #print("LANGPIAR INIT")
+        #print(langpair)     
+        self.langpair = langpair
+        self.langENC = str(langpair).split("-")[0]
+        self.langDEC = str(langpair).split("-")[1]
+        print(self.langENC)
+        print(self.langDEC)
+
         self.model = model
         self.fields = fields
         tgt_field = dict(self.fields)["tgt"].base_field
@@ -242,7 +250,7 @@ class Inference(object):
         out_file=None,
         report_align=False,
         report_score=True,
-        logger=None,
+        logger=None, langpair = None,
     ):
         """Alternate constructor.
 
@@ -297,7 +305,7 @@ class Inference(object):
             report_align=report_align,
             report_score=report_score,
             logger=logger,
-            seed=opt.seed,
+            seed=opt.seed, langpair = langpair, 
         )
 
     def _log(self, msg):
@@ -325,7 +333,7 @@ class Inference(object):
                 src_vocabs,
                 batch.src_map if use_src_map else None,
             )
-            self.model.decoder.init_state(src, memory_bank, enc_states)
+            self.model.decoder["decoder"+self.langDEC].init_state(src, memory_bank, enc_states)
         else:
             gs = [0] * batch_size
         return gs
@@ -587,9 +595,13 @@ class Inference(object):
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
-        dec_out, dec_attn = self.model.decoder(
+#        dec_out, dec_attn = self.model.decoder(
+#            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
+#        )
+        dec_out, dec_attn = self.model.decoder["decoder"+str(self.langDEC)](
             decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
         )
+
 
         # Generator forward.
         if not self.copy_attn:
@@ -597,12 +609,12 @@ class Inference(object):
                 attn = dec_attn["std"]
             else:
                 attn = None
-            log_probs = self.model.generator(dec_out.squeeze(0))
+            log_probs = self.model.generator["generator"+str(self.langDEC)](dec_out.squeeze(0))
             # returns [(batch_size x beam_size) , vocab ] when 1 step
             # or [ tgt_len, batch_size, vocab ] when full sentence
         else:
             attn = dec_attn["copy"]
-            scores = self.model.generator(
+            scores = self.model.generator["generator"+str(self.langDEC)](
                 dec_out.view(-1, dec_out.size(2)),
                 attn.view(-1, attn.size(2)),
                 src_map,
@@ -776,9 +788,10 @@ class Translator(Inference):
             batch.src if isinstance(batch.src, tuple) else (batch.src, None)
         )
 
-        enc_states, memory_bank, src_lengths = self.model.encoder(
+        enc_states, memory_bank, src_lengths, mask = self.model.encoder["encoder"+str(self.langENC)](
             src, src_lengths
         )
+        alphas, memory_bank = self.model.attention_bridge(memory_bank, mask)
         if src_lengths is None:
             assert not isinstance(
                 memory_bank, tuple
@@ -812,7 +825,7 @@ class Translator(Inference):
 
         # (1) Run the encoder on the src.
         src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
-        self.model.decoder.init_state(src, memory_bank, enc_states)
+        self.model.decoder["decoder"+str(self.langDEC)].init_state(src, memory_bank, enc_states)
 
         gold_score = self._gold_score(
             batch,
@@ -837,7 +850,7 @@ class Translator(Inference):
             memory_bank, src_lengths, src_map, target_prefix=target_prefix
         )
         if fn_map_state is not None:
-            self.model.decoder.map_state(fn_map_state)
+            self.model.decoder["decoder"+str(self.langDEC)].map_state(fn_map_state)
 
         # (3) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
@@ -878,7 +891,7 @@ class Translator(Inference):
                     src_map = src_map.index_select(1, select_indices)
 
             if parallel_paths > 1 or any_finished:
-                self.model.decoder.map_state(
+                self.model.decoder["decoder"+str(self.langDEC)].map_state(
                     lambda state, dim: state.index_select(dim, select_indices)
                 )
 

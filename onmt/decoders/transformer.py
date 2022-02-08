@@ -449,9 +449,9 @@ class TransformerDecoder(TransformerDecoderBase):
         src_memory_bank = memory_bank.transpose(0, 1).contiguous()
 
         pad_idx = self.embeddings.word_padding_idx
-        src_lens = kwargs["memory_lengths"]
+        #src_lens = kwargs["memory_lengths"]
         src_max_len = self.state["src"].shape[0]
-        src_pad_mask = ~sequence_mask(src_lens, src_max_len).unsqueeze(1)
+        src_pad_mask = None #~sequence_mask(src_lens, src_max_len).unsqueeze(1)
         tgt_pad_mask = tgt_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_tgt]
 
         with_align = kwargs.pop("with_align", False)

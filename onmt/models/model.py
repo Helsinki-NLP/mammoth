@@ -1,6 +1,6 @@
 """ Onmt NMT Model base class definition """
 import torch.nn as nn
-
+from onmt.attention_bridge import AttentionBridge
 
 class BaseModel(nn.Module):
     """
@@ -8,7 +8,7 @@ class BaseModel(nn.Module):
     for a simple, generic encoder / decoder or decoder only model.
     """
 
-    def __init__(self, encoder, decoder):
+    def __init__(self, encoder, decoder, attention_bridge):
         super(BaseModel, self).__init__()
 
     def forward(self, src, tgt, lengths, bptt=False, with_align=False):
@@ -52,20 +52,26 @@ class NMTModel(BaseModel):
       decoder (onmt.decoders.DecoderBase): a decoder object
     """
 
-    def __init__(self, encoder, decoder):
-        super(NMTModel, self).__init__(encoder, decoder)
+    def __init__(self, encoder, decoder, attention_bridge):
+        super(NMTModel, self).__init__(encoder, decoder, attention_bridge)
         self.encoder = encoder
         self.decoder = decoder
+        self.attention_bridge = attention_bridge
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False):
+    def forward(self, src, tgt, lengths, bptt=False, with_align=False, src_task=None, tgt_task=None):
         dec_in = tgt[:-1]  # exclude last target from inputs
 
-        enc_state, memory_bank, lengths = self.encoder(src, lengths)
+        encoderLang = self.encoder["encoder"+str(src_task)]
+        decoderLang = self.decoder["decoder"+str(tgt_task)]
+
+        enc_state, memory_bank, lengths, mask = encoderLang(src, lengths)
+
+        alphas, memory_bank = self.attention_bridge(memory_bank, mask)
 
         if not bptt:
-            self.decoder.init_state(src, memory_bank, enc_state)
-        dec_out, attns = self.decoder(dec_in, memory_bank,
-                                      memory_lengths=lengths,
+            decoderLang.init_state(src, memory_bank, enc_state)
+        dec_out, attns = decoderLang(dec_in, memory_bank,
+                                      memory_lengths=None,
                                       with_align=with_align)
         return dec_out, attns
 
@@ -83,6 +89,7 @@ class NMTModel(BaseModel):
         """
 
         enc, dec = 0, 0
+        
         for name, param in self.named_parameters():
             if 'encoder' in name:
                 enc += param.nelement()

@@ -58,6 +58,47 @@ def build_dynamic_fields(opts, src_specials=None, tgt_specials=None):
 
     return fields
 
+def build_dynamic_fields_langspec(opts, lang_enc_path, lang_dec_path):
+    """Build fields for dynamic, including load & build vocab."""
+    fields = _get_dynamic_fields(opts)
+
+    counters = defaultdict(Counter)
+    logger.info("Loading vocab from text file...")
+    print("ENC THEN DEC")
+    print(lang_enc_path)
+    print(lang_dec_path)
+
+    _src_vocab, _src_vocab_size = _load_vocab(
+        lang_enc_path, 'src', counters,
+        min_freq=opts.src_words_min_frequency)
+
+#    if opts.src_feats_vocab:
+#        for feat_name, filepath in opts.src_feats_vocab.items():
+#            _, _ = _load_vocab(
+#                filepath, feat_name, counters,
+#                min_freq=0)
+
+#    if opts.tgt_vocab:
+    _tgt_vocab, _tgt_vocab_size = _load_vocab(
+        lang_dec_path, 'tgt', counters,
+        min_freq=opts.tgt_words_min_frequency)
+#    elif opts.share_vocab:
+#        logger.info("Sharing src vocab to tgt...")
+#        counters['tgt'] = counters['src']
+#    else:
+#        raise ValueError("-tgt_vocab should be specified if not share_vocab.")
+    src_specials=None
+    tgt_specials=None
+    logger.info("Building fields with vocab in counters...")
+    fields = _build_fields_vocab(
+        fields, counters, 'text', opts.share_vocab,
+        opts.vocab_size_multiple,
+        opts.src_vocab_size, opts.src_words_min_frequency,
+        opts.tgt_vocab_size, opts.tgt_words_min_frequency,
+        src_specials=src_specials, tgt_specials=tgt_specials)
+
+    return fields
+
 
 def get_vocabs(fields):
     """Get a dict contain src & tgt vocab extracted from fields."""

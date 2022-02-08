@@ -7,7 +7,8 @@ import torch.nn as nn
 
 from onmt.modules.util_class import Elementwise
 from onmt.utils.logging import logger
-
+#import bitsandbytes as bnb
+#from onmt.modules.stable_embeddings import StableEmbedding
 
 class SequenceTooLongError(Exception):
     pass

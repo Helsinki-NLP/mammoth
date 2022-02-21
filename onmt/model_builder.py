@@ -114,9 +114,9 @@ def load_test_model(opt, model_path=None):
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
     #fields = checkpoint['vocab']
-    Fields_dict = checkpoint['vocab']
+    fields_dict = checkpoint['vocab']
     print("FIELDS")
-    print(Fields_dict)
+    print(fields_dict)
 #    model = checkpoint['whole_model']
     device = torch.device("cuda")
     model.to(device)
@@ -125,21 +125,21 @@ def load_test_model(opt, model_path=None):
     langENC = str(langpair).split("-")[0]
     langDEC = str(langpair).split("-")[1]
     fields = {}
-    if langpair in Fields_dict:
-        fields = Fields_dict[langpair]
+    if langpair in fields_dict:
+        fields = fields_dict[langpair]
     else:
         #we can omit it, but ok
         encDone = False
         decDone = False
-        for langpairFields in Fields_dict:
+        for langpairFields in fields_dict:
             if encDone and decDone:
                 break 
             LANGsrc_tgt = langpairFields.split("-")
             if LANGsrc_tgt[0] == langENC and not encDone:
-                fields["src"] = Fields_dict[langpairFields]["src"]
+                fields["src"] = fields_dict[langpairFields]["src"]
                 encDone = True
             if LANGsrc_tgt[1] == langDEC and not decDone:
-                fields["tgt"] = Fields_dict[langpairFields]["tgt"]
+                fields["tgt"] = fields_dict[langpairFields]["tgt"]
                 decDone = True
         indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
         fields["indices"] = indices
@@ -198,7 +198,7 @@ def build_decoder_with_embeddings(
 
 
 
-def build_task_specific_model(model_opt, Fields_dict, device, checkpoint, node_rank, device_rank):
+def build_task_specific_model(model_opt, fields_dict, device, checkpoint, node_rank, device_rank):
 #def build_task_specific_model(model_opt, fields, device, checkpoint, node_rank, device_rank):
     # Share the embedding matrix - preprocess with share_vocab required.
 #    if model_opt.share_embeddings:
@@ -224,11 +224,11 @@ def build_task_specific_model(model_opt, Fields_dict, device, checkpoint, node_r
     #device3 = torch.device("cuda", 3)
     logger.info("NODE RANK DEVICE RANK")
     logger.info(str(node_rank) +" "+str(device_rank))
-    #Fields_dict = None
+    #fields_dict = None
     if model_opt.model_task == ModelTask.SEQ2SEQ:
         encoders_md = None
         decoders_md = None
-#        Fields_dict = OrderedDict()
+#        fields_dict = OrderedDict()
         #model_opt.node_gpu_langs
         #node_gpu_assignment.txt
         #0 0 de-en en-fi fi-fr
@@ -254,8 +254,8 @@ def build_task_specific_model(model_opt, Fields_dict, device, checkpoint, node_r
                         LANGsrc_tgt = src_tgt_lang.split("-")
                         logger.info(LANGsrc_tgt)
                         #fields, transforms_cls = prepare_fields_transforms(opt, LANGsrc_tgt[0], LANGsrc_tgt[1])
-                        #Fields_dict[src_tgt_lang] = fields
-                        fields = Fields_dict[src_tgt_lang]
+                        #fields_dict[src_tgt_lang] = fields
+                        fields = fields_dict[src_tgt_lang]
                         if not LANGsrc_tgt[0] in sourceLangs:
                             sourceLangs.add(LANGsrc_tgt[0])
                             encoder, src_emb = buildOnlyEnc(model_opt, fields)
@@ -492,7 +492,7 @@ def build_base_model(model_opt, fields, gpu, checkpoint=None, gpu_id=None):
     return model
 
 #def build_base_model_langspec(model_opt, fields, gpu, checkpoint=None, nodeRank=None, deviceRank=None):
-def build_base_model_langspec(model_opt, Fields_dict, gpu, checkpoint=None, nodeRank=None, deviceRank=None):
+def build_base_model_langspec(model_opt, fields_dict, gpu, checkpoint=None, nodeRank=None, deviceRank=None):
     """Build a model from opts.
 
     Args:
@@ -529,7 +529,7 @@ def build_base_model_langspec(model_opt, Fields_dict, gpu, checkpoint=None, node
     device = torch.device("cuda")
     logger.info(device)
 #    model, generators_md, langs = build_task_specific_model(model_opt, fields, device, checkpoint, nodeRank, deviceRank)
-    model, generators_md = build_task_specific_model(model_opt, Fields_dict, device, checkpoint, nodeRank, deviceRank)
+    model, generators_md = build_task_specific_model(model_opt, fields_dict, device, checkpoint, nodeRank, deviceRank)
 
     model.generator = generators_md
     model.to(device)
@@ -549,10 +549,10 @@ def build_base_model_langspec(model_opt, Fields_dict, gpu, checkpoint=None, node
     return model, generators_md
 
 #def build_model(model_opt, opt, fields, checkpoint, nodeRank, deviceRank):
-def build_model(model_opt, opt, Fields_dict, checkpoint, nodeRank, deviceRank):
+def build_model(model_opt, opt, fields_dict, checkpoint, nodeRank, deviceRank):
     logger.info('Building model...')
 #    model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint)
-    model, generators_md = build_base_model_langspec(model_opt, Fields_dict, use_gpu(opt), checkpoint, nodeRank, deviceRank)
+    model, generators_md = build_base_model_langspec(model_opt, fields_dict, use_gpu(opt), checkpoint, nodeRank, deviceRank)
 #    model, generators_md, langs = build_base_model_langspec(model_opt, fields, use_gpu(opt), checkpoint, nodeRank, deviceRank)
     logger.info(model)
     return model, generators_md

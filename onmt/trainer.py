@@ -19,7 +19,7 @@ from collections import OrderedDict
 from operator import add
 import torch.distributed
 
-def build_trainer(opt, device_id, model, Fields_dict, optim, model_saver=None, generators_md=None,
+def build_trainer(opt, device_id, model, fields_dict, optim, model_saver=None, generators_md=None,
                   dictLangEncoder_toGroup=None, dictLangDecoder_toGroup=None):
     """
     Simplify `Trainer` creation based on user `opt`s*
@@ -42,8 +42,8 @@ def build_trainer(opt, device_id, model, Fields_dict, optim, model_saver=None, g
     #    for name, generator in generators_md.items():
     # nameLang = str(name).replace("generator", "")
     targetLangs = set()
-    for src_tgt_lang in Fields_dict.keys():
-        tgt_field = dict(Fields_dict[src_tgt_lang])["tgt"].base_field
+    for src_tgt_lang in fields_dict.keys():
+        tgt_field = dict(fields_dict[src_tgt_lang])["tgt"].base_field
         nameLang = src_tgt_lang.split("-")[1]
         if nameLang in targetLangs:
             continue

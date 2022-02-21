@@ -154,7 +154,7 @@ def init_distributed(model, dictLangEncoder_toGroup, dictLangDecoder_toGroup, la
     all_reduce_tensors_init(wa, float(world_size))
 
 
-def main(opt, Fields_dict, device_id,
+def main(opt, fields_dict, device_id,
          batch_queue=None, semaphore=None, nodeRank=None, dictLangEncoder_toGroup=None, dictLangDecoder_toGroup=None): #fields, transforms_cls, checkpoint, 
     """Start training on `device_id`."""
     # NOTE: It's important that ``opt`` has been validated and updated
@@ -182,7 +182,7 @@ def main(opt, Fields_dict, device_id,
     #logger.info(dictLangDecoder_toGroup)
     logger.info("BUILDING MODEL")
     # Build model.
-    model, generators_md = build_model(model_opt, opt, Fields_dict, checkpoint, nodeRank, device_id) #build_model(model_opt, opt, fields, checkpoint, nodeRank, device_id)
+    model, generators_md = build_model(model_opt, opt, fields_dict, checkpoint, nodeRank, device_id) #build_model(model_opt, opt, fields, checkpoint, nodeRank, device_id)
     logger.info("INIT MODEL")
     init_distributed(model, dictLangEncoder_toGroup, dictLangDecoder_toGroup, langsEnc, langsDec, world_size)
     model.count_parameters(log=logger.info)
@@ -229,13 +229,13 @@ def main(opt, Fields_dict, device_id,
     #print("TRIANINGI STEPS")
     #print(optim.training_step)
     # Build model saver
-    model_saver = build_model_saver(model_opt, opt, model, Fields_dict, optim, unique_device_id)
+    model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, unique_device_id)
     logger.info("BUILD TRAINER")
     trainer = build_trainer(
-        opt, device_id, model, Fields_dict, optim, model_saver=model_saver, generators_md=generators_md,  dictLangEncoder_toGroup=dictLangEncoder_toGroup, dictLangDecoder_toGroup=dictLangDecoder_toGroup)
+        opt, device_id, model, fields_dict, optim, model_saver=model_saver, generators_md=generators_md,  dictLangEncoder_toGroup=dictLangEncoder_toGroup, dictLangDecoder_toGroup=dictLangDecoder_toGroup)
     logger.info("DONE BUILD TRAINER")
     if batch_queue is None:
-        _train_iter_map = _build_train_iter(opt, Fields_dict, transforms_cls, stride=1, offset=0, nodeID=0, gpuID=0)
+        _train_iter_map = _build_train_iter(opt, fields_dict, transforms_cls, stride=1, offset=0, nodeID=0, gpuID=0)
         train_iter = IterOnDevice(_train_iter_map, device_id)
     else:
         assert semaphore is not None, \
@@ -255,7 +255,7 @@ def main(opt, Fields_dict, device_id,
 
         train_iter = _train_iter()
     logger.info("VALID ITER")
-    valid_iter = _build_valid_iter(opt, Fields_dict, transforms_cls)
+    valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
     if valid_iter is not None:
         valid_iter = IterOnDevice(valid_iter, device_id)
 

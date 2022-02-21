@@ -4,9 +4,8 @@ import sys
 import torch
 from functools import partial
 import os
-import random
 
-from onmt.utils.distributed import ErrorHandler, consumer, batch_producer
+from onmt.utils.distributed import ErrorHandler, consumer, batch_producer, Scheduler
 from onmt.utils.misc import set_random_seed
 from onmt.modules.embeddings import prepare_pretrained_embeddings
 from onmt.utils.logging import init_logger, logger
@@ -22,8 +21,7 @@ from onmt.inputters.fields import build_dynamic_fields, save_fields, \
 from onmt.transforms import make_transforms, save_transforms, \
     get_specials, get_transforms_cls
 from collections import OrderedDict
-from onmt.constants import DefaultTokens, ModelTask
-import torch.distributed as dist
+from onmt.constants import ModelTask
 # Set sharing strategy manually instead of default based on the OS.
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -102,6 +100,7 @@ def init_train_prepare_fields_transforms(opt, lang_enc_path, lang_dec_path):
     """Prepare or dump fields & transforms before training."""
 
     fields = build_dynamic_fields_langspec(opt, lang_enc_path, lang_dec_path)
+    transforms_cls = get_transforms_cls(opt._all_transform)
     # TODO: maybe prepare pretrained embeddings, if any, with `prepare_pretrained_embeddings(opt, fields)`
 
     if opt.dump_fields:
@@ -150,17 +149,9 @@ def train(opt):
     print(num_nodes)
     node_rank = int(current_env["SLURM_NODEID"])
     print(node_rank)
-    """
-    node_name = current_env["SLURMD_NODENAME"]
-    node_rank=0
-    if str(node_name)!=str(opt.master_ip):
-        node_rank=1
-    print("NODE NAME AND RANK")
-    print(node_name)
-    print(node_rank)
-    """ 
+
     opt.data_task = ModelTask.SEQ2SEQ
-    transforms_cls = None
+    transforms_cls = get_transforms_cls(opt._all_transform)
     vocab_paths_enc = {}
     vocab_paths_dec = {}
     vocab_paths_file = open(opt.vocab_paths, 'rt')
@@ -174,35 +165,24 @@ def train(opt):
     vocab_paths_file.close()
 
     fields_dict = OrderedDict()
-    node_gpu_langs_file = open(opt.node_gpu_langs, 'rt')
+    global_scheduler = Scheduler(opt, node_id=None, gpu_id=None)
 
-    for line in node_gpu_langs_file:
-        lang = line.strip()
-        node_gpu_langs = lang.split(" ")
-        node_id = int(node_gpu_langs[0])
-        gpu_id = int(node_gpu_langs[1])
-        if node_id == node_rank:
-            for src_tgt_lang in node_gpu_langs[2:]:
-                lang_src_tgt = src_tgt_lang.split("-")
-                path_enc_vocab = vocab_paths_enc[lang_src_tgt[0]]
-                path_dec_vocab = vocab_paths_dec[lang_src_tgt[1]]
-                fields = init_train_prepare_fields_transforms(opt, path_enc_vocab, path_dec_vocab)
-                print("==========")
-                print(fields)
-                print("==========")
-                fields_dict[src_tgt_lang] = fields
-                
-    node_gpu_langs_file.close()
+    for side in ('src', 'tgt'):
+        for lang, vocab_path in global_scheduler.get_vocabularies(side=side):
+            fields_dict[(side, lang)] = init_train_prepare_fields_transforms(
+                opt, vocab_path=vocab_path, side=side
+            )
+    for key, val in fields_dict:
+        print(f'{key}:\t{val}')
 
-    nb_gpu = len(opt.gpu_ranks)
+    n_gpu = len(opt.gpu_ranks)
 
     train_process = partial(
         single_main,
-        Fields_dict=fields_dict
+        fields_dict=fields_dict
     )
 
     print(f"[{os.getpid()}] Initializing process group with: {current_env}")
-    print("DONE")
 
     if opt.world_size > 1:
 
@@ -218,30 +198,44 @@ def train(opt):
         procs = []
         producers = []
 
-        for device_id in range(nb_gpu):
+        for device_id in range(n_gpu):
+            scheduler = Scheduler(opt, node_id=node_rank, gpu_id=device_id)
+
             # each process's rank
-            dist_rank = nb_gpu * node_rank + device_id
-            current_env["RANK"] = str(dist_rank)
+            global_rank = n_gpu * node_rank + device_id
+            current_env["RANK"] = str(global_rank)
             current_env["LOCAL_RANK"] = str(device_id)
 
-            logger.info("UNO logger {} ".format(device_id))
             q = mp.Queue(opt.queue_size)
             queues += [q]
-            procs.append(mp.Process(target=consumer, args=(
-                train_process, opt, dist_rank, error_queue, q, semaphore, node_rank),
-                daemon=True))
+            procs.append(
+                mp.Process(
+                    target=consumer,
+                    args=(train_process, opt, global_rank, error_queue, q, semaphore, node_rank),
+                    daemon=True
+                )
+            )
             procs[device_id].start()
             logger.info(" Starting process pid: %d  " % procs[device_id].pid)
             error_handler.add_child(procs[device_id].pid)
-        # TODO: This does not work if we merge with the first loop, not sure why
-        # for device_id in range(nb_gpu):
+
             # Get the iterator to generate from
+            # We can't stride here without losing data: each dataset only goes to one GPU
+            corpora = scheduler.get_corpora(is_train=True)
             train_iter_map = _build_train_iter(
-                opt, fields_dict, transforms_cls, stride=nb_gpu, offset=device_id, nodeID=node_rank, gpuID=device_id)
-            producer = mp.Process(target=batch_producer,
-                                  args=(train_iter_map, queues[device_id],
-                                        semaphore, opt, device_id),
-                                  daemon=True)
+                opt,
+                corpora,
+                fields_dict,
+                transforms_cls,
+                stride=1,
+                offset=0
+            )
+
+            producer = mp.Process(
+                target=batch_producer,
+                args=(train_iter_map, queues[device_id], semaphore, opt, device_id),
+                daemon=True
+            )
             producers.append(producer)
             producers[device_id].start()
             logger.info(" Starting producer process pid: {}  ".format(
@@ -255,7 +249,7 @@ def train(opt):
         for p in producers:
             p.terminate()
 
-    elif nb_gpu == 1:  # case 1 GPU only
+    elif n_gpu == 1:  # case 1 GPU only
         train_process(opt, device_id=0)
     else:   # case only CPU
         train_process(opt, device_id=-1)

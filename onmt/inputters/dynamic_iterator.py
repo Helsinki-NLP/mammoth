@@ -197,12 +197,10 @@ class DynamicDatasetIter(object):
                 yield batch
 
 
-def build_dynamic_dataset_iter(Fields_dict, transforms_cls, opts, is_train=True,
+def build_dynamic_dataset_iter(fields_dict, transforms_cls, opts, is_train=True,
                                stride=1, offset=0, nodeID=-1, gpuID=-1):
     """Build `DynamicDatasetIter` from fields & opts."""
-    #transforms = make_transforms(opts, transforms_cls, fields)
-    transforms = None
-#    corpora = get_corpora(opts, is_train, nodeID=nodeID, gpuID=gpuID)
+    transforms = make_transforms(opts, transforms_cls, fields)
     corpora_its = get_corpora(opts, is_train, nodeID=nodeID, gpuID=gpuID)
     if corpora_its is None:
         assert not is_train, "only valid corpus is ignorable."
@@ -217,7 +215,6 @@ def build_dynamic_dataset_iter(Fields_dict, transforms_cls, opts, is_train=True,
         src_tgt = next(iter(corpora.keys())) #there is only one key
         print(src_tgt)
         langPair = src_tgt.split("_")[1]
-        fields = Fields_dict[langPair]
+        fields = fields_dict[langPair]
         itrs[src_tgt] = DynamicDatasetIter.from_opts(corpora, transforms, fields, opts, is_train, stride=stride, offset=offset)
     return itrs
-

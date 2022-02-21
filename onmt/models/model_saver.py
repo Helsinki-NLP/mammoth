@@ -7,7 +7,7 @@ from onmt.utils.logging import logger
 from copy import deepcopy
 
 
-def build_model_saver(model_opt, opt, model, Fields_dict, optim, output_id):
+def build_model_saver(model_opt, opt, model, fields_dict, optim, output_id):
     # _check_save_model_path
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
@@ -15,7 +15,7 @@ def build_model_saver(model_opt, opt, model, Fields_dict, optim, output_id):
     model_saver = ModelSaver(opt.save_model,
                              model,
                              model_opt,
-                             Fields_dict,
+                             fields_dict,
                              optim,
                              opt.keep_checkpoint, output_id)
     return model_saver
@@ -39,12 +39,12 @@ class ModelSaverBase(object):
     * `_rm_checkpoint
     """
 
-    def __init__(self, base_path, model, model_opt, Fields_dict, optim,
+    def __init__(self, base_path, model, model_opt, fields_dict, optim,
                  keep_checkpoint=-1, output_id="0"):
         self.base_path = base_path
         self.model = model
         self.model_opt = model_opt
-        self.Fields_dict = Fields_dict
+        self.fields_dict = fields_dict
         self.optim = optim
         self.last_saved_step = None
         self.keep_checkpoint = keep_checkpoint
@@ -136,7 +136,7 @@ class ModelSaver(ModelSaverBase):
         checkpoint = {
 #            'model': model_state_dict,
 #            'generator': generator_state_dict,
-            'vocab': self.Fields_dict, # vocab,
+            'vocab': self.fields_dict, # vocab,
             'opt': self.model_opt,
             #'optim': self.optim.state_dict(), #TODO
             'whole_model': self.model

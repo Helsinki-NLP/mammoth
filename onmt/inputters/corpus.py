@@ -11,7 +11,7 @@ from collections import Counter, defaultdict
 from contextlib import contextmanager
 
 import multiprocessing as mp
-import ast
+
 
 @contextmanager
 def exfile_open(filename, *args, **kwargs):
@@ -174,51 +174,19 @@ class ParallelCorpus(object):
             cls_name, self.src, self.tgt, self.align, self.src_feats)
 
 
-def get_corpora(opts, is_train=False, nodeID=-1, gpuID=-1):
-    corpora_its = []
-#    corpora_dict = {}
-    if is_train:
-        print("GET CORPORA")
-        #print(opts.data)
-        print(type(opts.data))
-        print("NOPE")
-        #itz_dict = ast.literal_eval(opts.data)
-        #print(itz_dict)
-        #print(type(itz_dict))
-        for corpus_id, corpus_dict in opts.data.items():
-            print("CORPUS ID")
-            print(corpus_id)
-            print(corpus_dict)
-            if corpus_id != CorpusName.VALID:
-                #print("CORPUS")
-                #print("path_src_"+str(nodeID)+"_"+str(gpuID))
-                SRCNAME="path_src_"+str(nodeID)+"_"+str(gpuID)
-                TGTNAME="path_tgt_"+str(nodeID)+"_"+str(gpuID)
-                if SRCNAME not in corpus_dict:
-                    continue
-                print("CORPUSz")
-                print(SRCNAME)
-                print(TGTNAME)
-                corpora_dict = {}
-                corpora_dict[corpus_id] = ParallelCorpus(
-                    corpus_id,
-                    corpus_dict[SRCNAME],
-                    corpus_dict[TGTNAME],
-                    None, #corpus_dict["path_align"],
-                    None)#corpus_dict["src_feats"])
-                corpora_its.append(corpora_dict)
+def get_corpus(opts, corpus_id: str, is_train: bool = False):
+    if not is_train:
+        corpus_id = CorpusName.VALID
+    if corpus_id in opts.data.keys():
+        return ParallelCorpus(
+            corpus_id,
+            opts.data[corpus_id]["path_src"],
+            opts.data[corpus_id]["path_tgt"],
+            align=None,
+            src_feats=None,
+        )
     else:
-        if CorpusName.VALID in opts.data.keys():
-            corpora_dict[CorpusName.VALID] = ParallelCorpus(
-                CorpusName.VALID,
-                opts.data[CorpusName.VALID]["path_src"],
-                opts.data[CorpusName.VALID]["path_tgt"],
-                opts.data[CorpusName.VALID]["path_align"],
-                opts.data[CorpusName.VALID]["src_feats"])
-        else:
-            return None
-#    return corpora_dict
-    return corpora_its
+        return None
 
 
 class ParallelCorpusIterator(object):
@@ -402,7 +370,7 @@ def init_pool(queues):
     build_sub_vocab.queues = queues
 
 
-def build_vocab(opts, transforms, n_sample=3):
+def build_vocab(opts, corpus_id, transforms, n_sample=3):
     """Build vocabulary from data."""
 
     if n_sample == -1:
@@ -415,7 +383,9 @@ def build_vocab(opts, transforms, n_sample=3):
     if opts.dump_samples:
         logger.info("The samples on which the vocab is built will be "
                     "dumped to disk. It may slow down the process.")
-    corpora = get_corpora(opts, is_train=True)
+    corpora = {
+        corpus_id: get_corpus(opts, corpus_id, is_train=True)
+    }
     counter_src = Counter()
     counter_tgt = Counter()
     counter_src_feats = defaultdict(Counter)
@@ -445,7 +415,7 @@ def build_vocab(opts, transforms, n_sample=3):
     return counter_src, counter_tgt, counter_src_feats
 
 
-def save_transformed_sample(opts, transforms, n_sample=3):
+def save_transformed_sample(opts, corpus_id, transforms, n_sample=3):
     """Save transformed data sample as specified in opts."""
 
     if n_sample == -1:
@@ -458,7 +428,7 @@ def save_transformed_sample(opts, transforms, n_sample=3):
     else:
         raise ValueError(f"n_sample should >= -1, get {n_sample}.")
 
-    corpora = get_corpora(opts, is_train=True)
+    corpora = {corpus_id: get_corpus(opts, corpus_id, is_train=True)}
     datasets_iterables = build_corpora_iters(
         corpora, transforms, opts.data,
         skip_empty_level=opts.skip_empty_level)

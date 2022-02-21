@@ -72,6 +72,8 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
     group.add("-data", "--data", required=True,
               help="List of datasets and their specifications. "
                    "See examples/*.yaml for further details.")
+    group.add("-src_tgt", "--src_tgt", required=True, nargs='+',
+              help="List of source and target language for each dataset. ")
     group.add("-skip_empty_level", "--skip_empty_level", default="warning",
               choices=["silent", "warning", "error"],
               help="Security level when encounter empty examples."
@@ -282,9 +284,9 @@ def model_opts(parser):
               help='Data type of the model.')
 
     group.add('--hidden_ab_size', '-hidden_ab_size', type=int, default=2048,
-            help="""Size of attention bridge hidden states""")
+              help="""Size of attention bridge hidden states""")
     group.add('--attention_heads', '-attention_heads', type=int, default=50,
-            help="""Number of attention heads in attention bridge""")
+              help="""Number of attention heads in attention bridge""")
 
     group.add('--encoder_type', '-encoder_type', type=str, default='rnn',
               choices=['rnn', 'brnn', 'ggnn', 'mean', 'transformer', 'cnn',
@@ -767,14 +769,14 @@ def translate_opts(parser):
                    "the log probabilities will be averaged directly. "
                    "Necessary for models whose output layers can assign "
                    "zero probability.")
-    group.add('--lang_pair', '-lang_pair', 
+    group.add('--lang_pair', '-lang_pair',
               help="language pair to translate")
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text",
               help="Type of the source input. Options: [text].")
 
-#    group.add('--lang_pair', '-lang_pair', 
+#    group.add('--lang_pair', '-lang_pair',
 #              help="language pair to translate")
 
     group.add('--src', '-src', required=True,

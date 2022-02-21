@@ -102,6 +102,14 @@ class DataOptsCheckerMixin(object):
         print(corpora)
         opt.data = corpora
 
+        src_vocab = yaml.safe_load(opt.src_vocab)
+        logger.info(f"Parsed {len(src_vocab)} vocabc from -src_vocab.")
+        opt.src_vocab = src_vocab
+
+        tgt_vocab = yaml.safe_load(opt.tgt_vocab)
+        logger.info(f"Parsed {len(tgt_vocab)} vocabc from -tgt_vocab.")
+        opt.tgt_vocab = tgt_vocab
+
     @classmethod
     def _validate_transforms_opts(cls, opt):
         """Check options used by transforms."""

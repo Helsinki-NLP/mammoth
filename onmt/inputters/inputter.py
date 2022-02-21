@@ -106,7 +106,7 @@ def get_task_spec_tokens(data_task, pad, bos, eos):
             "tgt": {"pad": pad, "bos": None, "eos": eos},
         }
     else:
-        raise ValueError("No task specific tokens defined for data_task")
+        raise ValueError(f"No task specific tokens defined for {data_task}")
 
 
 def get_fields(

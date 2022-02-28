@@ -196,24 +196,50 @@ class DynamicDatasetIter(object):
                 yield batch
 
 
-def build_dynamic_dataset_iter(fields_dict, transforms_cls, opts, is_train=True,
-                               stride=1, offset=0, nodeID=-1, gpuID=-1):
+def build_dynamic_dataset_iter(
+    fields_dict,
+    transforms_cls,
+    opts,
+    scheduler,
+    is_train=True,
+    stride=1,
+    offset=0,
+):
     """Build `DynamicDatasetIter` from fields & opts."""
-    transforms = make_transforms(opts, transforms_cls, fields)
-    corpora_its = get_corpora(opts, is_train, nodeID=nodeID, gpuID=gpuID)
-    if corpora_its is None:
-        assert not is_train, "only valid corpus is ignorable."
-        return None
+    ddi_map = {}
+    for tpl in scheduler.get_dataset_specs(fields_dict):
+        (
+            lang_pair,
+            encoder_id,
+            decoder_id,
+            corpus_id,
+            corpus,
+            src_fields,
+            tgt_fields
+        ) = tpl
+        merged_fields = {
+            'src': src_fields['src'],
+            'tgt': tgt_fields['tgt']
+        }
+        print(f'merged_fields {merged_fields}')
 
-#    return DynamicDatasetIter.from_opts(
-#        corpora, transforms, fields, opts, is_train,
-#        stride=stride, offset=offset)
-    itrs = {}
-    print("CORPORA ITS")
-    for corpora in corpora_its:
-        src_tgt = next(iter(corpora.keys())) #there is only one key
-        print(src_tgt)
-        langPair = src_tgt.split("_")[1]
-        fields = fields_dict[langPair]
-        itrs[src_tgt] = DynamicDatasetIter.from_opts(corpora, transforms, fields, opts, is_train, stride=stride, offset=offset)
-    return itrs
+        if transforms_cls:
+            transforms = make_transforms(opts, transforms_cls, merged_fields)
+        else:
+            print('No transforms defined')
+            transforms = []
+
+        # FIXME: wrap corpus iterator to add the metadata?
+        # FIXME: this wastes the potential of DynamicDatasetIter
+        corpora = {corpus_id: corpus}
+        ddi = DynamicDatasetIter.from_opts(
+            corpora,
+            transforms,
+            merged_fields,
+            opts,
+            is_train,
+            stride=stride,
+            offset=offset
+        )
+        ddi_map[tuple(lang_pair)] = ddi
+    return ddi_map

@@ -409,6 +409,15 @@ class Scheduler:
         return result
 
     def get_fields(self, side: str, fields_dict):
+        """Returns a list of tuples: (side, lang, component_id, fields).
+        side:           Either 'src' or 'tgt'.
+        lang:           The language code. Vocabularies are language specific.
+        component_id:   The encoder or decoder id. Embeddings are stored in
+                        the encoders/decoders, so that component needs to be identified
+                        in order to access the correct embeddings,
+                        even if the embeddings are language specific.
+        fields:         The actual Fields.
+        """
         my_lang_pairs = compress(self.lang_pairs, self._selector)
         component_ids = self.encoder_ids if side == 'src' else self.decoder_ids
         my_component_ids = compress(component_ids, self._selector)
@@ -420,6 +429,30 @@ class Scheduler:
             if not (side, lang, component_id) in seen:
                 result.append((side, lang, component_id, fields_dict[(side, lang)]))
             seen.add((side, lang, component_id))
+        return result
+
+    def get_dataset_specs(self, fields_dict):
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
+        my_encoder_ids = compress(self.encoder_ids, self._selector)
+        my_decoder_ids = compress(self.decoder_ids, self._selector)
+        corpus_ids = self.opt.data.keys()
+        my_corpus_ids = compress(corpus_ids, self._selector)
+        corpus_dict = self.get_corpora(is_train=True)
+
+        selected = [my_lang_pairs, my_encoder_ids, my_decoder_ids, my_corpus_ids]
+
+        result = []
+        for lang_pair, encoder_id, decoder_id, corpus_id in zip(*selected):
+            src_lang, tgt_lang = lang_pair
+            result.append((
+                lang_pair,
+                encoder_id,
+                decoder_id,
+                corpus_id,
+                corpus_dict[corpus_id],
+                fields_dict[('src', src_lang)],
+                fields_dict[('tgt', tgt_lang)],
+            ))
         return result
 
     def get_encoders(self):

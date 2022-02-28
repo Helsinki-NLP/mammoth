@@ -11,7 +11,8 @@ from onmt.modules.embeddings import prepare_pretrained_embeddings
 from onmt.utils.logging import init_logger, logger
 
 from onmt.models.model_saver import load_checkpoint
-from onmt.train_single import main as single_main, _build_train_iter
+from onmt.train_single import main as single_main
+from onmt.inputters.dynamic_iterator import build_dynamic_dataset_iter
 
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
@@ -204,12 +205,11 @@ def train(opt):
 
             # Get the iterator to generate from
             # We can't stride here without losing data: each dataset only goes to one GPU
-            corpora = scheduler.get_corpora(is_train=True)
-            train_iter_map = _build_train_iter(
-                opt,
-                corpora,
-                fields_dict,
-                transforms_cls,
+            train_iter_map = build_dynamic_dataset_iter(
+                fields_dict=fields_dict,
+                transforms_cls=transforms_cls,
+                opts=opt,
+                scheduler=scheduler,
                 stride=1,
                 offset=0
             )

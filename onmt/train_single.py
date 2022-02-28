@@ -51,14 +51,6 @@ def _build_valid_iter(opt, fields, transforms_cls):
     return valid_iter
 
 
-def _build_train_iter(opt, fields, transforms_cls, stride=1, offset=0, nodeID=-1, gpuID=-1):
-    """Build training iterator."""
-    train_iter_map = build_dynamic_dataset_iter(
-        fields, transforms_cls, opt, is_train=True,
-        stride=stride, offset=offset, nodeID=nodeID, gpuID=gpuID)
-    return train_iter_map
-
-
 def init_distributed(model, scheduler):
     my_encoder_groups, my_decoder_groups = scheduler.get_distributed_groups()
     for encoder_id, group in my_encoder_groups:
@@ -142,7 +134,15 @@ def main(
     logger.info("DONE BUILD TRAINER")
 
     if batch_queue is None:
-        _train_iter_map = _build_train_iter(opt, fields_dict, transforms_cls, stride=1, offset=0, nodeID=0, gpuID=0)
+        _train_iter_map = build_dynamic_dataset_iter(
+            fields_dict=fields_dict,
+            transforms_cls=transforms_cls,
+            opts=opt,
+            scheduler=scheduler,
+            is_train=True,
+            stride=1,
+            offset=0,
+        )
         train_iter = IterOnDevice(_train_iter_map, local_rank)
     else:
         assert semaphore is not None, \
@@ -150,15 +150,11 @@ def main(
 
         def _train_iter():
             while True:
-                (batch, langPairname) = batch_queue.get()
-#                print("TRAIN SINGLE ITER")
-#                print(batch)
-#                print(langPairname) #wmt_en-tr
+                (batch, lang_pair, encoder_id, decoder_id) = batch_queue.get()
                 semaphore.release()
                 # Move batch to specified device
-                IterOnDevice.batch_to_device(batch, device_id)
-                yield batch, langPairname
-
+                IterOnDevice.batch_to_device(batch, local_rank)
+                yield batch, lang_pair, encoder_id, decoder_id
 
         train_iter = _train_iter()
     logger.info("VALID ITER")

@@ -261,6 +261,21 @@ class Embeddings(nn.Module):
             self._modules['make_embedding'][1].dropout.p = dropout
 
 
+class PluggableEmbeddings(nn.ModuleDict):
+    def __init__(self, embedding_dict):
+        super().__init__()
+        for key, embeddings in embedding_dict.items():
+            self.add_module(f'embeddings{key}', embeddings)
+        self.active_key = None
+
+    def activate(self, key):
+        self.active_key = key
+
+    def forward(self, source, step=None):
+        active_embeddings = self[f'embeddings{self.active_key}']
+        return active_embeddings.forward(source, step=step)
+
+
 # Some utilitary functions for pretrained embeddings
 
 def read_embeddings(path, skip_lines=0, filter_set=None):

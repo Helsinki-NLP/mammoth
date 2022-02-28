@@ -355,7 +355,6 @@ def _build_fv_from_multifield(multifield, counters, build_fv_kwargs,
         logger.info(" * %s vocab size: %d." % (name, len(field.vocab)))
 
 
-
 def _build_fields_vocab(fields, counters, data_type, share_vocab,
                         vocab_size_multiple,
                         src_vocab_size, src_words_min_frequency,

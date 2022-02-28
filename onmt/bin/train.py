@@ -96,10 +96,10 @@ def _init_train(opt):
     return checkpoint, fields, transforms_cls
 
 
-def init_train_prepare_fields_transforms(opt, lang_enc_path, lang_dec_path):
+def init_train_prepare_fields_transforms(opt, vocab_path, side):
     """Prepare or dump fields & transforms before training."""
 
-    fields = build_dynamic_fields_langspec(opt, lang_enc_path, lang_dec_path)
+    fields = build_dynamic_fields_langspec(opt, vocab_path, side)
     transforms_cls = get_transforms_cls(opt._all_transform)
     # TODO: maybe prepare pretrained embeddings, if any, with `prepare_pretrained_embeddings(opt, fields)`
 
@@ -118,16 +118,8 @@ def init_train_prepare_fields_transforms(opt, lang_enc_path, lang_dec_path):
             "Sample saved, please check it before restart training.")
         sys.exit()
 
-    # Report src and tgt vocab sizes
-    for side in ['src', 'tgt']:
-        f = fields[side]
-        try:
-            f_iter = iter(f)
-        except TypeError:
-            f_iter = [(side, f)]
-        for sn, sf in f_iter:
-            if sf.use_vocab:
-                logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
+    for name, field in fields[side].fields:
+        print(f'prepped: {name}  {len(field.vocab)}')
 
     return fields
 
@@ -152,23 +144,12 @@ def train(opt):
 
     opt.data_task = ModelTask.SEQ2SEQ
     transforms_cls = get_transforms_cls(opt._all_transform)
-    vocab_paths_enc = {}
-    vocab_paths_dec = {}
-    vocab_paths_file = open(opt.vocab_paths, 'rt')
-    for line in vocab_paths_file:
-        line = line.strip()
-        encodec_lang_path = line.split("\t")
-        if encodec_lang_path[0] == "enc":
-            vocab_paths_enc[encodec_lang_path[1]] = encodec_lang_path[2]
-        if encodec_lang_path[0] == "dec":
-            vocab_paths_dec[encodec_lang_path[1]] = encodec_lang_path[2]
-    vocab_paths_file.close()
 
     fields_dict = OrderedDict()
-    global_scheduler = Scheduler(opt, node_id=None, gpu_id=None)
+    global_scheduler = Scheduler(opt, node_rank=None, local_rank=None)
 
     for side in ('src', 'tgt'):
-        for lang, vocab_path in global_scheduler.get_vocabularies(side=side):
+        for lang, vocab_path in global_scheduler.get_vocabularies(opt, side=side):
             fields_dict[(side, lang)] = init_train_prepare_fields_transforms(
                 opt, vocab_path=vocab_path, side=side
             )
@@ -198,26 +179,28 @@ def train(opt):
         procs = []
         producers = []
 
-        for device_id in range(n_gpu):
-            scheduler = Scheduler(opt, node_id=node_rank, gpu_id=device_id)
+        for local_rank in range(n_gpu):
+            scheduler = Scheduler(opt, node_rank=node_rank, local_rank=local_rank)
 
             # each process's rank
-            global_rank = n_gpu * node_rank + device_id
+            global_rank = n_gpu * node_rank + local_rank
             current_env["RANK"] = str(global_rank)
-            current_env["LOCAL_RANK"] = str(device_id)
+            current_env["LOCAL_RANK"] = str(local_rank)
 
             q = mp.Queue(opt.queue_size)
             queues += [q]
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opt, global_rank, error_queue, q, semaphore, node_rank),
+                    args=(
+                        train_process, opt, global_rank, error_queue, q, semaphore, node_rank, local_rank
+                    ),
                     daemon=True
                 )
             )
-            procs[device_id].start()
-            logger.info(" Starting process pid: %d  " % procs[device_id].pid)
-            error_handler.add_child(procs[device_id].pid)
+            procs[local_rank].start()
+            logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
+            error_handler.add_child(procs[local_rank].pid)
 
             # Get the iterator to generate from
             # We can't stride here without losing data: each dataset only goes to one GPU
@@ -233,14 +216,14 @@ def train(opt):
 
             producer = mp.Process(
                 target=batch_producer,
-                args=(train_iter_map, queues[device_id], semaphore, opt, device_id),
+                args=(train_iter_map, queues[local_rank], semaphore, opt, local_rank),
                 daemon=True
             )
             producers.append(producer)
-            producers[device_id].start()
+            producers[local_rank].start()
             logger.info(" Starting producer process pid: {}  ".format(
-                producers[device_id].pid))
-            error_handler.add_child(producers[device_id].pid)
+                producers[local_rank].pid))
+            error_handler.add_child(producers[local_rank].pid)
 
         for p in procs:
             logger.info("DD logger")
@@ -250,9 +233,9 @@ def train(opt):
             p.terminate()
 
     elif n_gpu == 1:  # case 1 GPU only
-        train_process(opt, device_id=0)
+        train_process(opt, global_rank=0, local_rank=0)
     else:   # case only CPU
-        train_process(opt, device_id=-1)
+        train_process(opt, global_rank=None, local_rank=None)
 
 
 def _get_parser():

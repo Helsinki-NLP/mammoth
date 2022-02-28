@@ -12,7 +12,7 @@ from onmt.models import build_model_saver
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
-from onmt.utils.distributed import all_reduce_tensors_init
+from onmt.utils.distributed import all_reduce_tensors_init, Scheduler
 from onmt.inputters.dynamic_iterator import build_dynamic_dataset_iter
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
@@ -59,6 +59,7 @@ def _build_train_iter(opt, fields, transforms_cls, stride=1, offset=0, nodeID=-1
     return train_iter_map
 
 
+# FIXME: obsolete, replaced by Scheduler.get_distributed_groups
 def create_group_distributed(model_opt, numGPUS, nodeRank, device_id):
     node_gpu_langsFile = open(model_opt.node_gpu_langs, 'rt')
     dictLangEncoder_toIDXset = OrderedDict()
@@ -154,35 +155,37 @@ def init_distributed(model, dictLangEncoder_toGroup, dictLangDecoder_toGroup, la
     all_reduce_tensors_init(wa, float(world_size))
 
 
-def main(opt, fields_dict, device_id,
-         batch_queue=None, semaphore=None, nodeRank=None, dictLangEncoder_toGroup=None, dictLangDecoder_toGroup=None): #fields, transforms_cls, checkpoint, 
+def main(
+    opt,
+    fields_dict,
+    global_rank,
+    error_queue=None,
+    batch_queue=None,
+    semaphore=None,
+    node_rank=None,
+    local_rank=None,
+):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opt`` has been validated and updated
     # at this point.
-    unique_device_id = device_id
-    numGPUSperNode = len(opt.gpu_ranks)
-    device_id = device_id % numGPUSperNode 
+    scheduler = Scheduler(opt, node_rank=node_rank, local_rank=local_rank)
 
-    world_size = int(opt.world_size)
-
-    configure_process(opt, device_id)
     init_logger(opt.log_file)
-
-    gpu_rankT = torch.distributed.get_rank()
-    logger.info("RANK GPU FROM TORCH %s", str(gpu_rankT))
+    if local_rank is not None:
+        configure_process(opt, local_rank)
+        gpu_rankT = torch.distributed.get_rank()
+        logger.info("RANK GPU FROM TORCH %s", str(gpu_rankT))
 
     #checkpoint, fields, transforms_cls = _init_train(opt)
     transforms_cls = None
     checkpoint = None
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
-    dictLangEncoder_toGroup, dictLangDecoder_toGroup, langsEnc, langsDec = create_group_distributed(model_opt, numGPUSperNode, nodeRank, device_id)
+    my_encoder_groups, my_decoder_groups = scheduler.get_distributed_groups()
 
-    #logger.info(dictLangEncoder_toGroup)
-    #logger.info(dictLangDecoder_toGroup)
-    logger.info("BUILDING MODEL")
     # Build model.
-    model, generators_md = build_model(model_opt, opt, fields_dict, checkpoint, nodeRank, device_id) #build_model(model_opt, opt, fields, checkpoint, nodeRank, device_id)
+    model, generators_md = build_model(model_opt, opt, fields_dict, scheduler, checkpoint)
+
     logger.info("INIT MODEL")
     init_distributed(model, dictLangEncoder_toGroup, dictLangDecoder_toGroup, langsEnc, langsDec, world_size)
     model.count_parameters(log=logger.info)

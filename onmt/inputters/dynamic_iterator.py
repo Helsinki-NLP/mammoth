@@ -3,7 +3,7 @@ from itertools import cycle
 
 from torchtext.legacy.data import batch as torchtext_batch
 from onmt.inputters import str2sortkey, max_tok_len, OrderedIterator
-from onmt.inputters.corpus import get_corpora, build_corpora_iters,\
+from onmt.inputters.corpus import get_corpus, build_corpora_iters,\
     DatasetAdapter
 from onmt.transforms import make_transforms
 from onmt.utils.logging import logger
@@ -63,7 +63,6 @@ class WeightedMixer(MixingStrategy):
     def _reset_iter(self, ds_name):
         self._iterators[ds_name] = iter(self.iterables[ds_name])
         self._counts[ds_name] = self._counts.get(ds_name, 0) + 1
-        #self._logging()
 
     def _iter_datasets(self):
         for ds_name, ds_weight in self.weights.items():
@@ -205,7 +204,7 @@ def build_dynamic_dataset_iter(fields_dict, transforms_cls, opts, is_train=True,
     if corpora_its is None:
         assert not is_train, "only valid corpus is ignorable."
         return None
-    
+
 #    return DynamicDatasetIter.from_opts(
 #        corpora, transforms, fields, opts, is_train,
 #        stride=stride, offset=offset)

@@ -255,28 +255,33 @@ class Scheduler:
     def __init__(
         self,
         opt: Namespace,
-        node_id: Optional[int] = None,
-        gpu_id: Optional[int] = None
+        node_rank: Optional[int] = None,
+        local_rank: Optional[int] = None
     ):
         """
         Has the responsibility for all resources that need to be
         consistently assigned to nodes and GPUs.
         This includes data, parameters, and vocabularies.
 
-        `gpu_id` is the local rank of the GPU.
-        When `node_id` and `gpu_id` are given, the methods return only
+        `local_rank` is the local rank of the GPU on this node.
+        When `node_rank` and `local_rank` are given, the methods return only
         the items needed in the specified process.
         When set to None, all items are returned.
         """
         self.opt = opt
-        self.node_id = node_id
-        self.gpu_id = gpu_id
+        self.node_rank = node_rank
+        self.local_rank = local_rank
 
         self.gpus_per_node = len(self.opt.gpu_ranks)
-        self.n_nodes = self.opt.world_size // self.gpus_per_node
+        if self.gpus_per_node > 0:
+            self.n_nodes = self.opt.world_size // self.gpus_per_node
+        else:
+            self.n_nodes = 1
+            self.gpus_per_node = 1
 
-        assert node_id is None or 0 <= node_id < self.n_nodes
-        assert gpu_id is None or 0 <= gpu_id < self.gpus_per_node
+        print(f'in scheduler: node_rank {node_rank} local_rank {local_rank}')
+        assert node_rank is None or 0 <= node_rank < self.n_nodes
+        assert local_rank is None or 0 <= local_rank < self.gpus_per_node
         # TODO: All the configuration lists should be the same length
         self.n_tasks = len(self.opt.src_tgt)
 
@@ -297,20 +302,26 @@ class Scheduler:
             self.decoder_ids = [tgt_lang for src_lang, tgt_lang in self.lang_pairs]
 
         # A list of booleans, selecting only relevant parts of the configuration lists
-        self._selector = self._get_selector(self.node_id, self.gpu_id)
+        self._selector = self._get_selector(self.node_rank, self.local_rank)
 
-    def _get_selector(self, node_id: Optional[int], gpu_id: Optional[int]):
-        if node_id is None or gpu_id is None:
+    def __repr__(self):
+        return (
+            f'{self.__class__.__name__}('
+            f'..., node_rank={self.node_rank}, local_rank={self.local_rank})'
+        )
+
+    def _get_selector(self, node_rank: Optional[int], local_rank: Optional[int]):
+        if node_rank is None or local_rank is None:
             # Keep all items in global mode
             return [True] * self.n_tasks
-        my_id = f'{node_id}:{gpu_id}'
+        my_id = f'{node_rank}:{local_rank}'
         return [assignment == my_id for assignment in self.opt.node_gpu]
 
     def _default_node_gpu(self):
         def yield_each_gpu():
-            for node_id in range(self.n_nodes):
-                for gpu_id in range(self.gpus_per_node):
-                    yield f'{node_id}:{gpu_id}'
+            for node_rank in range(self.n_nodes):
+                for local_rank in range(self.gpus_per_node):
+                    yield f'{node_rank}:{local_rank}'
 
         # yield GPUs in rank order, repeat as necessary
         return list(islice(cycle(yield_each_gpu()), self.n_tasks))
@@ -326,10 +337,10 @@ class Scheduler:
             encoder_to_gpus[encoder_id] = set()
         for decoder_id in self.decoder_ids:
             decoder_to_gpus[decoder_id] = set()
-        for node_id in range(self.n_nodes):
-            for gpu_id in range(self.gpus_per_node):
-                global_rank = node_id * self.gpus_per_node + gpu_id
-                selector = self._get_selector(node_id, gpu_id)
+        for node_rank in range(self.n_nodes):
+            for local_rank in range(self.gpus_per_node):
+                global_rank = node_rank * self.gpus_per_node + local_rank
+                selector = self._get_selector(node_rank, local_rank)
 
                 encoders_on_this_gpu = compress(self.encoder_ids, selector)
                 for encoder_id in encoders_on_this_gpu:
@@ -387,12 +398,35 @@ class Scheduler:
             for corpus_id in my_corpus_ids
         }
 
-    def get_vocabularies(self, side: str):
-        pass
+    def get_vocabularies(self, opt: Namespace, side: str):
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
+        result = []
+        for lang_pair in my_lang_pairs:
+            src_lang, tgt_lang = lang_pair
+            lang = src_lang if side == 'src' else tgt_lang
+            vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
+            result.append((lang, vocab_path))
+        return result
+
+    def get_fields(self, side: str, fields_dict):
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
+        component_ids = self.encoder_ids if side == 'src' else self.decoder_ids
+        my_component_ids = compress(component_ids, self._selector)
+        seen = set()
+        result = []
+        for lang_pair, component_id in zip(my_lang_pairs, my_component_ids):
+            src_lang, tgt_lang = lang_pair
+            lang = src_lang if side == 'src' else tgt_lang
+            if not (side, lang, component_id) in seen:
+                result.append((side, lang, component_id, fields_dict[(side, lang)]))
+            seen.add((side, lang, component_id))
+        return result
 
     def get_encoders(self):
         # TODO: also return how many times each component occurs, for normalization?
-        pass
+        my_encoder_ids = compress(self.encoder_ids, self._selector)
+        return my_encoder_ids
 
     def get_decoders(self):
-        pass
+        my_decoder_ids = compress(self.decoder_ids, self._selector)
+        return my_decoder_ids

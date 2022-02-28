@@ -103,11 +103,11 @@ class DataOptsCheckerMixin(object):
         opt.data = corpora
 
         src_vocab = yaml.safe_load(opt.src_vocab)
-        logger.info(f"Parsed {len(src_vocab)} vocabc from -src_vocab.")
+        logger.info(f"Parsed {len(src_vocab)} vocabs from -src_vocab.")
         opt.src_vocab = src_vocab
 
         tgt_vocab = yaml.safe_load(opt.tgt_vocab)
-        logger.info(f"Parsed {len(tgt_vocab)} vocabc from -tgt_vocab.")
+        logger.info(f"Parsed {len(tgt_vocab)} vocabs from -tgt_vocab.")
         opt.tgt_vocab = tgt_vocab
 
     @classmethod
@@ -158,9 +158,11 @@ class DataOptsCheckerMixin(object):
                     "-tgt_vocab is required if not -share_vocab."
             return
         # validation when train:
-        cls._validate_file(opt.src_vocab, info='src vocab')
+        for key, vocab in opt.src_vocab.items():
+            cls._validate_file(vocab, info=f'src vocab ({key})')
         if not opt.share_vocab:
-            cls._validate_file(opt.tgt_vocab, info='tgt vocab')
+            for key, vocab in opt.tgt_vocab.items():
+                cls._validate_file(vocab, info=f'tgt vocab ({key})')
 
         if opt.dump_fields or opt.dump_transforms:
             assert opt.save_data, "-save_data should be set if set \

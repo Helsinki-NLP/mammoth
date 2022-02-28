@@ -2,24 +2,46 @@
 import torch
 import torch.optim as optim
 from torch.nn.utils import clip_grad_norm_
-import operator
 import functools
-from copy import copy
 from math import sqrt
 import types
 import importlib
 from onmt.utils.misc import fn_args
-#from torch.distributed.optim import ZeroRedundancyOptimizer
 import math
-#from fairseq.optim.fp16_optimizer import MemoryEfficientFP16Optimizer
-#from transformers.optimization import Adafactor
-#from omegaconf import OmegaConf
-import argparse
-from fairseq.optim.fp16_optimizer import FP16Optimizer, MemoryEfficientFP16Optimizer
-#MemoryEfficientFP16Optimizer
-#from SM3 import SM3
 
-def build_torch_optimizer(model, opt, langsEnc, langsDec):
+
+def attention_bridge_optimizer(model, scheduler, base_optimizer):
+    multiOptims = {}
+    components = [
+        ('encoder', model.encoder, scheduler.get_encoders()),
+        ('decoder', model.decoder, scheduler.get_decoders()),
+        ('generator', model.generator, scheduler.get_generators()),
+    ]
+    for component_name, components, component_ids in components:
+        for component_id in component_ids:
+            params = []
+            comp = components[f'{component_name}{component_id}']
+            for name, param in comp.named_parameters():
+                if not param.requires_grad:
+                    continue
+                params.append(param)
+            ada = base_optimizer(params)
+            multiOptims[f'{component_name}_{component_id}'] = ada
+
+    attParam = []
+    for name, param in model.attention_bridge.named_parameters():
+        if not param.requires_grad:
+            continue
+        attParam.append(param)
+
+    ada = base_optimizer(attParam)
+    multiOptims["ATT"] = ada
+
+    optimizer = MultipleOptimizer(multiOptims, None)
+    return optimizer
+
+
+def build_torch_optimizer(model, opt, scheduler):
     """Builds the PyTorch optimizer.
 
     We use the default parameters for Adam that are suggested by
@@ -52,302 +74,13 @@ def build_torch_optimizer(model, opt, langsEnc, langsDec):
     elif opt.optim == 'adadelta':
         optimizer = optim.Adadelta(params, lr=opt.learning_rate)
     elif opt.optim == 'adafactor':
-        """
-
-        encs = []
-        decs = []
-        for name, param in model.named_parameters():
-            if not param.requires_grad:
-                continue
-            # TODO: Find a better way to check for sparse gradients.
-            if 'decoder' in name: #or 'generator' in name:
-                #print("DECODER: "+str(name))
-                decs.append(param)
-            else:
-                #print("ENCODER: "+str(name))
-                encs.append(param)
-        optimizer = MultipleOptimizer(
-            [optim.Adam(
-                encs,
-                lr=opt.learning_rate,
-                betas=betas,
-                eps=1e-9),
-             AdaFactorFairSeq(decs, warmup_init=True) ])
-        """
-#        optimizer = AdaFactorFairSeq(params)#, weight_decay=0.0001, warmup_init=True) 
-        #optimizer = SM3(params)
-        """
-#        optimizer = Adafactor(params)
-        multiOptims = []
-        multiOptims_Langs = []
-#        cfg_dls = argparse.Namespace(
-#            optimizer="adam",
-#            lr=[0.1],
-#            adam_betas="(0.9, 0.999)",
-#            adam_eps=1e-8,
-#            weight_decay=0.0,
-#            fp16_init_scale=1,
-#            fp16_scale_window=1,
-#            fp16_scale_tolerance=1,
-#            threshold_loss_scale=1,
-#            min_loss_scale=1e-4,
-#        )
-
-        cfg_dls = argparse.Namespace(
-            optimizer="adafactor",
-            lr=[None],
-            scale_parameter=True,
-            relative_step=True,
-            warmup_init=False,
-            fp16_no_flatten_grads=True,
-            update_freq=[4],
-            distributed_world_size=1,
-            model_parallel_size=1,
-            fp16_init_scale=1,
-            fp16_scale_window=1,
-            fp16_scale_tolerance=1,
-            threshold_loss_scale=1,
-            min_loss_scale=1e-4,
-        )
-
-#            fp16_init_scale=2 ** 7,
-#            fp16_scale_window=None,
-#            fp16_scale_tolerance=0.0,
-#            threshold_loss_scale=None,
-#            min_loss_scale=1e-4,
-#        )
-
-        """
-
-        """
-        cfg_dls = OmegaConf.create(
-            {
-
-                #"registry_name": {"_name": "adam",},
-                "optimization": {
-                    "lr": [0.1],
-                },
-                "optimizer": {
-                    "_name": "adam",
-                    "lr": [0.1],
-                    "adam_betas": "(0.9, 0.999)",
-                    "adam_eps": 1e-8,
-                    "weight_decay": 0.0,
-                },
-                "common": {
-                    "fp16_init_scale": 1,
-                    "fp16_scale_window": 1,
-                    "fp16_scale_tolerance": 1,
-                    "threshold_loss_scale": 1,
-                    "min_loss_scale": 1e-4,
-                    "tpu": False,
-                },
-            }
-        )
-        """
-
-        multiOptims = {} #[]
-        #multiOptims_Langs = []
-        for le in langsEnc.keys():
-            encParam = []
-            menc = model.encoder["encoder" + str(le)]
-            for name, param in menc.named_parameters():
-                if not param.requires_grad:
-                    continue
-                encParam.append(param)
-#            ada=optim.Adam(encParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-            ada=AdaFactorFairSeq(encParam)
-#            me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, encParam)
-#            me_optimizer = MemoryEfficientFP16Optimizer(
-#                params=encParam,
-#                optimizer=ada,
-#            )
-#            multiOptims.append(me_optimizer)
-
-            #multiOptims.append(ada)
-            #multiOptims.append(AdaFactorFairSeq(encParam))
-            #multiOptims_Langs.append("ENC_" + str(le))
-            multiOptims["ENC_" + str(le)]=ada #AdaFactorFairSeq(encParam)
-
-        for ld in langsDec.keys():
-            decParam = []
-            mdec = model.decoder["decoder" + str(ld)]
-            for name, param in mdec.named_parameters():
-                if not param.requires_grad:
-                    continue
-                decParam.append(param)
-            #ada=optim.Adam(decParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-            ada=AdaFactorFairSeq(decParam)
-#            me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, decParam)
-#            me_optimizer = MemoryEfficientFP16Optimizer(
-#                params=decParam,
-#                optimizer=ada,
-#            )
-            #multiOptims.append(ada)
-#            multiOptims.append(me_optimizer)
-
-#            multiOptims.append(AdaFactorFairSeq(decParam))
-            #multiOptims_Langs.append("DEC_" + str(ld))
-            multiOptims["DEC_" + str(ld)]=ada #AdaFactorFairSeq(decParam)
-
-            genParam = []
-            mgen = model.generator["generator" + str(ld)]
-            for name, param in mgen.named_parameters():
-                if not param.requires_grad:
-                    continue
-                genParam.append(param)
-#            me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, genParam)
-#            ada=optim.Adam(genParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-            ada=AdaFactorFairSeq(genParam)
-#            me_optimizer = MemoryEfficientFP16Optimizer(
-#                params=genParam,
-#                optimizer=ada,
-#            )
-#            multiOptims.append(ada)
-#            multiOptims.append(me_optimizer)
-
-#            multiOptims.append(AdaFactorFairSeq(genParam))
-#            multiOptims_Langs.append("GEN_" + str(ld))
-            multiOptims["GEN_" + str(ld)]=ada #AdaFactorFairSeq(genParam)
-
-        attParam = [] 
-        mATT = model.attention_bridge
-        for name, param in mATT.named_parameters():
-            if not param.requires_grad:
-                continue
-            attParam.append(param)
-#        me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, attParam)
-
-#        ada=optim.Adam(attParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-        ada=AdaFactorFairSeq(attParam)
-#        me_optimizer = MemoryEfficientFP16Optimizer(
-#            params=attParam,
-#            optimizer=ada,
-#        )
-#        multiOptims.append(me_optimizer)
-#        multiOptims.append(ada)
-#        multiOptims.append(AdaFactorFairSeq(attParam))
-        multiOptims["ATT"]=ada #AdaFactorFairSeq(attParam)
-#        multiOptims_Langs.append("ATT")
-
-        optimizer = MultipleOptimizer(multiOptims, None)
-        
-
-#        optimizer = AdaFactorFairSeq(params)
-#        optimizer = ZeroRedundancyOptimizer(
-#            params,
-#            optimizer_class=AdaFactor
-#        )
-#            AdaFactor
-#            params,
-#            non_constant_decay=True,
-#            enable_factorization=True,
-#            weight_decay=0)
+        optimizer = attention_bridge_optimizer(model, scheduler, AdaFactorFairSeq)
     elif opt.optim == 'adam':
-#        optimizer = ZeroRedundancyOptimizer(
-#            params,
-#            optimizer_class=optim.Adam,
-#            lr=opt.learning_rate,
-#            betas=betas,
-#            eps=1e-9
-#        )
-
-
-        multiOptims = {} #[]
-        #multiOptims_Langs = []
-        for le in langsEnc.keys():
-            encParam = []
-            menc = model.encoder["encoder" + str(le)]
-            for name, param in menc.named_parameters():
-                if not param.requires_grad:
-                    continue
-                encParam.append(param)
-#            ada=optim.Adam(encParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-            ada=optim.Adam(encParam, lr=opt.learning_rate,betas=betas, eps=1e-9)
-#            me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, encParam)
-#            me_optimizer = MemoryEfficientFP16Optimizer(
-#                params=encParam,
-#                optimizer=ada,
-#            )
-#            multiOptims.append(me_optimizer)
-
-            #multiOptims.append(ada)
-            #multiOptims.append(AdaFactorFairSeq(encParam))
-            #multiOptims_Langs.append("ENC_" + str(le))
-            multiOptims["ENC_" + str(le)]=ada #AdaFactorFairSeq(encParam)
-
-        for ld in langsDec.keys():
-            decParam = []
-            mdec = model.decoder["decoder" + str(ld)]
-            for name, param in mdec.named_parameters():
-                if not param.requires_grad:
-                    continue
-                decParam.append(param)
-            #ada=optim.Adam(decParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-            ada=optim.Adam(decParam, lr=opt.learning_rate,betas=betas, eps=1e-9)
-#            me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, decParam)
-#            me_optimizer = MemoryEfficientFP16Optimizer(
-#                params=decParam,
-#                optimizer=ada,
-#            )
-            #multiOptims.append(ada)
-#            multiOptims.append(me_optimizer)
-
-#            multiOptims.append(AdaFactorFairSeq(decParam))
-            #multiOptims_Langs.append("DEC_" + str(ld))
-            multiOptims["DEC_" + str(ld)]=ada #AdaFactorFairSeq(decParam)
-
-            genParam = []
-            mgen = model.generator["generator" + str(ld)]
-            for name, param in mgen.named_parameters():
-                if not param.requires_grad:
-                    continue
-                genParam.append(param)
-#            me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, genParam)
-#            ada=optim.Adam(genParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-            ada=optim.Adam(genParam, lr=opt.learning_rate,betas=betas, eps=1e-9)
-#            me_optimizer = MemoryEfficientFP16Optimizer(
-#                params=genParam,
-#                optimizer=ada,
-#            )
-#            multiOptims.append(ada)
-#            multiOptims.append(me_optimizer)
-
-#            multiOptims.append(AdaFactorFairSeq(genParam))
-#            multiOptims_Langs.append("GEN_" + str(ld))
-            multiOptims["GEN_" + str(ld)]=ada #AdaFactorFairSeq(genParam)
-
-        attParam = [] 
-        mATT = model.attention_bridge
-        for name, param in mATT.named_parameters():
-            if not param.requires_grad:
-                continue
-            attParam.append(param)
-#        me_optimizer = FP16Optimizer.build_optimizer(cfg_dls, attParam)
-
-#        ada=optim.Adam(attParam, lr=opt.learning_rate, betas=betas,eps=1e-9)
-        ada=optim.Adam(attParam, lr=opt.learning_rate,betas=betas, eps=1e-9)
-#        me_optimizer = MemoryEfficientFP16Optimizer(
-#            params=attParam,
-#            optimizer=ada,
-#        )
-#        multiOptims.append(me_optimizer)
-#        multiOptims.append(ada)
-#        multiOptims.append(AdaFactorFairSeq(attParam))
-        multiOptims["ATT"]=ada #AdaFactorFairSeq(attParam)
-#        multiOptims_Langs.append("ATT")
-
-        optimizer = MultipleOptimizer(multiOptims, None)
-
-
-
-
-
-#        optimizer = optim.Adam(
-#            params,
-#            lr=opt.learning_rate,
-#            betas=betas,
-#            eps=1e-9)
+        optimizer = attention_bridge_optimizer(
+            model,
+            scheduler,
+            lambda params: optim.Adam(params, lr=opt.learning_rate, betas=betas, eps=1e-9)
+        )
     elif opt.optim == 'sparseadam':
         encs = []
         decs = []
@@ -367,29 +100,6 @@ def build_torch_optimizer(model, opt, langsEnc, langsDec):
                 betas=betas,
                 eps=1e-9),
              AdaFactorFairSeq(decs, warmup_init=True) ])
-        """
-        dense = []
-        sparse = []
-        for name, param in model.named_parameters():
-            if not param.requires_grad:
-                continue
-            # TODO: Find a better way to check for sparse gradients.
-            if 'embed' in name:
-                sparse.append(param)
-            else:
-                dense.append(param)
-        optimizer = MultipleOptimizer(
-            [optim.Adam(
-                dense,
-                lr=opt.learning_rate,
-                betas=betas,
-                eps=1e-8),
-             optim.SparseAdam(
-                 sparse,
-                 lr=opt.learning_rate,
-                 betas=betas,
-                 eps=1e-8)])
-        """
     elif opt.optim == 'fusedadam':
         # we use here a FusedAdam() copy of an old Apex repo
         optimizer = FusedAdam(
@@ -564,7 +274,7 @@ class Optimizer(object):
         self._scaler = None
 
     @classmethod
-    def from_opt(cls, model, opt, checkpoint=None, langsEnc=None, langsDec=None):
+    def from_opt(cls, model, opt, scheduler, checkpoint=None):
         """Builds the optimizer from options.
 
         Args:
@@ -607,20 +317,19 @@ class Optimizer(object):
                 optim_state_dict = ckpt_state_dict
 
         optimizer = cls(
-            build_torch_optimizer(model, optim_opt, langsEnc, langsDec),
+            build_torch_optimizer(model, optim_opt, scheduler),
             optim_opt.learning_rate,
             learning_rate_decay_fn=make_learning_rate_decay_fn(optim_opt),
             max_grad_norm=optim_opt.max_grad_norm)
-        
+
         if opt.model_dtype == "fp16":
             if opt.optim == "fusedadam":
                 optimizer._fp16 = "legacy"
             else:
                 optimizer._fp16 = "amp"
-                #print("OPTMIZER FP16 AMP")
                 from torch.cuda.amp import GradScaler
                 optimizer._scaler = GradScaler()
-        
+
         if optim_state_dict:
             optimizer.load_state_dict(optim_state_dict)
         return optimizer
@@ -665,7 +374,6 @@ class Optimizer(object):
         """Wrapper for backward pass. Some optimizer requires ownership of the
         backward pass."""
         if self.amp:
-            #print("SCALE BACKOPTMIZER FP16 AMP")
             self._scaler.scale(loss).backward()
         elif self._fp16 == "legacy":
             kwargs = {}
@@ -687,7 +395,6 @@ class Optimizer(object):
             dict_opts = self._optimizer.optimizers
             for name in dict_opts:
                 self._scaler.unscale_(dict_opts[name])
-##            self._scaler.unscale_(self._optimizer)
         elif self._fp16 == "legacy":
             if hasattr(self._optimizer, "update_master_grads"):
                 self._optimizer.update_master_grads()
@@ -1249,4 +956,3 @@ class AdaFactorFairSeq(torch.optim.Optimizer):
                     p.data.copy_(p_data_fp32)
 
         return loss
-

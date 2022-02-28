@@ -15,12 +15,19 @@ import traceback
 import onmt.utils
 from onmt.utils.logging import logger
 import torch.nn as nn
-from collections import OrderedDict
-from operator import add
 import torch.distributed
 
-def build_trainer(opt, device_id, model, fields_dict, optim, model_saver=None, generators_md=None,
-                  dictLangEncoder_toGroup=None, dictLangDecoder_toGroup=None):
+
+def build_trainer(
+    opt,
+    device_id,
+    model,
+    fields_dict,
+    optim,
+    scheduler,
+    model_saver=None,
+    generators_md=None,
+):
     """
     Simplify `Trainer` creation based on user `opt`s*
 
@@ -35,35 +42,26 @@ def build_trainer(opt, device_id, model, fields_dict, optim, model_saver=None, g
             used to save the model
     """
 
-    #    tgt_field = dict(fields)["tgt"].base_field
     train_loss_md = nn.ModuleDict()
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
-    #    for name, generator in generators_md.items():
-    # nameLang = str(name).replace("generator", "")
-    targetLangs = set()
-    for src_tgt_lang in fields_dict.keys():
-        tgt_field = dict(fields_dict[src_tgt_lang])["tgt"].base_field
-        nameLang = src_tgt_lang.split("-")[1]
-        if nameLang in targetLangs:
-            continue
-        targetLangs.add(nameLang)
-        logger.info("BEFORE")
-        logger.info(nameLang)
-        if not "generator" + nameLang in generators_md:
-            continue
-        logger.info("AFTER")
-        logger.info(nameLang)
-        generator = generators_md["generator" + nameLang]
-        train_loss_md.add_module('trainloss{0}'.format(nameLang),
-                                 onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=True,
-                                                                    generator=generator))  # [name] = onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=True, generator=generator)
-        valid_loss_md.add_module('valloss{0}'.format(nameLang),
-                                 onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False,
-                                                                    generator=generator))  # [name] = onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False,  generator=generator)
-    #    train_loss = onmt.utils.loss.build_loss_compute(model, tgt_field, opt, generator=generator)
-    #    valid_loss = onmt.utils.loss.build_loss_compute(
-    #        model, tgt_field, opt, train=False,  generator=generator)
+
+    for (side, lang, component_id, fields) in scheduler.get_fields('tgt', fields_dict):
+        generator = generators_md[f"generator{lang}"]
+        # This retrieves the primary field of this crappy datastructure
+        tgt_field = fields['tgt'].fields[0][1]
+        train_loss_md.add_module(
+            f'trainloss{lang}',
+            onmt.utils.loss.build_loss_compute(
+                model, tgt_field, opt, train=True, generator=generator
+            ),
+        )
+        valid_loss_md.add_module(
+            f'valloss{lang}',
+            onmt.utils.loss.build_loss_compute(
+                model, tgt_field, opt, train=False, generator=generator
+            ),
+        )
 
     trunc_size = opt.truncated_decoder  # Badly named...
     shard_size = opt.max_generator_batches if opt.model_dtype == 'fp32' else 0
@@ -75,7 +73,7 @@ def build_trainer(opt, device_id, model, fields_dict, optim, model_saver=None, g
     average_every = opt.average_every
     dropout = opt.dropout
     dropout_steps = opt.dropout_steps
-    if device_id >= 0:
+    if device_id is not None and device_id >= 0:
         gpu_rank = opt.gpu_ranks[device_id]
     else:
         gpu_rank = -1
@@ -87,20 +85,30 @@ def build_trainer(opt, device_id, model, fields_dict, optim, model_saver=None, g
         if opt.early_stopping > 0 else None
 
     report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
-    trainer = onmt.Trainer(model, train_loss_md, valid_loss_md, optim, trunc_size,
-                           shard_size, norm_method,
-                           accum_count, accum_steps,
-                           n_gpu, gpu_rank,
-                           gpu_verbose_level, report_manager,
-                           with_align=True if opt.lambda_align > 0 else False,
-                           model_saver=model_saver,  # if gpu_rank <= 0 else None,
-                           average_decay=average_decay,
-                           average_every=average_every,
-                           model_dtype=opt.model_dtype,
-                           earlystopper=earlystopper,
-                           dropout=dropout,
-                           dropout_steps=dropout_steps, dictLangEncoder_toGroup=dictLangEncoder_toGroup,
-                           dictLangDecoder_toGroup=dictLangDecoder_toGroup)
+    trainer = onmt.Trainer(
+        model,
+        train_loss_md,
+        valid_loss_md,
+        optim,
+        trunc_size,
+        shard_size,
+        norm_method,
+        accum_count,
+        accum_steps,
+        n_gpu,
+        gpu_rank,
+        gpu_verbose_level,
+        report_manager,
+        with_align=True if opt.lambda_align > 0 else False,
+        model_saver=model_saver,
+        average_decay=average_decay,
+        average_every=average_every,
+        model_dtype=opt.model_dtype,
+        earlystopper=earlystopper,
+        dropout=dropout,
+        dropout_steps=dropout_steps,
+        scheduler=scheduler,
+    )
     return trainer
 
 
@@ -137,8 +145,8 @@ class Trainer(object):
                  n_gpu=1, gpu_rank=1, gpu_verbose_level=0,
                  report_manager=None, with_align=False, model_saver=None,
                  average_decay=0, average_every=1, model_dtype='fp32',
-                 earlystopper=None, dropout=[0.3], dropout_steps=[0], dictLangEncoder_toGroup=None,
-                 dictLangDecoder_toGroup=None):
+                 earlystopper=None, dropout=[0.3], dropout_steps=[0],
+                 scheduler=None):
         # Basic attributes.
         self.model = model
         self.train_loss_md = train_loss_md
@@ -164,13 +172,8 @@ class Trainer(object):
         self.dropout = dropout
         self.dropout_steps = dropout_steps
 
-        self.dictLangEncoder_toGroup = dictLangEncoder_toGroup
-        self.dictLangDecoder_toGroup = dictLangDecoder_toGroup
-        #TODO
-        self.numLangPairONthisdevice = 4 #numLangPairONthisdevice
+        self.scheduler = scheduler
 
-        #self.training_step_all = 1
-        self.unique_devide_id =None
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
             if self.accum_count_l[i] > 1:
@@ -182,8 +185,6 @@ class Trainer(object):
         self.model.train()
 
     def _accum_count(self, step):
-        # print("AACOMCONT")
-        # print(step)
         for i in range(len(self.accum_steps)):
             if step > self.accum_steps[i]:
                 _accum = self.accum_count_l[i]
@@ -199,16 +200,10 @@ class Trainer(object):
     def _accum_batches(self, iterator):
         batches = []
         normalization = 0
-        #self.accum_count = self._accum_count(self.training_step_all)
         self.accum_count = self._accum_count(self.optim.training_step)
-        # print("ACCUM BATCH")
         for batch, langPairname in iterator:
-            # print(langPairname) #wmt_en-tr
-            SrcTgt = str(langPairname).split("_")[1].split("-")
-            sourceLang = SrcTgt[0]
-            targetLang = SrcTgt[1]
-            # print(sourceLang)
-            # print(targetLang)
+            # FIXME: change iterator return
+            sourceLang, targetLang = str(langPairname).split("_")[1].split("-")
             batches.append(batch)
             if self.norm_method == "tokens":
                 num_tokens = batch.tgt[1:, :, 0].ne(
@@ -219,7 +214,6 @@ class Trainer(object):
             if len(batches) == self.accum_count:
                 yield batches, normalization, sourceLang, targetLang
                 self.accum_count = self._accum_count(self.optim.training_step)
-                #self.accum_count = self._accum_count(self.training_step_all)
                 batches = []
                 normalization = 0
         if batches:
@@ -269,29 +263,14 @@ class Trainer(object):
         total_stats = onmt.utils.Statistics()
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
-        self.unique_devide_id =unique_devide_id
         self.optim.zero_grad()
         trainEnum = enumerate(self._accum_batches(train_iter))
-        #print("ENURMEATE")
-        #print(trainEnum)
-        #print(next(trainEnum))
-        # WHILE TRUE
-        #self.numLangPairONthisdevice*=4
-        
-        #if self.unique_devide_id ==0 or self.unique_devide_id ==2:
-        #    dataw = [p.data for p in self.model.decoder["decoderet"].parameters()]
-        #    logger.info("devide_id: %s - %s", str(self.unique_devide_id), str(dataw[2][:10]))
-
 
         while True:
 
-            step =  self.optim.training_step #self.training_step_all # self.optim.training_step
+            step =  self.optim.training_step
             self._maybe_update_dropout(step)
 
-            #grads_enc_communication = OrderedDict()
-            #grads_dec_communication = OrderedDict()
-            #grads_att_communication = OrderedDict()
-            #grads_gen_communication = OrderedDict()
             langsEnc = set()
             langsDec = set()
 
@@ -310,10 +289,6 @@ class Trainer(object):
                     batches, normalization, total_stats,
                     report_stats, sourceLang, targetLang)
 
-                #self.update_dict_grads(grads_enc, grads_enc_communication, sourceLang)
-                #self.update_dict_grads(grads_dec, grads_dec_communication, targetLang)
-                #self.update_dict_grads(grads_gen, grads_gen_communication, targetLang)
-                #self.update_dict_grads(grads_att, grads_att_communication, "attention_bridge")
                 langsEnc.add(sourceLang)
                 langsDec.add(targetLang)
 

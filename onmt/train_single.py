@@ -59,100 +59,25 @@ def _build_train_iter(opt, fields, transforms_cls, stride=1, offset=0, nodeID=-1
     return train_iter_map
 
 
-# FIXME: obsolete, replaced by Scheduler.get_distributed_groups
-def create_group_distributed(model_opt, numGPUS, nodeRank, device_id):
-    node_gpu_langsFile = open(model_opt.node_gpu_langs, 'rt')
-    dictLangEncoder_toIDXset = OrderedDict()
-    dictLangDecoder_toIDXset = OrderedDict()
-    langsEnc = OrderedDict()
-    langsDec = OrderedDict()
-#    numLangPairONthisdevice = 0
-    myuniqueidx = numGPUS * nodeRank + device_id
-    for line in node_gpu_langsFile:
-        nodeIDXgpuIdx_langpair = line.strip().split(" ")
-        nodeIDX = int(nodeIDXgpuIdx_langpair[0])
-        gpuIDX = int(nodeIDXgpuIdx_langpair[1])
-        langpair = nodeIDXgpuIdx_langpair[2].split("-")
+def init_distributed(model, scheduler):
+    my_encoder_groups, my_decoder_groups = scheduler.get_distributed_groups()
+    for encoder_id, group in my_encoder_groups:
+        weights = [p.data for p in model.encoder[f'encoder{encoder_id}'].parameters()]
+        print(f'enc weights {weights}')
+        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
-        if nodeIDX == nodeRank and gpuIDX == device_id:
-#            numLangPairONthisdevice+=1
-            if langpair[0] in langsEnc:
-                countIDXlp = langsEnc[langpair[0]]+1
-            else:
-                countIDXlp = 1
-            langsEnc[langpair[0]] = countIDXlp
+    for decoder_id, group in my_decoder_groups:
+        weights = [p.data for p in model.decoder[f'decoder{decoder_id}'].parameters()]
+        print(f'dec weights {weights}')
+        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
-            if langpair[1] in langsDec:
-                countIDXlp = langsDec[langpair[1]]+1
-            else:
-                countIDXlp = 1
-            langsDec[langpair[1]] = countIDXlp
+    # FIXME: need a generator group?
+    #    weights = [p.data for p in model.generator[f'generator{generator_id}'].parameters()]
+    #    print(f'gen weights {weights}')
+    #    all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
-
-#            langsEnc.add(langpair[0])
-#            langsDec.add(langpair[1])
-        dist_rank = numGPUS * nodeIDX + gpuIDX
-
-        if not langpair[0] in dictLangEncoder_toIDXset:
-            idxset = set()
-        else:
-            idxset = dictLangEncoder_toIDXset[langpair[0]]
-        idxset.add(dist_rank)
-        dictLangEncoder_toIDXset[langpair[0]] = idxset
-
-        if not langpair[1] in dictLangDecoder_toIDXset:
-            idxsetD = set()
-        else:
-            idxsetD = dictLangDecoder_toIDXset[langpair[1]]
-        idxsetD.add(dist_rank)
-        dictLangDecoder_toIDXset[langpair[1]] = idxsetD
-
-    node_gpu_langsFile.close()
-    dictLangEncoder_toGroup = OrderedDict()
-    dictLangDecoder_toGroup = OrderedDict()
-
-    for k in dictLangEncoder_toIDXset:
-        if len(list(dictLangEncoder_toIDXset[k])) ==1:
-            continue
-        logger.info("%s encoderGroup %s unique-IDX %s",str(k),str(list(sorted(dictLangEncoder_toIDXset[k]))), myuniqueidx)
-        dictLangEncoder_toGroup[k] = dist.new_group(list(sorted(dictLangEncoder_toIDXset[k])))
-    for k in dictLangDecoder_toIDXset:
-        if len(list(dictLangDecoder_toIDXset[k])) ==1:
-            continue
-        logger.info("%s decoderGroup %s unique-IDX %s", str(k),str(list(sorted(dictLangDecoder_toIDXset[k]))), myuniqueidx)
-        dictLangDecoder_toGroup[k] = dist.new_group(list(sorted(dictLangDecoder_toIDXset[k])))
-
-
-    return dictLangEncoder_toGroup, dictLangDecoder_toGroup, langsEnc, langsDec
-
-
-def init_distributed(model, dictLangEncoder_toGroup, dictLangDecoder_toGroup, langsEnc, langsDec, world_size):
-    for langsource in dictLangEncoder_toGroup.keys():
-        if langsource in langsEnc:
-            groupE = dictLangEncoder_toGroup[langsource]
-            weightsEnc = [p.data for p in model.encoder["encoder" + str(langsource)].parameters()]
-            we = [*weightsEnc]
-            all_reduce_tensors_init(we, float(langsEnc[str(langsource)]), groupE)
-
-    for langtarget in dictLangDecoder_toGroup.keys():
-        if langtarget in langsDec:
-            groupD = dictLangDecoder_toGroup[langtarget]
-            weightsDec = [p.data for p in model.decoder["decoder" + str(langtarget)].parameters()]
-            wd = [*weightsDec]
-            all_reduce_tensors_init(wd, float(langsDec[str(langtarget)]), groupD)
-            logger.info(langtarget)
-            if str(langtarget) == 'cs':
-                for p in model.decoder["decoder" + str(langtarget)].parameters():
-                    logger.info(p[0:10])
-                    break
- 
-            weightsGen = [p.data for p in model.generator["generator" + str(langtarget)].parameters()]
-            wg = [*weightsGen]
-            all_reduce_tensors_init(wg, float(langsDec[str(langtarget)]), groupD)
-
-    weightsAtt = [p.data for p in model.attention_bridge.parameters()]
-    wa = [*weightsAtt]
-    all_reduce_tensors_init(wa, float(world_size))
+    weights = [p.data for p in model.attention_bridge.parameters()]
+    all_reduce_tensors_init(weights, numtoaverage=None, group=None)
 
 
 def main(
@@ -187,59 +112,38 @@ def main(
     model, generators_md = build_model(model_opt, opt, fields_dict, scheduler, checkpoint)
 
     logger.info("INIT MODEL")
-    init_distributed(model, dictLangEncoder_toGroup, dictLangDecoder_toGroup, langsEnc, langsDec, world_size)
+    if local_rank is not None:
+        init_distributed(model, scheduler)
     model.count_parameters(log=logger.info)
-    logger.info("LANGS DEVICE")
-    logger.info(langsEnc)
-    logger.info(langsDec)
 
-#    model, optim, _, _ = deepspeed.initialize(config="/scratch/project_2005099/members/raganato/ds_config.json", model=model, model_parameters=model.parameters())
-    logger.info("MODEL DDDP")
-#    model = DDP(modelz, device_ids=[device_id], output_device=device_id, find_unused_parameters=True)
-    """
-    print("MODEL DDP")
-    print(model)
-    print("MODEL DDP2")
-    for name, param in model.named_parameters():
-          print(name)
-    print("THEN")
-    """
     # Build optimizer.
     logger.info("BUILD OPTMIZER")
-    #optims = {}
-    #for le in langsEnc.keys():
-    #    menc = model.encoder["encoder" + str(le)]
-    #    optimE = Optimizer.from_opt(menc, opt, checkpoint=checkpoint)
-    #    optimE.zero_grad()
-    #    optims["ENC_"+str(le)] = optimE
-    #for ld in langsDec.keys():
-    #    mdec = model.decoder["decoder" + str(ld)]
-    #    optimD = Optimizer.from_opt(mdec, opt, checkpoint=checkpoint)
-    #    optimD.zero_grad()
-    #    optims["DEC_"+str(ld)] = optimD
-    #    mgen = model.generator["generator" + str(ld)]
-    #    optimG = Optimizer.from_opt(mgen, opt, checkpoint=checkpoint)
-    #    optimG.zero_grad()
-    #    optims["GEN_"+str(ld)] = optimG
+    optim = Optimizer.from_opt(
+        model,
+        opt,
+        scheduler=scheduler,
+        checkpoint=checkpoint,
+    )
 
-    #mATT = model.attention_bridge
-    #optimA = Optimizer.from_opt(mATT, opt, checkpoint=checkpoint)
-   # optimA.zero_grad()
-    #optims["attention_bridge"] = optimA
-
-    optim = Optimizer.from_opt(model, opt, checkpoint=checkpoint, langsEnc=langsEnc, langsDec=langsDec)
-
-    #print("TRIANINGI STEPS")
-    #print(optim.training_step)
     # Build model saver
-    model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, unique_device_id)
+    model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, global_rank)
+
     logger.info("BUILD TRAINER")
     trainer = build_trainer(
-        opt, device_id, model, fields_dict, optim, model_saver=model_saver, generators_md=generators_md,  dictLangEncoder_toGroup=dictLangEncoder_toGroup, dictLangDecoder_toGroup=dictLangDecoder_toGroup)
+        opt,
+        local_rank,
+        model,
+        fields_dict,
+        optim,
+        scheduler=scheduler,
+        model_saver=model_saver,
+        generators_md=generators_md,
+    )
     logger.info("DONE BUILD TRAINER")
+
     if batch_queue is None:
         _train_iter_map = _build_train_iter(opt, fields_dict, transforms_cls, stride=1, offset=0, nodeID=0, gpuID=0)
-        train_iter = IterOnDevice(_train_iter_map, device_id)
+        train_iter = IterOnDevice(_train_iter_map, local_rank)
     else:
         assert semaphore is not None, \
             "Using batch_queue requires semaphore as well"

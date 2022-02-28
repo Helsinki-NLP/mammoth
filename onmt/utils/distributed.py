@@ -430,3 +430,7 @@ class Scheduler:
     def get_decoders(self):
         my_decoder_ids = compress(self.decoder_ids, self._selector)
         return my_decoder_ids
+
+    def get_generators(self):
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
+        return [tgt_lang for (src_lang, tgt_lang) in my_lang_pairs]

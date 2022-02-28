@@ -151,11 +151,61 @@ class DynamicDatasetIter(object):
             stride=stride, offset=offset
         )
 
+    @classmethod
+    def from_scheduler(
+        cls,
+        scheduler,
+        transforms_cls,
+        fields_dict,
+        opts,
+        is_train,
+        stride=1,
+        offset=0,
+    ):
+        # FIXME: this is awkward. Remove the old instead.
+        for tpl in scheduler.get_dataset_specs(fields_dict):
+            (
+                lang_pair,
+                encoder_id,
+                decoder_id,
+                corpus_id,
+                corpus,
+                src_fields,
+                tgt_fields
+            ) = tpl
+            merged_fields = {
+                'src': src_fields['src'],
+                'tgt': tgt_fields['tgt']
+            }
+            print(f'merged_fields {merged_fields}')
+
+            if transforms_cls:
+                transforms = make_transforms(opts, transforms_cls, merged_fields)
+            else:
+                print('No transforms defined')
+                transforms = []
+
+            corpora[corpus_id] = corpus
+
+        batch_size = opts.batch_size if is_train else opts.valid_batch_size
+        if opts.batch_size_multiple is not None:
+            batch_size_multiple = opts.batch_size_multiple
+        else:
+            batch_size_multiple = 8 if opts.model_dtype == "fp16" else 1
+        return cls(
+            corpora, opts.data, transforms, fields, is_train, opts.batch_type,
+            batch_size, batch_size_multiple, data_type=opts.data_type,
+            bucket_size=opts.bucket_size, pool_factor=opts.pool_factor,
+            skip_empty_level=opts.skip_empty_level,
+            stride=stride, offset=offset
+        )
+
     def _init_datasets(self):
         datasets_iterables = build_corpora_iters(
             self.corpora, self.transforms, self.corpora_info,
             skip_empty_level=self.skip_empty_level,
             stride=self.stride, offset=self.offset)
+        # FIXME: this needs to be moved later, to support corpora with different Fields
         self.dataset_adapter = DatasetAdapter(self.fields, self.is_train)
         datasets_weights = {
             ds_name: int(self.corpora_info[ds_name]['weight'])
@@ -193,53 +243,5 @@ class DynamicDatasetIter(object):
                 repeat=False,
             )
             for batch in train_iter:
+                # FIXME: add a namedtuple with the metadata?
                 yield batch
-
-
-def build_dynamic_dataset_iter(
-    fields_dict,
-    transforms_cls,
-    opts,
-    scheduler,
-    is_train=True,
-    stride=1,
-    offset=0,
-):
-    """Build `DynamicDatasetIter` from fields & opts."""
-    ddi_map = {}
-    for tpl in scheduler.get_dataset_specs(fields_dict):
-        (
-            lang_pair,
-            encoder_id,
-            decoder_id,
-            corpus_id,
-            corpus,
-            src_fields,
-            tgt_fields
-        ) = tpl
-        merged_fields = {
-            'src': src_fields['src'],
-            'tgt': tgt_fields['tgt']
-        }
-        print(f'merged_fields {merged_fields}')
-
-        if transforms_cls:
-            transforms = make_transforms(opts, transforms_cls, merged_fields)
-        else:
-            print('No transforms defined')
-            transforms = []
-
-        # FIXME: wrap corpus iterator to add the metadata?
-        # FIXME: this wastes the potential of DynamicDatasetIter
-        corpora = {corpus_id: corpus}
-        ddi = DynamicDatasetIter.from_opts(
-            corpora,
-            transforms,
-            merged_fields,
-            opts,
-            is_train,
-            stride=stride,
-            offset=offset
-        )
-        ddi_map[tuple(lang_pair)] = ddi
-    return ddi_map

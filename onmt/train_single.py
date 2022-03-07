@@ -89,7 +89,7 @@ def main(
     scheduler = Scheduler(opt, node_rank=node_rank, local_rank=local_rank)
 
     init_logger(opt.log_file)
-    if local_rank is not None:
+    if node_rank is not None and local_rank is not None:
         configure_process(opt, local_rank)
         gpu_rankT = torch.distributed.get_rank()
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rankT))
@@ -105,7 +105,7 @@ def main(
     model, generators_md = build_model(model_opt, opt, fields_dict, scheduler, checkpoint)
 
     logger.info("INIT MODEL")
-    if local_rank is not None:
+    if node_rank is not None and local_rank is not None:
         init_distributed(model, scheduler)
     model.count_parameters(log=logger.info)
 

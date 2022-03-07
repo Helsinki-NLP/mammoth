@@ -1,5 +1,6 @@
 """Module that contain shard utils for dynamic data."""
 import os
+from itertools import cycle
 from onmt.utils.logging import logger
 from onmt.constants import CorpusName
 from onmt.transforms import TransformPipe
@@ -114,7 +115,7 @@ class DatasetAdapter(object):
         return dataset
 
     def wrap(self, iterable, metadata):
-        for bucket in iterable:
+        for bucket in cycle(iterable):
             examples = self._to_examples(bucket, is_train=self.is_train)
             dataset = TorchtextDataset(examples, self.fields_dict)
             yield dataset, metadata

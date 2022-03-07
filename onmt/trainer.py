@@ -313,10 +313,11 @@ class Trainer(object):
                 p.grad.data for p in self.model.attention_bridge.parameters()
                 if p.requires_grad and p.grad is not None
             ]
-            # a group is not specified: reduce across all devices
-            onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                grads, rescale_denom=1.0
-            )
+            if self.scheduler.node_rank is not None and self.scheduler.local_rank is not None:
+                # a group is not specified: reduce across all devices
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(
+                    grads, rescale_denom=1.0
+                )
 
             self.optim.step()
             self.optim.zero_grad()

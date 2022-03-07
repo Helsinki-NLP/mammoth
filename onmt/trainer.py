@@ -332,27 +332,27 @@ class Trainer(object):
                 metadata
             )
 
-            if valid_iter is not None and step % valid_steps == 0:
-                if self.gpu_verbose_level > 0:
-                    logger.info('GpuRank %d: validate step %d'
-                                % (self.gpu_rank, step))
-                valid_stats = self.validate(
-                    valid_iter, moving_average=self.moving_average, sourceLang=sourceLang, targetLang=targetLang)
-                if self.gpu_verbose_level > 0:
-                    logger.info('GpuRank %d: gather valid stat \
-                                    step %d' % (self.gpu_rank, step))
-                valid_stats = self._maybe_gather_stats(valid_stats)
-                if self.gpu_verbose_level > 0:
-                    logger.info('GpuRank %d: report stat step %d'
-                                % (self.gpu_rank, step))
-                self._report_step(self.optim.learning_rate(), #learning_rate_to_show, #self.optim.learning_rate(),
-                                  step, valid_stats=valid_stats)
-                # Run patience mechanism
-                if self.earlystopper is not None:
-                    self.earlystopper(valid_stats, step)
-                    # If the patience has reached the limit, stop training
-                    if self.earlystopper.has_stopped():
-                        break
+            # if valid_iter is not None and step % valid_steps == 0:
+            #     if self.gpu_verbose_level > 0:
+            #         logger.info('GpuRank %d: validate step %d'
+            #                     % (self.gpu_rank, step))
+            #     valid_stats = self.validate(
+            #         valid_iter, moving_average=self.moving_average, sourceLang=sourceLang, targetLang=targetLang)
+            #     if self.gpu_verbose_level > 0:
+            #         logger.info('GpuRank %d: gather valid stat \
+            #                         step %d' % (self.gpu_rank, step))
+            #     valid_stats = self._maybe_gather_stats(valid_stats)
+            #     if self.gpu_verbose_level > 0:
+            #         logger.info('GpuRank %d: report stat step %d'
+            #                     % (self.gpu_rank, step))
+            #     self._report_step(self.optim.learning_rate(), #learning_rate_to_show, #self.optim.learning_rate(),
+            #                       step, valid_stats=valid_stats)
+            #     # Run patience mechanism
+            #     if self.earlystopper is not None:
+            #         self.earlystopper(valid_stats, step)
+            #         # If the patience has reached the limit, stop training
+            #         if self.earlystopper.has_stopped():
+            #             break
 
             if (self.model_saver is not None
                     and (save_checkpoint_steps != 0
@@ -478,8 +478,6 @@ class Trainer(object):
                 if self.model.decoder[f'decoder{metadata.decoder_id}'].state is not None:
                     self.model.decoder[f'decoder{metadata.decoder_id}'].detach_state()
 
-
-
     def _start_report_manager(self, start_time=None):
         """
         Simple function to start report manager (if any)
@@ -489,24 +487,22 @@ class Trainer(object):
                 self.report_manager.start()
             else:
                 self.report_manager.start_time = start_time
-    
-    
+
     def _maybe_gather_stats(self, stat):
         """
         Gather statistics in multi-processes cases
-    
+
         Args:
             stat(:obj:onmt.utils.Statistics): a Statistics object to gather
                 or None (it returns None in this case)
-    
+
         Returns:
             stat: the updated (or unchanged) stat object
         """
         if stat is not None and self.n_gpu > 1:
             return onmt.utils.Statistics.all_gather_stats(stat)
         return stat
-    
-    
+
     def _maybe_report_training(self, step, num_steps, learning_rate,
                                report_stats, metadata):
         """
@@ -522,8 +518,7 @@ class Trainer(object):
                 else self.earlystopper.current_tolerance,
                 report_stats, metadata,
                 multigpu=self.n_gpu > 1)
-    
-    
+
     def _report_step(self, learning_rate, step, train_stats=None,
                      valid_stats=None):
         """

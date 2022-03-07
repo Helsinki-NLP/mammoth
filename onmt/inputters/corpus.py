@@ -328,43 +328,42 @@ def append_features_to_example(example, features):
     return " ".join(toks)
 
 
-def build_sub_vocab(corpora, transforms, opts, n_sample, stride, offset):
+def build_sub_vocab(corpus_id, corpus, transforms, opts, n_sample, stride, offset):
     """Build vocab on (strided) subpart of the data."""
     sub_counter_src = Counter()
     sub_counter_tgt = Counter()
     sub_counter_src_feats = defaultdict(Counter)
-    datasets_iterables = build_corpora_iters(
-        corpora, transforms, opts.data,
+    c_iter = build_corpora_iter(
+        corpus_id, corpus, transforms, opts.data,
         skip_empty_level=opts.skip_empty_level,
         stride=stride, offset=offset)
-    for c_name, c_iter in datasets_iterables.items():
-        for i, item in enumerate(c_iter):
-            maybe_example = DatasetAdapter._process(item, is_train=True)
-            if maybe_example is None:
-                if opts.dump_samples:
-                    build_sub_vocab.queues[c_name][offset].put("blank")
-                continue
-            src_line, tgt_line = (maybe_example['src']['src'],
-                                  maybe_example['tgt']['tgt'])
-            src_line_pretty = src_line
-            for feat_name, feat_line in maybe_example["src"].items():
-                if feat_name not in ["src", "src_original"]:
-                    sub_counter_src_feats[feat_name].update(
-                        feat_line.split(' '))
-                    if opts.dump_samples:
-                        src_line_pretty = append_features_to_example(
-                            src_line_pretty, feat_line)
-            sub_counter_src.update(src_line.split(' '))
-            sub_counter_tgt.update(tgt_line.split(' '))
+    for i, item in enumerate(c_iter):
+        maybe_example = DatasetAdapter._process(item, is_train=True)
+        if maybe_example is None:
             if opts.dump_samples:
-                build_sub_vocab.queues[c_name][offset].put(
-                    (i, src_line_pretty, tgt_line))
-            if n_sample > 0 and ((i+1) * stride + offset) >= n_sample:
+                build_sub_vocab.queues[corpus_id][offset].put("blank")
+            continue
+        src_line, tgt_line = (maybe_example['src']['src'],
+                              maybe_example['tgt']['tgt'])
+        src_line_pretty = src_line
+        for feat_name, feat_line in maybe_example["src"].items():
+            if feat_name not in ["src", "src_original"]:
+                sub_counter_src_feats[feat_name].update(
+                    feat_line.split(' '))
                 if opts.dump_samples:
-                    build_sub_vocab.queues[c_name][offset].put("break")
-                break
+                    src_line_pretty = append_features_to_example(
+                        src_line_pretty, feat_line)
+        sub_counter_src.update(src_line.split(' '))
+        sub_counter_tgt.update(tgt_line.split(' '))
         if opts.dump_samples:
-            build_sub_vocab.queues[c_name][offset].put("break")
+            build_sub_vocab.queues[corpus_id][offset].put(
+                (i, src_line_pretty, tgt_line))
+        if n_sample > 0 and ((i+1) * stride + offset) >= n_sample:
+            if opts.dump_samples:
+                build_sub_vocab.queues[corpus_id][offset].put("break")
+            break
+    if opts.dump_samples:
+        build_sub_vocab.queues[corpus_id][offset].put("break")
     return sub_counter_src, sub_counter_tgt, sub_counter_src_feats
 
 
@@ -406,7 +405,7 @@ def build_vocab(opts, corpus_id, transforms, n_sample=3):
         write_process.start()
     with mp.Pool(opts.num_threads, init_pool, [queues]) as p:
         func = partial(
-            build_sub_vocab, corpora, transforms,
+            build_sub_vocab, corpus_id, corpora[corpus_id], transforms,
             opts, n_sample, opts.num_threads)
         for sub_counter_src, sub_counter_tgt, sub_counter_src_feats in p.imap(
                 func, range(0, opts.num_threads)):
@@ -431,25 +430,24 @@ def save_transformed_sample(opts, corpus_id, transforms, n_sample=3):
     else:
         raise ValueError(f"n_sample should >= -1, get {n_sample}.")
 
-    corpora = {corpus_id: get_corpus(opts, corpus_id, is_train=True)}
-    datasets_iterables = build_corpora_iters(
-        corpora, transforms, opts.data,
+    corpus = get_corpus(opts, corpus_id, is_train=True)
+    c_iter = build_corpora_iter(
+        corpus_id, corpus, transforms, opts.data,
         skip_empty_level=opts.skip_empty_level)
     sample_path = os.path.join(
         os.path.dirname(opts.save_data), CorpusName.SAMPLE)
     os.makedirs(sample_path, exist_ok=True)
-    for c_name, c_iter in datasets_iterables.items():
-        dest_base = os.path.join(
-            sample_path, "{}.{}".format(c_name, CorpusName.SAMPLE))
-        with open(dest_base + ".src", 'w', encoding="utf-8") as f_src,\
-                open(dest_base + ".tgt", 'w', encoding="utf-8") as f_tgt:
-            for i, item in enumerate(c_iter):
-                maybe_example = DatasetAdapter._process(item, is_train=True)
-                if maybe_example is None:
-                    continue
-                src_line, tgt_line = (maybe_example['src']['src'],
-                                      maybe_example['tgt']['tgt'])
-                f_src.write(src_line + '\n')
-                f_tgt.write(tgt_line + '\n')
-                if n_sample > 0 and i >= n_sample:
-                    break
+    dest_base = os.path.join(
+        sample_path, "{}.{}".format(corpus_id, CorpusName.SAMPLE))
+    with open(dest_base + ".src", 'w', encoding="utf-8") as f_src,\
+            open(dest_base + ".tgt", 'w', encoding="utf-8") as f_tgt:
+        for i, item in enumerate(c_iter):
+            maybe_example = DatasetAdapter._process(item, is_train=True)
+            if maybe_example is None:
+                continue
+            src_line, tgt_line = (maybe_example['src']['src'],
+                                  maybe_example['tgt']['tgt'])
+            f_src.write(src_line + '\n')
+            f_tgt.write(tgt_line + '\n')
+            if n_sample > 0 and i >= n_sample:
+                break

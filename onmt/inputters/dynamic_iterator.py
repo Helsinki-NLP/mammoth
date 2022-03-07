@@ -117,7 +117,7 @@ class DynamicDatasetIter(object):
                  batch_type, batch_size, batch_size_multiple, data_type="text",
                  bucket_size=2048, pool_factor=8192,
                  skip_empty_level='warning', stride=1, offset=0):
-        self.scheduler_scheduler
+        self.scheduler = scheduler
         self.opts = opts
         self.transforms_cls = transforms_cls
         self.fields_dict = fields_dict
@@ -196,7 +196,7 @@ class DynamicDatasetIter(object):
                 stride=self.stride, offset=self.offset
             )
             bucketed_iter = self._bucketing(raw_iter)
-            dataset_adapter = DatasetAdapter(self.fields, self.is_train)
+            dataset_adapter = DatasetAdapter(merged_fields, self.is_train)
             transformed_iter = dataset_adapter.wrap(bucketed_iter, metadata)
 
             datasets_iterables[corpus_id] = transformed_iter
@@ -221,7 +221,7 @@ class DynamicDatasetIter(object):
     def __iter__(self):
         if self.init_iterators is False:
             self._init_datasets()
-        for dataset, metadata in self.mixer():
+        for dataset, metadata in self.mixer:
             train_iter = OrderedIterator(
                 dataset,
                 self.batch_size,

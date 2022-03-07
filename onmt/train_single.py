@@ -161,7 +161,7 @@ def main(
     logger.info("VALID ITER")
     valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
     if valid_iter is not None:
-        valid_iter = IterOnDevice(valid_iter, device_id)
+        valid_iter = IterOnDevice(valid_iter, local_rank)
 
     if len(opt.gpu_ranks):
         logger.info('Starting training on GPU: %s' % opt.gpu_ranks)
@@ -177,7 +177,9 @@ def main(
         train_steps,
         save_checkpoint_steps=opt.save_checkpoint_steps,
         valid_iter=valid_iter,
-        valid_steps=opt.valid_steps, unique_devide_id=unique_device_id)
+        valid_steps=opt.valid_steps,
+        global_rank=global_rank
+    )
 
     if trainer.report_manager.tensorboard_writer is not None:
         trainer.report_manager.tensorboard_writer.close()

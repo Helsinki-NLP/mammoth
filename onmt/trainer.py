@@ -174,6 +174,8 @@ class Trainer(object):
 
         self.scheduler = scheduler
 
+        self.my_encoder_groups, self.my_decoder_groups = self.scheduler.get_distributed_groups()
+
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
             if self.accum_count_l[i] > 1:
@@ -236,7 +238,8 @@ class Trainer(object):
               train_steps,
               save_checkpoint_steps=5000,
               valid_iter=None,
-              valid_steps=10000, unique_devide_id=None):
+              valid_steps=10000,
+              global_rank=None):
         """
         The main training loop by iterating over `train_iter` and possibly
         running validation on `valid_iter`.
@@ -266,173 +269,66 @@ class Trainer(object):
 
         while True:
 
-            step =  self.optim.training_step
+            step = self.optim.training_step
             self._maybe_update_dropout(step)
 
-            langsEnc = set()
-            langsDec = set()
-
-            for j in range(self.numLangPairONthisdevice):
-                i, (batches, normalization, sourceLang, targetLang) = next(trainEnum)
-                # step = self.optim.training_step
-                # self._maybe_update_dropout(step)
-                #logger.info("%s - %s -RANK: %s", str(sourceLang),str(targetLang),str(unique_devide_id))
+            for j in range(self.scheduler.gpus_per_node):
+                i, (batches, normalization, metadata) = next(trainEnum)
+                logger.info(f'{j} {i} global_rank {global_rank}: {metadata}')
 
                 if self.n_gpu > 1:
-                    normalization = sum(onmt.utils.distributed
-                                        .all_gather_list
-                                        (normalization))
+                    normalization = sum(
+                        onmt.utils.distributed.all_gather_list(normalization)
+                    )
 
                 grads_enc, grads_dec, grads_att, grads_gen = self._gradient_accumulation_overLangPair(
                     batches, normalization, total_stats,
-                    report_stats, sourceLang, targetLang)
-
-                langsEnc.add(sourceLang)
-                langsDec.add(targetLang)
-
-
-            sourceLang = str(langsEnc)
-            targetLang = str(langsDec)
-            #logger.info(sourceLang + " - "+ targetLang)
-            #logger.info("ENC")
+                    report_stats, metadata)
             
-            #logger.info("START Unique devide id %s",self.unique_devide_id)
-            
-            for langsource in self.dictLangEncoder_toGroup.keys():
-                if langsource in langsEnc:
-                    #logger.info("%s EncoderGrads - Unique devide id %s",langsource, self.unique_devide_id)
-                    groupE = self.dictLangEncoder_toGroup[langsource]
-                    #logger.info(groupE)
-                    #gradse = grads_enc_communication[langsource]
-                    gradse = [p.grad.data for p in self.model.encoder["encoder" + str(langsource)].parameters() if
-                                p.requires_grad and p.grad is not None]
-                    #logger.info(gradse)
-                    onmt.utils.distributed.all_reduce_and_rescale_tensors(gradse, float(1), groupE)
-                    #idxgra=0
-                    #for p in self.model.encoder["encoder"+str(langsource)].parameters():
-                    #    p.grad.data = gradse[idxgra]
-                    #    idxgra+=1
+            for encoder_id, group in self.my_encoder_groups:
+                grads = [p.grad.data for p in model.encoder[f'encoder{encoder_id}'].parameters()]
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(
+                    grads, rescale_denom=1.0, group=group
+                )
+            for decoder_id, group in self.my_decoder_groups:
+                grads = [p.grad.data for p in model.decoder[f'decoder{decoder_id}'].parameters()]
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(
+                    grads, rescale_denom=1.0, group=group
+                )
+                # Assuming that generators are in the same group as decoders
+                grads = [
+                    p.grad.data for p
+                    in self.model.generator[f'generator{metadata.trg_lang}'.parameters()]
+                    if p.requires_grad and p.grad is not None
+                ]
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(
+                    grads, rescale_denom=1.0, group=group
+                )
 
+            grads = [
+                p.grad.data for p in self.model.attention_bridge.parameters()
+                if p.requires_grad and p.grad is not None
+            ]
+            # a group is not specified: reduce across all devices
+            onmt.utils.distributed.all_reduce_and_rescale_tensors(
+                grads, rescale_denom=1.0
+            )
 
-            
-            #onmt.utils.distributed.all_reduce_and_rescale_tensors(gradse, float(1))#, group)
-            #print("DEC and GEN")
-            for langtarget in self.dictLangDecoder_toGroup.keys():
-                if langtarget in langsDec:
-#                    logger.info("%s DecoderGrads - Unique devide id %s",langtarget, self.unique_devide_id)
-                    groupD = self.dictLangDecoder_toGroup[langtarget]
-                    #logger.info(groupD)
-                    #gradsd = grads_dec_communication[langtarget]
-                    gradsd = [p.grad.data for p in self.model.decoder["decoder" + str(langtarget)].parameters() if
-                                p.requires_grad and p.grad is not None]
-
-                    onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsd, float(1), groupD)
-                    #idxgra=0
-                    #for p in self.model.decoder["decoder"+str(langtarget)].parameters():
-                    #    p.grad.data = gradsd[idxgra]
-                    #    idxgra+=1
-                    #if str(langtarget) == 'cs':
-                    #    for p in self.model.decoder["decoder" + str(langtarget)].parameters():
-                    #        logger.info("Traindevice "+str(self.unique_devide_id)+" "+str(p[5:10]))
-                    #        break
-
-#                    if (self.unique_devide_id ==0 or self.unique_devide_id ==2) and langtarget =="et" :
-#                        logger.info("%s DecoderGrads - Unique devide id %s - %s - %s",langtarget, self.unique_devide_id, str(step), str(gradsd[2][:10]))
-#                        idxgra=0
-#                        for p in self.model.decoder["decoder"+str(langtarget)].parameters():
-#                            p.grad.data = gradsd[idxgra]
-#                            idxgra+=1
-                #onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsd, float(1))#, group)
-                #for t in gradsd:
-                #    torch.distributed.all_reduce(t)
-                    #logger.info("%s GeneratorGrads - Unique devide id %s",langtarget, self.unique_devide_id)
-                    #gradsg = grads_gen_communication[langtarget]
-                    gradsg = [p.grad.data for p in self.model.generator["generator" + str(langtarget)].parameters() if
-                                p.requires_grad and p.grad is not None]
-                    onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsg, float(1), groupD)
-                    #idxgra=0
-                    #for p in self.model.generator["generator"+str(langtarget)].parameters():
-                    #    p.grad.data = gradsg[idxgra]
-                    #    idxgra+=1
-
-                #onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsg, float(1))#, group)
-                #for t in gradsg:
-                #    torch.distributed.all_reduce(t)
-                        
-
-            #langsource = "en"
-            #gradse = grads_enc_communication[langsource]
-            #logger.info("EN case ENC")
-            #onmt.utils.distributed.all_reduce_and_rescale_tensors(gradse, float(1))
-
-            #langtarget = "en"
-            #gradsd = grads_dec_communication[langtarget]
-            #logger.info("EN case DEC")
-            #onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsd, float(1))
-
-            #gradsg = grads_gen_communication[langtarget]
-            #logger.info("EN case GEN")
-            #onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsg, float(1))
-
-
-            #print("ATT")
-            #logger.info("%s AttentionGrads - Unique devide id %s",sourceLang, self.unique_devide_id)
-            #gradsa = grads_att_communication["attention_bridge"]
-            gradsa = [p.grad.data for p in self.model.attention_bridge.parameters() if
-                            p.requires_grad and p.grad is not None]
-            onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsa, float(1))
-            #idxgra=0
-            #for p in self.model.attention_bridge.parameters():
-            #    p.grad.data = gradsa[idxgra]
-            #    idxgra+=1
-
-            #for t in gradsa:
-            #    torch.distributed.all_reduce(t)
-            #logger.info("done comm grads - Unique devide id %s",self.unique_devide_id)
-
-            #TODO
-            #for le in langsEnc:
-            #    optimEnc  = self.optim["ENC_"+str(le)]
-            #    optimEnc.step()
-            #    optimEnc.zero_grad()
-            #for ld in langsDec:
-            #    optimDec  = self.optim["DEC_"+str(ld)]
-            #    optimDec.step()
-            #    optimDec.zero_grad()
-            #    optimGen  = self.optim["GEN_"+str(ld)]
-            #    optimGen.step()
-            #    optimGen.zero_grad()
-
-            #optimATT = self.optim["attention_bridge"]
-            ##optimATT.step()
-            #optimATT.zero_grad()
-
-            #if self.unique_devide_id ==0 or self.unique_devide_id ==2:
-            #    dataw = [p.data for p in self.model.decoder["decoderet"].parameters()]
-            #    datagw = [p.grad.data for p in self.model.decoder["decoderet"].parameters()]
-            #    logger.info("devide_id: %s - BEFORE %s - %s - %s", str(self.unique_devide_id), str(step), str(dataw[2][:10]), str(datagw[2][:10]))
-
-            self.optim.step()#langsEnc, langsDec)
-            #self.training_step_all+=1
+            self.optim.step()
             self.optim.zero_grad()
-            #learning_rate_to_show = optimATT.learning_rate()
 
-            #if self.unique_devide_id ==0 or self.unique_devide_id ==2:
-            #    dataw = [p.data for p in self.model.decoder["decoderet"].parameters()]
-            #    datagw = [p.grad.data for p in self.model.decoder["decoderet"].parameters()]
-            #    logger.info("devide_id: %s - AFTER %s - %s - %s", str(self.unique_devide_id), str(step), str(dataw[2][:10]), str(datagw[2][:10]))
-
-
-           # logger.info("done optim - Unique devide id %s",self.unique_devide_id)
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)
 
 
             report_stats = self._maybe_report_training(
-                step, train_steps,
-                self.optim.learning_rate(), #learning_rate_to_show, #self.optim.learning_rate(),
-                report_stats, (sourceLang, targetLang))
+                step,
+                train_steps,
+                self.optim.learning_rate(),
+                report_stats,
+                metadata
+            )
 
             if valid_iter is not None and step % valid_steps == 0:
                 if self.gpu_verbose_level > 0:
@@ -468,20 +364,6 @@ class Trainer(object):
             self.model_saver.save(step, moving_average=self.moving_average)
         return total_stats
 
-    
-    def update_dict_grads(self, gradsIN, grads_dict, lang):
-        if gradsIN == None:
-            return
-        if not lang in grads_dict:
-            grads_dict[lang] = gradsIN
-        else:
-            grads = grads_dict[lang]
-            my_list = [grads, gradsIN]
-            result = torch.stack(my_list).sum(dim=0)        
-            gradsTot = result #[*map(add, grads, gradsIN)] #list( )
-            #gradsTot = grads + gradsIN
-            grads_dict[lang] = gradsTot
-    
     
     def validate(self, valid_iter, moving_average=None, sourceLang=None, targetLang=None):
         """ Validate model.
@@ -533,7 +415,7 @@ class Trainer(object):
     
     
     def _gradient_accumulation_overLangPair(self, true_batches, normalization, total_stats,
-                                            report_stats, sourceLang, targetLang):
+                                            report_stats, metadata):
         grads_enc = None  # _communication = OrderedDict()
         grads_dec = None  # _communication = OrderedDict()
         grads_att = None  # _communication = OrderedDict()
@@ -836,7 +718,7 @@ class Trainer(object):
     
     
     def _maybe_report_training(self, step, num_steps, learning_rate,
-                               report_stats, src_tgt):
+                               report_stats, metadata):
         """
         Simple function to report training stats (if report_manager is set)
         see `onmt.utils.ReportManagerBase.report_training` for doc
@@ -848,7 +730,7 @@ class Trainer(object):
                 learning_rate,
                 None if self.earlystopper is None
                 else self.earlystopper.current_tolerance,
-                report_stats, src_tgt,
+                report_stats, metadata,
                 multigpu=self.n_gpu > 1)
     
     

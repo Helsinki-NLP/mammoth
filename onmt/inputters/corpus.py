@@ -113,6 +113,12 @@ class DatasetAdapter(object):
         dataset = TorchtextDataset(examples, self.fields_dict)
         return dataset
 
+    def wrap(self, iterable, metadata):
+        for bucket in iterable:
+            examples = self._to_examples(bucket, is_train=self.is_train)
+            dataset = TorchtextDataset(examples, self.fields_dict)
+            yield dataset, metadata
+
 
 class ParallelCorpus(object):
     """A parallel corpus file pair that can be loaded to iterate."""

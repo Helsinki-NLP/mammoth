@@ -186,46 +186,15 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
     init_logger(opt.log_file, log_level=log_level)
     set_random_seed(opt.seed, False)
     logger.info("BATCH PRODUCER")
-    logger.info(generator_to_serve_map)
+    logger.info(generator_to_serve)
 
-    def pred(x):
-        """
-        Filters batches that belong only
-        to gpu_ranks of current node
-        """
-        for rank in opt.gpu_ranks:
-            if x[0] % opt.world_size == rank:
-                return True
-
-    ll = list(generator_to_serve_map.keys())
-    train_iters = {
-        k: (filter(pred, enumerate(f)))
-        for k, f in generator_to_serve_map.items()
-    }
-
-    sizeLL = len(ll)
-
-    first = True
-    while True:
-        for idx in range(0, sizeLL):
-            train_enum = train_iters[ll[idx]]
-
-            def next_batch(langPairName):
-                # NOTE: stride (if needed) is handled at the
-                # generator (train_iter) level
-                new_batch = next(train_enum)
-                semaphore.acquire()
-                return new_batch[1], langPairName
-
-            if first:
-                b, langPairName = next_batch(ll[idx])
-                first = False
-            b.dataset = None
-            # Move batch to correspond device_id when consumer iterate
-            # hack to dodge unpicklable `dict_keys`
-            b.fields = list(b.fields)
-            queue.put((b, langPairName))
-            b, langPairName = next_batch(ll[idx])
+    for batch, metadata in generator_to_serve:
+        semaphore.acquire()
+        batch.dataset = None
+        # Move batch to correspond device_id when consumer iterate
+        # hack to dodge unpicklable `dict_keys`
+        batch.fields = list(batch.fields)
+        queue.put((batch, metadata))
 
 
 def consumer(

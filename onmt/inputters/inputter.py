@@ -207,13 +207,14 @@ class IterOnDevice(object):
     """Sent items from `iterable` on `device_id` and yield."""
 
     def __init__(self, iterable, device_id):
-        self.iterable_map = iterable
+        self.iterable = iterable
         self.device_id = device_id
 
     @staticmethod
     def batch_to_device(batch, device_id):
         """Move `batch` to `device_id`, cpu if `device_id` < 0."""
-        curr_device = batch.indices.device
+        curr_device = batch.tgt.device
+        device_id = device_id if device_id is not None else -1
         device = torch.device(device_id) if device_id >= 0 \
             else torch.device('cpu')
         if curr_device != device:
@@ -222,7 +223,8 @@ class IterOnDevice(object):
             else:
                 batch.src = batch.src.to(device)
             batch.tgt = batch.tgt.to(device)
-            batch.indices = batch.indices.to(device)
+            batch.indices = batch.indices.to(device) \
+                if hasattr(batch, 'indices') else None
             batch.alignment = batch.alignment.to(device) \
                 if hasattr(batch, 'alignment') else None
             batch.src_map = batch.src_map.to(device) \
@@ -231,9 +233,9 @@ class IterOnDevice(object):
                 if hasattr(batch, 'align') else None
 
     def __iter__(self):
-        for batch in self.iterable:
+        for batch, metadata in self.iterable:
             self.batch_to_device(batch, self.device_id)
-            yield batch
+            yield batch, metadata
 
 
 def filter_example(ex, use_src_len=True, use_tgt_len=True,

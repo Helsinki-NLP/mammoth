@@ -215,10 +215,11 @@ def build_task_specific_model(
         encoder = build_only_enc(model_opt, pluggable_src_emb)
         encoders_md.add_module(f'encoder{encoder_id}', encoder)
 
-    for side, lang, encoder_id, fields in scheduler.get_fields(
+    for side, lang, decoder_id, fields in scheduler.get_fields(
         side='tgt', fields_dict=fields_dict
     ):
         tgt_emb = build_tgt_emb(model_opt, fields)
+        tgt_embs_by_decoder[decoder_id][lang] = tgt_emb
         generator = build_generator(
             model_opt,
             fields,
@@ -242,7 +243,11 @@ def build_task_specific_model(
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         attention_bridge.half()
 
-    nmt_model = onmt.models.NMTModel(encoder=encoders_md, decoder=decoders_md, attention_bridge=attention_bridge)
+    nmt_model = onmt.models.NMTModel(
+        encoder=encoders_md,
+        decoder=decoders_md,
+        attention_bridge=attention_bridge
+    )
     return nmt_model, generators_md
 
 
@@ -258,7 +263,7 @@ def build_only_enc(model_opt, src_emb):
                 xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         encoder.half()
-        
+
     return encoder
 
 

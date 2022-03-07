@@ -1,6 +1,6 @@
 """ Onmt NMT Model base class definition """
 import torch.nn as nn
-from onmt.attention_bridge import AttentionBridge
+
 
 class BaseModel(nn.Module):
     """
@@ -58,21 +58,27 @@ class NMTModel(BaseModel):
         self.decoder = decoder
         self.attention_bridge = attention_bridge
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False, src_task=None, tgt_task=None):
+    def forward(self, src, tgt, lengths, bptt=False, with_align=False, metadata=None):
         dec_in = tgt[:-1]  # exclude last target from inputs
 
-        encoderLang = self.encoder["encoder"+str(src_task)]
-        decoderLang = self.decoder["decoder"+str(tgt_task)]
+        encoder = self.encoder[f'encoder{metadata.encoder_id}']
+        decoder = self.decoder[f'decoder{metadata.decoder_id}']
+        # Activate the correct pluggable embeddings
+        encoder.embeddings.activate(metadata.src_lang)
+        decoder.embeddings.activate(metadata.tgt_lang)
 
-        enc_state, memory_bank, lengths, mask = encoderLang(src, lengths)
+        enc_state, memory_bank, lengths, mask = encoder(src, lengths)
 
         alphas, memory_bank = self.attention_bridge(memory_bank, mask)
 
         if not bptt:
-            decoderLang.init_state(src, memory_bank, enc_state)
-        dec_out, attns = decoderLang(dec_in, memory_bank,
-                                      memory_lengths=None,
-                                      with_align=with_align)
+            decoder.init_state(src, memory_bank, enc_state)
+        dec_out, attns = decoder(
+            dec_in,
+            memory_bank,
+            memory_lengths=None,
+            with_align=with_align
+        )
         return dec_out, attns
 
     def update_dropout(self, dropout):
@@ -89,7 +95,7 @@ class NMTModel(BaseModel):
         """
 
         enc, dec = 0, 0
-        
+
         for name, param in self.named_parameters():
             if 'encoder' in name:
                 enc += param.nelement()

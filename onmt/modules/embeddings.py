@@ -10,6 +10,7 @@ from onmt.utils.logging import logger
 #import bitsandbytes as bnb
 #from onmt.modules.stable_embeddings import StableEmbedding
 
+
 class SequenceTooLongError(Exception):
     pass
 
@@ -269,11 +270,21 @@ class PluggableEmbeddings(nn.ModuleDict):
         self.active_key = None
 
     def activate(self, key):
+        assert f'embeddings{key}' in self, \
+            f'Embeddings "embeddings{key}" not in {self.keys()}'
         self.active_key = key
 
-    def forward(self, source, step=None):
+    @property
+    def _active_embeddings(self):
         active_embeddings = self[f'embeddings{self.active_key}']
-        return active_embeddings.forward(source, step=step)
+        return active_embeddings
+
+    def forward(self, source, step=None):
+        return self._active_embeddings.forward(source, step=step)
+
+    @property
+    def word_padding_idx(self):
+        return self._active_embeddings.word_padding_idx
 
 
 # Some utilitary functions for pretrained embeddings

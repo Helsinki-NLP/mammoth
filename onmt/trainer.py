@@ -207,7 +207,7 @@ class Trainer(object):
             batches.append(batch)
             if self.norm_method == "tokens":
                 num_tokens = batch.tgt[1:, :, 0].ne(
-                    self.train_loss_md["trainloss" + metadata.tgt_lang].padding_idx).sum()
+                    self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
                 normalization += num_tokens.item()
             else:
                 normalization += batch.batch_size
@@ -281,17 +281,21 @@ class Trainer(object):
                         onmt.utils.distributed.all_gather_list(normalization)
                     )
 
-                grads_enc, grads_dec, grads_att, grads_gen = self._gradient_accumulation_overLangPair(
-                    batches, normalization, total_stats,
-                    report_stats, metadata)
-            
+                self._gradient_accumulation_overLangPair(
+                    batches,
+                    normalization,
+                    total_stats,
+                    report_stats,
+                    metadata
+                )
+
             for encoder_id, group in self.my_encoder_groups:
-                grads = [p.grad.data for p in model.encoder[f'encoder{encoder_id}'].parameters()]
+                grads = [p.grad.data for p in self.model.encoder[f'encoder{encoder_id}'].parameters()]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
             for decoder_id, group in self.my_decoder_groups:
-                grads = [p.grad.data for p in model.decoder[f'decoder{decoder_id}'].parameters()]
+                grads = [p.grad.data for p in self.model.decoder[f'decoder{decoder_id}'].parameters()]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
@@ -317,10 +321,8 @@ class Trainer(object):
             self.optim.step()
             self.optim.zero_grad()
 
-
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)
-
 
             report_stats = self._maybe_report_training(
                 step,
@@ -364,7 +366,6 @@ class Trainer(object):
             self.model_saver.save(step, moving_average=self.moving_average)
         return total_stats
 
-    
     def validate(self, valid_iter, moving_average=None, sourceLang=None, targetLang=None):
         """ Validate model.
             valid_iter: validate data iterator
@@ -412,47 +413,46 @@ class Trainer(object):
         valid_model.train()
     
         return stats
-    
-    
-    def _gradient_accumulation_overLangPair(self, true_batches, normalization, total_stats,
-                                            report_stats, metadata):
-        grads_enc = None  # _communication = OrderedDict()
-        grads_dec = None  # _communication = OrderedDict()
-        grads_att = None  # _communication = OrderedDict()
-        grads_gen = None  # _communication = OrderedDict()
-    
+
+    def _gradient_accumulation_overLangPair(
+        self,
+        true_batches,
+        normalization,
+        total_stats,
+        report_stats,
+        metadata
+    ):
         for k, batch in enumerate(true_batches):
-    
+
             target_size = batch.tgt.size(0)
             # Truncated BPTT: reminder not compatible with accum > 1
             if self.trunc_size:
                 trunc_size = self.trunc_size
             else:
                 trunc_size = target_size
-    
+
             src, src_lengths = batch.src if isinstance(batch.src, tuple) \
                 else (batch.src, None)
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
-    
+
             tgt_outer = batch.tgt
-    
+
             bptt = False
             for j in range(0, target_size - 1, trunc_size):
                 # 1. Create truncated target.
                 tgt = tgt_outer[j: j + trunc_size]
-                #TODO: AMP == TRUE If fp16 
-                #logger.info("ENABLED asd %s", self.optim["attention_bridge"].amp)
-                with torch.cuda.amp.autocast(enabled=self.optim.amp): #self.optim.amp):
-                    # print("BATCH DEVICE")
-                    # print(str(src.device)+ " - "+ str(tgt.device))
+                # TODO: AMP == TRUE If fp16
+                with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     outputs, attns = self.model(
                         src, tgt, src_lengths, bptt=bptt,
-                        with_align=self.with_align, src_task=sourceLang, tgt_task=targetLang)
+                        with_align=self.with_align,
+                        metadata=metadata
+                    )
                     bptt = True
-    
+
                     # 3. Compute loss.
-                    loss, batch_stats = self.train_loss_md["trainloss" + targetLang](
+                    loss, batch_stats = self.train_loss_md[f'trainloss{metadata.tgt_lang}'](
                         batch,
                         outputs,
                         attns,
@@ -460,236 +460,26 @@ class Trainer(object):
                         shard_size=self.shard_size,
                         trunc_start=j,
                         trunc_size=trunc_size)
-                    #logger.info(loss)
-    
+                    # logger.info(loss)
+
                 try:
                     if loss is not None:
-                        #loss.backward()               
                         self.optim.backward(loss)
-                        #optimGen  = self.optim["GEN_"+str(targetLang)]
-                        #optimGen.backward(loss)
-                        #optimDec  = self.optim["DEC_"+str(targetLang)]
-                        #optimDec.backward(loss)
-                        #optimATT = self.optim["attention_bridge"]
-                        #optimATT.backward(loss)
-                        #optimEnc  = self.optim["ENC_"+str(sourceLang)]
-                        #optimEnc.backward(loss)
-    
+
                     total_stats.update(batch_stats)
                     report_stats.update(batch_stats)
-    
+
                 except Exception:
                     traceback.print_exc()
                     logger.info("At step %d, we removed a batch - accum %d",
                                 self.training_step_all, k)
-                """
-                if sourceLang in self.dictLangEncoder_toGroup.keys():    
-                    gradsEnc = [p.grad.data for p in self.model.encoder["encoder" + str(sourceLang)].parameters() if
-                                p.requires_grad and p.grad is not None]
-                    gradse = gradsEnc #[*gradsEnc]
-                    if grads_enc == None:
-                        grads_enc = gradse
-                    else:
-                        my_list = [grads_enc, gradse]
-                        result = torch.stack(my_list).sum(dim=0)                        
-                        grads_enc = result #[*map(add, grads_enc, gradse)] # list() 
 
-                if targetLang in self.dictLangDecoder_toGroup.keys():    
-                    gradsDec = [p.grad.data for p in self.model.decoder["decoder" + str(targetLang)].parameters() if
-                                p.requires_grad and p.grad is not None]
-                    gradsd = gradsDec #[*gradsDec]
-                    if grads_dec == None:
-                        grads_dec = gradsd
-                    else:
-                        my_list = [grads_dec, gradsd]
-                        result = torch.stack(my_list).sum(dim=0)                        
-                        grads_dec = result # torch.add(grads_dec, gradsd) #[*map(add, grads_dec, gradsd)] # list() 
-
-                    gradsGen = [p.grad.data for p in self.model.generator["generator" + str(targetLang)].parameters() if
-                                p.requires_grad and p.grad is not None]
-                    gradsg = gradsGen # [*gradsGen]
-                    if grads_gen == None:
-                        grads_gen = gradsg
-                    else:
-                        my_list = [grads_gen, gradsg]
-                        result = torch.stack(my_list).sum(dim=0)                        
-                        grads_gen = result #torch.add(grads_gen, gradsg) #[*map(add, grads_gen, gradsg)]# list() 
-    
-                gradsAtt = [p.grad.data for p in self.model.attention_bridge.parameters() if
-                            p.requires_grad and p.grad is not None]
-                gradsa = gradsAtt #[*gradsAtt]
-                if grads_att == None:
-                    grads_att = gradsa
-                else:
-                    my_list = [grads_att, gradsa]
-                    result = torch.stack(my_list).sum(dim=0)                        
-                    grads_att = result #torch.add(grads_att, gradsa)# [*map(add, grads_att, gradsa)] #list() 
-                """     
-    
-
-    
-                #                self.update_dict_grads(gradse, grads_enc_communication, sourceLang)
-                #                self.update_dict_grads(gradsd, grads_dec_communication, targetLang)
-                #                self.update_dict_grads(gradsg, grads_gen_communication, targetLang)
-                #                self.update_dict_grads(gradsa, grads_att_communication, "attention_bridge")
-    
                 # If truncated, don't backprop fully.
-                if self.model.decoder["decoder" + str(targetLang)].state is not None:
-                    self.model.decoder["decoder" + str(targetLang)].detach_state()
-    
-        return grads_enc, grads_dec, grads_att, grads_gen
-    
-    
-    def _gradient_accumulation(self, true_batches, normalization, total_stats,
-                               report_stats, sourceLang, targetLang):
-        if self.accum_count > 1:
-            self.optim.zero_grad()
-        # print("GRADIENT ACC")
-        # print(str(sourceLang)+" - "+str(targetLang))
-        # deviceENC = next(self.model.encoder["encoder"+str(sourceLang)].parameters()).device
-        # print(deviceENC)
-        # print(next(self.model.decoder["decoder"+str(targetLang)].parameters()).device)
-        # self.model.decoder["decoder"+str(sourceLang)].to(deviceENC)
-        # print(next(self.model.decoder["decoder"+str(targetLang)].parameters()).device)
-    
-        for k, batch in enumerate(true_batches):
-    
-            target_size = batch.tgt.size(0)
-            # Truncated BPTT: reminder not compatible with accum > 1
-            if self.trunc_size:
-                trunc_size = self.trunc_size
-            else:
-                trunc_size = target_size
-    
-            src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                else (batch.src, None)
-            if src_lengths is not None:
-                report_stats.n_src_words += src_lengths.sum().item()
-    
-            tgt_outer = batch.tgt
-    
-            bptt = False
-            for j in range(0, target_size - 1, trunc_size):
-                # 1. Create truncated target.
-                tgt = tgt_outer[j: j + trunc_size]
-    
-                # 2. F-prop all but generator.
-                if self.accum_count == 1:
-                    self.optim.zero_grad()
-    
-                with torch.cuda.amp.autocast(enabled=self.optim.amp):
-                    # print("BATCH DEVICE")
-                    # print(str(src.device)+ " - "+ str(tgt.device))
-                    outputs, attns = self.model(
-                        src, tgt, src_lengths, bptt=bptt,
-                        with_align=self.with_align, src_task=sourceLang, tgt_task=targetLang)
-                    bptt = True
-    
-                    # 3. Compute loss.
-                    loss, batch_stats = self.train_loss_md["trainloss" + targetLang](
-                        batch,
-                        outputs,
-                        attns,
-                        normalization=normalization,
-                        shard_size=self.shard_size,
-                        trunc_start=j,
-                        trunc_size=trunc_size)
-    
-                try:
-                    if loss is not None:
-                        self.optim.backward(loss)
-    
-                    total_stats.update(batch_stats)
-                    report_stats.update(batch_stats)
-    
-                except Exception:
-                    traceback.print_exc()
-                    logger.info("At step %d, we removed a batch - accum %d",
-                                self.optim.training_step, k) #self.training_step_all, 
-    
-                # 4. Update the parameters and statistics.
-                if self.accum_count == 1:
-                    # self.optim.step()
-                    # Multi GPU gradient gather
-                    if self.n_gpu > 1:
-                        gradsEnc = [p.grad.data for p in self.model.encoder["encoder" + str(sourceLang)].parameters()
-                                    if p.requires_grad
-                                    and p.grad is not None]
-                        gradse = [*gradsEnc]
-                        group = self.dictLangEncoder_toGroup[sourceLang]
-                        # torch.distributed.all_reduce(gradse, group=group)
-                        onmt.utils.distributed.all_reduce_and_rescale_tensors(gradse, float(1), group)
-    
-                        gradsATT = self.model.attention_bridge.parameters()
-                        gradsa = [*gradsATT]
-                        # torch.distributed.all_reduce(gradsa, group=group)
-                        onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsa, float(1))
-    
-                        gradsDec = [p.grad.data for p in self.model.decoder["decoder" + str(targetLang)].parameters()
-                                    if p.requires_grad
-                                    and p.grad is not None]
-                        gradsd = [*gradsDec]
-                        group = self.dictLangDecoder_toGroup[targetLang]
-                        # torch.distributed.all_reduce(gradsd, group=group)
-                        onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsd, float(1), group)
-    
-                        gradsGEN = [p.grad.data for p in self.model.generator["generator" + str(targetLang)].parameters()
-                                    if p.requires_grad
-                                    and p.grad is not None]
-                        gradsg = [*gradsGEN]
-                        group = self.dictLangDecoder_toGroup[targetLang]
-                        # torch.distributed.all_reduce(gradsg, group=group)
-                        onmt.utils.distributed.all_reduce_and_rescale_tensors(gradsg, float(1), group)
-    
-                        """
-                        grads = [p.grad.data for p in self.model.parameters()
-                                 if p.requires_grad
-                                 and p.grad is not None]
-    
-                        gradsEnc = [p.grad.data for p in self.model.encoder["encoder"+str(sourceLang)].parameters()
-                                 if p.requires_grad
-                                 and p.grad is not None]
-                        gradsATT = [p.grad.data for p in self.model.attention_bridge.parameters()
-                                 if p.requires_grad
-                                 and p.grad is not None]
-                        gradsDec = [p.grad.data for p in self.model.decoder["decoder"+str(targetLang)].parameters()
-                                 if p.requires_grad
-                                 and p.grad is not None]
-                        gradsGen = [p.grad.data for p in self.model.generator["generator"+str(targetLang)].parameters()
-                                 if p.requires_grad
-                                 and p.grad is not None]
-    
-                        grads = [*gradsEnc, *gradsATT, *gradsDec, *gradsGen] 
-    
-                        onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                            grads, float(1))
-                        """
-    
-                    self.optim.step()
-                    # self.training_step_all+=1
-    
-                # If truncated, don't backprop fully.
-                # TO CHECK
-                # if dec_state is not None:
-                #    dec_state.detach()
-                if self.model.decoder["decoder" + str(targetLang)].state is not None:
-                    self.model.decoder["decoder" + str(targetLang)].detach_state()
-    
-        # in case of multi step gradient accumulation,
-        # update only after accum batches
-        # TODO
-        if self.accum_count > 1:
-            if self.n_gpu > 1:
-                grads = [p.grad.data for p in self.model.parameters()
-                         if p.requires_grad
-                         and p.grad is not None]
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                    grads, float(1))
-            self.optim.step()
-    
-            # self.training_step_all +=1
-    
-    
+                if self.model.decoder[f'decoder{metadata.decoder_id}'].state is not None:
+                    self.model.decoder[f'decoder{metadata.decoder_id}'].detach_state()
+
+
+
     def _start_report_manager(self, start_time=None):
         """
         Simple function to start report manager (if any)

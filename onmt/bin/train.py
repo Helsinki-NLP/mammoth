@@ -12,7 +12,7 @@ from onmt.utils.logging import init_logger, logger
 
 from onmt.models.model_saver import load_checkpoint
 from onmt.train_single import main as single_main
-from onmt.inputters.dynamic_iterator import build_dynamic_dataset_iter
+from onmt.inputters.dynamic_iterator import DynamicDatasetIter
 
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
@@ -205,18 +205,19 @@ def train(opt):
 
             # Get the iterator to generate from
             # We can't stride here without losing data: each dataset only goes to one GPU
-            train_iter_map = build_dynamic_dataset_iter(
-                fields_dict=fields_dict,
-                transforms_cls=transforms_cls,
-                opts=opt,
+            train_iter = DynamicDatasetIter.from_opts(
                 scheduler=scheduler,
+                transforms_cls=transforms_cls,
+                fields_dict=fields_dict,
+                opts=opt,
+                is_train=True,
                 stride=1,
                 offset=0
             )
 
             producer = mp.Process(
                 target=batch_producer,
-                args=(train_iter_map, queues[local_rank], semaphore, opt, local_rank),
+                args=(train_iter, queues[local_rank], semaphore, opt, local_rank),
                 daemon=True
             )
             producers.append(producer)

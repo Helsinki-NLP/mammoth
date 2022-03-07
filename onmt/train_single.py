@@ -13,7 +13,7 @@ from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
 from onmt.utils.distributed import all_reduce_tensors_init, Scheduler
-from onmt.inputters.dynamic_iterator import build_dynamic_dataset_iter
+from onmt.inputters.dynamic_iterator import DynamicDatasetIter
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 from collections import OrderedDict
@@ -46,8 +46,9 @@ def _get_model_opts(opt, checkpoint=None):
 
 def _build_valid_iter(opt, fields, transforms_cls):
     """Build iterator used for validation."""
-    valid_iter = build_dynamic_dataset_iter(
-        fields, transforms_cls, opt, is_train=False)
+    # valid_iter = DynamicDatasetIter(
+    #     fields, transforms_cls, opt, is_train=False)
+    valid_iter = iter([])   # FIXME: validation temporarily disabled
     return valid_iter
 
 
@@ -134,16 +135,16 @@ def main(
     logger.info("DONE BUILD TRAINER")
 
     if batch_queue is None:
-        _train_iter_map = build_dynamic_dataset_iter(
-            fields_dict=fields_dict,
-            transforms_cls=transforms_cls,
-            opts=opt,
+        _train_iter = DynamicDatasetIter.from_opts(
             scheduler=scheduler,
+            transforms_cls=transforms_cls,
+            fields_dict=fields_dict,
+            opts=opt,
             is_train=True,
             stride=1,
             offset=0,
         )
-        train_iter = IterOnDevice(_train_iter_map, local_rank)
+        train_iter = IterOnDevice(_train_iter, local_rank)
     else:
         assert semaphore is not None, \
             "Using batch_queue requires semaphore as well"

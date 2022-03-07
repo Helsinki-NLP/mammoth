@@ -231,38 +231,9 @@ class IterOnDevice(object):
                 if hasattr(batch, 'align') else None
 
     def __iter__(self):
-        ll = list(self.iterable_map.keys())
-        train_iters = {k:
-                    (enumerate(f))
-                    for k, f in self.iterable_map.items()}
-        idx=0
-        first0 = True
-        first1 = True
-        while True:
-            train_enum = train_iters[ll[idx]]
-
-            def next_batch(langPairName):
-                new_batch = next(train_enum)
-                return new_batch[1], langPairName
-        
-            if first0 and idx==0:
-                batch, langPairName = next_batch(ll[idx])
-                first0 = False
-
-            if first1 and idx==1:
-                batch, langPairName = next_batch(ll[idx])
-                first1 = False
-
-            idx+=1
-            if idx==2:
-                idx=0
-            batch, langPairName = next_batch(ll[idx])
+        for batch in self.iterable:
             self.batch_to_device(batch, self.device_id)
-            yield batch, langPairName
-
-#        for batch in self.iterable:
-#            self.batch_to_device(batch, self.device_id)
-#            yield batch
+            yield batch
 
 
 def filter_example(ex, use_src_len=True, use_tgt_len=True,

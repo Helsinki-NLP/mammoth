@@ -180,7 +180,7 @@ class ErrorHandler(object):
         raise Exception(msg)
 
 
-def batch_producer(generator_to_serve_map, queue, semaphore, opt, device_id):
+def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
     """Produce batches to `queues` from `generator_to_serve`."""
     log_level = "INFO" if opt.verbose or device_id == 0 else "WARNING"
     init_logger(opt.log_file, log_level=log_level)
@@ -445,7 +445,8 @@ class Scheduler:
         for lang_pair, encoder_id, decoder_id, corpus_id in zip(*selected):
             src_lang, tgt_lang = lang_pair
             result.append((
-                lang_pair,
+                src_lang,
+                tgt_lang,
                 encoder_id,
                 decoder_id,
                 corpus_id,

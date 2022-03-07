@@ -270,22 +270,19 @@ class ParallelCorpusIterator(object):
         yield from indexed_corpus
 
 
-def build_corpora_iters(corpora, transforms, corpora_info,
-                        skip_empty_level='warning', stride=1, offset=0):
-    """Return `ParallelCorpusIterator` for all corpora defined in opts."""
-    corpora_iters = dict()
-    for c_id, corpus in corpora.items():
-        transform_names = corpora_info[c_id].get('transforms', [])
-        corpus_transform = [
-            transforms[name] for name in transform_names if name in transforms
-        ]
-        transform_pipe = TransformPipe.build_from(corpus_transform)
-        logger.info(f"{c_id}'s transforms: {str(transform_pipe)}")
-        corpus_iter = ParallelCorpusIterator(
-            corpus, transform_pipe,
-            skip_empty_level=skip_empty_level, stride=stride, offset=offset)
-        corpora_iters[c_id] = corpus_iter
-    return corpora_iters
+def build_corpora_iter(corpus_id, corpus, transforms, corpus_info,
+                       skip_empty_level='warning', stride=1, offset=0):
+    """Return `ParallelCorpusIterator` for a corpus defined in opts."""
+    transform_names = corpus_info.get('transforms', [])
+    corpus_transform = [
+        transforms[name] for name in transform_names if name in transforms
+    ]
+    transform_pipe = TransformPipe.build_from(corpus_transform)
+    logger.info(f"{corpus_id}'s transforms: {str(transform_pipe)}")
+    corpus_iter = ParallelCorpusIterator(
+        corpus, transform_pipe,
+        skip_empty_level=skip_empty_level, stride=stride, offset=offset)
+    return corpus_iter
 
 
 def write_files_from_queues(sample_path, queues):

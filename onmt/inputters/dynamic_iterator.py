@@ -1,12 +1,17 @@
 """Module that contain iterator used for dynamic data."""
+from collections import namedtuple
 from itertools import cycle
 
 from torchtext.legacy.data import batch as torchtext_batch
 from onmt.inputters import str2sortkey, max_tok_len, OrderedIterator
-from onmt.inputters.corpus import get_corpus, build_corpora_iters,\
-    DatasetAdapter
+from onmt.inputters.corpus import build_corpora_iter, DatasetAdapter
 from onmt.transforms import make_transforms
 from onmt.utils.logging import logger
+
+
+DatasetMetadata = namedtuple(
+    'DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id'.split()
+)
 
 
 class MixingStrategy(object):
@@ -108,13 +113,14 @@ class DynamicDatasetIter(object):
         mixer (MixingStrategy): the strategy to iterate corpora.
     """
 
-    def __init__(self, corpora, corpora_info, transforms, fields, is_train,
+    def __init__(self, scheduler, opts, corpora_info, transforms_cls, fields_dict, is_train,
                  batch_type, batch_size, batch_size_multiple, data_type="text",
                  bucket_size=2048, pool_factor=8192,
                  skip_empty_level='warning', stride=1, offset=0):
-        self.corpora = corpora
-        self.transforms = transforms
-        self.fields = fields
+        self.scheduler_scheduler
+        self.opts = opts
+        self.transforms_cls = transforms_cls
+        self.fields_dict = fields_dict
         self.corpora_info = corpora_info
         self.is_train = is_train
         self.init_iterators = False
@@ -135,7 +141,7 @@ class DynamicDatasetIter(object):
         self.skip_empty_level = skip_empty_level
 
     @classmethod
-    def from_opts(cls, corpora, transforms, fields, opts, is_train,
+    def from_opts(cls, scheduler, transforms_cls, fields_dict, opts, is_train,
                   stride=1, offset=0):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
@@ -144,28 +150,19 @@ class DynamicDatasetIter(object):
         else:
             batch_size_multiple = 8 if opts.model_dtype == "fp16" else 1
         return cls(
-            corpora, opts.data, transforms, fields, is_train, opts.batch_type,
+            scheduler, opts, opts.data, transforms_cls, fields_dict, is_train, opts.batch_type,
             batch_size, batch_size_multiple, data_type=opts.data_type,
             bucket_size=opts.bucket_size, pool_factor=opts.pool_factor,
             skip_empty_level=opts.skip_empty_level,
             stride=stride, offset=offset
         )
 
-    @classmethod
-    def from_scheduler(
-        cls,
-        scheduler,
-        transforms_cls,
-        fields_dict,
-        opts,
-        is_train,
-        stride=1,
-        offset=0,
-    ):
-        # FIXME: this is awkward. Remove the old instead.
-        for tpl in scheduler.get_dataset_specs(fields_dict):
+    def _init_datasets(self):
+        datasets_iterables = dict()
+        for tpl in self.scheduler.get_dataset_specs(self.fields_dict):
             (
-                lang_pair,
+                src_lang,
+                tgt_lang,
                 encoder_id,
                 decoder_id,
                 corpus_id,
@@ -179,34 +176,31 @@ class DynamicDatasetIter(object):
             }
             print(f'merged_fields {merged_fields}')
 
-            if transforms_cls:
-                transforms = make_transforms(opts, transforms_cls, merged_fields)
+            metadata = DatasetMetadata(
+                src_lang=src_lang,
+                tgt_lang=tgt_lang,
+                encoder_id=encoder_id,
+                decoder_id=decoder_id,
+                corpus_id=corpus_id
+            )
+
+            if self.transforms_cls:
+                transforms = make_transforms(self.opts, self.transforms_cls, merged_fields)
             else:
                 print('No transforms defined')
                 transforms = []
 
-            corpora[corpus_id] = corpus
+            raw_iter = build_corpora_iter(
+                corpus_id, corpus, transforms, self.corpora_info[corpus_id],
+                skip_empty_level=self.skip_empty_level,
+                stride=self.stride, offset=self.offset
+            )
+            bucketed_iter = self._bucketing(raw_iter)
+            dataset_adapter = DatasetAdapter(self.fields, self.is_train)
+            transformed_iter = dataset_adapter.wrap(bucketed_iter, metadata)
 
-        batch_size = opts.batch_size if is_train else opts.valid_batch_size
-        if opts.batch_size_multiple is not None:
-            batch_size_multiple = opts.batch_size_multiple
-        else:
-            batch_size_multiple = 8 if opts.model_dtype == "fp16" else 1
-        return cls(
-            corpora, opts.data, transforms, fields, is_train, opts.batch_type,
-            batch_size, batch_size_multiple, data_type=opts.data_type,
-            bucket_size=opts.bucket_size, pool_factor=opts.pool_factor,
-            skip_empty_level=opts.skip_empty_level,
-            stride=stride, offset=offset
-        )
+            datasets_iterables[corpus_id] = transformed_iter
 
-    def _init_datasets(self):
-        datasets_iterables = build_corpora_iters(
-            self.corpora, self.transforms, self.corpora_info,
-            skip_empty_level=self.skip_empty_level,
-            stride=self.stride, offset=self.offset)
-        # FIXME: this needs to be moved later, to support corpora with different Fields
-        self.dataset_adapter = DatasetAdapter(self.fields, self.is_train)
         datasets_weights = {
             ds_name: int(self.corpora_info[ds_name]['weight'])
             for ds_name in datasets_iterables.keys()
@@ -217,9 +211,9 @@ class DynamicDatasetIter(object):
             self.mixer = SequentialMixer(datasets_iterables, datasets_weights)
         self.init_iterators = True
 
-    def _bucketing(self):
+    def _bucketing(self, iterable):
         buckets = torchtext_batch(
-            self.mixer,
+            iterable,
             batch_size=self.bucket_size,
             batch_size_fn=None)
         yield from buckets
@@ -227,8 +221,7 @@ class DynamicDatasetIter(object):
     def __iter__(self):
         if self.init_iterators is False:
             self._init_datasets()
-        for bucket in self._bucketing():
-            dataset = self.dataset_adapter(bucket)
+        for dataset, metadata in self.mixer():
             train_iter = OrderedIterator(
                 dataset,
                 self.batch_size,
@@ -243,5 +236,4 @@ class DynamicDatasetIter(object):
                 repeat=False,
             )
             for batch in train_iter:
-                # FIXME: add a namedtuple with the metadata?
-                yield batch
+                yield batch, metadata

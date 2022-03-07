@@ -201,23 +201,21 @@ class Trainer(object):
         batches = []
         normalization = 0
         self.accum_count = self._accum_count(self.optim.training_step)
-        for batch, langPairname in iterator:
-            # FIXME: change iterator return
-            sourceLang, targetLang = str(langPairname).split("_")[1].split("-")
+        for batch, metadata in iterator:
             batches.append(batch)
             if self.norm_method == "tokens":
                 num_tokens = batch.tgt[1:, :, 0].ne(
-                    self.train_loss_md["trainloss" + targetLang].padding_idx).sum()
+                    self.train_loss_md["trainloss" + metadata.tgt_lang].padding_idx).sum()
                 normalization += num_tokens.item()
             else:
                 normalization += batch.batch_size
             if len(batches) == self.accum_count:
-                yield batches, normalization, sourceLang, targetLang
+                yield batches, normalization, metadata
                 self.accum_count = self._accum_count(self.optim.training_step)
                 batches = []
                 normalization = 0
         if batches:
-            yield batches, normalization, sourceLang, targetLang
+            yield batches, normalization, metadata
 
     def _update_average(self, step):
         if self.moving_average is None:

@@ -133,15 +133,20 @@ def train(opt):
     ArgumentParser.validate_prepare_opts(opt)
     set_random_seed(opt.seed, False)
 
+    n_gpu = len(opt.gpu_ranks)
     # set PyTorch distributed related environment variables
     current_env = os.environ
-    current_env["MASTER_ADDR"] = opt.master_ip
-    current_env["MASTER_PORT"] = str(opt.master_port)
     current_env["WORLD_SIZE"] = str(opt.world_size)
-    num_nodes = current_env["SLURM_NNODES"]
-    print(num_nodes)
-    node_rank = int(current_env["SLURM_NODEID"])
-    print(node_rank)
+    # if `n_gpu` differs from `opt.world_size` we assume the training runs on multiple nodes
+    if n_gpu != int(opt.world_size):
+        current_env["MASTER_ADDR"] = opt.master_ip
+        current_env["MASTER_PORT"] = str(opt.master_port)
+        num_nodes = current_env["SLURM_NNODES"]
+        node_rank = int(current_env["SLURM_NODEID"])
+    else:
+        num_nodes = 1
+        node_rank = 0
+    logger.info("Training on {} node(s)".format(num_nodes))
 
     opt.data_task = ModelTask.SEQ2SEQ
     transforms_cls = get_transforms_cls(opt._all_transform)
@@ -156,8 +161,6 @@ def train(opt):
             )
     for key, val in fields_dict:
         print(f'{key}:\t{val}')
-
-    n_gpu = len(opt.gpu_ranks)
 
     train_process = partial(
         single_main,

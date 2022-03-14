@@ -21,7 +21,7 @@ def is_master(opt, device_id):
     return opt.gpu_ranks[device_id] == 0
 
 
-def multi_init(opt, device_id):
+def multi_init(opt, global_rank):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
         master_ip=opt.master_ip, master_port=opt.master_port
     )
@@ -30,7 +30,7 @@ def multi_init(opt, device_id):
     torch.distributed.init_process_group(
         backend=opt.gpu_backend,
         init_method=dist_init_method,
-        rank=device_id,
+        rank=global_rank,
         world_size=dist_world_size,
     )
 
@@ -198,17 +198,20 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
 
 
 def consumer(
-    process_fn, opt, device_id, error_queue, batch_queue, semaphore, node_rank
+    process_fn, opt, global_rank, error_queue, batch_queue, semaphore, node_rank, local_rank
 ):  # noqa: E501
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
-        multi_init(opt, device_id)
+        print(f'global_rank {global_rank} node_rank {node_rank} local_rank {local_rank}')
+        print(f'opt.gpu_ranks {opt.gpu_ranks}')
+        multi_init(opt, global_rank)
         process_fn(
             opt,
-            device_id=device_id,
+            global_rank=global_rank,
             batch_queue=batch_queue,
             semaphore=semaphore,
-            nodeRank=node_rank,
+            node_rank=node_rank,
+            local_rank=local_rank,
         )
 
     except KeyboardInterrupt:
@@ -217,7 +220,7 @@ def consumer(
         # propagate exception to parent process, keeping original traceback
         import traceback
 
-        error_queue.put((opt.gpu_ranks[device_id], traceback.format_exc()))
+        error_queue.put((opt.gpu_ranks[node_rank], traceback.format_exc()))
 
 
 class Scheduler:

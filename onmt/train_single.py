@@ -151,11 +151,11 @@ def main(
 
         def _train_iter():
             while True:
-                (batch, lang_pair, encoder_id, decoder_id) = batch_queue.get()
+                batch, metadata = batch_queue.get()
                 semaphore.release()
                 # Move batch to specified device
                 IterOnDevice.batch_to_device(batch, local_rank)
-                yield batch, lang_pair, encoder_id, decoder_id
+                yield batch, metadata
 
         train_iter = _train_iter()
     logger.info("VALID ITER")

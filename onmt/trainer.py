@@ -302,7 +302,7 @@ class Trainer(object):
                 # Assuming that generators are in the same group as decoders
                 grads = [
                     p.grad.data for p
-                    in self.model.generator[f'generator{metadata.trg_lang}'.parameters()]
+                    in self.model.generator[f'generator{metadata.tgt_lang}'].parameters()
                     if p.requires_grad and p.grad is not None
                 ]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(

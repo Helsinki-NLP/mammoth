@@ -93,66 +93,45 @@ def load_test_model(opt, model_path=None):
 
     if len(opt.models) > 1:
         model_path_enc = opt.models[0]
-        checkpoint = torch.load(model_path_enc, map_location=lambda storage, loc: storage) 
+        checkpoint = torch.load(model_path_enc, map_location=lambda storage, loc: storage)
         model = checkpoint['whole_model']
-        print("PRIMA 1")
         for name, param in model.decoder["decodercs"].named_parameters():
-            print(str(name)+" "+str(param[0:10]))
+            print(f'{name}: {param[0:10]}')
 
         model_path_dec = opt.models[1]
         model_dec = torch.load(model_path_dec, map_location=lambda storage, loc: storage)['whole_model']
-        print("DOPO 1")
         for name, param in model_dec.decoder["decodercs"].named_parameters():
-            print(str(name)+" "+str(param[0:10]))
-        print("DOPO 2")
+            print(f'{name}: {param[0:10]}')
         model.decoder = model_dec.decoder
         model.generator = model_dec.generator
     else:
-        checkpoint = torch.load(model_path,map_location=lambda storage, loc: storage)
+        checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
         model = checkpoint['whole_model']
-
 
     model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
-    #fields = checkpoint['vocab']
     fields_dict = checkpoint['vocab']
     print("FIELDS")
     print(fields_dict)
-#    model = checkpoint['whole_model']
-    device = torch.device("cuda")
-    model.to(device)
+    if opt.gpu != -1:
+        device = torch.device("cuda")
+        model.to(device)
 
-    langpair = opt.lang_pair
-    langENC = str(langpair).split("-")[0]
-    langDEC = str(langpair).split("-")[1]
+    lang_pair = opt.lang_pair
+    src_lang, tgt_lang = lang_pair.split("-")
     fields = {}
-    if langpair in fields_dict:
-        fields = fields_dict[langpair]
-    else:
-        #we can omit it, but ok
-        encDone = False
-        decDone = False
-        for langpairFields in fields_dict:
-            if encDone and decDone:
-                break 
-            LANGsrc_tgt = langpairFields.split("-")
-            if LANGsrc_tgt[0] == langENC and not encDone:
-                fields["src"] = fields_dict[langpairFields]["src"]
-                encDone = True
-            if LANGsrc_tgt[1] == langDEC and not decDone:
-                fields["tgt"] = fields_dict[langpairFields]["tgt"]
-                decDone = True
-        indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
-        fields["indices"] = indices
+    fields['src'] = fields_dict[('src', src_lang)]['src']
+    fields['tgt'] = fields_dict[('tgt', tgt_lang)]['tgt']
+    indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
+    fields["indices"] = indices
 
     # Avoid functionality on inference
     model_opt.update_vocab = False
 
     print("====")
     print(fields)
-#    model = build_base_model(model_opt, fields, use_gpu(opt), checkpoint,
-#                             opt.gpu)
+
     if opt.fp32:
         model.float()
     elif opt.int8:

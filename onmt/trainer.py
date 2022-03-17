@@ -274,7 +274,7 @@ class Trainer(object):
 
             for j in range(self.scheduler.gpus_per_node):
                 i, (batches, normalization, metadata) = next(trainEnum)
-                logger.debug(f'{j} {i} global_rank {global_rank}: {metadata}')
+                logger.info(f'{j} {i} global_rank {global_rank}: {metadata}')
 
                 if self.n_gpu > 1:
                     normalization = sum(

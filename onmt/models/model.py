@@ -171,7 +171,7 @@ class LanguageModel(BaseModel):
 
         if callable(log):
             # No encoder in LM, seq2seq count formatting kept
-            log("encoder: {}".format(enc))
-            log("decoder: {}".format(dec))
+            log("total encoder parameters: {}".format(enc))
+            log("total decoder parameters: {}".format(dec))
             log("* number of parameters: {}".format(enc + dec))
         return enc, dec

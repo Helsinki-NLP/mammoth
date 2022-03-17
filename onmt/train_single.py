@@ -12,7 +12,7 @@ from onmt.models import build_model_saver
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
-from onmt.utils.distributed import all_reduce_tensors_init, Scheduler
+from onmt.utils.distributed import all_reduce_tensors_init, Scheduler, is_master
 from onmt.inputters.dynamic_iterator import DynamicDatasetIter
 from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
@@ -56,12 +56,12 @@ def init_distributed(model, scheduler):
     my_encoder_groups, my_decoder_groups = scheduler.get_distributed_groups()
     for encoder_id, group in my_encoder_groups:
         weights = [p.data for p in model.encoder[f'encoder{encoder_id}'].parameters()]
-        print(f'enc weights {weights}')
+        # print(f'enc weights {weights}')
         all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
     for decoder_id, group in my_decoder_groups:
         weights = [p.data for p in model.decoder[f'decoder{decoder_id}'].parameters()]
-        print(f'dec weights {weights}')
+        # print(f'dec weights {weights}')
         all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
     # FIXME: need a generator group?
@@ -91,8 +91,8 @@ def main(
     init_logger(opt.log_file)
     if node_rank is not None and local_rank is not None:
         configure_process(opt, local_rank)
-        gpu_rankT = torch.distributed.get_rank()
-        logger.info("RANK GPU FROM TORCH %s", str(gpu_rankT))
+        gpu_rank_t = torch.distributed.get_rank()
+        logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     #checkpoint, fields, transforms_cls = _init_train(opt)
     transforms_cls = None
@@ -104,13 +104,15 @@ def main(
     # Build model.
     model, generators_md = build_model(model_opt, opt, fields_dict, scheduler, checkpoint)
 
-    logger.info("INIT MODEL")
+    logger.info("GPU {} - Init model".format(global_rank))
     if node_rank is not None and local_rank is not None:
         init_distributed(model, scheduler)
-    model.count_parameters(log=logger.info)
+    enc, dec = model.count_parameters(log=logger.debug)
+    logger.info("GPU {} - total encoder parameters: {}".format(global_rank, enc))
+    logger.info("GPU {} - total decoder parameters: {}".format(global_rank, dec))
 
     # Build optimizer.
-    logger.info("BUILD OPTMIZER")
+    logger.info("GPU {} - Build optimizer".format(global_rank))
     optim = Optimizer.from_opt(
         model,
         opt,
@@ -121,7 +123,7 @@ def main(
     # Build model saver
     model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, global_rank)
 
-    logger.info("BUILD TRAINER")
+    logger.info("GPU {} - Build trainer".format(global_rank))
     trainer = build_trainer(
         opt,
         local_rank,
@@ -132,7 +134,7 @@ def main(
         model_saver=model_saver,
         generators_md=generators_md,
     )
-    logger.info("DONE BUILD TRAINER")
+    logger.info("GPU {} - Trainer built".format(global_rank))
 
     if batch_queue is None:
         _train_iter = DynamicDatasetIter.from_opts(
@@ -158,20 +160,22 @@ def main(
                 yield batch, metadata
 
         train_iter = _train_iter()
-    logger.info("VALID ITER")
+    logger.info("GPU {} - Valid iter".format(global_rank))
     valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
     if valid_iter is not None:
         valid_iter = IterOnDevice(valid_iter, local_rank)
 
     if len(opt.gpu_ranks):
-        logger.info('Starting training on GPU: %s' % opt.gpu_ranks)
+        if is_master(global_rank):
+            logger.info('Starting training on GPU: %s' % opt.gpu_ranks)
     else:
         logger.info('Starting training on CPU, could be very slow')
     train_steps = opt.train_steps
     if opt.single_pass and train_steps > 0:
-        logger.warning("Option single_pass is enabled, ignoring train_steps.")
+        if is_master(global_rank):
+            logger.warning("Option single_pass is enabled, ignoring train_steps.")
         train_steps = 0
-    logger.info("TRAIN GO")
+    logger.info("GPU {} - Starting training".format(global_rank))
     trainer.train(
         train_iter,
         train_steps,

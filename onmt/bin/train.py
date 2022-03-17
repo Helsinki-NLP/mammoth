@@ -120,7 +120,7 @@ def init_train_prepare_fields_transforms(opt, vocab_path, side):
         sys.exit()
 
     for name, field in fields[side].fields:
-        print(f'prepped: {name}  {len(field.vocab)}')
+        logger.debug(f'prepped: {name}  {len(field.vocab)}')
 
     return fields
 
@@ -159,22 +159,21 @@ def train(opt):
             fields_dict[(side, lang)] = init_train_prepare_fields_transforms(
                 opt, vocab_path=vocab_path, side=side
             )
-    for key, val in fields_dict:
-        print(f'{key}:\t{val}')
+    # for key, val in fields_dict:
+    #     print(f'{key}:\t{val}')
 
     train_process = partial(
         single_main,
         fields_dict=fields_dict
     )
 
-    print(f"[{os.getpid()}] Initializing process group with: {current_env}")
+    logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 
     if opt.world_size > 1:
 
         queues = []
         mp = torch.multiprocessing.get_context('spawn')
-        print(opt.queue_size)
-        print(opt.world_size)
+        logger.info("world_size = {}, queue_size = {}".format(opt.world_size, opt.queue_size))
         semaphore = mp.Semaphore(opt.world_size * opt.queue_size)
         # Create a thread to listen for errors in the child processes.
         error_queue = mp.SimpleQueue()

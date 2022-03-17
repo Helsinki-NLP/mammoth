@@ -10,7 +10,7 @@ def init_logger(
     rotate=False,
     log_level=logging.INFO,
 ):
-    log_format = logging.Formatter("[%(asctime)s %(levelname)s] %(message)s")
+    log_format = logging.Formatter("[%(asctime)s %(process)s %(levelname)s] %(message)s")
     logger = logging.getLogger()
     logger.setLevel(log_level)
 

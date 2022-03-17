@@ -95,13 +95,13 @@ def load_test_model(opt, model_path=None):
         model_path_enc = opt.models[0]
         checkpoint = torch.load(model_path_enc, map_location=lambda storage, loc: storage)
         model = checkpoint['whole_model']
-        for name, param in model.decoder["decodercs"].named_parameters():
-            print(f'{name}: {param[0:10]}')
+        # for name, param in model.decoder["decodercs"].named_parameters():
+        #     print(f'{name}: {param[0:10]}')
 
         model_path_dec = opt.models[1]
         model_dec = torch.load(model_path_dec, map_location=lambda storage, loc: storage)['whole_model']
-        for name, param in model_dec.decoder["decodercs"].named_parameters():
-            print(f'{name}: {param[0:10]}')
+        # for name, param in model_dec.decoder["decodercs"].named_parameters():
+        #     print(f'{name}: {param[0:10]}')
         model.decoder = model_dec.decoder
         model.generator = model_dec.generator
     else:
@@ -129,8 +129,8 @@ def load_test_model(opt, model_path=None):
     # Avoid functionality on inference
     model_opt.update_vocab = False
 
-    print("====")
-    print(fields)
+    # print("====")
+    # print(fields)
 
     if opt.fp32:
         model.float()
@@ -391,5 +391,6 @@ def build_model(model_opt, opt, fields_dict, scheduler, checkpoint):
         scheduler=scheduler,
         checkpoint=checkpoint,
     )
-    logger.info(model)
+    # logger.info(model)
+    logger.info('Building model - done!')
     return model, generators_md

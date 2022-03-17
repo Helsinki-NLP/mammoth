@@ -25,10 +25,9 @@ class DataOptsCheckerMixin(object):
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
         corpora = yaml.safe_load(opt.data)
-        print("PARSE")
+        logger.info("Parsing corpora")
         for cname, corpus in corpora.items():
-            print(cname)
-            print(corpus)
+            logger.info("Parsing corpus '{}': {}".format(cname, corpus))
             # Check Transforms
             _transforms = corpus.get('transforms', None)
             if _transforms is None:
@@ -99,7 +98,6 @@ class DataOptsCheckerMixin(object):
                 corpus["src_feats"] = None
 
         logger.info(f"Parsed {len(corpora)} corpora from -data.")
-        print(corpora)
         opt.data = corpora
 
         src_vocab = yaml.safe_load(opt.src_vocab)

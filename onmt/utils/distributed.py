@@ -17,8 +17,8 @@ from onmt.utils.misc import set_random_seed
 from typing import Any, Dict, Optional
 
 
-def is_master(opt, device_id):
-    return opt.gpu_ranks[device_id] == 0
+def is_master(global_rank):
+    return global_rank == 0
 
 
 def multi_init(opt, global_rank):
@@ -251,7 +251,7 @@ class Scheduler:
             self.n_nodes = 1
             self.gpus_per_node = 1
 
-        print(f'in scheduler: node_rank {node_rank} local_rank {local_rank}')
+        logger.info(f'in scheduler: node_rank {node_rank} local_rank {local_rank}')
         assert node_rank is None or 0 <= node_rank < self.n_nodes
         assert local_rank is None or 0 <= local_rank < self.gpus_per_node
         # TODO: All the configuration lists should be the same length
@@ -360,6 +360,8 @@ class Scheduler:
             (decoder_id, group) for (decoder_id, group) in decoder_to_group.items()
             if decoder_id in my_decoder_ids
         ]
+        logger.info("my_decoder_ids: {}, my_encoder_ids: {}".format(my_decoder_ids, my_encoder_ids))
+        logger.info("encoder groups: {}, decoder groups: {}".format(my_decoder_groups, my_encoder_groups))
         return my_encoder_groups, my_decoder_groups
 
     def get_corpora(self, is_train=False) -> Dict[str, Any]:

@@ -114,11 +114,15 @@ class DatasetAdapter(object):
         dataset = TorchtextDataset(examples, self.fields_dict)
         return dataset
 
-    def wrap(self, iterable, metadata):
+    def wrap(self, iterable):
+        """Indefinitely repeat the buckets in the iterable,
+        each time sampling new transforms for each bucket.
+        The yielded TorchtextDatasets only contain a single bucket of data.
+        """
         for bucket in cycle(iterable):
             examples = self._to_examples(bucket, is_train=self.is_train)
             dataset = TorchtextDataset(examples, self.fields_dict)
-            yield dataset, metadata
+            yield dataset
 
 
 class ParallelCorpus(object):
@@ -277,8 +281,10 @@ class ParallelCorpusIterator(object):
         yield from indexed_corpus
 
 
-def build_corpora_iter(corpus_id, corpus, transforms, corpus_info,
-                       skip_empty_level='warning', stride=1, offset=0):
+def build_corpora_iter(
+    corpus_id, corpus, transforms, corpus_info,
+    skip_empty_level='warning', stride=1, offset=0
+) -> ParallelCorpusIterator:
     """Return `ParallelCorpusIterator` for a corpus defined in opts."""
     transform_names = corpus_info.get('transforms', [])
     corpus_transform = [

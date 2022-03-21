@@ -153,11 +153,11 @@ def main(
 
         def _train_iter():
             while True:
-                batch, metadata = batch_queue.get()
+                batch, metadata, communication_batch_id = batch_queue.get()
                 semaphore.release()
                 # Move batch to specified device
                 IterOnDevice.batch_to_device(batch, local_rank)
-                yield batch, metadata
+                yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()
     logger.info("GPU {} - Valid iter".format(global_rank))

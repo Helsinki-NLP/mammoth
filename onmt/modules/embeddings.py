@@ -263,6 +263,13 @@ class Embeddings(nn.Module):
 
 
 class PluggableEmbeddings(nn.ModuleDict):
+    """
+    Wraps multiple embeddings,
+    allowing any of them to be plugged in by calling activate.
+    This is necessary to decouple encoders/decoder from embeddings:
+    it is possible to e.g. share a single encoder with multiple source
+    languages each having their own embeddings.
+    """
     def __init__(self, embedding_dict):
         super().__init__()
         for key, embeddings in embedding_dict.items():

@@ -152,6 +152,7 @@ def train(opt):
     transforms_cls = get_transforms_cls(opt._all_transform)
 
     fields_dict = OrderedDict()
+    # For creating fields, we use a scheduler that doesn't filter by node and gpu
     global_scheduler = Scheduler(opt, node_rank=None, local_rank=None)
 
     for side in ('src', 'tgt'):
@@ -183,6 +184,7 @@ def train(opt):
         producers = []
 
         for local_rank in range(n_gpu):
+            # This scheduler will only yield the items that are active on this gpu
             scheduler = Scheduler(opt, node_rank=node_rank, local_rank=local_rank)
 
             # each process's rank

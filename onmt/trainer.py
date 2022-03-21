@@ -202,22 +202,36 @@ class Trainer(object):
     def _accum_batches(self, iterator):
         batches = []
         normalization = 0
+        current_comm_batch_id = None
+        comm_batch_count = 0
         self.accum_count = self._accum_count(self.optim.training_step)
-        for batch, metadata in iterator:
-            batches.append(batch)
+        for batch, metadata, communication_batch_id in iterator:
+            if current_comm_batch_id is None:
+                current_comm_batch_id = communication_batch_id
+            # when communication_batch_id changes, we might be ready to synch
+            if current_comm_batch_id != communication_batch_id:
+                comm_batch_count += 1
+                current_comm_batch_id = communication_batch_id
+            # accum_count refers to number of communication batches
+            # (i.e. one batch from all language pairs)
+            # seen before synching gradients
+            if comm_batch_count == self.accum_count:
+                print(f'yielding {len(batches)} batches, accum {comm_batch_count} == {self.accum_count}')
+                yield batches, normalization
+                self.accum_count = self._accum_count(self.optim.training_step)
+                batches = []
+                normalization = 0
+                comm_batch_count = 0
+            print(f'appending batch with {metadata}, communication_batch_id {communication_batch_id}')
+            batches.append((batch, metadata))
             if self.norm_method == "tokens":
                 num_tokens = batch.tgt[1:, :, 0].ne(
                     self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
                 normalization += num_tokens.item()
             else:
                 normalization += batch.batch_size
-            if len(batches) == self.accum_count:
-                yield batches, normalization, metadata
-                self.accum_count = self._accum_count(self.optim.training_step)
-                batches = []
-                normalization = 0
         if batches:
-            yield batches, normalization, metadata
+            yield batches, normalization
 
     def _update_average(self, step):
         if self.moving_average is None:
@@ -273,8 +287,8 @@ class Trainer(object):
             self._maybe_update_dropout(step)
 
             for j in range(self.scheduler.gpus_per_node):
-                i, (batches, normalization, metadata) = next(trainEnum)
-                logger.info(f'{j} {i} global_rank {global_rank}: {metadata}')
+                i, (batches_with_meta, normalization) = next(trainEnum)
+                logger.info(f'{j} {i} global_rank {global_rank}')
 
                 if self.n_gpu > 1:
                     normalization = sum(
@@ -282,11 +296,10 @@ class Trainer(object):
                     )
 
                 self._gradient_accumulation_overLangPair(
-                    batches,
+                    batches_with_meta,
                     normalization,
                     total_stats,
                     report_stats,
-                    metadata
                 )
 
             for encoder_id, group in self.my_encoder_groups:
@@ -299,7 +312,11 @@ class Trainer(object):
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
-                # Assuming that generators are in the same group as decoders
+                # FIXME: bug here.
+                # Currently assuming that generators are in the same group as decoders
+                # Generators should have their own tgt_lang based communication group.
+                # The same group should be used for the target embeddings.
+                # Likewise, source embeddings need their own group.
                 grads = [
                     p.grad.data for p
                     in self.model.generator[f'generator{metadata.tgt_lang}'].parameters()
@@ -330,7 +347,6 @@ class Trainer(object):
                 train_steps,
                 self.optim.learning_rate(),
                 report_stats,
-                metadata
             )
 
             # if valid_iter is not None and step % valid_steps == 0:
@@ -417,13 +433,13 @@ class Trainer(object):
 
     def _gradient_accumulation_overLangPair(
         self,
-        true_batches,
+        batches_with_meta,
         normalization,
         total_stats,
         report_stats,
-        metadata
     ):
-        for k, batch in enumerate(true_batches):
+        for k, (batch, metadata) in enumerate(batches_with_meta):
+            logger.info(f'batch with metadata {metadata}')
 
             target_size = batch.tgt.size(0)
             # Truncated BPTT: reminder not compatible with accum > 1
@@ -505,7 +521,7 @@ class Trainer(object):
         return stat
 
     def _maybe_report_training(self, step, num_steps, learning_rate,
-                               report_stats, metadata):
+                               report_stats):
         """
         Simple function to report training stats (if report_manager is set)
         see `onmt.utils.ReportManagerBase.report_training` for doc
@@ -517,7 +533,7 @@ class Trainer(object):
                 learning_rate,
                 None if self.earlystopper is None
                 else self.earlystopper.current_tolerance,
-                report_stats, metadata,
+                report_stats,
                 multigpu=self.n_gpu > 1)
 
     def _report_step(self, learning_rate, step, train_stats=None,

@@ -188,13 +188,13 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
     logger.info("BATCH PRODUCER")
     logger.info(generator_to_serve)
 
-    for batch, metadata in generator_to_serve:
+    for batch, metadata, communication_batch_id in generator_to_serve:
         semaphore.acquire()
         batch.dataset = None
         # Move batch to correspond device_id when consumer iterate
         # hack to dodge unpicklable `dict_keys`
         batch.fields = list(batch.fields)
-        queue.put((batch, metadata))
+        queue.put((batch, metadata, communication_batch_id))
 
 
 def consumer(

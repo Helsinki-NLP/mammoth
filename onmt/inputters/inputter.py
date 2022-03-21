@@ -233,9 +233,9 @@ class IterOnDevice(object):
                 if hasattr(batch, 'align') else None
 
     def __iter__(self):
-        for batch, metadata in self.iterable:
+        for batch, metadata, communication_batch_id in self.iterable:
             self.batch_to_device(batch, self.device_id)
-            yield batch, metadata
+            yield batch, metadata, communication_batch_id
 
 
 def filter_example(ex, use_src_len=True, use_tgt_len=True,

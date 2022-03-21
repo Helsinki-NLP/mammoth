@@ -4,7 +4,7 @@ from itertools import cycle
 
 from torchtext.legacy.data import batch as torchtext_batch
 from onmt.inputters import str2sortkey, max_tok_len, OrderedIterator
-from onmt.inputters.corpus import build_corpora_iter, DatasetAdapter
+from onmt.inputters.corpus import build_corpora_iter, DatasetAdapter, ParallelCorpusIterator
 from onmt.transforms import make_transforms
 from onmt.utils.logging import logger
 
@@ -158,7 +158,7 @@ class DynamicDatasetIter(object):
         )
 
     def _init_datasets(self):
-        datasets_iterables = dict()
+        self.dataset_iterators = []
         for tpl in self.scheduler.get_dataset_specs(self.fields_dict):
             (
                 src_lang,
@@ -190,25 +190,27 @@ class DynamicDatasetIter(object):
                 print('No transforms defined')
                 transforms = []
 
-            raw_iter = build_corpora_iter(
+            # iterator over strings
+            raw_iter: ParallelCorpusIterator = build_corpora_iter(
                 corpus_id, corpus, transforms, self.corpora_info[corpus_id],
                 skip_empty_level=self.skip_empty_level,
                 stride=self.stride, offset=self.offset
             )
+
+            # iterator over lists of strings
+            # each list is a bucket, not a minibatch
             bucketed_iter = self._bucketing(raw_iter)
+
+            # iterator over single-bucket torchtext datasets
+            # transforms are applied here
             dataset_adapter = DatasetAdapter(merged_fields, self.is_train)
-            transformed_iter = dataset_adapter.wrap(bucketed_iter, metadata)
+            transformed_iter = dataset_adapter.wrap(bucketed_iter)
 
-            datasets_iterables[corpus_id] = transformed_iter
+            # iterator over minibatches
+            ordered_iter = self._wrap_in_ordered_iterator(transformed_iter)
 
-        datasets_weights = {
-            ds_name: int(self.corpora_info[ds_name]['weight'])
-            for ds_name in datasets_iterables.keys()
-        }
-        if self.is_train:
-            self.mixer = WeightedMixer(datasets_iterables, datasets_weights)
-        else:
-            self.mixer = SequentialMixer(datasets_iterables, datasets_weights)
+            self.dataset_iterators.append((ordered_iter, metadata))
+
         self.init_iterators = True
 
     def _bucketing(self, iterable):
@@ -218,12 +220,10 @@ class DynamicDatasetIter(object):
             batch_size_fn=None)
         yield from buckets
 
-    def __iter__(self):
-        if self.init_iterators is False:
-            self._init_datasets()
-        for dataset, metadata in self.mixer:
+    def _wrap_in_ordered_iterator(self, transformed_iter):
+        for bucket_dataset in transformed_iter:
             train_iter = OrderedIterator(
-                dataset,
+                bucket_dataset,
                 self.batch_size,
                 pool_factor=self.pool_factor,
                 batch_size_fn=self.batch_size_fn,
@@ -235,5 +235,17 @@ class DynamicDatasetIter(object):
                 sort_key=self.sort_key,
                 repeat=False,
             )
-            for batch in train_iter:
-                yield batch, metadata
+            yield from train_iter
+
+    def __iter__(self):
+        if self.init_iterators is False:
+            self._init_datasets()
+
+        # All minibatches with the same communication_batch_id should be trained on
+        # before synching gradients between devices
+        communication_batch_id = 0
+        while True:
+            # interleaves one minibatch from each language pair, in a round-robin fashion
+            for ordered_iter, metadata in self.dataset_iterators:
+                yield next(ordered_iter), metadata, communication_batch_id
+            communication_batch_id += 1

@@ -287,6 +287,7 @@ def build_corpora_iter(
 ) -> ParallelCorpusIterator:
     """Return `ParallelCorpusIterator` for a corpus defined in opts."""
     transform_names = corpus_info.get('transforms', [])
+    print(f'transform_names {transform_names}')
     corpus_transform = [
         transforms[name] for name in transform_names if name in transforms
     ]
@@ -341,7 +342,7 @@ def build_sub_vocab(corpus_id, corpus, transforms, opts, n_sample, stride, offse
     sub_counter_tgt = Counter()
     sub_counter_src_feats = defaultdict(Counter)
     c_iter = build_corpora_iter(
-        corpus_id, corpus, transforms, opts.data,
+        corpus_id, corpus, transforms, opts.data[corpus_id],
         skip_empty_level=opts.skip_empty_level,
         stride=stride, offset=offset)
     for i, item in enumerate(c_iter):
@@ -439,7 +440,7 @@ def save_transformed_sample(opts, corpus_id, transforms, n_sample=3):
 
     corpus = get_corpus(opts, corpus_id, is_train=True)
     c_iter = build_corpora_iter(
-        corpus_id, corpus, transforms, opts.data,
+        corpus_id, corpus, transforms, opts.data[corpus_id],
         skip_empty_level=opts.skip_empty_level)
     sample_path = os.path.join(
         os.path.dirname(opts.save_data), CorpusName.SAMPLE)

@@ -74,11 +74,11 @@ class DataOptsCheckerMixin(object):
                     raise ValueError(f'Corpus {cname} prefix are required.')
             # Check weight
             weight = corpus.get('weight', None)
-            if weight is None:
+            if weight is not None:
                 if cname != CorpusName.VALID:
-                    logger.warning(f"Corpus {cname}'s weight should be given."
-                                   " We default it to 1 for you.")
-                corpus['weight'] = 1
+                    logger.warning(f"Corpus {cname}'s weight is set, but weights are not supported."
+                                   " We reset it to 1 for you.")
+            corpus['weight'] = 1
 
             # Check features
             src_feats = corpus.get("src_feats", None)

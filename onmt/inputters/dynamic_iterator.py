@@ -184,6 +184,7 @@ class DynamicDatasetIter(object):
                 corpus_id=corpus_id
             )
 
+            print(f'self.transforms_cls {self.transforms_cls}')
             if self.transforms_cls:
                 transforms = make_transforms(self.opts, self.transforms_cls, merged_fields)
             else:

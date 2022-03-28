@@ -258,18 +258,18 @@ class Scheduler:
         self.n_tasks = len(self.opt.src_tgt)
 
         # When --node_gpu is not set, assume an assigment that fills gpus in rank order
-        if 'node_gpu' not in self.opt:
+        if not self.opt.node_gpu:
             self.opt.node_gpu = self._default_node_gpu()
 
         self.lang_pairs = [lang_pair.split('-') for lang_pair in self.opt.src_tgt]
         assert len(self.lang_pairs) == self.n_tasks
-        if 'enc_sharing_group' in self.opt:
+        if self.opt.enc_sharing_group:
             self.encoder_ids = self.opt.enc_sharing_group
             assert len(self.encoder_ids) == self.n_tasks
         else:
             # if no encoder sharing groups are defined, encoders are language specific
             self.encoder_ids = [src_lang for src_lang, tgt_lang in self.lang_pairs]
-        if 'dec_sharing_group' in self.opt:
+        if self.opt.dec_sharing_group:
             self.decoder_ids = self.opt.dec_sharing_group
             assert len(self.decoder_ids) == self.n_tasks
         else:

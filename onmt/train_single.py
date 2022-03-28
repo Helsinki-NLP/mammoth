@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Training on a single process."""
 import torch
-#import deepspeed
 
 from onmt.inputters.inputter import IterOnDevice
 from onmt.model_builder import build_model
@@ -14,9 +13,7 @@ from onmt.utils.parse import ArgumentParser
 
 from onmt.utils.distributed import all_reduce_tensors_init, Scheduler, is_master
 from onmt.inputters.dynamic_iterator import DynamicDatasetIter
-from torch.nn.parallel import DistributedDataParallel as DDP
-import torch.distributed as dist
-from collections import OrderedDict
+from onmt.transforms import get_transforms_cls
 
 
 def configure_process(opt, device_id):
@@ -112,8 +109,7 @@ def main(
         gpu_rank_t = torch.distributed.get_rank()
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
-    #checkpoint, fields, transforms_cls = _init_train(opt)
-    transforms_cls = None
+    transforms_cls = get_transforms_cls(opt._all_transform)
     checkpoint = None
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 

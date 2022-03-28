@@ -284,6 +284,7 @@ class PluggableEmbeddings(nn.ModuleDict):
     @property
     def _active_embeddings(self):
         active_embeddings = self[f'embeddings{self.active_key}']
+        print(f'plugging in embeddings{self.active_key}')
         return active_embeddings
 
     def forward(self, source, step=None):

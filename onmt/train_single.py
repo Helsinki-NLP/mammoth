@@ -53,24 +53,42 @@ def _build_valid_iter(opt, fields, transforms_cls):
 
 
 def init_distributed(model, scheduler):
-    my_encoder_groups, my_decoder_groups = scheduler.get_distributed_groups()
-    for encoder_id, group in my_encoder_groups:
-        weights = [p.data for p in model.encoder[f'encoder{encoder_id}'].parameters()]
-        # print(f'enc weights {weights}')
+    my_component_groups = scheduler.get_distributed_groups()
+    for encoder_id, group in my_component_groups['encoder']:
+        weights = [
+            p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters()
+            if 'embeddings' not in name
+        ]
         all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
-    for decoder_id, group in my_decoder_groups:
-        weights = [p.data for p in model.decoder[f'decoder{decoder_id}'].parameters()]
-        # print(f'dec weights {weights}')
+    for decoder_id, group in my_component_groups['decoder']:
+        weights = [
+            p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters()
+            if 'embeddings' not in name
+        ]
         all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
-    # FIXME: need a generator group?
-    #    weights = [p.data for p in model.generator[f'generator{generator_id}'].parameters()]
-    #    print(f'gen weights {weights}')
-    #    all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+    for src_emb_id, group in my_component_groups['src_emb']:
+        src_lang, encoder_id = src_emb_id
+        embs = model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
+        weights = [p.data for p in embs.parameters()]
+        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+
+    for tgt_emb_id, group in my_component_groups['tgt_emb']:
+        tgt_lang, decoder_id = tgt_emb_id
+        embs = model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
+        weights = [p.data for p in embs.parameters()]
+        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+
+        weights = [p.data for p in model.generator[f'generator{tgt_lang}'].parameters()]
+        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
 
     weights = [p.data for p in model.attention_bridge.parameters()]
     all_reduce_tensors_init(weights, numtoaverage=None, group=None)
+
+    logger.info('After init_distributed')
+    for name, p in model.named_parameters():
+        logger.info(f'{scheduler.node_rank}:{scheduler.local_rank} {name}: {p.flatten()[:10]}')
 
 
 def main(
@@ -98,8 +116,6 @@ def main(
     transforms_cls = None
     checkpoint = None
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
-
-    my_encoder_groups, my_decoder_groups = scheduler.get_distributed_groups()
 
     # Build model.
     model, generators_md = build_model(model_opt, opt, fields_dict, scheduler, checkpoint)

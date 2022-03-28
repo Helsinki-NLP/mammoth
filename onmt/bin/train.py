@@ -141,8 +141,8 @@ def train(opt):
     if n_gpu != int(opt.world_size):
         current_env["MASTER_ADDR"] = opt.master_ip
         current_env["MASTER_PORT"] = str(opt.master_port)
-        num_nodes = current_env["SLURM_NNODES"]
-        node_rank = int(current_env["SLURM_NODEID"])
+        num_nodes = current_env.get("SLURM_NNODES", 1)
+        node_rank = int(current_env.get("SLURM_NODEID", 0))
     else:
         num_nodes = 1
         node_rank = 0

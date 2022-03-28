@@ -267,11 +267,6 @@ def model_opts(parser):
         help="Type of task for the model either seq2seq or lm",
     )
 
-    group.add("--target_langs", "-target_langs", default=None,
-              help="path filename to get target languages")
-    group.add("--node_gpu_langs", "-node_gpu_langs", default=None,
-              help="path filename to nodeidx gpuidx and langs")
-
     # Encoder-Decoder Options
     group = parser.add_argument_group('Model- Encoder-Decoder')
     group.add('--model_type', '-model_type', default='text',
@@ -287,6 +282,12 @@ def model_opts(parser):
               help="""Size of attention bridge hidden states""")
     group.add('--attention_heads', '-attention_heads', type=int, default=50,
               help="""Number of attention heads in attention bridge""")
+    group.add("--enc_sharing_group", "-enc_sharing_group", nargs='+',
+              help="List of encoder sharing group id for each dataset. ")
+    group.add("--dec_sharing_group", "-dec_sharing_group", nargs='+',
+              help="List of decoder sharing group id for each dataset. ")
+    group.add("--node_gpu", "-node_gpu", nargs='+',
+              help="List of node:gpu assignments")
 
     group.add('--encoder_type', '-encoder_type', type=str, default='rnn',
               choices=['rnn', 'brnn', 'ggnn', 'mean', 'transformer', 'cnn',

@@ -100,7 +100,7 @@ class Statistics(object):
         """ compute elapsed time """
         return time.time() - self.start_time
 
-    def output(self, step, num_steps, learning_rate, start, metadata):
+    def output(self, step, num_steps, learning_rate, start, metadata=None):
         """Write out statistics to stdout.
 
         Args:
@@ -110,9 +110,12 @@ class Statistics(object):
         """
         t = self.elapsed_time()
         step_fmt = "%2d" % step
-        meta_str = '; '.join(
-            [f'{key}: {val}' for key, val in zip(metadata._fields, metadata)]
-        )
+        if metadata:
+            meta_str = '; '.join(
+                [f'{key}: {val}' for key, val in zip(metadata._fields, metadata)]
+            )
+        else:
+            meta_str = ''
         if num_steps > 0:
             step_fmt = "%s/%5d" % (step_fmt, num_steps)
         logger.info(

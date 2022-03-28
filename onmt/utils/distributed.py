@@ -202,8 +202,8 @@ def consumer(
 ):  # noqa: E501
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
-        print(f'global_rank {global_rank} node_rank {node_rank} local_rank {local_rank}')
-        print(f'opt.gpu_ranks {opt.gpu_ranks}')
+        logger.info(f'global_rank {global_rank} node_rank {node_rank} local_rank {local_rank}')
+        logger.info(f'opt.gpu_ranks {opt.gpu_ranks}')
         multi_init(opt, global_rank)
         process_fn(
             opt,
@@ -262,13 +262,16 @@ class Scheduler:
             self.opt.node_gpu = self._default_node_gpu()
 
         self.lang_pairs = [lang_pair.split('-') for lang_pair in self.opt.src_tgt]
+        assert len(self.lang_pairs) == self.n_tasks
         if 'enc_sharing_group' in self.opt:
             self.encoder_ids = self.opt.enc_sharing_group
+            assert len(self.encoder_ids) == self.n_tasks
         else:
             # if no encoder sharing groups are defined, encoders are language specific
             self.encoder_ids = [src_lang for src_lang, tgt_lang in self.lang_pairs]
         if 'dec_sharing_group' in self.opt:
             self.decoder_ids = self.opt.dec_sharing_group
+            assert len(self.decoder_ids) == self.n_tasks
         else:
             # if no decoder sharing groups are defined, decoders are language specific
             self.decoder_ids = [tgt_lang for src_lang, tgt_lang in self.lang_pairs]
@@ -304,41 +307,63 @@ class Scheduler:
     ):
         # encoder_id -> set of global_ranks
         encoder_to_gpus = OrderedDict()
+        # decoder_id -> set of global_ranks
         decoder_to_gpus = OrderedDict()
+        # (src_lang, encoder_id) -> set of global_ranks
+        src_emb_to_gpus = OrderedDict()
+        # (tgt_lang, decoder_id) -> set of global_ranks
+        tgt_emb_to_gpus = OrderedDict()
         for encoder_id in self.encoder_ids:
             encoder_to_gpus[encoder_id] = set()
         for decoder_id in self.decoder_ids:
             decoder_to_gpus[decoder_id] = set()
+
         for node_rank in range(self.n_nodes):
             for local_rank in range(self.gpus_per_node):
                 global_rank = node_rank * self.gpus_per_node + local_rank
                 selector = self._get_selector(node_rank, local_rank)
 
-                encoders_on_this_gpu = compress(self.encoder_ids, selector)
+                encoders_on_this_gpu = list(compress(self.encoder_ids, selector))
                 for encoder_id in encoders_on_this_gpu:
                     encoder_to_gpus[encoder_id].add(global_rank)
 
-                decoders_on_this_gpu = compress(self.decoder_ids, selector)
+                decoders_on_this_gpu = list(compress(self.decoder_ids, selector))
                 for decoder_id in decoders_on_this_gpu:
                     decoder_to_gpus[decoder_id].add(global_rank)
 
-        encoder_to_group = OrderedDict()
-        for encoder_id, global_ranks in encoder_to_gpus.items():
-            if len(global_ranks) < 2:
-                # only create a process group if the component is on 2 or more gpus
-                continue
-            sorted_global_ranks = list(sorted(global_ranks))
-            encoder_to_group[encoder_id] = new_group_func(sorted_global_ranks)
+                lang_pairs_on_this_gpu = list(compress(self.lang_pairs, selector))
+                for lang_pair, encoder_id in zip(lang_pairs_on_this_gpu, encoders_on_this_gpu):
+                    src_lang, tgt_lang = lang_pair
+                    key = (src_lang, encoder_id)
+                    if key not in src_emb_to_gpus:
+                        src_emb_to_gpus[key] = set()
+                    src_emb_to_gpus[key].add(global_rank)
 
-        decoder_to_group = OrderedDict()
-        for decoder_id, global_ranks in decoder_to_gpus.items():
-            if len(global_ranks) < 2:
-                # only create a process group if the component is on 2 or more gpus
-                continue
-            sorted_global_ranks = list(sorted(global_ranks))
-            decoder_to_group[decoder_id] = new_group_func(sorted_global_ranks)
+                for lang_pair, decoder_id in zip(lang_pairs_on_this_gpu, decoders_on_this_gpu):
+                    src_lang, tgt_lang = lang_pair
+                    key = (tgt_lang, decoder_id)
+                    if key not in tgt_emb_to_gpus:
+                        tgt_emb_to_gpus[key] = set()
+                    tgt_emb_to_gpus[key].add(global_rank)
 
-        return encoder_to_group, decoder_to_group
+        result = {}
+        components = [
+            ('encoder', encoder_to_gpus),
+            ('decoder', decoder_to_gpus),
+            ('src_emb', src_emb_to_gpus),
+            ('tgt_emb', tgt_emb_to_gpus),
+        ]
+        for key, component_to_gpus in components:
+            component_to_group = OrderedDict()
+            for component_id, global_ranks in component_to_gpus.items():
+                if len(global_ranks) < 2:
+                    # only create a process group if the component is on 2 or more gpus
+                    continue
+                sorted_global_ranks = list(sorted(global_ranks))
+                component_to_group[component_id] = new_group_func(sorted_global_ranks)
+            result[key] = component_to_group
+
+        return result
 
     def get_distributed_groups(
         self,
@@ -349,20 +374,63 @@ class Scheduler:
         Only components present on this GPU are returned.
         The pairs are returned in a consistent order across GPUs.
         """
-        encoder_to_group, decoder_to_group = self.create_all_distributed_groups(new_group_func)
+        components_to_group = self.create_all_distributed_groups(new_group_func)
+        logger.info(f'components_to_group: {components_to_group}')
         my_encoder_ids = set(compress(self.encoder_ids, self._selector))
+        for encoder_id in my_encoder_ids:
+            if encoder_id not in components_to_group['encoder']:
+                logger.info(f'encoder {encoder_id} is on a single device')
         my_encoder_groups = [
-            (encoder_id, group) for (encoder_id, group) in encoder_to_group.items()
+            (encoder_id, group) for (encoder_id, group) in components_to_group['encoder'].items()
             if encoder_id in my_encoder_ids
         ]
+
         my_decoder_ids = set(compress(self.decoder_ids, self._selector))
+        for decoder_id in my_decoder_ids:
+            if decoder_id not in components_to_group['decoder']:
+                logger.info(f'decoder {decoder_id} is on a single device')
         my_decoder_groups = [
-            (decoder_id, group) for (decoder_id, group) in decoder_to_group.items()
+            (decoder_id, group) for (decoder_id, group) in components_to_group['decoder'].items()
             if decoder_id in my_decoder_ids
         ]
-        logger.info("my_decoder_ids: {}, my_encoder_ids: {}".format(my_decoder_ids, my_encoder_ids))
-        logger.info("encoder groups: {}, decoder groups: {}".format(my_decoder_groups, my_encoder_groups))
-        return my_encoder_groups, my_decoder_groups
+
+        my_src_emb_ids = self.get_src_embs()
+        for src_emb_id in my_src_emb_ids:
+            if src_emb_id not in components_to_group['src_emb']:
+                logger.info(f'src_emb {src_emb_id} is on a single device')
+        my_src_emb_groups = [
+            (src_emb_id, group) for (src_emb_id, group) in components_to_group['src_emb'].items()
+            if src_emb_id in my_src_emb_ids
+        ]
+
+        my_tgt_emb_ids = self.get_tgt_embs()
+        for tgt_emb_id in my_tgt_emb_ids:
+            if tgt_emb_id not in components_to_group['tgt_emb']:
+                logger.info(f'tgt_emb {tgt_emb_id} is on a single device')
+        my_tgt_emb_groups = [
+            (tgt_emb_id, group) for (tgt_emb_id, group) in components_to_group['tgt_emb'].items()
+            if tgt_emb_id in my_tgt_emb_ids
+        ]
+
+        gpu_str = f'{self.node_rank}:{self.local_rank}'
+        logger.info("{} my_encoder_ids: {}, my_decoder_ids: {}".format(
+            gpu_str, my_encoder_ids, my_decoder_ids)
+        )
+        logger.info("{} my_src_emb_ids: {}, my_tgt_emb_ids: {}".format(
+            gpu_str, my_src_emb_ids, my_tgt_emb_ids)
+        )
+        logger.info("{} my_decoder groups: {}, my_encoder groups: {}".format(
+            gpu_str, my_decoder_groups, my_encoder_groups)
+        )
+        logger.info("{} my_src_emb groups: {}, my_tgt_emb_groups groups: {}".format(
+            gpu_str, my_src_emb_groups, my_tgt_emb_groups)
+        )
+        return {
+            'encoder': my_encoder_groups,
+            'decoder': my_decoder_groups,
+            'src_emb': my_src_emb_groups,
+            'tgt_emb': my_tgt_emb_groups
+        }
 
     def get_corpora(self, is_train=False) -> Dict[str, Any]:
         corpus_ids = self.opt.data.keys()
@@ -438,6 +506,22 @@ class Scheduler:
     def get_decoders(self):
         my_decoder_ids = compress(self.decoder_ids, self._selector)
         return my_decoder_ids
+
+    def get_src_embs(self):
+        my_lang_pairs = list(compress(self.lang_pairs,  self._selector))
+        my_encoder_ids = list(compress(self.encoder_ids, self._selector))
+        return [
+            (lang_pair[0], encoder_id) for (lang_pair, encoder_id)
+            in zip(my_lang_pairs, my_encoder_ids)
+        ]
+
+    def get_tgt_embs(self):
+        my_lang_pairs = compress(self.lang_pairs,  self._selector)
+        my_decoder_ids = compress(self.decoder_ids, self._selector)
+        return [
+            (lang_pair[1], decoder_id) for (lang_pair, decoder_id)
+            in zip(my_lang_pairs, my_decoder_ids)
+        ]
 
     def get_generators(self):
         my_lang_pairs = compress(self.lang_pairs, self._selector)

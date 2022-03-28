@@ -174,7 +174,11 @@ class Trainer(object):
 
         self.scheduler = scheduler
 
-        self.my_encoder_groups, self.my_decoder_groups = self.scheduler.get_distributed_groups()
+        my_component_groups = self.scheduler.get_distributed_groups()
+        self.my_encoder_groups = my_component_groups['encoder']
+        self.my_decoder_groups = my_component_groups['decoder']
+        self.my_src_emb_groups = my_component_groups['src_emb']
+        self.my_tgt_emb_groups = my_component_groups['tgt_emb']
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -216,13 +220,13 @@ class Trainer(object):
             # (i.e. one batch from all language pairs)
             # seen before synching gradients
             if comm_batch_count == self.accum_count:
-                print(f'yielding {len(batches)} batches, accum {comm_batch_count} == {self.accum_count}')
+                logger.info(f'yielding {len(batches)} batches, accum {comm_batch_count} == {self.accum_count}')
                 yield batches, normalization
                 self.accum_count = self._accum_count(self.optim.training_step)
                 batches = []
                 normalization = 0
                 comm_batch_count = 0
-            print(f'appending batch with {metadata}, communication_batch_id {communication_batch_id}')
+            logger.info(f'appending batch with {metadata}, communication_batch_id {communication_batch_id}')
             batches.append((batch, metadata))
             if self.norm_method == "tokens":
                 num_tokens = batch.tgt[1:, :, 0].ne(
@@ -303,23 +307,46 @@ class Trainer(object):
                 )
 
             for encoder_id, group in self.my_encoder_groups:
-                grads = [p.grad.data for p in self.model.encoder[f'encoder{encoder_id}'].parameters()]
+                grads = [
+                    p.grad.data for name, p
+                    in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
+                    if 'embeddings' not in name and p.requires_grad and p.grad is not None
+                ]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
             for decoder_id, group in self.my_decoder_groups:
-                grads = [p.grad.data for p in self.model.decoder[f'decoder{decoder_id}'].parameters()]
+                grads = [
+                    p.grad.data for name, p
+                    in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
+                    if 'embeddings' not in name and p.requires_grad and p.grad is not None
+                ]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
-                # FIXME: bug here.
-                # Currently assuming that generators are in the same group as decoders
-                # Generators should have their own tgt_lang based communication group.
-                # The same group should be used for the target embeddings.
-                # Likewise, source embeddings need their own group.
+            for src_emb_id, group in self.my_src_emb_groups:
+                src_lang, encoder_id = src_emb_id
+                embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
+                grads = [
+                    p.grad.data for p in embs.parameters()
+                    if p.requires_grad and p.grad is not None
+                ]
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(
+                    grads, rescale_denom=1.0, group=group
+                )
+            for tgt_emb_id, group in self.my_tgt_emb_groups:
+                tgt_lang, decoder_id = tgt_emb_id
+                embs = self.model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
+                grads = [
+                    p.grad.data for p in embs.parameters()
+                    if p.requires_grad and p.grad is not None
+                ]
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(
+                    grads, rescale_denom=1.0, group=group
+                )
                 grads = [
                     p.grad.data for p
-                    in self.model.generator[f'generator{metadata.tgt_lang}'].parameters()
+                    in self.model.generator[f'generator{tgt_lang}'].parameters()
                     if p.requires_grad and p.grad is not None
                 ]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
@@ -338,6 +365,14 @@ class Trainer(object):
 
             self.optim.step()
             self.optim.zero_grad()
+
+            if step % 100 == 0:
+                logger.info(f'After gradient sync {step}')
+                for name, p in self.model.named_parameters():
+                    logger.info(
+                        f'{self.scheduler.node_rank}:{self.scheduler.local_rank}'
+                        f' {name}: {p.flatten()[:10]}'
+                    )
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)

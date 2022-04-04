@@ -1,6 +1,5 @@
 """Module that contain shard utils for dynamic data."""
 import os
-from itertools import cycle
 from onmt.utils.logging import logger
 from onmt.constants import CorpusName
 from onmt.transforms import TransformPipe
@@ -67,8 +66,9 @@ class DatasetAdapter(object):
         example, transform, cid = item
         # this is a hack: appears quicker to apply it here
         # than in the ParallelCorpusIterator
+        # Without copy this function is impure: it modifies example in place
         maybe_example = transform.apply(
-            example, is_train=is_train, corpus_name=cid)
+            example.copy(), is_train=is_train, corpus_name=cid)
         if maybe_example is None:
             return None
 
@@ -115,11 +115,11 @@ class DatasetAdapter(object):
         return dataset
 
     def wrap(self, iterable):
-        """Indefinitely repeat the buckets in the iterable,
-        each time sampling new transforms for each bucket.
+        """For each of the buckets in the iterable,
+        sample new transforms and wrap in a dataset.
         The yielded TorchtextDatasets only contain a single bucket of data.
         """
-        for bucket in cycle(iterable):
+        for bucket in iterable:
             examples = self._to_examples(bucket, is_train=self.is_train)
             dataset = TorchtextDataset(examples, self.fields_dict)
             yield dataset
@@ -287,7 +287,6 @@ def build_corpora_iter(
 ) -> ParallelCorpusIterator:
     """Return `ParallelCorpusIterator` for a corpus defined in opts."""
     transform_names = corpus_info.get('transforms', [])
-    print(f'transform_names {transform_names}')
     corpus_transform = [
         transforms[name] for name in transform_names if name in transforms
     ]

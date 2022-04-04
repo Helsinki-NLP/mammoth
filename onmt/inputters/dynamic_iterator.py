@@ -14,6 +14,12 @@ DatasetMetadata = namedtuple(
 )
 
 
+def reload_forever(generator_factory):
+    while True:
+        generator = generator_factory()
+        yield from generator
+
+
 class MixingStrategy(object):
     """Mixing strategy that should be used in Data Iterator."""
 
@@ -192,15 +198,19 @@ class DynamicDatasetIter(object):
                 transforms = []
 
             # iterator over strings
-            raw_iter: ParallelCorpusIterator = build_corpora_iter(
-                corpus_id, corpus, transforms, self.corpora_info[corpus_id],
-                skip_empty_level=self.skip_empty_level,
-                stride=self.stride, offset=self.offset
-            )
+            def iterate_corpus_once():
+                raw_iter: ParallelCorpusIterator = build_corpora_iter(
+                    corpus_id, corpus, transforms, self.corpora_info[corpus_id],
+                    skip_empty_level=self.skip_empty_level,
+                    stride=self.stride, offset=self.offset
+                )
+                return raw_iter
+
+            infinite_iter = reload_forever(iterate_corpus_once)
 
             # iterator over lists of strings
             # each list is a bucket, not a minibatch
-            bucketed_iter = self._bucketing(raw_iter)
+            bucketed_iter = self._bucketing(infinite_iter)
 
             # iterator over single-bucket torchtext datasets
             # transforms are applied here

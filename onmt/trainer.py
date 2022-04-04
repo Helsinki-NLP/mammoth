@@ -294,11 +294,6 @@ class Trainer(object):
                 i, (batches_with_meta, normalization) = next(trainEnum)
                 # logger.info(f'{j} {i} global_rank {global_rank}')
 
-                if self.n_gpu > 1:
-                    normalization = sum(
-                        onmt.utils.distributed.all_gather_list(normalization)
-                    )
-
                 self._gradient_accumulation_overLangPair(
                     batches_with_meta,
                     normalization,

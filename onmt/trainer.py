@@ -220,13 +220,13 @@ class Trainer(object):
             # (i.e. one batch from all language pairs)
             # seen before synching gradients
             if comm_batch_count == self.accum_count:
-                logger.info(f'yielding {len(batches)} batches, accum {comm_batch_count} == {self.accum_count}')
+                # logger.info(f'yielding {len(batches)} batches, accum {comm_batch_count} == {self.accum_count}')
                 yield batches, normalization
                 self.accum_count = self._accum_count(self.optim.training_step)
                 batches = []
                 normalization = 0
                 comm_batch_count = 0
-            logger.info(f'appending batch with {metadata}, communication_batch_id {communication_batch_id}')
+            # logger.info(f'appending batch with {metadata}, communication_batch_id {communication_batch_id}')
             batches.append((batch, metadata))
             if self.norm_method == "tokens":
                 num_tokens = batch.tgt[1:, :, 0].ne(
@@ -292,7 +292,7 @@ class Trainer(object):
 
             for j in range(self.scheduler.gpus_per_node):
                 i, (batches_with_meta, normalization) = next(trainEnum)
-                logger.info(f'{j} {i} global_rank {global_rank}')
+                # logger.info(f'{j} {i} global_rank {global_rank}')
 
                 if self.n_gpu > 1:
                     normalization = sum(
@@ -366,7 +366,7 @@ class Trainer(object):
             self.optim.step()
             self.optim.zero_grad()
 
-            if step % 100 == 0:
+            if step % 1000 == 0:
                 logger.info(f'After gradient sync {step}')
                 for name, p in self.model.named_parameters():
                     logger.info(
@@ -474,7 +474,7 @@ class Trainer(object):
         report_stats,
     ):
         for k, (batch, metadata) in enumerate(batches_with_meta):
-            logger.info(f'batch with metadata {metadata}')
+            # logger.info(f'batch with metadata {metadata}')
 
             target_size = batch.tgt.size(0)
             # Truncated BPTT: reminder not compatible with accum > 1

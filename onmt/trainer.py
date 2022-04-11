@@ -301,7 +301,7 @@ class Trainer(object):
                     report_stats,
                 )
 
-            for encoder_id, group in self.my_encoder_groups:
+            for encoder_id, (_, group) in self.my_encoder_groups:
                 grads = [
                     p.grad.data for name, p
                     in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
@@ -310,7 +310,7 @@ class Trainer(object):
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
-            for decoder_id, group in self.my_decoder_groups:
+            for decoder_id, (_, group) in self.my_decoder_groups:
                 grads = [
                     p.grad.data for name, p
                     in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
@@ -319,7 +319,7 @@ class Trainer(object):
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
-            for src_emb_id, group in self.my_src_emb_groups:
+            for src_emb_id, (_, group) in self.my_src_emb_groups:
                 src_lang, encoder_id = src_emb_id
                 embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
                 grads = [
@@ -329,7 +329,7 @@ class Trainer(object):
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(
                     grads, rescale_denom=1.0, group=group
                 )
-            for tgt_emb_id, group in self.my_tgt_emb_groups:
+            for tgt_emb_id, (_, group) in self.my_tgt_emb_groups:
                 tgt_lang, decoder_id = tgt_emb_id
                 embs = self.model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
                 grads = [

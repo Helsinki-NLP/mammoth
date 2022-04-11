@@ -39,12 +39,12 @@ def multi_init(opt, global_rank):
     return gpu_rank
 
 
-def all_reduce_tensors_init(tensors, numtoaverage, group=None):
+def broadcast_tensors(tensors, src=0, group=None):
     for t in tensors:
         if group is None:
-            torch.distributed.all_reduce(t, op=torch.distributed.ReduceOp.MAX)
+            torch.distributed.broadcast(t, src)
         else:
-            torch.distributed.all_reduce(t, op=torch.distributed.ReduceOp.MAX, group=group)
+            torch.distributed.broadcast(t, src, group=group)
 
 
 def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None,
@@ -360,7 +360,8 @@ class Scheduler:
                     # only create a process group if the component is on 2 or more gpus
                     continue
                 sorted_global_ranks = list(sorted(global_ranks))
-                component_to_group[component_id] = new_group_func(sorted_global_ranks)
+                min_rank = sorted_global_ranks[0]
+                component_to_group[component_id] = (min_rank, new_group_func(sorted_global_ranks))
             result[key] = component_to_group
 
         return result

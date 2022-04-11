@@ -11,7 +11,7 @@ from onmt.models import build_model_saver
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
-from onmt.utils.distributed import all_reduce_tensors_init, Scheduler, is_master
+from onmt.utils.distributed import broadcast_tensors, Scheduler, is_master
 from onmt.inputters.dynamic_iterator import DynamicDatasetIter
 from onmt.transforms import get_transforms_cls
 
@@ -51,37 +51,37 @@ def _build_valid_iter(opt, fields, transforms_cls):
 
 def init_distributed(model, scheduler):
     my_component_groups = scheduler.get_distributed_groups()
-    for encoder_id, group in my_component_groups['encoder']:
+    for encoder_id, (min_rank, group) in my_component_groups['encoder']:
         weights = [
             p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters()
             if 'embeddings' not in name
         ]
-        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+        broadcast_tensors(weights, src=min_rank, group=group)
 
-    for decoder_id, group in my_component_groups['decoder']:
+    for decoder_id, (min_rank, group) in my_component_groups['decoder']:
         weights = [
             p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters()
             if 'embeddings' not in name
         ]
-        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+        broadcast_tensors(weights, src=min_rank, group=group)
 
-    for src_emb_id, group in my_component_groups['src_emb']:
+    for src_emb_id, (min_rank, group) in my_component_groups['src_emb']:
         src_lang, encoder_id = src_emb_id
         embs = model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
         weights = [p.data for p in embs.parameters()]
-        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+        broadcast_tensors(weights, src=min_rank, group=group)
 
-    for tgt_emb_id, group in my_component_groups['tgt_emb']:
+    for tgt_emb_id, (min_rank, group) in my_component_groups['tgt_emb']:
         tgt_lang, decoder_id = tgt_emb_id
         embs = model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
         weights = [p.data for p in embs.parameters()]
-        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+        broadcast_tensors(weights, src=min_rank, group=group)
 
         weights = [p.data for p in model.generator[f'generator{tgt_lang}'].parameters()]
-        all_reduce_tensors_init(weights, numtoaverage=None, group=group)
+        broadcast_tensors(weights, src=min_rank, group=group)
 
     weights = [p.data for p in model.attention_bridge.parameters()]
-    all_reduce_tensors_init(weights, numtoaverage=None, group=None)
+    broadcast_tensors(weights, src=0)
 
     logger.info('After init_distributed')
     for name, p in model.named_parameters():

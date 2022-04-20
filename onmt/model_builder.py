@@ -209,8 +209,10 @@ def build_task_specific_model(
         pluggable_tgt_emb = PluggableEmbeddings(tgt_embs_by_decoder[decoder_id])
         decoder = build_only_dec(model_opt, pluggable_tgt_emb)
         decoders_md.add_module(f'decoder{decoder_id}', decoder)
-
-    attention_bridge = AttentionBridge(model_opt.rnn_size, model_opt.attention_heads, model_opt)
+    
+    if opt.use_attention_bridge:
+        # TODO: implement hierarchical approach to layer sharing
+        attention_bridge = AttentionBridge.from_opt(model_opt)
 
     if model_opt.param_init != 0.0:
         for p in attention_bridge.parameters():

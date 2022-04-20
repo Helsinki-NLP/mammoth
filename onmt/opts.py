@@ -278,10 +278,6 @@ def model_opts(parser):
               choices=['fp32', 'fp16'],
               help='Data type of the model.')
 
-    group.add('--hidden_ab_size', '-hidden_ab_size', type=int, default=2048,
-              help="""Size of attention bridge hidden states""")
-    group.add('--attention_heads', '-attention_heads', type=int, default=50,
-              help="""Number of attention heads in attention bridge""")
     group.add("--enc_sharing_group", "-enc_sharing_group", nargs='+',
               help="List of encoder sharing group id for each dataset. ")
     group.add("--dec_sharing_group", "-dec_sharing_group", nargs='+',
@@ -437,7 +433,24 @@ def model_opts(parser):
               choices=["O0", "O1", "O2", "O3"],
               help="For FP16 training, the opt_level to use."
                    "See https://nvidia.github.io/apex/amp.html#opt-levels.")
+    
+    # attention bridge options
+    group = parser.add_argument_group("Attention_bridge")
+    group.add('--hidden_ab_size', '-hidden_ab_size', type=int, default=2048,
+              help="""Size of attention bridge hidden states""")
+    group.add('--attention_heads', '-attention_heads', type=int, default=50,
+              help="""Number of attention heads in attention bridge""")
 
+    group.add("--use_attention_bridge", "-use_attention_bridge", 
+              action="store_true",
+              help="""Use self-attention shared layers between enc and dec""")
+    group.add("--n_layers_attbrg", "-n_layers_ab", type=int,  default=1,
+              help="""Number of layers for the attention bridge""")
+    group.add("--layer_type_attbrg", "-layer_type_ab", type=str, default="transformer",
+              choices=["transformer", "fixed-size"],
+              help="""For an N-layered attention bridge, choose
+                    whether the N-1 previous layers are transformer layers or
+                    fixed-size inner-attention layers.""")
 
 def _add_train_general_opts(parser):
     """ General options for training """

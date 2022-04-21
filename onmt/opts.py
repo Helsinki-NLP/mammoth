@@ -836,6 +836,63 @@ def translate_opts(parser):
               help="Device to run on")
 
 
+def build_bilingual_model(parser):
+    """options for modular translation"""
+    group = parser.add_argument_group("Source and Target Languages")
+    group.add(
+        "--src_lang",
+        "-src_lang",
+        required=True,
+        help="The 2-character source language code",
+    )
+    group.add(
+        "--tgt_lang",
+        "-tgt_lang",
+        required=True,
+        help="The 2-character target language code",
+    )
+    group = parser.add_argument_group("Model Modules")
+    group.add(
+        "--encoder",
+        "-encoder",
+        required=False,
+        help="Path to the encoder module .pt file"
+        "NOT NEEDED IF --model gives a path+model_preffix",
+
+    )
+    group.add(
+        "--decoder",
+        "-decoder",
+        required=False,
+        help="Path to the decoder module .pt file"
+        "NOT NEEDED IF --model gives a path+model_preffix",
+    )
+    group.add(
+        "--bridge",
+        "-bridge",
+        required=False,
+        help="Path to the attention bridge module .pt file",
+    )
+    group.add(
+        "--generator",
+        "-generator",
+        required=False,
+        help="Path to the generator module .pt file",
+    )
+    group.add(
+        "--model_frame",
+        "-model_frame",
+        required=False,
+        help="Path to the model frame .pt file",
+    )
+    group.add(
+        "--output_model",
+        "-output_model",
+        required=False,
+        help="Path to the model output",
+    )
+
+
 # Copyright 2016 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.

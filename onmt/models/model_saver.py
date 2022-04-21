@@ -1,13 +1,17 @@
 import os
-import torch
-
 from collections import deque
 from onmt.utils.logging import logger
+
+import torch
+
+from onmt.utils.distributed import is_master
+from onmt.utils.module_splitter import explode_model
+
 
 from copy import deepcopy
 
 
-def build_model_saver(model_opt, opt, model, fields_dict, optim, output_id):
+def build_model_saver(model_opt, opt, model, fields_dict, optim, device_id):
     # _check_save_model_path
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
@@ -17,7 +21,9 @@ def build_model_saver(model_opt, opt, model, fields_dict, optim, output_id):
                              model_opt,
                              fields_dict,
                              optim,
-                             opt.keep_checkpoint, output_id)
+                             opt.keep_checkpoint, 
+                             device_id,
+                             opt.save_all_gpus)
     return model_saver
 
 
@@ -39,8 +45,16 @@ class ModelSaverBase(object):
     * `_rm_checkpoint
     """
 
-    def __init__(self, base_path, model, model_opt, fields_dict, optim,
-                 keep_checkpoint=-1, output_id="0"):
+    def __init__(self, 
+                 base_path, 
+                 model, 
+                 model_opt, 
+                 fields_dict, 
+                 optim,
+                 keep_checkpoint=-1, 
+                 device_id="0",
+                 all_gpus=False,
+                ):
         self.base_path = base_path
         self.model = model
         self.model_opt = model_opt
@@ -50,7 +64,8 @@ class ModelSaverBase(object):
         self.keep_checkpoint = keep_checkpoint
         if keep_checkpoint > 0:
             self.checkpoint_queue = deque([], maxlen=keep_checkpoint)
-        self.output_id = output_id
+        self.device_id = device_id
+        self.all_gpus = all_gpus
 
     def save(self, step, moving_average=None):
         """Main entry point for model saver
@@ -69,7 +84,7 @@ class ModelSaverBase(object):
                 model_params_data.append(param.data)
                 param.data = avg.data
 
-        chkpt, chkpt_name = self._save(step, save_model, self.output_id)
+        chkpt_names = self._save(step, save_model, self.device_id)
         self.last_saved_step = step
 
         if moving_average:
@@ -81,9 +96,9 @@ class ModelSaverBase(object):
             if len(self.checkpoint_queue) == self.checkpoint_queue.maxlen:
                 todel = self.checkpoint_queue.popleft()
                 self._rm_checkpoint(todel)
-            self.checkpoint_queue.append(chkpt_name)
+            self.checkpoint_queue.append(chkpt_names)
 
-    def _save(self, step, model):
+    def _save(self, step):
         """Save a resumable checkpoint.
 
         Args:
@@ -113,40 +128,94 @@ class ModelSaverBase(object):
 class ModelSaver(ModelSaverBase):
     """Simple model saver to filesystem"""
 
-    def _save(self, step, model, output_id):
-#        model_state_dict = model.state_dict()
-#        model_state_dict = {k: v for k, v in model_state_dict.items()
-#                            if 'generator' not in k}
-#        generator_state_dict = model.generator.state_dict()
+    def _save(self, step, model, device_id):
+        real_model = model.module if isinstance(model, nn.DataParallel) else model
 
-        # NOTE: We need to trim the vocab to remove any unk tokens that
-        # were not originally here.
-
-#        vocab = deepcopy(self.fields)
-#        for side in ["src", "tgt"]:
-#            keys_to_pop = []
-#            if hasattr(vocab[side], "fields"):
-#                unk_token = vocab[side].fields[0][1].vocab.itos[0]
-#                for key, value in vocab[side].fields[0][1].vocab.stoi.items():
-#                    if value == 0 and key != unk_token:
-#                        keys_to_pop.append(key)
-#                for key in keys_to_pop:
-#                    vocab[side].fields[0][1].vocab.stoi.pop(key, None)
+        model_state_dict = real_model.state_dict()
+        encoder_ids = {index: lang for lang, index in model.encoder_ids.items()}
+        decoder_ids = {index: lang for lang, index in model.decoder_ids.items()}
 
         checkpoint = {
-#            'model': model_state_dict,
-#            'generator': generator_state_dict,
-            'vocab': self.fields_dict, # vocab,
-            'opt': self.model_opt,
-            #'optim': self.optim.state_dict(), #TODO
-            'whole_model': self.model
+            "model": model_state_dict,
+            # 'generator': generator_state_dict,
+            "vocab": self.fields_dict,
+            "opt": self.model_opt,
+            # "optim": self.optim.state_dict(),
+            "optim": {
+                "enc": {lang: lang_optim.state_dict() for lang, lang_optim in self.optim["enc"].items()},
+                "dec": {lang: lang_optim.state_dict() for lang, lang_optim in self.optim["dec"].items()},
+                "gen": {lang: lang_optim.state_dict() for lang, lang_optim in self.optim["gen"].items()},
+                "att": self.optim["att"].state_dict()
+            },
+            "whole_model": self.model,
         }
 
-        logger.info("Saving checkpoint %s_%s_step_%d.pt" % (self.base_path, output_id, step))
-        checkpoint_path = '%s_%s_step_%d.pt' % (self.base_path, output_id, step)
-        torch.save(checkpoint, checkpoint_path)
-        return checkpoint, checkpoint_path
+        tmp_checkpoint_paths = []
 
-    def _rm_checkpoint(self, name):
-        if os.path.exists(name):
-            os.remove(name)
+        if self.all_gpus:
+            # save models trained in each gpu
+            checkpoint_path = "{}_step_{}_gpu_{}.pt".format(self.base_path, step, device_id)
+            logger.info("Saving full checkpoint {}".format(checkpoint_path))
+            torch.save(checkpoint, checkpoint_path)
+            tmp_checkpoint_paths.append(checkpoint_path)
+
+        encoders, decoders, attention_bridge, generators, model_frame = explode_model(
+            checkpoint
+        )
+
+        # TODO: refactor (in a dedicated saver class?)
+        # encoder modules
+        for i, encoder in enumerate(encoders):
+            checkpoint_path = "{}_step_{}_{}_enc.pt".format(
+                self.base_path, step, encoder_ids[i]
+            )
+            if os.path.isfile(checkpoint_path):
+                logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
+            else:
+                logger.info("Saving encoder checkpoint {}".format(checkpoint_path))
+                torch.save(encoder, checkpoint_path)
+                tmp_checkpoint_paths.append(checkpoint_path)
+        # decoder modules
+        for i, decoder in enumerate(decoders):
+            checkpoint_path = "{}_step_{}_{}_dec.pt".format(
+                self.base_path, step, decoder_ids[i]
+            )
+            if os.path.isfile(checkpoint_path):
+                logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
+            else:
+                logger.info("Saving decoder checkpoint {}".format(checkpoint_path))
+                torch.save(decoder, checkpoint_path)
+                tmp_checkpoint_paths.append(checkpoint_path)
+        # generator modules
+        for i, generator in enumerate(generators):
+            checkpoint_path = "{}_step_{}_{}_gen.pt".format(
+                self.base_path, step, decoder_ids[i]
+            )
+            if os.path.isfile(checkpoint_path):
+                logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
+            else:
+                logger.info("Saving generator checkpoint {}".format(checkpoint_path))
+                torch.save(generator, checkpoint_path)
+                tmp_checkpoint_paths.append(checkpoint_path)
+
+        if is_master(device_id):
+            # TODO: not sure how to deal with model_state_dict, fields, model_opt and optim.state_dict() in a multi-gpu
+            #  setting. Is it OK to save only from master?
+            # attention bridge module
+            checkpoint_path = "{}_step_{}_bridge.pt".format(self.base_path, step)
+            logger.info("Saving attention bridge checkpoint {}".format(checkpoint_path))
+            torch.save(attention_bridge, checkpoint_path)
+            tmp_checkpoint_paths.append(checkpoint_path)
+
+            # model frame
+            checkpoint_path = "{}_step_{}_frame.pt".format(self.base_path, step)
+            logger.info("Saving model frame checkpoint {}".format(checkpoint_path))
+            torch.save(model_frame, checkpoint_path)
+            tmp_checkpoint_paths.append(checkpoint_path)
+
+        return tmp_checkpoint_paths
+
+    def _rm_checkpoint(self, names):
+        for name in names:
+            if os.path.exists(name):
+                os.remove(name)

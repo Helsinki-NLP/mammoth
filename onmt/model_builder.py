@@ -20,6 +20,7 @@ from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
+from onmt.utils.module_splitter import build_bilingual_model
 from onmt.constants import ModelTask
 
 from onmt.transforms import make_transforms, save_transforms, \
@@ -86,6 +87,51 @@ def build_decoder(opt, embeddings):
                else opt.decoder_type
     return str2dec[dec_type].from_opt(opt, embeddings)
 
+
+def load_test_multitask_model(opt, model_path=None):
+    if model_path is None:
+        model_path = opt.models[0]
+    
+    if model_path.endswith('.pt'):
+        return load_test_model(opt, model_path)
+    else:
+        model_path = model_path if model_path.endswith('_') else f'{model_path}_'
+        enc_path = model_path + opt.src_lang + '_enc.pt'
+        dec_path = model_path + opt.tgt_lang + '_dec.pt'
+        opt.generator = model_path + opt.tgt_lang + '_gen.pt' if opt.generator is None else opt.generator
+        opt.bridge = model_path + 'bridge.pt' if opt.bridge is None else opt.bridge
+        opt.model_frame = model_path + 'frame.pt' if opt.model_frame is None else opt.model_frame
+
+
+        encoder = torch.load(enc_path, map_location=lambda storage, loc: storage)
+        decoder = torch.load(dec_path, map_location=lambda storage, loc: storage)
+        bridge = torch.load(opt.bridge, map_location=lambda storage, loc: storage)
+        generator = torch.load(opt.generator, map_location=lambda storage, loc: storage)
+        frame = torch.load(opt.model_frame, map_location=lambda storage, loc: storage)
+
+        checkpoint = build_bilingual_model(
+            src_lang=opt.src_lang,
+            tgt_lang=opt.tgt_lang,
+            enc_module=encoder,
+            dec_module=decoder,
+            ab_module=bridge,
+            gen_module=generator,
+            model_frame=frame,
+        )
+
+        model = checkpoint['whole_model']
+        vocab = checkpoint['vocab']
+        src_tgtpair = opt.src_lang+'-'+opt.tgt_lang
+        vocab = vocab if type(vocab) is dict else vocab[src_tgtpair]
+        fields = vocab
+
+        model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
+        device = torch.device("cuda" if use_gpu(opt) else "cpu")
+        model.to(device)
+
+        model.eval()
+
+        return fields, model, model_opt
 
 def load_test_model(opt, model_path=None):
     if model_path is None:

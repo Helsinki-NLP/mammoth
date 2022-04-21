@@ -69,7 +69,7 @@ class NMTModel(BaseModel):
 
         enc_state, memory_bank, lengths, mask = encoder(src, lengths)
 
-        alphas, memory_bank = self.attention_bridge(memory_bank, mask)
+        memory_bank, alphas = self.attention_bridge(memory_bank, mask)
 
         if not bptt:
             decoder.init_state(src, memory_bank, enc_state)

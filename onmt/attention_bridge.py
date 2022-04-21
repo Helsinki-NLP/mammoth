@@ -4,27 +4,18 @@ from __future__ import division
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import onmt
-from onmt.rmsnorm_torch import RMSNorm
+#from onmt.rmsnorm_torch import RMSNorm
+from onmt.encoders.transformer import TransformerEncoderLayer
 #from onmt.modules.position_ffn import ActivationFunction
-#from onmt.encoders.transformer import TransformerEncoderLayer
-import math
+#import math
 
-
-from __future__ import division
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import onmt
 
 class AttentionBridgeLayer(nn.Module):
     """
     Multi-headed attention. Bridge between encoders->decoders
     """
-    def __init__(self, 
-                 hidden_size, 
+    def __init__(self,
+                 hidden_size,
                  attention_heads,
                  hidden_ab_size,
                  model_type,
@@ -57,7 +48,7 @@ class AttentionBridgeLayer(nn.Module):
         #     for i in range(num_layers)])#
 
         #self.layer_norm = RMSNorm(d, eps=1e-6)  #nn.LayerNorm(d, eps=1e-6) #RMSNorm(d, eps=1e-6) #nn.LayerNorm(d, eps=1e-6)
-        #self.layer_norm_init = RMSNorm(d, eps=1e-6) 
+        #self.layer_norm_init = RMSNorm(d, eps=1e-6)
         #self.ws3 = nn.LayerNorm(d, eps=1e-6) #RMSNorm(d) #nn.LayerNorm(d, eps=1e-6)
         #self.ws3 = nn.Linear(d, d, bias=True)
 
@@ -86,9 +77,9 @@ class AttentionBridgeLayer(nn.Module):
         return alphas, self.M
 
     def forward(self, enc_output, mask):
-       """     
+        """
         mask: binary mask 1/0 indicating which keys have
-        zero/non-zero attention ``(batch, query_len, key_len)`` -> # [bsz, 1, len]     
+        zero/non-zero attention ``(batch, query_len, key_len)`` -> # [bsz, 1, len]
         """
         output, alphas = self.mixAtt(enc_output, mask)
         #take transpose to match dimensions s.t. r=new_seq_len:
@@ -157,61 +148,71 @@ class AttentionBridgeLayer(nn.Module):
 
 
 
+class Id_ab(nn.Sequential):
+    """
+    Return the input for any number of inputs.
+    We pass this, when we are not using the attention bridge
+    """
+    def forward(self, *input):
+        for module in self._modules.values():
+            input = module(*input)
+        return input
 
 class AttentionBridge(nn.Module):
     """
     N-layered attention-bridge between encoders->decoders
     """
-    def __init__(self, 
-            n_layers_attbrg,
-            layer_type_attbrg,
-            word_padding_idx,
-            dropout,
-            enc_rnn_size, 
-            heads, 
-            transformer_ff,
-            max_relative_positions,
-            model_opt,
-            ):
+    def __init__(self,
+                 n_layers_attbrg,
+                 layer_type_attbrg,
+                 word_padding_idx,
+                 dropout,
+                 enc_rnn_size,
+                 heads,
+                 transformer_ff,
+                 max_relative_positions,
+                 model_opt,
+                ):
         """Attention Heads Layer:"""
         super(AttentionBridge, self).__init__()
-        self.ab_nlayers = n_layers_attbrg 
-        self.ab_layertype = layer_type_attbrg 
+        self.ab_nlayers = n_layers_attbrg
+        self.ab_layertype = layer_type_attbrg
         self.word_padding_idx = word_padding_idx
         if self.ab_layertype == 'fixed-size':
             self.attbrg = nn.ModuleList([
                 AttentionBridgeLayer.from_opt(model_opt) for i in range(self.ab_nlayers)
                 ])
         elif self.ab_layertype == 'transformer':
-            from  onmt.encoders.transformer import TransformerEncoderLayer
             self.attbrg = nn.ModuleList(
                 [TransformerEncoderLayer(
-                    d_model=enc_rnn_size, 
-                    heads=heads, 
-                    d_ff=transformer_ff, 
+                    d_model=enc_rnn_size,
+                    heads=heads,
+                    d_ff=transformer_ff,
                     dropout=dropout,
                     max_relative_positions=max_relative_positions)
                 for i in range(self.ab_nlayers-1)])
             self.attbrg.append(AttentionBridgeLayer.from_opt(model_opt))
-    
+
     @classmethod
     def from_opt(cls, opt):
         """Alternate constructor."""
-        return cls(
-            opt.n_layers_attbrg
-            opt.layer_type_attbrg,
-            opt.word_padding_idx,
-            opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
-            opt.enc_rnn_size, 
-            opt.heads, 
-            opt.transformer_ff,
-            opt.max_relative_positions,
-            model_opt,
-            )
+        if opt.use_attention_bridge:
+            return cls(
+                opt.n_layers_attbrg,
+                opt.layer_type_attbrg,
+                opt.word_padding_idx,
+                opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
+                opt.enc_rnn_size,
+                opt.heads,
+                opt.transformer_ff,
+                opt.max_relative_positions,
+                opt,
+                )
+        else:
+            return Id_ab()
 
     def forward(self, enc_in_out):
         """Forward pass for the bridge layers"""
-        
         src, out = enc_in_out
         out = torch.transpose(out, 0, 1).contiguous()
         words = src[:, :, 0].transpose(0, 1)
@@ -219,8 +220,7 @@ class AttentionBridge(nn.Module):
         mask = words.data.eq(self.word_padding_idx).unsqueeze(1)  # [B, 1, T]
         for layer in self.attbrg:
             if isinstance(layer, AttentionBridgeLayer):
-                alphas, out = layer((src,out)) 
+                alphas, out = layer((src, out))
             else:
                 out = layer(out, mask)
-        
-        return alphas, out.transpose(0, 1).contiguous()
+        return out.transpose(0, 1).contiguous(), alphas

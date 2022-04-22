@@ -110,3 +110,6 @@ ENV/
 
 # Tensorboard
 runs/
+
+#SFTP
+sftp.config*.json

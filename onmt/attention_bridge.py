@@ -181,7 +181,7 @@ class AttentionBridge(nn.Module):
         out = enc_output
         for layer in self.attbrg:
             if isinstance(layer, AttentionBridgeLayer):
-                out, alphas  = layer(out, mask)
+                alphas, out  = layer(out, mask)
             else:
-                out = layer(out, mask)
-        return out.transpose(0, 1).contiguous(), alphas
+                out = layer(out, mask).transpose(0, 1).contiguous()
+        return out, alphas # [hop, bsz, nhid], [bsz, hop, srcseqlen]

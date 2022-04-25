@@ -58,23 +58,13 @@ class AttentionBridgeLayer(nn.Module):
     def from_opt(cls, opt):
         """Alternate constructor."""
         return cls(
-            opt.hidden_size,
+            opt.rnn_size,
             opt.attention_heads,
             opt.hidden_ab_size,
             opt.model_type,
             opt.dec_rnn_size,
         )
 
-    def v1forward(self, enc_in_out: tuple):
-        enc_input, enc_output = enc_in_out
-        self.M, alphas = self.mixAtt(enc_output, enc_input)
-
-        #output, alphas = self.mixAtt(enc_output, enc_input)
-        #take transpose to match dimensions s.t. r=new_seq_len:
-        #self.M = torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
-        #self.M = self.layer_norm(self.M)
-        #h_avrg = (self.M).mean(dim=0, keepdim=True)
-        return alphas, self.M
 
     def forward(self, enc_output, mask):
         """
@@ -90,31 +80,6 @@ class AttentionBridgeLayer(nn.Module):
         #h_avrg = (self.M).mean(dim=0, keepdim=True)
         return alphas, self.M
 
-
-    def v1mixAtt(self, outp, inp):
-        """Notation based on Lin et al. (2017) A structured self-attentive sentence embedding"""
-        #outp = torch.transpose(outp, 0, 1).contiguous() # <- passed to the AttentionBridge
-        size = outp.size()  # [bsz, len, nhid]
-        compressed_embeddings = outp.view(-1, size[2])  # [bsz*len, nhid*2]
-
-        hbar = self.relu(self.ws1(compressed_embeddings))  # [bsz*len, attention-unit]
-
-        alphas = self.ws2(hbar).view(size[0], size[1], -1)  # [bsz, len, hop]
-        alphas = torch.transpose(alphas, 1, 2).contiguous()  # [bsz, hop, len]
-
-        #Penalize alphas if "text"
-        if self.model_type == "text":
-            transformed_inp = torch.transpose(inp, 0, 1).contiguous()  # [bsz, len]
-            transformed_inp = transformed_inp.view(size[0], 1, size[1])  # [bsz, 1, len]
-            concatenated_inp = [transformed_inp for i in range(self.attention_hops)]
-            concatenated_inp = torch.cat(concatenated_inp, 1)  # [bsz, hop, len]
-
-            penalized_alphas = alphas + (-10000 * (concatenated_inp == 1).float()) # [bsz, hop, len] + [bsz, hop, len]
-            alphas = penalized_alphas
-
-        alphas = self.softmax(alphas.view(-1, size[1]))  # [bsz*hop, len]
-        alphas = alphas.view(size[0], self.attention_hops, size[1])  # [bsz, hop, len]
-        return torch.bmm(alphas, outp), alphas
 
     def mixAtt(self, outp, mask):
         """Notation based on Lin et al. (2017) A structured self-attentive sentence embedding"""
@@ -211,16 +176,12 @@ class AttentionBridge(nn.Module):
         else:
             return Id_ab()
 
-    def forward(self, enc_in_out):
+    def forward(self,  enc_output, mask):
         """Forward pass for the bridge layers"""
-        src, out = enc_in_out
-        out = torch.transpose(out, 0, 1).contiguous()
-        words = src[:, :, 0].transpose(0, 1)
-        w_batch, w_len = words.size()
-        mask = words.data.eq(self.word_padding_idx).unsqueeze(1)  # [B, 1, T]
+        out = enc_output
         for layer in self.attbrg:
             if isinstance(layer, AttentionBridgeLayer):
-                alphas, out = layer((src, out))
+                out, alphas  = layer(out, mask)
             else:
                 out = layer(out, mask)
         return out.transpose(0, 1).contiguous(), alphas

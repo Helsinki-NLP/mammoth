@@ -41,6 +41,7 @@ def build_embeddings(opt, text_field, for_encoder=True):
 
     pad_indices = [f.vocab.stoi[f.pad_token] for _, f in text_field]
     word_padding_idx, feat_pad_indices = pad_indices[0], pad_indices[1:]
+    opt.word_padding_idx = word_padding_idx
 
     num_embs = [len(f.vocab) for _, f in text_field]
     num_word_embeddings, num_feat_embeddings = num_embs[0], num_embs[1:]

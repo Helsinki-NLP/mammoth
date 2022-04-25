@@ -463,7 +463,8 @@ def _add_train_general_opts(parser):
               help="Model filename (the model will be saved as "
                    "<save_model>_N.pt where N is the number "
                    "of steps")
-
+    group.add("--save_all_gpus", "-save_all_gpus", action="store_true",
+        help="Whether to store a model from every gpu (in addition to the modules)")
     group.add('--save_checkpoint_steps', '-save_checkpoint_steps',
               type=int, default=5000,
               help="""Save a checkpoint every X steps""")

@@ -3,6 +3,7 @@ from collections import deque
 from onmt.utils.logging import logger
 
 import torch
+import torch.nn as nn
 
 from onmt.utils.distributed import is_master
 from onmt.utils.module_splitter import explode_model
@@ -132,21 +133,16 @@ class ModelSaver(ModelSaverBase):
         real_model = model.module if isinstance(model, nn.DataParallel) else model
 
         model_state_dict = real_model.state_dict()
-        encoder_ids = {index: lang for lang, index in model.encoder_ids.items()}
-        decoder_ids = {index: lang for lang, index in model.decoder_ids.items()}
+        encoder_ids = {index: lang[0].replace('encoder','') for index, lang in enumerate(model.encoder.named_children())}
+        decoder_ids = {index: lang[0].replace('decoder','') for index, lang in enumerate(model.decoder.named_children())}
 
         checkpoint = {
             "model": model_state_dict,
             # 'generator': generator_state_dict,
             "vocab": self.fields_dict,
             "opt": self.model_opt,
-            # "optim": self.optim.state_dict(),
-            "optim": {
-                "enc": {lang: lang_optim.state_dict() for lang, lang_optim in self.optim["enc"].items()},
-                "dec": {lang: lang_optim.state_dict() for lang, lang_optim in self.optim["dec"].items()},
-                "gen": {lang: lang_optim.state_dict() for lang, lang_optim in self.optim["gen"].items()},
-                "att": self.optim["att"].state_dict()
-            },
+            "optim": { k:v.state_dict() 
+                for k,v in self.optim._optimizer.optimizers.items() },
             "whole_model": self.model,
         }
 

@@ -20,7 +20,7 @@ from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
-from onmt.utils.module_splitter import build_bilingual_model
+from onmt.utils.module_splitter import create_bilingual_statedict
 from onmt.constants import ModelTask
 
 from onmt.transforms import make_transforms, save_transforms, \
@@ -90,9 +90,13 @@ def build_decoder(opt, embeddings):
 
 
 def load_test_multitask_model(opt, model_path=None):
+    """ If a checkpoint ending with ".pt" returns a full model 
+        otherwise it builds a bilingual model"""
     if model_path is None:
         model_path = opt.models[0]
     
+    opt.lang_pair = opt.lang_pair if opt.lang_pair else f'{opt.src_lang}-{opt.tgt_lang}'
+
     if model_path.endswith('.pt'):
         return load_test_model(opt, model_path)
     else:
@@ -110,23 +114,32 @@ def load_test_multitask_model(opt, model_path=None):
         generator = torch.load(opt.generator, map_location=lambda storage, loc: storage)
         frame = torch.load(opt.model_frame, map_location=lambda storage, loc: storage)
 
-        checkpoint = build_bilingual_model(
+        ckpt_state_dict = create_bilingual_statedict(
             src_lang=opt.src_lang,
             tgt_lang=opt.tgt_lang,
             enc_module=encoder,
             dec_module=decoder,
             ab_module=bridge,
             gen_module=generator,
-            model_frame=frame,
         )
 
-        model = checkpoint['whole_model']
-        vocab = checkpoint['vocab']
-        src_tgtpair = opt.src_lang+'-'+opt.tgt_lang
-        vocab = vocab if type(vocab) is dict else vocab[src_tgtpair]
-        fields = vocab
 
-        model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
+        fields = {
+            'src': frame["vocab"].get(('src', opt.src_lang))['src'],
+            'tgt': frame["vocab"].get(('tgt', opt.tgt_lang))['tgt'],
+        }
+        fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
+
+        model_opt = ArgumentParser.ckpt_model_opts(frame['opt'])
+        # Avoid functionality on inference
+        model_opt.update_vocab = False
+        model = create_bilingual_model(
+            src_lang=opt.src_lang,
+            tgt_lang=opt.tgt_lang,
+            model_opt=model_opt,
+            fields=fields
+            )
+        model.load_state_dict(ckpt_state_dict)
         device = torch.device("cuda" if use_gpu(opt) else "cpu")
         model.to(device)
 
@@ -142,13 +155,9 @@ def load_test_model(opt, model_path=None):
         model_path_enc = opt.models[0]
         checkpoint = torch.load(model_path_enc, map_location=lambda storage, loc: storage)
         model = checkpoint['whole_model']
-        # for name, param in model.decoder["decodercs"].named_parameters():
-        #     print(f'{name}: {param[0:10]}')
 
         model_path_dec = opt.models[1]
         model_dec = torch.load(model_path_dec, map_location=lambda storage, loc: storage)['whole_model']
-        # for name, param in model_dec.decoder["decodercs"].named_parameters():
-        #     print(f'{name}: {param[0:10]}')
         model.decoder = model_dec.decoder
         model.generator = model_dec.generator
     else:
@@ -166,7 +175,7 @@ def load_test_model(opt, model_path=None):
         model.to(device)
 
     lang_pair = opt.lang_pair
-    src_lang, tgt_lang = lang_pair.split("-")
+    src_lang, tgt_lang = lang_pair.split("-") 
     fields = {}
     fields['src'] = fields_dict[('src', src_lang)]['src']
     fields['tgt'] = fields_dict[('tgt', tgt_lang)]['tgt']
@@ -175,9 +184,6 @@ def load_test_model(opt, model_path=None):
 
     # Avoid functionality on inference
     model_opt.update_vocab = False
-
-    # print("====")
-    # print(fields)
 
     if opt.fp32:
         model.float()
@@ -190,6 +196,34 @@ def load_test_model(opt, model_path=None):
     model.generator.eval()
     return fields, model, model_opt
 
+def create_bilingual_model(src_lang, tgt_lang, model_opt, fields):
+    """For translation - state dict to be loaded to this model."""
+    
+    encoder = nn.ModuleDict()
+    decoder = nn.ModuleDict()
+    generator = nn.ModuleDict()
+
+    src_emb = build_src_emb(model_opt, fields)
+    tgt_emb = build_tgt_emb(model_opt, fields)
+    pluggable_src_emb = PluggableEmbeddings({f'{src_lang}':src_emb})
+    pluggable_tgt_emb = PluggableEmbeddings({f'{tgt_lang}':tgt_emb})
+    
+    pluggable_src_emb.activate(src_lang)
+    pluggable_tgt_emb.activate(tgt_lang)
+    encoder.add_module(f'encoder{src_lang}', build_only_enc(model_opt, pluggable_src_emb))
+    decoder.add_module(f'decoder{tgt_lang}', build_only_dec(model_opt, pluggable_tgt_emb))
+    generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, fields, tgt_emb))
+
+    attention_bridge = AttentionBridge.from_opt(model_opt)
+
+    nmt_model = onmt.models.NMTModel(
+        encoder=encoder,
+        decoder=decoder,
+        attention_bridge=attention_bridge
+    )
+
+    nmt_model.generator = generator
+    return nmt_model
 
 def build_src_emb(model_opt, fields):
     # Build embeddings.

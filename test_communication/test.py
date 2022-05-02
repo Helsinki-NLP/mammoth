@@ -1,5 +1,7 @@
+import ast
 import logging
 import os
+from typing import List
 from unittest import TestCase
 
 import onmt
@@ -10,11 +12,26 @@ logger = logging.getLogger(__name__)
 
 
 class TestTraining(TestCase):
-
     @classmethod
     def setUpClass(cls) -> None:
         cls.parser = ArgumentParser(description="train.py")
         onmt.opts.train_opts(cls.parser)
+
+    @staticmethod
+    def _get_model_components(opt) -> List[str]:
+        components_enc = [
+            "{}_enc".format(src_lang)
+            for src_lang in ast.literal_eval(opt.src_vocab).keys()
+        ]
+        components_dec = [
+            "{}_dec".format(tgt_lang)
+            for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()
+        ]
+        components_gen = [
+            "{}_gen".format(tgt_lang)
+            for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()
+        ]
+        return ["frame", "bridge", *components_enc, *components_dec, *components_gen]
 
     def test_training_1gpu_4pairs(self):
         out_model_prefix = "wmt_1gpu_4pairs"
@@ -35,17 +52,28 @@ class TestTraining(TestCase):
                 "0:0",
             ]
         )
-        out_file = "models/{}_0_step_20.pt".format(out_model_prefix)
-        if os.path.exists(out_file):
-            logger.info("Removing file {}".format(out_file))
-            os.remove(out_file)
-        logger.info("Launch training")
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+            logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        if os.path.exists(out_file):
-            logger.info("Removing file {}".format(out_file))
-            os.remove(out_file)
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
 
     def test_training_2gpus_4pairs(self):
         out_model_prefix = "wmt_2gpus_4pairs"
@@ -67,17 +95,24 @@ class TestTraining(TestCase):
                 "0:1",
             ]
         )
-        out_files = ["models/{}_{}_step_20.pt".format(out_model_prefix, gpu_rank) for gpu_rank in range(0, 2)]
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
         logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_1_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_1_step_20.pt".format(out_model_prefix), os.listdir("models"))
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -103,17 +138,24 @@ class TestTraining(TestCase):
                 "0:0",
             ]
         )
-        out_files = ["models/{}_{}_step_20.pt".format(out_model_prefix, gpu_rank) for gpu_rank in range(0, 2)]
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
         logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_1_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_1_step_20.pt".format(out_model_prefix), os.listdir("models"))
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -141,21 +183,24 @@ class TestTraining(TestCase):
                 "0:3",
             ]
         )
-        out_files = ["models/{}_{}_step_20.pt".format(out_model_prefix, gpu_rank) for gpu_rank in range(0, 4)]
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
         logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_1_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_2_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_3_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_1_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_2_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_3_step_20.pt".format(out_model_prefix), os.listdir("models"))
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -190,19 +235,24 @@ class TestTraining(TestCase):
                 "0:2",
             ]
         )
-        out_files = ["models/{}_{}_step_20.pt".format(out_model_prefix, gpu_rank) for gpu_rank in range(0, 3)]
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
         logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_1_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_2_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_1_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_2_step_20.pt".format(out_model_prefix), os.listdir("models"))
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -246,19 +296,24 @@ class TestTraining(TestCase):
                 "0:2",
             ]
         )
-        out_files = ["models/{}_{}_step_20.pt".format(out_model_prefix, gpu_rank) for gpu_rank in range(0, 3)]
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
         logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_1_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_2_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_1_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_2_step_20.pt".format(out_model_prefix), os.listdir("models"))
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -294,21 +349,24 @@ class TestTraining(TestCase):
                 "0:3",
             ]
         )
-        out_files = ["models/{}_{}_step_20.pt".format(out_model_prefix, gpu_rank) for gpu_rank in range(0, 4)]
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
         logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_1_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_2_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_3_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_1_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_2_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_3_step_20.pt".format(out_model_prefix), os.listdir("models"))
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -356,21 +414,24 @@ class TestTraining(TestCase):
                 "0:3",
             ]
         )
-        out_files = ["models/{}_{}_step_20.pt".format(out_model_prefix, gpu_rank) for gpu_rank in range(0, 4)]
+        components = self._get_model_components(opt)
+        out_files = [
+            "models/{}_step_20_{}.pt".format(out_model_prefix, cmp)
+            for cmp in components
+        ]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
         logger.info("Launch training")
         train(opt)
-        self.assertNotIn("{}_0_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_1_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_2_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertNotIn("{}_3_step_10.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_0_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_1_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_2_step_20.pt".format(out_model_prefix), os.listdir("models"))
-        self.assertIn("{}_3_step_20.pt".format(out_model_prefix), os.listdir("models"))
+        for cmp in components:
+            self.assertNotIn(
+                "{}_step_10_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
+            self.assertIn(
+                "{}_step_20_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
+            )
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))

@@ -65,30 +65,29 @@ def build_dynamic_fields(opts, src_specials=None, tgt_specials=None):
     return fields
 
 
-def build_dynamic_fields_langspec(opts, vocab_path, side):
+def build_dynamic_fields_langspec(opts, vocab_path, side, specials):
     """Build fields for dynamic, including load & build vocab."""
     fields = _get_dynamic_fields(opts)
 
     counters = defaultdict(Counter)
     logger.info("Loading vocab from text file...")
     logger.info(f'side {side} path {vocab_path}')
+    logger.info(f'specials {specials}')
 
     logger.info("Building fields with vocab in counters...")
 
     build_fv_kwargs = defaultdict(dict)
     if side == 'src':
         _src_vocab, _src_vocab_size = _load_vocab(vocab_path, 'src', counters, min_freq=opts.src_words_min_frequency)
-        src_specials = []
         build_fv_kwargs["src"] = dict(
-            max_size=opts.src_vocab_size, min_freq=opts.src_words_min_frequency, specials=src_specials
+            max_size=opts.src_vocab_size, min_freq=opts.src_words_min_frequency, specials=specials
         )
         src_multifield = fields["src"]
         _build_fv_from_multifield(src_multifield, counters, build_fv_kwargs, size_multiple=opts.vocab_size_multiple)
     else:
         _tgt_vocab, _tgt_vocab_size = _load_vocab(vocab_path, 'tgt', counters, min_freq=opts.tgt_words_min_frequency)
-        tgt_specials = []
         build_fv_kwargs["tgt"] = dict(
-            max_size=opts.tgt_vocab_size, min_freq=opts.tgt_words_min_frequency, specials=tgt_specials
+            max_size=opts.tgt_vocab_size, min_freq=opts.tgt_words_min_frequency, specials=specials
         )
         tgt_multifield = fields["tgt"]
         _build_fv_from_multifield(tgt_multifield, counters, build_fv_kwargs, size_multiple=opts.vocab_size_multiple)

@@ -97,8 +97,8 @@ class AttentionBridgeLayer(nn.Module):
         alphas = self.ws2(hbar).view(size[0], size[1], -1)  # [bsz, len, hop]
         alphas = torch.transpose(alphas, 1, 2).contiguous()  # [bsz, hop, len]
 
-        #Penalize alphas if "text"
-        if self.model_type == "text":
+        #Penalize alphas if "text" and only the 1st AB-layer 
+        if self.model_type == "text" and alphas.size(-1) == mask.size(-1):
             #transformed_inp = torch.transpose(inp, 0, 1).contiguous()  # [bsz, len]
             #transformed_inp = transformed_inp.view(size[0], 1, size[1])  # [bsz, 1, len]
             concatenated_inp = [mask for i in range(self.attention_hops)]
@@ -113,11 +113,14 @@ class AttentionBridgeLayer(nn.Module):
 
 
 
-class Id_ab(nn.Sequential):
+class Id_ab(nn.ModuleList):
     """
     Return the input for any number of inputs.
     We pass this, when we are not using the attention bridge
     """
+    def __init__(self):
+        super(Id_ab, self).__init__()
+
     def forward(self, *input):
         for module in self._modules.values():
             input = module(*input)
@@ -154,6 +157,7 @@ class AttentionBridge(nn.Module):
                     heads=heads,
                     d_ff=transformer_ff,
                     dropout=dropout,
+                    attention_dropout=model_opt.attention_dropout[0],
                     max_relative_positions=max_relative_positions)
                 for i in range(self.ab_nlayers-1)])
             self.attbrg.append(AttentionBridgeLayer.from_opt(model_opt))
@@ -183,5 +187,6 @@ class AttentionBridge(nn.Module):
             if isinstance(layer, AttentionBridgeLayer):
                 alphas, out  = layer(out, mask)
             else:
+                out = out.transpose(0,1).contiguous()
                 out = layer(out, mask).transpose(0, 1).contiguous()
         return out, alphas # [hop, bsz, nhid], [bsz, hop, srcseqlen]

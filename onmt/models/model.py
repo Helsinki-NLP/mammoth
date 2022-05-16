@@ -66,6 +66,7 @@ class NMTModel(BaseModel):
         # Activate the correct pluggable embeddings
         encoder.embeddings.activate(metadata.src_lang)
         decoder.embeddings.activate(metadata.tgt_lang)
+        # logger.info(f'in NMTModel.forward {metadata}')
 
         enc_state, memory_bank, lengths, mask = encoder(src, lengths)
 

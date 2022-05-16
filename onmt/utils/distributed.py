@@ -3,18 +3,20 @@
     https://github.com/pytorch/fairseq
 """
 import math
+import numpy as np
 import os
 import pickle
 import signal
 import torch.distributed
 
+from abc import ABC, abstractmethod
 from argparse import Namespace
 from collections import OrderedDict
 from itertools import compress, cycle, islice
 from onmt.inputters.corpus import get_corpus
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 
 def is_master(global_rank):
@@ -43,6 +45,48 @@ def broadcast_tensors(tensors, src=0, group=None):
             torch.distributed.broadcast(t, src)
         else:
             torch.distributed.broadcast(t, src, group=group)
+
+
+def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
+    # Set missing gradients to zero, keeping track of true gradients
+    require_grad = [(name, p) for (name, p) in named_parameters if p.requires_grad]
+    device = require_grad[0][1].device
+    ready_list = []
+    for name, p in require_grad:
+        if hasattr(p, 'has_grad') and p.has_grad:
+            ready_list.append(1.0)
+        else:
+            ready_list.append(0.0)
+            if p.grad is None:
+                p.grad = torch.zeros_like(p)
+
+    # Communicate the ready bits, and reduce them using summation.
+    # This gives the number of non-dummy gradients participating, for normalization
+    ready_t = torch.tensor(ready_list).to(device)
+    if group is None:
+        torch.distributed.all_reduce(ready_t)
+    else:
+        torch.distributed.all_reduce(ready_t, group=group)
+    rescale_denoms = ready_t  # after reduction
+
+    # Omit if all nodes sent a zero ready bit
+    grads = [p.grad.data for name, p in require_grad]
+    grads = [grad for (grad, denom) in zip(grads, rescale_denoms) if denom > 0]
+    rescale_denoms = [denom for denom in rescale_denoms if denom > 0]
+    assert len(grads) == len(rescale_denoms)
+    if len(grads) == 0:
+        logger.info('No remaining grads in this group.')
+        return
+
+    # All devices communicate either a real gradient or a dummy zeros of the same size
+    # Can not use rescale_denom, as each grad may have its own denominator
+    all_reduce_and_rescale_tensors(grads, rescale_denom=1)
+
+    # Normalize using the previously computed values
+    for grad, denom in zip(grads, rescale_denoms):
+        if denom > 0:
+            grad.div_(denom)
+        # else: TODO reuse p.has_grad to prevent this parameter from being stepped?
 
 
 def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None, buffer_size=10485760):
@@ -235,6 +279,8 @@ class Scheduler:
             self.n_nodes = 1
             self.gpus_per_node = 1
 
+        self.tasks_per_communication_batch = opt.accum_count
+
         logger.info(f'in scheduler: node_rank {node_rank} local_rank {local_rank}')
         assert node_rank is None or 0 <= node_rank < self.n_nodes
         assert local_rank is None or 0 <= local_rank < self.gpus_per_node
@@ -262,6 +308,21 @@ class Scheduler:
 
         # A list of booleans, selecting only relevant parts of the configuration lists
         self._selector = self._get_selector(self.node_rank, self.local_rank)
+
+        strategies = {
+            'sampling': SamplingSchedulingStrategy,
+            'roundrobin': RoundRobinSchedulingStrategy,
+        }
+        try:
+            self.strategy = strategies[opt.scheduling_strategy](
+                my_corpus_ids=list(compress(self.opt.data.keys(), self._selector)),
+                opt_data=self.opt.data,
+            )
+        except KeyError:
+            raise ValueError(
+                f'Invalid valus for scheduling_strategy "{opt.scheduling_strategy}".'
+                f'Expecting one of {strategies.keys()}'
+            )
 
     def __repr__(self):
         return f'{self.__class__.__name__}(' f'..., node_rank={self.node_rank}, local_rank={self.local_rank})'
@@ -481,6 +542,12 @@ class Scheduler:
             )
         return result
 
+    def sample_corpus_ids(self, communication_batch_id: int):
+        return self.strategy.sample_corpus_ids(
+            self.tasks_per_communication_batch,
+            communication_batch_id,
+        )
+
     def get_encoders(self):
         # TODO: also return how many times each component occurs, for normalization?
         my_encoder_ids = compress(self.encoder_ids, self._selector)
@@ -503,3 +570,64 @@ class Scheduler:
     def get_generators(self):
         my_lang_pairs = compress(self.lang_pairs, self._selector)
         return [tgt_lang for (src_lang, tgt_lang) in my_lang_pairs]
+
+
+class SchedulingStrategy(ABC):
+    @abstractmethod
+    def __init__(self, my_corpus_ids: List[str], opt_data: dict):
+        pass
+
+    @abstractmethod
+    def sample_corpus_ids(self, n_samples: int, communication_batch_id: int):
+        pass
+
+
+class SamplingSchedulingStrategy(SchedulingStrategy):
+    """
+    Schedules tasks by sampling with replacement from a categorical distribution.
+    The probabilities are found by normalizing the weights of all valid corpora.
+    Valid corpora are those that are present on this device, and have already reached
+    their curriculum starting point "from_step".
+    """
+
+    def __init__(self, my_corpus_ids: List[str], opt_data: dict):
+        self.my_corpus_ids = my_corpus_ids
+        self.opt_data = opt_data
+
+    def sample_corpus_ids(
+        self,
+        n_samples: int,
+        communication_batch_id: int,
+    ):
+        weights = [
+            self.opt_data[corpus_id]['weight'] if self.opt_data[corpus_id]['from_step'] <= communication_batch_id else 0
+            for corpus_id in self.my_corpus_ids
+        ]
+        sum_w = sum(weights)
+        if sum_w == 0:
+            raise Exception('Can not set "from_step" of all corpora to nonzero')
+        p = [weight / sum_w for weight in weights]
+        # for id, pp in zip(my_corpus_ids, p):
+        #     logger.info(f'{id} {pp}')
+        # sampling with replacement from weighted corpora (language pairs)
+        sampled_corpus_ids = np.random.choice(self.my_corpus_ids, size=n_samples, p=p)
+        # logger.info(f'sampled {sampled_corpus_ids}')
+        return sampled_corpus_ids
+
+
+class RoundRobinSchedulingStrategy(SchedulingStrategy):
+    """
+    Schedules tasks in a round-robin fashion.
+    Yields a communication batch of n_samples at a time.
+    When reaching the end of the list of tasks, starts over from the beginning.
+    """
+
+    def __init__(self, my_corpus_ids: List[str], opt_data: dict):
+        self.infinite_corpus_ids = cycle(my_corpus_ids)
+
+    def sample_corpus_ids(
+        self,
+        n_samples: int,
+        communication_batch_id: int,
+    ):
+        return list(islice(self.infinite_corpus_ids, n_samples))

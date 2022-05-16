@@ -834,6 +834,7 @@ def _add_train_general_opts(parser):
         default=[0],
         help="Steps at which accum_count values change",
     )
+    group.add('--scheduling_strategy', '-scheduling_strategy', choices=['sampling', 'roundrobin'], default='sampling')
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
     group.add('--valid_batch_size', '-valid_batch_size', type=int, default=32, help='Maximum batch size for validation')
     group.add(

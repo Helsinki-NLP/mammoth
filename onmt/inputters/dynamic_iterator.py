@@ -177,7 +177,7 @@ class DynamicDatasetIter(object):
         )
 
     def _init_datasets(self):
-        self.dataset_iterators = []
+        self.dataset_iterators = dict()
         for tpl in self.scheduler.get_dataset_specs(self.fields_dict):
             (src_lang, tgt_lang, encoder_id, decoder_id, corpus_id, corpus, src_fields, tgt_fields) = tpl
             merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}
@@ -221,7 +221,7 @@ class DynamicDatasetIter(object):
             # iterator over minibatches
             ordered_iter = self._wrap_in_ordered_iterator(transformed_iter)
 
-            self.dataset_iterators.append((ordered_iter, metadata))
+            self.dataset_iterators[corpus_id] = (ordered_iter, metadata)
 
         self.init_iterators = True
 
@@ -254,7 +254,7 @@ class DynamicDatasetIter(object):
         # before synching gradients between devices
         communication_batch_id = 0
         while True:
-            # interleaves one minibatch from each language pair, in a round-robin fashion
-            for ordered_iter, metadata in self.dataset_iterators:
+            for corpus_id in self.scheduler.sample_corpus_ids(communication_batch_id):
+                ordered_iter, metadata = self.dataset_iterators[corpus_id]
                 yield next(ordered_iter), metadata, communication_batch_id
             communication_batch_id += 1

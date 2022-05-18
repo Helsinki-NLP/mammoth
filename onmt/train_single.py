@@ -83,9 +83,9 @@ def init_distributed(model, scheduler):
     weights = [p.data for p in model.attention_bridge.parameters()]
     broadcast_tensors(weights, src=0)
 
-    logger.info('After init_distributed')
+    logger.debug('After init_distributed')
     for name, p in model.named_parameters():
-        logger.info(f'{scheduler.node_rank}:{scheduler.local_rank} {name}: {p.flatten()[:10]}')
+        logger.debug(f'{scheduler.node_rank}:{scheduler.local_rank} {name}: {p.flatten()[:10]}')
 
 
 def main(

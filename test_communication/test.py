@@ -6,6 +6,7 @@ from unittest import TestCase
 
 import onmt
 from onmt.bin.train import train
+from onmt.bin.translate import translate
 from onmt.utils.parse import ArgumentParser
 
 logger = logging.getLogger(__name__)
@@ -436,3 +437,35 @@ class TestTraining(TestCase):
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
+
+
+class TestTranslate(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.parser = ArgumentParser(description="translate.py")
+        onmt.opts.config_opts(cls.parser)
+        onmt.opts.translate_opts(cls.parser)
+        onmt.opts.build_bilingual_model(cls.parser)
+
+    def test_translate(self):
+        # TODO: train model instead of loading one the one used now, remove all absolute paths, add test data in the repo
+        opt, _ = self.parser.parse_known_args(
+            [
+                "-gpu",
+                "0",
+                "-data_type",
+                "text",
+                "-src_lang",
+                "en",
+                "-tgt_lang",
+                "fr",
+                "-model",
+                "/home/micheleb/models/scaleUpMNMT/opus12/opus12.50.adaf_step_3000_",
+                "-src",
+                "/home/micheleb/data/scaleUpMNMT/prepare_opus_data_out/supervised/en-fr/opus.en-fr-dev.en.sp",
+                "-output",
+                "/home/micheleb/projects/OpenNMT-py-v2/translate_test.tmp",
+                "-use_attention_bridge",
+            ]
+        )
+        translate(opt)

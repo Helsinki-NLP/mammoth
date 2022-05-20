@@ -33,9 +33,11 @@ def attention_bridge_optimizer(model, scheduler, base_optimizer):
         if not param.requires_grad:
             continue
         attParam.append(param)
-
-    ada = base_optimizer(attParam)
-    multiOptims["ATT"] = ada
+    
+    # skip AB optimizer if AB is not in use
+    if len(attParam):
+        ada = base_optimizer(attParam)
+        multiOptims["ATT"] = ada
 
     optimizer = MultipleOptimizer(multiOptims, None)
     return optimizer

@@ -20,6 +20,7 @@ from onmt.modules.util_class import Cast
 from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
 from onmt.utils.parse import ArgumentParser
+from onmt.utils.module_splitter import create_bilingual_statedict
 from onmt.constants import ModelTask
 
 from onmt.transforms import make_transforms, save_transforms, \
@@ -40,6 +41,7 @@ def build_embeddings(opt, text_field, for_encoder=True):
 
     pad_indices = [f.vocab.stoi[f.pad_token] for _, f in text_field]
     word_padding_idx, feat_pad_indices = pad_indices[0], pad_indices[1:]
+    opt.word_padding_idx = word_padding_idx
 
     num_embs = [len(f.vocab) for _, f in text_field]
     num_word_embeddings, num_feat_embeddings = num_embs[0], num_embs[1:]
@@ -87,6 +89,64 @@ def build_decoder(opt, embeddings):
     return str2dec[dec_type].from_opt(opt, embeddings)
 
 
+def load_test_multitask_model(opt, model_path=None):
+    """ If a checkpoint ending with ".pt" returns a full model 
+        otherwise it builds a bilingual model"""
+    if model_path is None:
+        model_path = opt.models[0]
+    
+    opt.lang_pair = opt.lang_pair if opt.lang_pair else f'{opt.src_lang}-{opt.tgt_lang}'
+
+    if model_path.endswith('.pt'):
+        return load_test_model(opt, model_path)
+    else:
+        model_path = model_path if model_path.endswith('_') else f'{model_path}_'
+        enc_path = model_path + opt.src_lang + '_enc.pt'
+        dec_path = model_path + opt.tgt_lang + '_dec.pt'
+        opt.generator = model_path + opt.tgt_lang + '_gen.pt' if opt.generator is None else opt.generator
+        opt.bridge = model_path + 'bridge.pt' if opt.bridge is None else opt.bridge
+        opt.model_frame = model_path + 'frame.pt' if opt.model_frame is None else opt.model_frame
+
+
+        encoder = torch.load(enc_path, map_location=lambda storage, loc: storage)
+        decoder = torch.load(dec_path, map_location=lambda storage, loc: storage)
+        bridge = torch.load(opt.bridge, map_location=lambda storage, loc: storage)
+        generator = torch.load(opt.generator, map_location=lambda storage, loc: storage)
+        frame = torch.load(opt.model_frame, map_location=lambda storage, loc: storage)
+
+        ckpt_state_dict = create_bilingual_statedict(
+            src_lang=opt.src_lang,
+            tgt_lang=opt.tgt_lang,
+            enc_module=encoder,
+            dec_module=decoder,
+            ab_module=bridge,
+            gen_module=generator,
+        )
+
+
+        fields = {
+            'src': frame["vocab"].get(('src', opt.src_lang))['src'],
+            'tgt': frame["vocab"].get(('tgt', opt.tgt_lang))['tgt'],
+        }
+        fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
+
+        model_opt = ArgumentParser.ckpt_model_opts(frame['opt'])
+        # Avoid functionality on inference
+        model_opt.update_vocab = False
+        model = create_bilingual_model(
+            src_lang=opt.src_lang,
+            tgt_lang=opt.tgt_lang,
+            model_opt=model_opt,
+            fields=fields
+            )
+        model.load_state_dict(ckpt_state_dict)
+        device = torch.device("cuda" if use_gpu(opt) else "cpu")
+        model.to(device)
+
+        model.eval()
+
+        return fields, model, model_opt
+
 def load_test_model(opt, model_path=None):
     if model_path is None:
         model_path = opt.models[0]
@@ -95,13 +155,9 @@ def load_test_model(opt, model_path=None):
         model_path_enc = opt.models[0]
         checkpoint = torch.load(model_path_enc, map_location=lambda storage, loc: storage)
         model = checkpoint['whole_model']
-        # for name, param in model.decoder["decodercs"].named_parameters():
-        #     print(f'{name}: {param[0:10]}')
 
         model_path_dec = opt.models[1]
         model_dec = torch.load(model_path_dec, map_location=lambda storage, loc: storage)['whole_model']
-        # for name, param in model_dec.decoder["decodercs"].named_parameters():
-        #     print(f'{name}: {param[0:10]}')
         model.decoder = model_dec.decoder
         model.generator = model_dec.generator
     else:
@@ -119,7 +175,7 @@ def load_test_model(opt, model_path=None):
         model.to(device)
 
     lang_pair = opt.lang_pair
-    src_lang, tgt_lang = lang_pair.split("-")
+    src_lang, tgt_lang = lang_pair.split("-") 
     fields = {}
     fields['src'] = fields_dict[('src', src_lang)]['src']
     fields['tgt'] = fields_dict[('tgt', tgt_lang)]['tgt']
@@ -128,9 +184,6 @@ def load_test_model(opt, model_path=None):
 
     # Avoid functionality on inference
     model_opt.update_vocab = False
-
-    # print("====")
-    # print(fields)
 
     if opt.fp32:
         model.float()
@@ -143,6 +196,34 @@ def load_test_model(opt, model_path=None):
     model.generator.eval()
     return fields, model, model_opt
 
+def create_bilingual_model(src_lang, tgt_lang, model_opt, fields):
+    """For translation - state dict to be loaded to this model."""
+    
+    encoder = nn.ModuleDict()
+    decoder = nn.ModuleDict()
+    generator = nn.ModuleDict()
+
+    src_emb = build_src_emb(model_opt, fields)
+    tgt_emb = build_tgt_emb(model_opt, fields)
+    pluggable_src_emb = PluggableEmbeddings({f'{src_lang}':src_emb})
+    pluggable_tgt_emb = PluggableEmbeddings({f'{tgt_lang}':tgt_emb})
+    
+    pluggable_src_emb.activate(src_lang)
+    pluggable_tgt_emb.activate(tgt_lang)
+    encoder.add_module(f'encoder{src_lang}', build_only_enc(model_opt, pluggable_src_emb))
+    decoder.add_module(f'decoder{tgt_lang}', build_only_dec(model_opt, pluggable_tgt_emb))
+    generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, fields, tgt_emb))
+
+    attention_bridge = AttentionBridge.from_opt(model_opt)
+
+    nmt_model = onmt.models.NMTModel(
+        encoder=encoder,
+        decoder=decoder,
+        attention_bridge=attention_bridge
+    )
+
+    nmt_model.generator = generator
+    return nmt_model
 
 def build_src_emb(model_opt, fields):
     # Build embeddings.
@@ -210,7 +291,8 @@ def build_task_specific_model(
         decoder = build_only_dec(model_opt, pluggable_tgt_emb)
         decoders_md.add_module(f'decoder{decoder_id}', decoder)
 
-    attention_bridge = AttentionBridge(model_opt.rnn_size, model_opt.attention_heads, model_opt)
+    # TODO: implement hierarchical approach to layer sharing
+    attention_bridge = AttentionBridge.from_opt(model_opt)
 
     if model_opt.param_init != 0.0:
         for p in attention_bridge.parameters():

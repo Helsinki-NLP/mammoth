@@ -44,6 +44,7 @@ def _get_parser():
 
     opts.config_opts(parser)
     opts.translate_opts(parser)
+    opts.build_bilingual_model(parser)
     return parser
 
 

@@ -22,12 +22,15 @@ from onmt.constants import ModelTask
 
 def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
+        if not os.path.isdir(os.path.dirname(opt.output)):
+            logger.info('WARNING: output file directory does not exist... creating it.')
+            os.makedirs( os.path.dirname(opt.output), exist_ok=True )
         out_file = codecs.open(opt.output, "w+", "utf-8")
 
     load_test_model = (
         onmt.decoders.ensemble.load_test_model
         if len(opt.models) > 3
-        else onmt.model_builder.load_test_model
+        else onmt.model_builder.load_test_multitask_model
     )
     fields, model, model_opt = load_test_model(opt)
 
@@ -153,8 +156,6 @@ class Inference(object):
         logger=None,
         seed=-1, langpair = None,
     ):
-        #print("LANGPIAR INIT")
-        #print(langpair)     
         self.langpair = langpair
         self.langENC = str(langpair).split("-")[0]
         self.langDEC = str(langpair).split("-")[1]
@@ -791,7 +792,9 @@ class Translator(Inference):
         enc_states, memory_bank, src_lengths, mask = self.model.encoder["encoder"+str(self.langENC)](
             src, src_lengths
         )
-        alphas, memory_bank = self.model.attention_bridge(memory_bank, mask)
+
+        memory_bank, alphas = self.model.attention_bridge(memory_bank, mask)
+
         if src_lengths is None:
             assert not isinstance(
                 memory_bank, tuple

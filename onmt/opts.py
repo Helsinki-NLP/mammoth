@@ -278,10 +278,6 @@ def model_opts(parser):
               choices=['fp32', 'fp16'],
               help='Data type of the model.')
 
-    group.add('--hidden_ab_size', '-hidden_ab_size', type=int, default=2048,
-              help="""Size of attention bridge hidden states""")
-    group.add('--attention_heads', '-attention_heads', type=int, default=50,
-              help="""Number of attention heads in attention bridge""")
     group.add("--enc_sharing_group", "-enc_sharing_group", nargs='+',
               help="List of encoder sharing group id for each dataset. ")
     group.add("--dec_sharing_group", "-dec_sharing_group", nargs='+',
@@ -437,7 +433,24 @@ def model_opts(parser):
               choices=["O0", "O1", "O2", "O3"],
               help="For FP16 training, the opt_level to use."
                    "See https://nvidia.github.io/apex/amp.html#opt-levels.")
+    
+    # attention bridge options
+    group = parser.add_argument_group("Attention_bridge")
+    group.add('--hidden_ab_size', '-hidden_ab_size', type=int, default=2048,
+              help="""Size of attention bridge hidden states""")
+    group.add('--attention_heads', '-attention_heads', type=int, default=50,
+              help="""Number of attention heads in attention bridge""")
 
+    group.add("--use_attention_bridge", "-use_attention_bridge", 
+              action="store_true",
+              help="""Use self-attention shared layers between enc and dec""")
+    group.add("--n_layers_attbrg", "-n_layers_ab", type=int,  default=1,
+              help="""Number of layers for the attention bridge""")
+    group.add("--layer_type_attbrg", "-layer_type_ab", type=str, default="transformer",
+              choices=["transformer", "fixed-size"],
+              help="""For an N-layered attention bridge, choose
+                    whether the N-1 previous layers are transformer layers or
+                    fixed-size inner-attention layers.""")
 
 def _add_train_general_opts(parser):
     """ General options for training """
@@ -450,7 +463,8 @@ def _add_train_general_opts(parser):
               help="Model filename (the model will be saved as "
                    "<save_model>_N.pt where N is the number "
                    "of steps")
-
+    group.add("--save_all_gpus", "-save_all_gpus", action="store_true",
+        help="Whether to store a model from every gpu (in addition to the modules)")
     group.add('--save_checkpoint_steps', '-save_checkpoint_steps',
               type=int, default=5000,
               help="""Save a checkpoint every X steps""")
@@ -821,6 +835,63 @@ def translate_opts(parser):
                    "is sents. Tokens will do dynamic batching")
     group.add('--gpu', '-gpu', type=int, default=-1,
               help="Device to run on")
+
+
+def build_bilingual_model(parser):
+    """options for modular translation"""
+    group = parser.add_argument_group("Source and Target Languages")
+    group.add(
+        "--src_lang",
+        "-src_lang",
+        required=True,
+        help="The 2-character source language code",
+    )
+    group.add(
+        "--tgt_lang",
+        "-tgt_lang",
+        required=True,
+        help="The 2-character target language code",
+    )
+    group = parser.add_argument_group("Model Modules")
+    group.add(
+        "--encoder",
+        "-encoder",
+        required=False,
+        help="Path to the encoder module .pt file"
+        "NOT NEEDED IF --model gives a path+model_preffix",
+
+    )
+    group.add(
+        "--decoder",
+        "-decoder",
+        required=False,
+        help="Path to the decoder module .pt file"
+        "NOT NEEDED IF --model gives a path+model_preffix",
+    )
+    group.add(
+        "--bridge",
+        "-bridge",
+        required=False,
+        help="Path to the attention bridge module .pt file",
+    )
+    group.add(
+        "--generator",
+        "-generator",
+        required=False,
+        help="Path to the generator module .pt file",
+    )
+    group.add(
+        "--model_frame",
+        "-model_frame",
+        required=False,
+        help="Path to the model frame .pt file",
+    )
+    group.add(
+        "--output_model",
+        "-output_model",
+        required=False,
+        help="Path to the model output",
+    )
 
 
 # Copyright 2016 The Chromium Authors. All rights reserved.

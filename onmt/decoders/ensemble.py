@@ -127,7 +127,7 @@ def load_test_model(opt):
     models = []
     for model_path in opt.models:
         fields, model, model_opt = \
-            onmt.model_builder.load_test_model(opt, model_path=model_path)
+            onmt.model_builder.load_test_multitask_model(opt, model_path=model_path)
         if shared_fields is None:
             shared_fields = fields
         else:

@@ -46,6 +46,9 @@ def _add_logging_opts(parser, is_train=True):
                   type=str, default="runs/onmt",
                   help="Log directory for Tensorboard. "
                        "This is also the name of the run.")
+        group.add('--lca_loginterval', '-lca_loginterval', type=int, default=-1,
+                  help="Compute and print the att-bridge LCA at this interval.")
+
     else:
         # Options only during inference
         group.add('--attn_debug', '-attn_debug', action="store_true",

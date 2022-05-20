@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+import os
+import json
 import logging
 from logging.handlers import RotatingFileHandler
 logger = logging.getLogger()
@@ -29,3 +31,16 @@ def init_logger(
         logger.addHandler(file_handler)
 
     return logger
+
+def log_lca_values(step, lca_logs, lca_params, opath, dump_logs=False):
+    for k, v in lca_params.items():
+        lca_sum = v.sum().item()
+        lca_mean = v.mean().item()
+        lca_logs[k][f'STEP_{step}'] = {'sum': lca_sum, 'mean':lca_mean}
+                                        
+    if dump_logs:
+        if os.path.exists(opath):
+            os.system(f'cp {opath} {opath}.previous')
+        with open(opath, 'w+') as f:
+            json.dump(lca_logs, f)
+        logger.info(f'dumped LCA logs in {opath}')

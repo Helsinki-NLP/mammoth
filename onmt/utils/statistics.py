@@ -3,6 +3,9 @@ import time
 import math
 import sys
 
+from collections import Counter
+from torch.linalg import norm
+
 from onmt.utils.logging import logger
 
 
@@ -22,6 +25,14 @@ class Statistics(object):
         self.n_correct = n_correct
         self.n_src_words = 0
         self.start_time = time.time()
+
+        # losses per task
+        self.loss_per_task = Counter()
+
+        # parameter-level statistics
+        self.magnitude_denom = 0
+        self.param_magnitudes = Counter()
+        self.grad_magnitudes = Counter()
 
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
@@ -84,6 +95,24 @@ class Statistics(object):
         if update_n_src_words:
             self.n_src_words += stat.n_src_words
 
+    def update_task_loss(self, loss, metadata, global_rank):
+        if not loss:
+            logger.info('not loss', f'{global_rank}_{metadata.src_lang}_{metadata.tgt_lang}')
+            return
+        if global_rank is not None:
+            key = f'{global_rank}_{metadata.src_lang}_{metadata.tgt_lang}'
+        else:
+            key = f'{metadata.src_lang}_{metadata.tgt_lang}'
+        self.loss_per_task[key] += loss
+
+    def update_from_parameters(self, named_parameters):
+        self.magnitude_denom += 1
+        # Accumulate L2 norms of parameters and their gradients
+        for name, param in named_parameters:
+            self.param_magnitudes[name] += norm(param.data, ord=2).item()
+            if param.requires_grad and param.grad is not None:
+                self.grad_magnitudes[name] += norm(param.grad.data, ord=2).item()
+
     def accuracy(self):
         """compute accuracy"""
         return 100 * (self.n_correct / self.n_words)
@@ -142,3 +171,14 @@ class Statistics(object):
         writer.add_scalar(prefix + "/lr", learning_rate, step)
         if patience is not None:
             writer.add_scalar(prefix + "/patience", patience, step)
+
+        if self.magnitude_denom > 0:
+            # log parameter-level statistics
+            for param, magnitude in self.param_magnitudes.items():
+                writer.add_scalar(f'params/{param}', magnitude / self.magnitude_denom, step)
+            for param, magnitude in self.grad_magnitudes.items():
+                writer.add_scalar(f'grads/{param}', magnitude / self.magnitude_denom, step)
+
+        if len(self.loss_per_task) > 0:
+            for key, loss in self.loss_per_task.items():
+                writer.add_scalar(f'loss_per_task/{key}', loss, step)

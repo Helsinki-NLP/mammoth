@@ -106,6 +106,7 @@ def build_trainer(
         dropout=dropout,
         dropout_steps=dropout_steps,
         scheduler=scheduler,
+        report_stats_from_parameters=opt.report_stats_from_parameters,
         lca_loginterval=opt.lca_loginterval,
     )
     return trainer
@@ -161,6 +162,7 @@ class Trainer(object):
         dropout=[0.3],
         dropout_steps=[0],
         scheduler=None,
+        report_stats_from_parameters=False,
         lca_loginterval=-1,
     ):
         # Basic attributes.
@@ -178,6 +180,7 @@ class Trainer(object):
         self.gpu_rank = gpu_rank
         self.gpu_verbose_level = gpu_verbose_level
         self.report_manager = report_manager
+        self.report_stats_from_parameters = report_stats_from_parameters
         self.with_align = with_align
         self.model_saver = model_saver
         self.average_decay = average_decay
@@ -189,6 +192,7 @@ class Trainer(object):
         self.dropout_steps = dropout_steps
 
         self.scheduler = scheduler
+
         my_component_groups = self.scheduler.get_distributed_groups()
         self.my_encoder_groups = my_component_groups['encoder']
         self.my_decoder_groups = my_component_groups['decoder']
@@ -369,6 +373,8 @@ class Trainer(object):
                 # a group is not specified: reduce across all devices
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0)
 
+            self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
+
             # LCA
             if (self.lca_loginterval > 0) and (step % self.lca_loginterval == 0) and (global_rank == 0):
                 for k, v in self.model.named_parameters():
@@ -488,6 +494,7 @@ class Trainer(object):
         normalization,
         total_stats,
         report_stats,
+        global_rank=None,
     ):
         for k, (batch, metadata) in enumerate(batches_with_meta):
             # logger.info(f'batch with metadata {metadata}')
@@ -534,6 +541,7 @@ class Trainer(object):
 
                     total_stats.update(batch_stats)
                     report_stats.update(batch_stats)
+                    report_stats.update_task_loss(batch_stats.loss, metadata, global_rank)
 
                 except Exception:
                     traceback.print_exc()
@@ -567,6 +575,10 @@ class Trainer(object):
         if stat is not None and self.n_gpu > 1:
             return onmt.utils.Statistics.all_gather_stats(stat)
         return stat
+
+    def _maybe_update_stats_from_parameters(self, report_stats, named_parameters):
+        if self.report_manager is not None and self.report_stats_from_parameters:
+            report_stats.update_from_parameters(named_parameters)
 
     def _maybe_report_training(self, step, num_steps, learning_rate, report_stats):
         """

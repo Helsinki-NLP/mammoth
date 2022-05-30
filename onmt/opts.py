@@ -59,6 +59,12 @@ def _add_logging_opts(parser, is_train=True):
             help="Log directory for Tensorboard. This is also the name of the run.",
         )
         group.add(
+            '--report_stats_from_parameters',
+            '-report_stats_from_parameters=',
+            action="store_true",
+            help="Report parameter-level statistics in tensorboard",
+        )
+        group.add(
             '--lca_loginterval',
             '-lca_loginterval',
             type=int,

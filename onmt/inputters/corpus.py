@@ -258,7 +258,7 @@ def build_corpora_iter(
     transform_names = corpus_info.get('transforms', [])
     corpus_transform = [transforms[name] for name in transform_names if name in transforms]
     transform_pipe = TransformPipe.build_from(corpus_transform)
-    logger.info(f"{corpus_id}'s transforms: {str(transform_pipe)}")
+    # logger.info(f"{corpus_id}'s transforms: {str(transform_pipe)}")
     corpus_iter = ParallelCorpusIterator(
         corpus, transform_pipe, skip_empty_level=skip_empty_level, stride=stride, offset=offset
     )

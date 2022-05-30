@@ -8,7 +8,12 @@ from onmt.utils.logging import logger
 
 
 def build_report_manager(opt, gpu_rank):
-    if opt.tensorboard and gpu_rank <= 0:
+    # Vanilla onmt has here an additional gpu_rank <= 0
+    # which would cause only the first GPU of each node to log.
+    # This change allows all GPUs to log.
+    # FIXME: prevent clobbering on multiple writes to the same step
+    # Note that the previous was also broken: multiple nodes would clobber each other
+    if opt.tensorboard:
         from torch.utils.tensorboard import SummaryWriter
 
         if not hasattr(opt, 'tensorboard_log_dir_dated'):

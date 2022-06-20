@@ -286,8 +286,8 @@ class Trainer(object):
         self._start_report_manager(start_time=total_stats.start_time)
         # LCA
         if self.lca_loginterval > 0:
-            lca_logs = {k: dict() for k, v in self.model.named_parameters() if v.requires_grad and k.find('attention_bridge') >= 0}
-            lca_params = {k: torch.zeros_like(v.data) for k, v in self.model.named_parameters() if v.requires_grad and k.find('attention_bridge') >= 0}
+            lca_logs = {k: dict() for k, v in self.model.named_parameters() if v.requires_grad and 'attention_bridge' in k}
+            lca_params = {k: torch.zeros_like(v.data) for k, v in self.model.named_parameters() if v.requires_grad and 'attention_bridge' in k}
         # /LCA
         self.optim.zero_grad()
         trainEnum = enumerate(self._accum_batches(train_iter))

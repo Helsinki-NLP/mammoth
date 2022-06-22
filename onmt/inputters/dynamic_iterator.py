@@ -1,6 +1,6 @@
 """Module that contain iterator used for dynamic data."""
 from collections import namedtuple
-from itertools import cycle
+from itertools import cycle, chain, repeat
 
 from torchtext.legacy.data import batch as torchtext_batch
 from onmt.inputters import str2sortkey, max_tok_len, OrderedIterator
@@ -197,7 +197,7 @@ class DynamicDatasetIter(object):
                 stride=self.stride, offset=self.offset
             )
 
-            infinite_iter = cycle(raw_iter)
+            infinite_iter = chain.from_iterable(repeat(raw_iter))
 
             # iterator over lists of strings
             # each list is a bucket, not a minibatch

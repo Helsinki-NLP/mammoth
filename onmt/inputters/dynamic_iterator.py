@@ -174,7 +174,7 @@ class DynamicDatasetIter(object):
                 'src': src_fields['src'],
                 'tgt': tgt_fields['tgt']
             }
-            print(f'merged_fields {merged_fields}')
+            logger.debug(f'merged_fields {merged_fields}')
 
             metadata = DatasetMetadata(
                 src_lang=src_lang,
@@ -184,7 +184,7 @@ class DynamicDatasetIter(object):
                 corpus_id=corpus_id
             )
 
-            print(f'self.transforms_cls {self.transforms_cls}')
+            logger.debug(f'self.transforms_cls {self.transforms_cls}')
             if self.transforms_cls:
                 transforms = make_transforms(self.opts, self.transforms_cls, merged_fields)
             else:

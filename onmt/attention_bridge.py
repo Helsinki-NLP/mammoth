@@ -215,6 +215,7 @@ class AttentionBridge(nn.Module):
         """Attention Heads Layer"""
         super(AttentionBridge, self).__init__()
         self.layers = layers
+        self.is_fixed_length = any(l.is_fixed_length for l in layers)
     #
     #
     # self.ab_nlayers = n_layers_attbrg

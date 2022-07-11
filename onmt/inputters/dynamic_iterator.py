@@ -197,6 +197,9 @@ class DynamicDatasetIter(object):
                 stride=self.stride, offset=self.offset
             )
 
+            # We repeat the raw_iter object (an instance of ParallelCorpusIterator), rather 
+            # than cycling and cacheing through its __iter__ function. This avoids loading 
+            # the full corpus in memory.
             infinite_iter = chain.from_iterable(repeat(raw_iter))
 
             # iterator over lists of strings

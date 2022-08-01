@@ -14,6 +14,13 @@ from onmt.encoders import str2enc
 
 from onmt.decoders import str2dec
 
+from onmt.models.adapters import (
+    AdaptedTransformerDecoder,
+    AdaptedTransformerEncoder,
+    Adapter,
+    EncoderAdapterLayer,
+    DecoderAdapterLayer,
+)
 from onmt.modules import Embeddings
 from onmt.modules.embeddings import PluggableEmbeddings
 from onmt.modules.util_class import Cast
@@ -69,6 +76,8 @@ def build_encoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
     enc_type = opt.encoder_type if opt.model_type == "text" else opt.model_type
+    if enc_type == 'transformer' and uses_adapters(opt):
+        return AdaptedTransformerEncoder.from_opt(opt, embeddings)
     return str2enc[enc_type].from_opt(opt, embeddings)
 
 
@@ -80,6 +89,8 @@ def build_decoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
     dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed else opt.decoder_type
+    if dec_type == 'transformer' and uses_adapters(opt):
+        return AdaptedTransformerDecoder.from_opt(opt, embeddings)
     return str2dec[dec_type].from_opt(opt, embeddings)
 
 
@@ -200,6 +211,7 @@ def load_test_model(opt, model_path=None):
     return fields, model, model_opt
 
 
+# FIXME: create only the requested adapters
 def create_bilingual_model(src_lang, tgt_lang, enc_id, dec_id, model_opt, fields):
     """For translation - state dict to be loaded to this model."""
 
@@ -302,7 +314,16 @@ def build_task_specific_model(
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         attention_bridge.half()
 
-    nmt_model = onmt.models.NMTModel(encoder=encoders_md, decoder=decoders_md, attention_bridge=attention_bridge)
+    nmt_model = onmt.models.NMTModel(
+        encoder=encoders_md,
+        decoder=decoders_md,
+        attention_bridge=attention_bridge
+    )
+    if uses_adapters(model_opt):
+        logger.info('Creating adapters...')
+        create_adapters(nmt_model, model_opt, task_queue_manager, fields_dict)
+    print('built model:')
+    print(nmt_model)
 
     # register a forward hook to keep track of which parameters have valid gradients.
     # p.grad is None can not be used: grad is None only before first update.
@@ -458,6 +479,70 @@ def build_base_model_langspec(
     model.to(device)
 
     return model, generators_md
+
+
+def uses_adapters(opt):
+    return 'adapters' in opt
+
+
+def create_adapters(model, opt, scheduler, fields_dict):
+    my_enc_adapter_ids = set()
+    my_dec_adapter_ids = set()
+    adapter_to_encoder_ids = defaultdict(set)
+    adapter_to_decoder_ids = defaultdict(set)
+    for ds in scheduler.get_dataset_specs(fields_dict):
+        for adapter_id in ds.encoder_adapter_ids:
+            my_enc_adapter_ids.add(adapter_id)
+            adapter_to_encoder_ids[adapter_id].add(ds.encoder_id)
+        for adapter_id in ds.decoder_adapter_ids:
+            my_dec_adapter_ids.add(adapter_id)
+            adapter_to_decoder_ids[adapter_id].add(ds.decoder_id)
+    for adapter_group, adapter_opts in opt.adapters['encoder'].items():
+        for sub_id in adapter_opts['ids']:
+            adapter_id = (adapter_group, sub_id)
+            if adapter_id not in my_enc_adapter_ids:
+                continue
+            adapter_name = '_'.join(adapter_id)
+            adapter = Adapter(name=adapter_name)
+            input_dim = opt.rnn_size
+            hidden_dim = adapter_opts['hidden_size']
+
+            encoder_ids = adapter_to_encoder_ids[adapter_id]
+            adapted_modules = [
+                model.encoder[f'encoder{encoder_id}'] for encoder_id in encoder_ids
+            ]
+            adapter_cls = EncoderAdapterLayer
+
+            for layer_idx in adapter_opts['layers']:
+                adapter.add_layer(
+                    layer_idx,
+                    adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
+                )
+            for adapted_module in adapted_modules:
+                adapted_module.add_adapter(adapter_name, adapter)
+    for adapter_group, adapter_opts in opt.adapters['decoder'].items():
+        for sub_id in adapter_opts['ids']:
+            adapter_id = (adapter_group, sub_id)
+            if adapter_id not in my_dec_adapter_ids:
+                continue
+            adapter_name = '_'.join(adapter_id)
+            adapter = Adapter(name=adapter_name)
+            input_dim = opt.rnn_size
+            hidden_dim = adapter_opts['hidden_size']
+
+            decoder_ids = adapter_to_decoder_ids[adapter_id]
+            adapted_modules = [
+                model.decoder[f'decoder{decoder_id}'] for decoder_id in decoder_ids
+            ]
+            adapter_cls = DecoderAdapterLayer
+
+            for layer_idx in adapter_opts['layers']:
+                adapter.add_layer(
+                    layer_idx,
+                    adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
+                )
+            for adapted_module in adapted_modules:
+                adapted_module.add_adapter(adapter_name, adapter)
 
 
 def build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint):

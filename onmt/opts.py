@@ -671,6 +671,11 @@ def model_opts(parser):
         help="""Use layer normalization after lin, simple and feedforward bridge layers""",
     )
 
+    # adapter options are in a dict "adapters", and in the corpus options
+    group = parser.add_argument_group("Adapters")
+    group.add('-adapters', '--adapters',
+              help="""Adapter specifications""")
+
 
 def _add_train_general_opts(parser):
     """General options for training"""

@@ -67,6 +67,15 @@ class NMTModel(BaseModel):
         encoder.embeddings.activate(metadata.src_lang)
         decoder.embeddings.activate(metadata.tgt_lang)
 
+        if metadata.encoder_adapter_ids is not None:
+            encoder.deactivate_adapters()
+            for adapter_id in metadata.encoder_adapter_ids:
+                encoder.activate_adapter('_'.join(adapter_id))
+        if metadata.decoder_adapter_ids is not None:
+            decoder.deactivate_adapters()
+            for adapter_id in metadata.decoder_adapter_ids:
+                decoder.activate_adapter('_'.join(adapter_id))
+
         enc_state, memory_bank, lengths, mask = encoder(src, lengths)
 
         memory_bank, alphas = self.attention_bridge(memory_bank, mask)

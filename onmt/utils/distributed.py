@@ -490,7 +490,10 @@ TASK_DISTRIBUTION_STRATEGIES = {
     'roundrobin': RoundRobinTaskDistributionStrategy,
 }
 
-DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
+DatasetMetadata = namedtuple(
+    'DatasetMetadata',
+    'src_lang tgt_lang encoder_id decoder_id corpus_id encoder_adapter_ids decoder_adapter_ids'
+)
 
 
 @dataclass
@@ -506,6 +509,8 @@ class TaskSpecs():
     corpus_opt: dict
     src_vocab: Any  # FIXME: type
     tgt_vocab: Any
+    encoder_adapter_ids: List[str]
+    decoder_adapter_ids: List[str]
 
     def get_serializable_metadata(self):
         """
@@ -519,6 +524,8 @@ class TaskSpecs():
             encoder_id=self.encoder_id,
             decoder_id=self.decoder_id,
             corpus_id=self.corpus_id,
+            encoder_adapter_ids=self.encoder_adapter_ids,
+            decoder_adapter_ids=self.decoder_adapter_ids,
         )
 
 
@@ -626,6 +633,12 @@ class TaskQueueManager:
         ):
             corpus_opt = opt.data[corpus_id]
             weight = corpus_opt.get('weight', 1.0)
+            if 'adapters' in corpus_opt:
+                encoder_adapter_ids = corpus_opt['adapters'].get('encoder')
+                decoder_adapter_ids = corpus_opt['adapters'].get('decoder')
+            else:
+                encoder_adapter_ids = None
+                decoder_adapter_ids = None
             task = TaskSpecs(
                 node_rank=node_rank,
                 local_rank=local_rank,
@@ -638,6 +651,8 @@ class TaskQueueManager:
                 corpus_opt=corpus_opt,
                 src_vocab=None,
                 tgt_vocab=None,
+                encoder_adapter_ids=encoder_adapter_ids,
+                decoder_adapter_ids=decoder_adapter_ids,
             )
             tasks.append(task)
         return cls(

@@ -415,6 +415,10 @@ class TransformerDecoder(TransformerDecoderBase):
     def detach_state(self):
         self.state["src"] = self.state["src"].detach()
 
+    def _get_layers(self):
+        """ Allow subclasses to modify layer stack on-the-fly """
+        return self.transformer_layers
+
     def forward(self, tgt, memory_bank=None, step=None, memory_lengths=None, **kwargs):
         """Decode, possibly stepwise."""
         if memory_bank is None:
@@ -443,8 +447,12 @@ class TransformerDecoder(TransformerDecoderBase):
         with_align = kwargs.pop("with_align", False)
         attn_aligns = []
 
-        for i, layer in enumerate(self.transformer_layers):
-            layer_cache = self.state["cache"]["layer_{}".format(i)] if step is not None else None
+        for i, layer in enumerate(self._get_layers()):
+            layer_cache = (
+                self.state["cache"]["layer_{}".format(i)]
+                if step is not None
+                else None
+            )
             output, attn, attn_align = layer(
                 output,
                 src_memory_bank,
@@ -476,7 +484,8 @@ class TransformerDecoder(TransformerDecoderBase):
         batch_size = memory_bank.size(1)
         depth = memory_bank.size(-1)
 
-        for i, layer in enumerate(self.transformer_layers):
+        # TODO: only allocate cache to layers that actually need it
+        for i, layer in enumerate(self._get_layers()):
             layer_cache = {"memory_keys": None, "memory_values": None}
             if isinstance(layer.self_attn, AverageAttention):
                 layer_cache["prev_g"] = torch.zeros((batch_size, 1, depth), device=memory_bank.device)

@@ -155,11 +155,15 @@ class TransformerEncoder(EncoderBase):
         out = emb.transpose(0, 1).contiguous()
         mask = ~sequence_mask(lengths).unsqueeze(1)
         # Run the forward pass of every layer of the tranformer.
-        for layer in self.transformer:
-            out = layer(out, mask)
+        out = self._forward_loop(out, mask)
         out = self.layer_norm(out)
 
         return emb, out.transpose(0, 1).contiguous(), lengths, mask
+
+    def _forward_loop(self, out, mask):
+        """ Run the forward pass of every layer of the transformer. """
+        for layer in self.transformer:
+            out = layer(out, mask)
 
     def update_dropout(self, dropout, attention_dropout):
         self.embeddings.update_dropout(dropout)

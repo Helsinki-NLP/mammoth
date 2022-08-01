@@ -18,6 +18,16 @@ class DataOptsCheckerMixin(object):
             raise IOError(f"Please check path of your {info} file!")
 
     @classmethod
+    def _validate_adapters(cls, opt):
+        """Parse corpora specified in data field of YAML file."""
+        if not opt.adapters:
+            return
+        import yaml
+        adapter_opts = yaml.safe_load(opt.adapters)
+        # TODO: validate adapter opts
+        opt.adapters = adapter_opts
+
+    @classmethod
     def _validate_data(cls, opt):
         """Parse corpora specified in data field of YAML file."""
         import yaml
@@ -235,6 +245,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
     @classmethod
     def update_model_opts(cls, model_opt):
+        cls._validate_adapters(model_opt)
         if model_opt.word_vec_size > 0:
             model_opt.src_word_vec_size = model_opt.word_vec_size
             model_opt.tgt_word_vec_size = model_opt.word_vec_size

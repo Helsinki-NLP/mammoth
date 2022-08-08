@@ -31,7 +31,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
                  dec_rnn_size,
                  ):
         """Attention Heads Layer:"""
-        super(AttentionBridgeLayer, self).__init__()
+        super(LinAttentionBridgeLayer, self).__init__()
         d = hidden_size
         u = hidden_ab_size
         r = attention_heads
@@ -78,14 +78,16 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         mask: binary mask 1/0 indicating which keys have
         zero/non-zero attention ``(batch, query_len, key_len)`` -> # [bsz, 1, len]
         """
+        enc_output = enc_output.transpose(0, 1)
         output, alphas = self.mixAtt(enc_output, mask)
         #take transpose to match dimensions s.t. r=new_seq_len:
         #output = self.layer_norm(output)
         #output = self.ws3(output)
-        self.M = torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
+        # TODO: why cache? not sure what else is looking at layer.M
+        self.M = torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]       torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
         #self.M = self.layer_norm(self.M)
         #h_avrg = (self.M).mean(dim=0, keepdim=True)
-        return alphas, self.M
+        return alphas, output
 
     @property
     def is_fixed_length(self):
@@ -112,10 +114,12 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         if mask is not None:
             #transformed_inp = torch.transpose(inp, 0, 1).contiguous()  # [bsz, len]
             #transformed_inp = transformed_inp.view(size[0], 1, size[1])  # [bsz, 1, len]
-            concatenated_inp = [mask for i in range(self.attention_hops)]
-            concatenated_inp = torch.cat(concatenated_inp, 1)  # [bsz, hop, len]
+            B, L, H = size
+            mask_reshaped = mask.view(B, 1, L).expand(B, self.attention_hops, L)
+            # concatenated_inp = [mask for i in range(self.attention_hops)]
+            # concatenated_inp = torch.cat(concatenated_inp, 1)  # [bsz, hop, len]
 
-            penalized_alphas = alphas + (-10000 * (concatenated_inp == 1).float()) # [bsz, hop, len] + [bsz, hop, len]
+            penalized_alphas = alphas + (-10000 * (mask_reshaped == 1).float()) # [bsz, hop, len] + [bsz, hop, len]
             alphas = penalized_alphas
 
         alphas = self.softmax(alphas.view(-1, size[1]))  # [bsz*hop, len]
@@ -131,6 +135,7 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
         self.keys_proj = nn.Linear(input_size, hidden_size)
         self.values_proj = nn.Linear(input_size, input_size)
         self.d_sqrt = hidden_size ** 0.5
+        self.R = fixed_seqlen
         self.softmax = nn.Softmax(dim=-1)
 
     @property
@@ -139,14 +144,15 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
 
     def forward(self, outp, mask):
         B, L, H = outp.size()
-        R = self.query_matrix.weight.size(0)
+        R = self.R
         keys = self.keys_proj(outp)
         values = self.values_proj(outp)
         raw_scores = (self.query_matrix @ torch.flatten(keys, end_dim=-2).T).view(B, R, L)
         if mask is not None:
-            raw_scores = raw_scores.masked_fill(mask, -float('inf'))
+            mask_reshaped = mask.view(B, 1, L)
+            raw_scores = raw_scores.masked_fill(mask_reshaped, -float('inf'))
         attention_weights =  self.softmax(raw_scores / self.d_sqrt)
-        return attention_weights,attention_weights @ values
+        return attention_weights, attention_weights @ values
 
     @classmethod
     def from_opt(cls, opt):
@@ -160,7 +166,7 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
 class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncoderLayer):
     """Using a Transformer encoder layer as a shared component in the attention bridge"""
     def __init__(self, *args, **kwargs):
-        super(TransformerEncoderLayer, self).__init__(*args, **kwargs)
+        TransformerEncoderLayer.__init__(self, *args, **kwargs)
 
     @property
     def is_fixed_length(self):
@@ -168,24 +174,26 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
 
     def forward(self, outp, mask):
         outp = outp.transpose(0,1).contiguous()
-        outp = super(TransformerEncoderLayer, self).forward(outp, mask)
+        outp = TransformerEncoderLayer.forward(self, outp, mask)
         return None, outp.transpose(0, 1).contiguous()
 
     @classmethod
     def from_opt(cls, opt):
         return cls(
-            d_model=opt.enc_rnn_size,
-            heads=opt.heads,
-            d_ff=opt.hidden_ab_size,
-            dropout=opt.dropout,
-            attention_dropout=opt.attention_dropout[0],
-            max_relative_positions=opt.smax_relative_positions
+            opt.enc_rnn_size,
+            opt.heads,
+            opt.hidden_ab_size, # d_ff
+            # TODO: that list indexing things seems suspicious to me...
+            opt.dropout[0],
+            opt.attention_dropout[0],
+            max_relative_positions=opt.max_relative_positions,
         )
 
 
 class FeedForwardAttentionBridgeLayer(BaseAttentionBridgeLayer):
     """Simple feedforward bridge component"""
     def __init__(self, input_size, hidden_size):
+        super().__init__()
         self.module = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             nn.ReLU(),
@@ -197,7 +205,7 @@ class FeedForwardAttentionBridgeLayer(BaseAttentionBridgeLayer):
         return False
 
     def forward(self, outp, mask):
-        return self.module(outp)
+        return None, self.module(outp)
 
     @classmethod
     def from_opt(cls, opt):
@@ -214,7 +222,7 @@ class AttentionBridge(nn.Module):
     def __init__(self, layers):
         """Attention Heads Layer"""
         super(AttentionBridge, self).__init__()
-        self.layers = layers
+        self.layers = nn.ModuleList(layers)
         self.is_fixed_length = any(l.is_fixed_length for l in layers)
     #
     #
@@ -240,18 +248,17 @@ class AttentionBridge(nn.Module):
     @classmethod
     def from_opt(cls, opt):
         """Alternate constructor."""
-        if opt.ab_layers:
-            layer_type_to_cls = {
-                'lin': LinAttentionBridgeLayer,
-                'simple': SimpleAttentionBridgeLayer,
-                'transformer': TransformerAttentionBridgeLayer,
-                'feedforward': FeedForwardAttentionBridgeLayer,
-            }
-            layers = nn.ModuleList([
-                layer_type_to_cls[layer_type].from_opt(opt)
-                for layer_type in opt.ab_layers
-            ])
-            return cls(layers)
+        layer_type_to_cls = {
+            'lin': LinAttentionBridgeLayer,
+            'simple': SimpleAttentionBridgeLayer,
+            'transformer': TransformerAttentionBridgeLayer,
+            'feedforward': FeedForwardAttentionBridgeLayer,
+        }
+        layers = [
+            layer_type_to_cls[layer_type].from_opt(opt)
+            for layer_type in opt.ab_layers
+        ]
+        return cls(layers)
             # return cls(
             #     opt.n_layers_attbrg,
             #     opt.layer_type_attbrg,
@@ -263,16 +270,16 @@ class AttentionBridge(nn.Module):
             #     opt.max_relative_positions,
             #     opt,
             #     )
-        else:
-            return nn.Identity()
 
     def forward(self, enc_output, mask):
         """Forward pass for the bridge layers"""
-        out = enc_output
+        out = enc_output.transpose(0, 1)
+        alphas = None
         for layer in self.layers:
             alphas, out  = layer(out, mask)
             if layer.is_fixed_length:
                 # In this case, we've padded all examples to a constant size,
                 # so the mask is no longer required
                 mask = None
+        out =  torch.transpose(out, 0, 1).contiguous() # [hop, bsz, nhid]
         return out, alphas # [hop, bsz, nhid], [bsz, hop, srcseqlen]

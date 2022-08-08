@@ -1,0 +1,57 @@
+src_vocab:
+  de: /scratch/project_2005099/data/wmt/many2many.wmt.vocab.src
+  en: /scratch/project_2005099/data/wmt/many2many.wmt.vocab.src
+tgt_vocab:
+  de: /scratch/project_2005099/data/wmt/many2many.wmt.vocab.src
+  en: /scratch/project_2005099/data/wmt/many2many.wmt.vocab.src
+overwrite: False
+data:
+  train_en-de:
+    path_src: /scratch/project_2005099/data/wmt/train/en-de/wmt.en-de.train.BPE.en
+    path_tgt: /scratch/project_2005099/data/wmt/train/en-de/wmt.en-de.train.BPE.de
+  train_de-en:
+    path_src: /scratch/project_2005099/data/wmt/train/de-en/wmt.de-en.train.BPE.de
+    path_tgt: /scratch/project_2005099/data/wmt/train/de-en/wmt.de-en.train.BPE.en
+src_tgt:
+- en-de
+- de-en
+node_gpu:
+- "0:0"
+- "0:0"
+batch_size: 4096
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 4096
+max_generator_batches: 2
+ab_layers: ['lin', 'lin']
+hidden_ab_size: 512
+ab_fixed_length: 50
+encoder_type: transformer
+decoder_type: transformer
+rnn_size: 256
+word_vec_size: 256
+transformer_ff: 2048
+heads: 2
+enc_layers: 2
+dec_layers: 2
+dropout: 0.1
+label_smoothing: 0.1
+param_init: 0.0
+param_init_glorot: true
+position_encoding: true
+save_checkpoint_steps: 10000
+keep_checkpoint: 10
+seed: 3435
+train_steps: 500000
+valid_steps: 10000
+warmup_steps: 8000
+report_every: 100
+accum_count: 1
+optim: adafactor
+decay_method: none
+learning_rate: 3.0
+max_grad_norm: 0.0
+seed: 3435
+model_type: text
+world_size: 1
+gpu_ranks: [0]

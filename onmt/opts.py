@@ -447,6 +447,9 @@ def model_opts(parser):
     group.add('--ab_layers', '-ab_layers', nargs='*', default=[],
               choices=['lin', 'simple', 'transformer', 'feedforward'],
               help="Composition of the attention bridge")
+    group.add('--ab_layer_norm', '-ab_layer_norm', type=str, default='none',
+              choices=['none', 'rmsnorm', 'layernorm'],
+              help="""Use layer normalization after lin, simple and feedforward bridge layers""")
 
 def _add_train_general_opts(parser):
     """ General options for training """

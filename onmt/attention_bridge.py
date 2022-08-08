@@ -4,7 +4,7 @@ from __future__ import division
 
 import torch
 import torch.nn as nn
-#from onmt.rmsnorm_torch import RMSNorm
+from onmt.rmsnorm_torch import RMSNorm
 from onmt.encoders.transformer import TransformerEncoderLayer
 #from onmt.modules.position_ffn import ActivationFunction
 #import math
@@ -29,7 +29,8 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
                  hidden_ab_size,
                  model_type,
                  dec_rnn_size,
-                 ):
+                 ab_layer_norm=None,
+        ):
         """Attention Heads Layer:"""
         super(LinAttentionBridgeLayer, self).__init__()
         d = hidden_size
@@ -47,6 +48,11 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         self.attention_hops = r
         #self.layer_norm = nn.LayerNorm(d, eps=1e-6)
         self.M = None
+        self.norm = nn.Identity()
+        if ab_layer_norm == 'rmsnorm':
+            self.norm = RMSNorm(d, eps=1e-6)
+        elif ab_layer_norm == 'layernorm':
+            self.norm = nn.LayerNorm(d, eps=1e-6)
 
         #ADDONS - alessandro's (?)
         #self.transformer = nn.ModuleList(
@@ -70,6 +76,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
             opt.hidden_ab_size,
             opt.model_type,
             opt.dec_rnn_size,
+            opt.ab_layer_norm,
         )
 
 
@@ -83,6 +90,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         #take transpose to match dimensions s.t. r=new_seq_len:
         #output = self.layer_norm(output)
         #output = self.ws3(output)
+        output = self.norm(output) # possibly an nn.Identity
         # TODO: why cache? not sure what else is looking at layer.M
         self.M = torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]       torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
         #self.M = self.layer_norm(self.M)
@@ -129,7 +137,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
 
 class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
     """Simple attention based bridge layer using a fixed query matrix"""
-    def __init__(self, input_size, hidden_size, fixed_seqlen):
+    def __init__(self, input_size, hidden_size, fixed_seqlen, ab_layer_norm):
         super().__init__()
         self.query_matrix = nn.Parameter(torch.zeros(fixed_seqlen, hidden_size))
         self.keys_proj = nn.Linear(input_size, hidden_size)
@@ -137,6 +145,11 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
         self.d_sqrt = hidden_size ** 0.5
         self.R = fixed_seqlen
         self.softmax = nn.Softmax(dim=-1)
+        self.norm = nn.Identity()
+        if ab_layer_norm == 'rmsnorm':
+            self.norm = RMSNorm(input_size, eps=1e-6)
+        elif ab_layer_norm == 'layernorm':
+            self.norm = nn.LayerNorm(input_size, eps=1e-6)
 
     @property
     def is_fixed_length(self):
@@ -152,7 +165,8 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
             mask_reshaped = mask.view(B, 1, L)
             raw_scores = raw_scores.masked_fill(mask_reshaped, -float('inf'))
         attention_weights =  self.softmax(raw_scores / self.d_sqrt)
-        return attention_weights, attention_weights @ values
+        output = self.norm(attention_weights @ values)
+        return attention_weights, output
 
     @classmethod
     def from_opt(cls, opt):
@@ -160,6 +174,7 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
             opt.enc_rnn_size,
             opt.hidden_ab_size,
             opt.ab_fixed_length,
+            opt.ab_layer_norm,
         )
 
 
@@ -192,12 +207,18 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
 
 class FeedForwardAttentionBridgeLayer(BaseAttentionBridgeLayer):
     """Simple feedforward bridge component"""
-    def __init__(self, input_size, hidden_size):
+    def __init__(self, input_size, hidden_size, ab_layer_norm):
         super().__init__()
+        norm = nn.Identity()
+        if ab_layer_norm == 'rmsnorm':
+            norm = RMSNorm(input_size, eps=1e-6)
+        elif ab_layer_norm == 'layernorm':
+            norm = nn.LayerNorm(input_size, eps=1e-6)
         self.module = nn.Sequential(
             nn.Linear(input_size, hidden_size),
             nn.ReLU(),
-            nn.Linear(hidden_size, input_size)
+            nn.Linear(hidden_size, input_size),
+            norm,
         )
 
     @property
@@ -212,6 +233,7 @@ class FeedForwardAttentionBridgeLayer(BaseAttentionBridgeLayer):
         return cls(
             opt.enc_rnn_size,
             opt.hidden_ab_size,
+            opt.ab_layer_norm,
         )
 
 

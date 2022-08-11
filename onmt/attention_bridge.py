@@ -180,9 +180,8 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
         mask: binary mask 1/0 indicating which keys have
         zero/non-zero attention ``(batch, query_len, key_len)`` -> # [bsz, 1, len]
         """
-        outp = outp.transpose(0,1).contiguous()
         outp = TransformerEncoderLayer.forward(self, outp, mask)
-        return None, outp.transpose(0, 1).contiguous()
+        return None, outp
 
     @classmethod
     def from_opt(cls, opt):

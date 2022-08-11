@@ -24,11 +24,14 @@ class AttentionBridgeNorm(nn.Module):
     """Norm component (shared implementation across architectures)."""
     def __init__(self, normalized_shape, ab_layer_norm_type):
         super().__init__()
-        self.norm = nn.Identity()
         if ab_layer_norm_type == 'rmsnorm':
             self.norm = RMSNorm(normalized_shape, eps=1e-6)
         elif ab_layer_norm_type == 'layernorm':
             self.norm = nn.LayerNorm(normalized_shape, eps=1e-6)
+        elif ab_layer_norm_type == 'none':
+            self.norm = nn.Identity()
+        else:
+            raise ValueError(f"ab_layer_norm_type `{ab_layer_norm_type}` is not recognized.")
 
     def forward(self, input):
         return self.norm(input) # possibly an nn.Identity
@@ -82,23 +85,8 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         mask: binary mask 1/0 indicating which keys have
         zero/non-zero attention ``(batch, query_len, key_len)`` -> # [bsz, 1, len]
         """
-        enc_output = enc_output.transpose(0, 1)
-        output, alphas = self.mixAtt(enc_output, mask)
-        output = self.norm(output)
-        # TODO: why cache? not sure what else is looking at layer.M
-        self.M = torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]       torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
-        return alphas, output
-
-    @property
-    def is_fixed_length(self):
-        return True
-
-    # TODO: why is this a helper function?
-    def mixAtt(self, outp, mask):
-        """Notation based on Lin et al. (2017)"""
-        outp = torch.transpose(outp, 0, 1).contiguous()
-        B, L, H = outp.size()  # [bsz, len, nhid]
-        compressed_embeddings = outp.view(-1, H)  # [bsz*len, nhid*2]
+        B, L, H = enc_output.size()  # [bsz, len, nhid]
+        compressed_embeddings = enc_output.view(-1, H)  # [bsz*len, nhid*2]
         hbar = self.ws1(compressed_embeddings)  # [bsz*len, attention-unit]
 
         alphas = self.ws2(hbar).view(B, L, -1)  # [bsz, len, hop]
@@ -113,12 +101,23 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
 
         alphas = self.softmax(alphas.view(-1, L))  # [bsz*hop, len]
         alphas = alphas.view(B, self.attention_hops, L)  # [bsz, hop, len]
-        return torch.bmm(alphas, outp), alphas
+        output = torch.bmm(alphas, enc_output)
+
+        output = self.norm(output)
+        # TODO: why cache? not sure what else is looking at layer.M
+        self.M = torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]       torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
+        return alphas, output
+
+    @property
+    def is_fixed_length(self):
+        return True
+
 
 
 class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
     """Simple attention based bridge layer using a fixed query matrix.
-    This matrix is a learned parameter, so the model should learn to
+    This matrix is a learned parameter: the model should learn to probe the
+    latent key space to produce coherent mixtures of value vectors.
     """
     def __init__(self, input_size, hidden_size, fixed_seqlen, ab_layer_norm):
         super().__init__()
@@ -263,8 +262,8 @@ class AttentionBridge(nn.Module):
         for layer in self.layers:
             alphas, out  = layer(out, mask)
             if layer.is_fixed_length:
-                # In this case, we've padded all examples to a constant size,
-                # so the mask is no longer required
+                # In this case, we've ensured all batch items have a constant
+                # sequence length, so the mask is no longer required.
                 mask = None
         out =  torch.transpose(out, 0, 1).contiguous() # [hop, bsz, nhid]
         return out, alphas # [hop, bsz, nhid], [bsz, hop, srcseqlen]

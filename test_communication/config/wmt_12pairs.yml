@@ -76,10 +76,9 @@ batch_type: tokens
 normalization: tokens
 valid_batch_size: 4096
 max_generator_batches: 2
-use_attention_bridge: true
-n_layers_ab: 1
-layer_type_ab: fixed-size
+ab_layers: ['lin', 'lin']
 hidden_ab_size: 512
+ab_fixed_length: 50
 attention_heads: 2
 encoder_type: transformer
 decoder_type: transformer
@@ -94,11 +93,11 @@ label_smoothing: 0.1
 param_init: 0.0
 param_init_glorot: true
 position_encoding: true
-train_steps: 20
+train_steps: 4
 valid_steps: 100
-warmup_steps: 2
-report_every: 4
-save_checkpoint_steps: 10
+warmup_steps: 1
+report_every: 2
+save_checkpoint_steps: 2
 keep_checkpoint: 1
 accum_count: 1
 optim: adafactor

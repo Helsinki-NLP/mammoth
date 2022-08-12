@@ -70,13 +70,16 @@ class NMTModel(BaseModel):
         enc_state, memory_bank, lengths, mask = encoder(src, lengths)
 
         memory_bank, alphas = self.attention_bridge(memory_bank, mask)
+        if self.attention_bridge.is_fixed_length:
+            # turn off masking in the transformer decoder
+            lengths = None
 
         if not bptt:
             decoder.init_state(src, memory_bank, enc_state)
         dec_out, attns = decoder(
             dec_in,
             memory_bank,
-            memory_lengths=None,
+            memory_lengths=lengths,
             with_align=with_align
         )
         return dec_out, attns

@@ -86,7 +86,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         zero/non-zero attention ``(batch, query_len, key_len)`` -> # [bsz, 1, len]
         """
         B, L, H = enc_output.size()  # [bsz, len, nhid]
-        compressed_embeddings = enc_output.view(-1, H)  # [bsz*len, nhid*2]
+        compressed_embeddings = enc_output.reshape(-1, H)  # [bsz*len, nhid*2]
         hbar = self.ws1(compressed_embeddings)  # [bsz*len, attention-unit]
 
         alphas = self.ws2(hbar).view(B, L, -1)  # [bsz, len, hop]

@@ -307,17 +307,15 @@ class Trainer(object):
                     if v.requires_grad and k.find('attention_bridge') >= 0}
             # /LCA
 
+            i, (batches_with_meta, normalization) = next(trainEnum)
+            # logger.info(f'{j} {i} global_rank {global_rank}')
 
-            for j in range(self.scheduler.gpus_per_node):
-                i, (batches_with_meta, normalization) = next(trainEnum)
-                # logger.info(f'{j} {i} global_rank {global_rank}')
-
-                self._gradient_accumulation_overLangPair(
-                    batches_with_meta,
-                    normalization,
-                    total_stats,
-                    report_stats,
-                )
+            self._gradient_accumulation_overLangPair(
+                batches_with_meta,
+                normalization,
+                total_stats,
+                report_stats,
+            )
 
             for encoder_id, (_, group) in self.my_encoder_groups:
                 grads = [

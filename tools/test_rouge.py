@@ -10,7 +10,7 @@ import codecs
 from onmt.utils.logging import init_logger, logger
 
 
-def test_rouge(cand, ref):
+def eval_rouge(cand, ref):
     """Calculate ROUGE scores of sequences passed as an iterator
        e.g. a list of str, an open file, StringIO or even sys.stdin
     """
@@ -71,5 +71,5 @@ if __name__ == "__main__":
         candidates = codecs.open(args.c, encoding="utf-8")
     references = codecs.open(args.r, encoding="utf-8")
 
-    results_dict = test_rouge(candidates, references)
+    results_dict = eval_rouge(candidates, references)
     logger.info(rouge_results_to_str(results_dict))

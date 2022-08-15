@@ -5,7 +5,7 @@ import itertools
 import os
 from copy import deepcopy
 
-from torchtext.data import Field
+from torchtext.legacy.data import Field
 
 from onmt.tests.utils_for_tests import product_dict
 

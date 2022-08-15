@@ -13,12 +13,9 @@ from onmt.utils.logging import init_logger, logger
 
 parser = argparse.ArgumentParser(description='translate.py')
 
-parser.add_argument('-model', required=True,
-                    help='Path to model .pt file')
-parser.add_argument('-output_dir', default='.',
-                    help="""Path to output the embeddings""")
-parser.add_argument('-gpu', type=int, default=-1,
-                    help="Device to run on")
+parser.add_argument('-model', required=True, help='Path to model .pt file')
+parser.add_argument('-output_dir', default='.', help="""Path to output the embeddings""")
+parser.add_argument('-gpu', type=int, default=-1, help="Device to run on")
 
 
 def write_embeddings(filename, dict, embeddings):
@@ -40,8 +37,7 @@ def main():
         torch.cuda.set_device(opt.gpu)
 
     # Add in default model arguments, possibly added since training.
-    checkpoint = torch.load(opt.model,
-                            map_location=lambda storage, loc: storage)
+    checkpoint = torch.load(opt.model, map_location=lambda storage, loc: storage)
     model_opt = checkpoint['opt']
 
     fields = checkpoint['vocab']
@@ -57,8 +53,7 @@ def main():
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
 
-    model = onmt.model_builder.build_base_model(
-        model_opt, fields, use_gpu(opt), checkpoint)
+    model = onmt.model_builder.build_base_model(model_opt, fields, use_gpu(opt), checkpoint)
     encoder = model.encoder  # no encoder for LM task
     decoder = model.decoder
 
@@ -66,12 +61,10 @@ def main():
     decoder_embeddings = decoder.embeddings.word_lut.weight.data.tolist()
 
     logger.info("Writing source embeddings")
-    write_embeddings(opt.output_dir + "/src_embeddings.txt", src_dict,
-                     encoder_embeddings)
+    write_embeddings(opt.output_dir + "/src_embeddings.txt", src_dict, encoder_embeddings)
 
     logger.info("Writing target embeddings")
-    write_embeddings(opt.output_dir + "/tgt_embeddings.txt", tgt_dict,
-                     decoder_embeddings)
+    write_embeddings(opt.output_dir + "/tgt_embeddings.txt", tgt_dict, decoder_embeddings)
 
     logger.info('... done.')
     logger.info('Converting model...')

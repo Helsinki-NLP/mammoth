@@ -27,19 +27,15 @@ def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
     unk_idx = tgt_field.vocab.stoi[tgt_field.unk_token]
 
     if opt.lambda_coverage != 0:
-        assert opt.coverage_attn, "--coverage_attn needs to be set in " \
-            "order to use --lambda_coverage != 0"
+        assert opt.coverage_attn, "--coverage_attn needs to be set in " "order to use --lambda_coverage != 0"
 
     if opt.copy_attn:
         criterion = onmt.modules.CopyGeneratorLoss(
-            len(tgt_field.vocab), opt.copy_attn_force,
-            unk_index=unk_idx, ignore_index=padding_idx
+            len(tgt_field.vocab), opt.copy_attn_force, unk_index=unk_idx, ignore_index=padding_idx
         )
     elif opt.label_smoothing > 0 and train:
-        criterion = LabelSmoothingLoss(
-            opt.label_smoothing, len(tgt_field.vocab), ignore_index=padding_idx
-        )
-    elif isinstance(generator[-1], LogSparsemax): #elif isinstance(model.generator[-1], LogSparsemax):
+        criterion = LabelSmoothingLoss(opt.label_smoothing, len(tgt_field.vocab), ignore_index=padding_idx)
+    elif isinstance(generator[-1], LogSparsemax):  # elif isinstance(model.generator[-1], LogSparsemax):
         criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
     else:
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
@@ -49,24 +45,20 @@ def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
     # passed to the NMTLossCompute. At the moment, the only supported
     # loss function of this kind is the sparsemax loss.
     use_raw_logits = isinstance(criterion, SparsemaxLoss)
-    loss_gen = generator[0] if use_raw_logits else generator #    loss_gen = model.generator[0] if use_raw_logits else model.generator
+    loss_gen = (
+        generator[0] if use_raw_logits else generator
+    )  # loss_gen = model.generator[0] if use_raw_logits else model.generator
     if opt.copy_attn:
         if opt.model_task == ModelTask.SEQ2SEQ:
             compute = onmt.modules.CopyGeneratorLossCompute(
-                criterion, loss_gen, tgt_field.vocab,
-                opt.copy_loss_by_seqlength,
-                lambda_coverage=opt.lambda_coverage
+                criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
             )
         elif opt.model_task == ModelTask.LANGUAGE_MODEL:
             compute = onmt.modules.CopyGeneratorLMLossCompute(
-                criterion, loss_gen, tgt_field.vocab,
-                opt.copy_loss_by_seqlength,
-                lambda_coverage=opt.lambda_coverage
+                criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
             )
         else:
-            raise ValueError(
-                f"No copy generator loss defined for task {opt.model_task}"
-            )
+            raise ValueError(f"No copy generator loss defined for task {opt.model_task}")
     else:
         if opt.model_task == ModelTask.SEQ2SEQ:
             compute = NMTLossCompute(
@@ -76,9 +68,7 @@ def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
                 lambda_align=opt.lambda_align,
             )
         elif opt.model_task == ModelTask.LANGUAGE_MODEL:
-            assert (
-                opt.lambda_align == 0.0
-            ), "lamdba_align not supported in LM loss"
+            assert opt.lambda_align == 0.0, "lamdba_align not supported in LM loss"
             compute = LMLossCompute(
                 criterion,
                 loss_gen,
@@ -86,9 +76,7 @@ def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
                 lambda_align=opt.lambda_align,
             )
         else:
-            raise ValueError(
-                f"No compute loss defined for task {opt.model_task}"
-            )
+            raise ValueError(f"No compute loss defined for task {opt.model_task}")
     compute.to(device)
 
     return compute
@@ -149,14 +137,7 @@ class LossComputeBase(nn.Module):
         """
         return NotImplementedError
 
-    def __call__(self,
-                 batch,
-                 output,
-                 attns,
-                 normalization=1.0,
-                 shard_size=0,
-                 trunc_start=0,
-                 trunc_size=None):
+    def __call__(self, batch, output, attns, normalization=1.0, shard_size=0, trunc_start=0, trunc_size=None):
         """Compute the forward loss, possibly in shards in which case this
         method also runs the backward pass and returns ``None`` as the loss
         value.
@@ -194,7 +175,7 @@ class LossComputeBase(nn.Module):
         batch_stats = onmt.utils.Statistics()
         for shard in shards(shard_state, shard_size):
             loss, stats = self._compute_loss(batch, **shard)
-            loss.div(float(normalization)).backward() #retain_graph=True)
+            loss.div(float(normalization)).backward()  # retain_graph=True)
             batch_stats.update(stats)
         return None, batch_stats
 
@@ -227,6 +208,7 @@ class LabelSmoothingLoss(nn.Module):
     KL-divergence between q_{smoothed ground truth prob.}(w)
     and p_{prob. computed by model}(w) is minimized.
     """
+
     def __init__(self, label_smoothing, tgt_vocab_size, ignore_index=-100):
         assert 0.0 < label_smoothing <= 1.0
         self.ignore_index = ignore_index
@@ -257,8 +239,10 @@ class CommonLossCompute(LossComputeBase):
 
     Implement loss compatible with coverage and alignement shards
     """
-    def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0, tgt_shift_index=1):
+
+    def __init__(
+        self, criterion, generator, normalization="sents", lambda_coverage=0.0, lambda_align=0.0, tgt_shift_index=1
+    ):
         super(CommonLossCompute, self).__init__(criterion, generator)
         self.lambda_coverage = lambda_coverage
         self.lambda_align = lambda_align
@@ -274,14 +258,11 @@ class CommonLossCompute(LossComputeBase):
             " Transformer decoders do not implement coverage"
         )
         assert std is not None, (
-            "lambda_coverage != 0.0 requires attention mechanism"
-            " that could not be found in the model."
+            "lambda_coverage != 0.0 requires attention mechanism" " that could not be found in the model."
         )
-        shard_state.update({"std_attn": attns.get("std"),
-                            "coverage_attn": coverage})
+        shard_state.update({"std_attn": attns.get("std"), "coverage_attn": coverage})
 
-    def _compute_loss(self, batch, output, target, std_attn=None,
-                      coverage_attn=None, align_head=None, ref_align=None):
+    def _compute_loss(self, batch, output, target, std_attn=None, coverage_attn=None, align_head=None, ref_align=None):
 
         bottled_output = self._bottle(output)
 
@@ -290,16 +271,14 @@ class CommonLossCompute(LossComputeBase):
 
         loss = self.criterion(scores, gtruth)
         if self.lambda_coverage != 0.0:
-            coverage_loss = self._compute_coverage_loss(
-                std_attn=std_attn, coverage_attn=coverage_attn)
+            coverage_loss = self._compute_coverage_loss(std_attn=std_attn, coverage_attn=coverage_attn)
             loss += coverage_loss
         if self.lambda_align != 0.0:
             if align_head.dtype != loss.dtype:  # Fix FP16
                 align_head = align_head.to(loss.dtype)
             if ref_align.dtype != loss.dtype:
                 ref_align = ref_align.to(loss.dtype)
-            align_loss = self._compute_alignement_loss(
-                align_head=align_head, ref_align=ref_align)
+            align_loss = self._compute_alignement_loss(align_head=align_head, ref_align=ref_align)
             loss += align_loss
         stats = self._stats(loss.clone(), scores, gtruth)
 
@@ -310,8 +289,7 @@ class CommonLossCompute(LossComputeBase):
         covloss *= self.lambda_coverage
         return covloss
 
-    def _add_align_shard_state(self, shard_state, batch, range_start,
-                               range_end, attns):
+    def _add_align_shard_state(self, shard_state, batch, range_start, range_end, attns):
         # attn_align should be in (batch_size, pad_tgt_size, pad_src_size)
         attn_align = attns.get("align", None)
         # align_idx should be a Tensor in size([N, 3]), N is total number
@@ -319,18 +297,12 @@ class CommonLossCompute(LossComputeBase):
         # ['sent_N°_in_batch', 'tgt_id+1', 'src_id'] (check AlignField)
         align_idx = batch.align
         assert attns is not None
-        assert attn_align is not None, (
-            "lambda_align != 0.0 requires " "alignement attention head"
-        )
-        assert align_idx is not None, (
-            "lambda_align != 0.0 requires " "provide guided alignement"
-        )
+        assert attn_align is not None, "lambda_align != 0.0 requires " "alignement attention head"
+        assert align_idx is not None, "lambda_align != 0.0 requires " "provide guided alignement"
         pad_tgt_size, batch_size, _ = batch.tgt.size()
         pad_src_size = batch.src[0].size(0)
         align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]
-        ref_align = onmt.utils.make_batch_align_matrix(
-            align_idx, align_matrix_size, normalize=True
-        )
+        ref_align = onmt.utils.make_batch_align_matrix(align_idx, align_matrix_size, normalize=True)
         # NOTE: tgt-src ref alignement that in range_ of shard
         # (coherent with batch.tgt)
         shard_state.update(
@@ -360,9 +332,7 @@ class CommonLossCompute(LossComputeBase):
         if self.lambda_coverage != 0.0:
             self._add_coverage_shard_state(shard_state, attns)
         if self.lambda_align != 0.0:
-            self._add_align_shard_state(
-                shard_state, batch, range_start, range_end, attns
-            )
+            self._add_align_shard_state(shard_state, batch, range_start, range_end, attns)
         return shard_state
 
 
@@ -370,26 +340,32 @@ class NMTLossCompute(CommonLossCompute):
     """
     Standard NMT Loss Computation.
     """
-    def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0):
-        super(NMTLossCompute, self).__init__(criterion, generator,
-                                             normalization=normalization,
-                                             lambda_coverage=lambda_coverage,
-                                             lambda_align=lambda_align,
-                                             tgt_shift_index=1)
+
+    def __init__(self, criterion, generator, normalization="sents", lambda_coverage=0.0, lambda_align=0.0):
+        super(NMTLossCompute, self).__init__(
+            criterion,
+            generator,
+            normalization=normalization,
+            lambda_coverage=lambda_coverage,
+            lambda_align=lambda_align,
+            tgt_shift_index=1,
+        )
 
 
 class LMLossCompute(CommonLossCompute):
     """
     Standard LM Loss Computation.
     """
-    def __init__(self, criterion, generator, normalization="sents",
-                 lambda_coverage=0.0, lambda_align=0.0):
-        super(LMLossCompute, self).__init__(criterion, generator,
-                                            normalization=normalization,
-                                            lambda_coverage=lambda_coverage,
-                                            lambda_align=lambda_align,
-                                            tgt_shift_index=0)
+
+    def __init__(self, criterion, generator, normalization="sents", lambda_coverage=0.0, lambda_align=0.0):
+        super(LMLossCompute, self).__init__(
+            criterion,
+            generator,
+            normalization=normalization,
+            lambda_coverage=lambda_coverage,
+            lambda_align=lambda_align,
+            tgt_shift_index=0,
+        )
 
 
 def filter_shard_state(state, shard_size=None):
@@ -435,8 +411,7 @@ def shards(state, shard_size, eval_only=False):
         # want a sequence of dictionaries of tensors.
         # First, unzip the dictionary into a sequence of keys and a
         # sequence of tensor-like sequences.
-        keys, values = zip(*((k, [v_chunk for v_chunk in v_split])
-                             for k, (_, v_split) in non_none.items()))
+        keys, values = zip(*((k, [v_chunk for v_chunk in v_split]) for k, (_, v_split) in non_none.items()))
 
         # Now, yield a dictionary for each shard. The keys are always
         # the same. values is a sequence of length #keys where each
@@ -451,7 +426,6 @@ def shards(state, shard_size, eval_only=False):
         variables = []
         for k, (v, v_split) in non_none.items():
             if isinstance(v, torch.Tensor) and state[k].requires_grad:
-                variables.extend(zip(torch.split(state[k], shard_size),
-                                     [v_chunk.grad for v_chunk in v_split]))
+                variables.extend(zip(torch.split(state[k], shard_size), [v_chunk.grad for v_chunk in v_split]))
         inputs, grads = zip(*variables)
-        torch.autograd.backward(inputs, grads) #, retain_graph=True)
+        torch.autograd.backward(inputs, grads)  # , retain_graph=True)

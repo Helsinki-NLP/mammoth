@@ -61,8 +61,7 @@ def _dynamic_dict(example, src_field, tgt_field):
 
     if "tgt" in example:
         tgt = tgt_field.tokenize(example["tgt"]["tgt"])
-        mask = torch.LongTensor(
-            [unk_idx] + [src_ex_vocab.stoi[w] for w in tgt] + [unk_idx])
+        mask = torch.LongTensor([unk_idx] + [src_ex_vocab.stoi[w] for w in tgt] + [unk_idx])
         example["alignment"] = mask
     return example
 
@@ -116,8 +115,7 @@ class Dataset(TorchtextDataset):
         self.sort_key = sort_key
         can_copy = 'src_map' in fields and 'alignment' in fields
 
-        read_iters = [r.read(dat, name, feats)
-                      for r, (name, dat, feats) in zip(readers, data)]
+        read_iters = [r.read(dat, name, feats) for r, (name, dat, feats) in zip(readers, data)]
 
         # self.src_vocabs is used in collapse_copy_scores and Translator.py
         self.src_vocabs = []
@@ -127,11 +125,9 @@ class Dataset(TorchtextDataset):
                 src_field = fields['src']
                 tgt_field = fields['tgt']
                 # this assumes src_field and tgt_field are both text
-                ex_dict = _dynamic_dict(
-                    ex_dict, src_field.base_field, tgt_field.base_field)
+                ex_dict = _dynamic_dict(ex_dict, src_field.base_field, tgt_field.base_field)
                 self.src_vocabs.append(ex_dict["src_ex_vocab"])
-            ex_fields = {k: [(k, v)] for k, v in fields.items() if
-                         k in ex_dict}
+            ex_fields = {k: [(k, v)] for k, v in fields.items() if k in ex_dict}
             ex = Example.fromdict(ex_dict, ex_fields)
             examples.append(ex)
 

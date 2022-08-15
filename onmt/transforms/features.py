@@ -29,9 +29,7 @@ class FilterFeatsTransform(Transform):
 
         for feat_name, feat_values in example['src_feats'].items():
             if len(example['src']) != len(feat_values):
-                logger.warning(
-                    f"Skipping example due to mismatch "
-                    f"between source and feature {feat_name}")
+                logger.warning(f"Skipping example due to mismatch " f"between source and feature {feat_name}")
                 return None
         return example
 
@@ -50,13 +48,20 @@ class InferFeatsTransform(Transform):
     def add_options(cls, parser):
         """Avalilable options related to this Transform."""
         group = parser.add_argument_group("Transform/InferFeats")
-        group.add("--reversible_tokenization", "-reversible_tokenization",
-                  default="joiner", choices=["joiner", "spacer"],
-                  help="Type of reversible tokenization "
-                       "applied on the tokenizer.")
-        group.add("--prior_tokenization", "-prior_tokenization",
-                  default=False, action="store_true",
-                  help="Whether the input has already been tokenized.")
+        group.add(
+            "--reversible_tokenization",
+            "-reversible_tokenization",
+            default="joiner",
+            choices=["joiner", "spacer"],
+            help="Type of reversible tokenization " "applied on the tokenizer.",
+        )
+        group.add(
+            "--prior_tokenization",
+            "-prior_tokenization",
+            default=False,
+            action="store_true",
+            help="Whether the input has already been tokenized.",
+        )
 
     def _parse_opts(self):
         super()._parse_opts()
@@ -70,10 +75,8 @@ class InferFeatsTransform(Transform):
             return example
 
         if self.reversible_tokenization == "joiner":
-            original_src = example["src_original"] \
-                if self.prior_tokenization else None
-            word_to_subword_mapping = subword_map_by_joiner(
-                example["src"], original_subwords=original_src)
+            original_src = example["src_original"] if self.prior_tokenization else None
+            word_to_subword_mapping = subword_map_by_joiner(example["src"], original_subwords=original_src)
         else:  # Spacer
             word_to_subword_mapping = subword_map_by_spacer(example["src"])
 
@@ -81,8 +84,7 @@ class InferFeatsTransform(Transform):
         for subword, word_id in zip(example["src"], word_to_subword_mapping):
             for feat_name, feat_values in example["src_feats"].items():
                 # Punctuation only
-                if not re.sub(r'(\W)+', '', subword).strip() \
-                        and not self.prior_tokenization:
+                if not re.sub(r'(\W)+', '', subword).strip() and not self.prior_tokenization:
                     inferred_feat = "<null>"
                 else:
                     inferred_feat = feat_values[word_id]

@@ -76,12 +76,7 @@ class NMTModel(BaseModel):
 
         if not bptt:
             decoder.init_state(src, memory_bank, enc_state)
-        dec_out, attns = decoder(
-            dec_in,
-            memory_bank,
-            memory_lengths=lengths,
-            with_align=with_align
-        )
+        dec_out, attns = decoder(dec_in, memory_bank, memory_lengths=lengths, with_align=with_align)
         return dec_out, attns
 
     def update_dropout(self, dropout):
@@ -123,8 +118,7 @@ class LanguageModel(BaseModel):
     def __init__(self, encoder=None, decoder=None):
         super(LanguageModel, self).__init__(encoder, decoder)
         if encoder is not None:
-            raise ValueError("LanguageModel should not be used"
-                             "with an encoder")
+            raise ValueError("LanguageModel should not be used" "with an encoder")
         self.decoder = decoder
 
     def forward(self, src, tgt, lengths, bptt=False, with_align=False):
@@ -150,10 +144,7 @@ class LanguageModel(BaseModel):
 
         if not bptt:
             self.decoder.init_state()
-        dec_out, attns = self.decoder(
-            src, memory_bank=None, memory_lengths=lengths,
-            with_align=with_align
-        )
+        dec_out, attns = self.decoder(src, memory_bank=None, memory_lengths=lengths, with_align=with_align)
         return dec_out, attns
 
     def update_dropout(self, dropout):

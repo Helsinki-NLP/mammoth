@@ -16,7 +16,7 @@ ACTIVATION_FUNCTIONS = {
 
 
 class PositionwiseFeedForward(nn.Module):
-    """ A two-layer Feed-Forward-Network with residual layer norm.
+    """A two-layer Feed-Forward-Network with residual layer norm.
 
     Args:
         d_model (int): the size of input for the first-layer of the FFN.
@@ -26,8 +26,7 @@ class PositionwiseFeedForward(nn.Module):
         activation_fn (ActivationFunction): activation function used.
     """
 
-    def __init__(self, d_model, d_ff, dropout=0.1,
-                 activation_fn=ActivationFunction.relu):
+    def __init__(self, d_model, d_ff, dropout=0.1, activation_fn=ActivationFunction.relu):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = nn.Linear(d_model, d_ff)
         self.w_2 = nn.Linear(d_ff, d_model)

@@ -10,7 +10,7 @@ import torch.nn as nn
 
 
 class RMSNorm(nn.Module):
-    def __init__(self, d, p=-1., eps=1e-8, bias=False):
+    def __init__(self, d, p=-1.0, eps=1e-8, bias=False):
         """
             Root Mean Square Layer Normalization
         :param d: model size
@@ -38,7 +38,7 @@ class RMSNorm(nn.Module):
             self.register_parameter("offset", self.offset)
 
     def forward(self, x):
-        if self.p < 0. or self.p > 1.:
+        if self.p < 0.0 or self.p > 1.0:
             norm_x = x.norm(2, dim=-1, keepdim=True)
             d_x = self.d
         else:
@@ -48,7 +48,7 @@ class RMSNorm(nn.Module):
             norm_x = partial_x.norm(2, dim=-1, keepdim=True)
             d_x = partial_size
 
-        rms_x = norm_x * d_x ** (-1. / 2)
+        rms_x = norm_x * d_x ** (-1.0 / 2)
         x_normed = x / (rms_x + self.eps)
 
         gating = self.sigmoid(self.gate * x)
@@ -57,17 +57,3 @@ class RMSNorm(nn.Module):
             return (self.scale * x_normed + self.offset) * gating
 
         return self.scale * x_normed * gating
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -4,14 +4,12 @@ from itertools import cycle, chain, repeat
 
 from torchtext.legacy.data import batch as torchtext_batch
 from onmt.inputters import str2sortkey, max_tok_len, OrderedIterator
-from onmt.inputters.corpus import build_corpora_iter, DatasetAdapter, ParallelCorpusIterator
+from onmt.inputters.corpus import build_corpora_iter, DatasetAdapter
 from onmt.transforms import make_transforms
 from onmt.utils.logging import logger
 
 
-DatasetMetadata = namedtuple(
-    'DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id'.split()
-)
+DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id'.split())
 
 
 class MixingStrategy(object):
@@ -27,8 +25,7 @@ class MixingStrategy(object):
         iter_keys = iterables.keys()
         weight_keys = weights.keys()
         if iter_keys != weight_keys:
-            raise ValueError(
-                f"keys in {iterables} & {iterables} should be equal.")
+            raise ValueError(f"keys in {iterables} & {iterables} should be equal.")
 
     def __iter__(self):
         raise NotImplementedError
@@ -63,7 +60,7 @@ class WeightedMixer(MixingStrategy):
         msgs = []
         for ds_name, ds_count in self._counts.items():
             msgs.append(f"\t\t\t* {ds_name}: {ds_count}")
-        logger.info("Weighted corpora loaded so far:\n"+"\n".join(msgs))
+        logger.info("Weighted corpora loaded so far:\n" + "\n".join(msgs))
 
     def _reset_iter(self, ds_name):
         self._iterators[ds_name] = iter(self.iterables[ds_name])
@@ -113,10 +110,24 @@ class DynamicDatasetIter(object):
         mixer (MixingStrategy): the strategy to iterate corpora.
     """
 
-    def __init__(self, scheduler, opts, corpora_info, transforms_cls, fields_dict, is_train,
-                 batch_type, batch_size, batch_size_multiple, data_type="text",
-                 bucket_size=2048, pool_factor=8192,
-                 skip_empty_level='warning', stride=1, offset=0):
+    def __init__(
+        self,
+        scheduler,
+        opts,
+        corpora_info,
+        transforms_cls,
+        fields_dict,
+        is_train,
+        batch_type,
+        batch_size,
+        batch_size_multiple,
+        data_type="text",
+        bucket_size=2048,
+        pool_factor=8192,
+        skip_empty_level='warning',
+        stride=1,
+        offset=0,
+    ):
         self.scheduler = scheduler
         self.opts = opts
         self.transforms_cls = transforms_cls
@@ -136,13 +147,11 @@ class DynamicDatasetIter(object):
         self.stride = stride
         self.offset = offset
         if skip_empty_level not in ['silent', 'warning', 'error']:
-            raise ValueError(
-                f"Invalid argument skip_empty_level={skip_empty_level}")
+            raise ValueError(f"Invalid argument skip_empty_level={skip_empty_level}")
         self.skip_empty_level = skip_empty_level
 
     @classmethod
-    def from_opts(cls, scheduler, transforms_cls, fields_dict, opts, is_train,
-                  stride=1, offset=0):
+    def from_opts(cls, scheduler, transforms_cls, fields_dict, opts, is_train, stride=1, offset=0):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -150,38 +159,32 @@ class DynamicDatasetIter(object):
         else:
             batch_size_multiple = 8 if opts.model_dtype == "fp16" else 1
         return cls(
-            scheduler, opts, opts.data, transforms_cls, fields_dict, is_train, opts.batch_type,
-            batch_size, batch_size_multiple, data_type=opts.data_type,
-            bucket_size=opts.bucket_size, pool_factor=opts.pool_factor,
+            scheduler,
+            opts,
+            opts.data,
+            transforms_cls,
+            fields_dict,
+            is_train,
+            opts.batch_type,
+            batch_size,
+            batch_size_multiple,
+            data_type=opts.data_type,
+            bucket_size=opts.bucket_size,
+            pool_factor=opts.pool_factor,
             skip_empty_level=opts.skip_empty_level,
-            stride=stride, offset=offset
+            stride=stride,
+            offset=offset,
         )
 
     def _init_datasets(self):
         self.dataset_iterators = []
         for tpl in self.scheduler.get_dataset_specs(self.fields_dict):
-            (
-                src_lang,
-                tgt_lang,
-                encoder_id,
-                decoder_id,
-                corpus_id,
-                corpus,
-                src_fields,
-                tgt_fields
-            ) = tpl
-            merged_fields = {
-                'src': src_fields['src'],
-                'tgt': tgt_fields['tgt']
-            }
+            (src_lang, tgt_lang, encoder_id, decoder_id, corpus_id, corpus, src_fields, tgt_fields) = tpl
+            merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}
             logger.debug(f'merged_fields {merged_fields}')
 
             metadata = DatasetMetadata(
-                src_lang=src_lang,
-                tgt_lang=tgt_lang,
-                encoder_id=encoder_id,
-                decoder_id=decoder_id,
-                corpus_id=corpus_id
+                src_lang=src_lang, tgt_lang=tgt_lang, encoder_id=encoder_id, decoder_id=decoder_id, corpus_id=corpus_id
             )
 
             logger.debug(f'self.transforms_cls {self.transforms_cls}')
@@ -192,13 +195,17 @@ class DynamicDatasetIter(object):
                 transforms = []
 
             raw_iter = build_corpora_iter(
-                corpus_id, corpus, transforms, self.corpora_info[corpus_id],
+                corpus_id,
+                corpus,
+                transforms,
+                self.corpora_info[corpus_id],
                 skip_empty_level=self.skip_empty_level,
-                stride=self.stride, offset=self.offset
+                stride=self.stride,
+                offset=self.offset,
             )
 
-            # We repeat the raw_iter object (an instance of ParallelCorpusIterator), rather 
-            # than cycling and cacheing through its __iter__ function. This avoids loading 
+            # We repeat the raw_iter object (an instance of ParallelCorpusIterator), rather
+            # than cycling and cacheing through its __iter__ function. This avoids loading
             # the full corpus in memory.
             infinite_iter = chain.from_iterable(repeat(raw_iter))
 
@@ -219,10 +226,7 @@ class DynamicDatasetIter(object):
         self.init_iterators = True
 
     def _bucketing(self, iterable):
-        buckets = torchtext_batch(
-            iterable,
-            batch_size=self.bucket_size,
-            batch_size_fn=None)
+        buckets = torchtext_batch(iterable, batch_size=self.bucket_size, batch_size_fn=None)
         yield from buckets
 
     def _wrap_in_ordered_iterator(self, transformed_iter):

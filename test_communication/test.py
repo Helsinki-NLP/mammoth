@@ -20,18 +20,9 @@ class TestTraining(TestCase):
 
     @staticmethod
     def _get_model_components(opt) -> List[str]:
-        components_enc = [
-            "{}_enc".format(src_lang)
-            for src_lang in ast.literal_eval(opt.src_vocab).keys()
-        ]
-        components_dec = [
-            "{}_dec".format(tgt_lang)
-            for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()
-        ]
-        components_gen = [
-            "{}_gen".format(tgt_lang)
-            for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()
-        ]
+        components_enc = ["{}_enc".format(src_lang) for src_lang in ast.literal_eval(opt.src_vocab).keys()]
+        components_dec = ["{}_dec".format(tgt_lang) for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()]
+        components_gen = ["{}_gen".format(tgt_lang) for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()]
         return ["frame", "bridge", *components_enc, *components_dec, *components_gen]
 
     def test_training_1gpu_4pairs(self):
@@ -54,10 +45,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -65,12 +53,8 @@ class TestTraining(TestCase):
             logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -102,10 +86,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -113,12 +94,8 @@ class TestTraining(TestCase):
             logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -148,10 +125,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -159,12 +133,8 @@ class TestTraining(TestCase):
             logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -194,10 +164,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -205,12 +172,8 @@ class TestTraining(TestCase):
             logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -240,10 +203,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -251,12 +211,8 @@ class TestTraining(TestCase):
             logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -283,10 +239,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -294,12 +247,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -332,10 +281,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -343,12 +289,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -379,10 +321,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -390,12 +329,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -426,10 +361,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -437,12 +369,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -475,10 +403,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -486,12 +411,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -518,10 +439,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -529,12 +447,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -563,10 +477,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -574,12 +485,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -615,10 +522,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -626,12 +530,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -676,10 +576,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -687,12 +584,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -729,10 +622,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -740,12 +630,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -794,10 +680,7 @@ class TestTraining(TestCase):
             ]
         )
         components = self._get_model_components(opt)
-        out_files = [
-            "models/{}_step_4_{}.pt".format(out_model_prefix, cmp)
-            for cmp in components
-        ]
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -805,12 +688,8 @@ class TestTraining(TestCase):
         logger.info("Launch training")
         train(opt)
         for cmp in components:
-            self.assertNotIn(
-                "{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
-            self.assertIn(
-                "{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models")
-            )
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
         for out_file in out_files:
             if os.path.exists(out_file):
                 logger.info("Removing file {}".format(out_file))
@@ -826,7 +705,8 @@ class TestTranslate(TestCase):
         onmt.opts.build_bilingual_model(cls.parser)
 
     def test_translate(self):
-        # TODO: train model instead of loading one the one used now, remove all absolute paths, add test data in the repo
+        # TODO: train model instead of loading one the one used now,
+        # remove all absolute paths, add test data in the repo
         opt, _ = self.parser.parse_known_args(
             [
                 "-gpu",

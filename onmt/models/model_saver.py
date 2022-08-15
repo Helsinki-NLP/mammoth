@@ -9,22 +9,14 @@ from onmt.utils.distributed import is_master
 from onmt.utils.module_splitter import explode_model
 
 
-from copy import deepcopy
-
-
 def build_model_saver(model_opt, opt, model, fields_dict, optim, device_id):
     # _check_save_model_path
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
-    model_saver = ModelSaver(opt.save_model,
-                             model,
-                             model_opt,
-                             fields_dict,
-                             optim,
-                             opt.keep_checkpoint, 
-                             device_id,
-                             opt.save_all_gpus)
+    model_saver = ModelSaver(
+        opt.save_model, model, model_opt, fields_dict, optim, opt.keep_checkpoint, device_id, opt.save_all_gpus
+    )
     return model_saver
 
 
@@ -33,8 +25,7 @@ def load_checkpoint(ckpt_path):
     checkpoint = None
     if ckpt_path:
         logger.info('Loading checkpoint from %s' % ckpt_path)
-        checkpoint = torch.load(ckpt_path,
-                                map_location=lambda storage, loc: storage)
+        checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
     return checkpoint
 
 
@@ -46,16 +37,17 @@ class ModelSaverBase(object):
     * `_rm_checkpoint
     """
 
-    def __init__(self, 
-                 base_path, 
-                 model, 
-                 model_opt, 
-                 fields_dict, 
-                 optim,
-                 keep_checkpoint=-1, 
-                 device_id="0",
-                 all_gpus=False,
-                ):
+    def __init__(
+        self,
+        base_path,
+        model,
+        model_opt,
+        fields_dict,
+        optim,
+        keep_checkpoint=-1,
+        device_id="0",
+        all_gpus=False,
+    ):
         self.base_path = base_path
         self.model = model
         self.model_opt = model_opt
@@ -89,8 +81,7 @@ class ModelSaverBase(object):
         self.last_saved_step = step
 
         if moving_average:
-            for param_data, param in zip(model_params_data,
-                                         save_model.parameters()):
+            for param_data, param in zip(model_params_data, save_model.parameters()):
                 param.data = param_data
 
         if self.keep_checkpoint > 0:
@@ -133,16 +124,19 @@ class ModelSaver(ModelSaverBase):
         real_model = model.module if isinstance(model, nn.DataParallel) else model
 
         model_state_dict = real_model.state_dict()
-        encoder_ids = {index: lang[0].replace('encoder','') for index, lang in enumerate(model.encoder.named_children())}
-        decoder_ids = {index: lang[0].replace('decoder','') for index, lang in enumerate(model.decoder.named_children())}
+        encoder_ids = {
+            index: lang[0].replace('encoder', '') for index, lang in enumerate(model.encoder.named_children())
+        }
+        decoder_ids = {
+            index: lang[0].replace('decoder', '') for index, lang in enumerate(model.decoder.named_children())
+        }
 
         checkpoint = {
             "model": model_state_dict,
             # 'generator': generator_state_dict,
             "vocab": self.fields_dict,
             "opt": self.model_opt,
-            "optim": { k:v.state_dict() 
-                for k,v in self.optim._optimizer.optimizers.items() },
+            "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
             "whole_model": self.model,
         }
 
@@ -155,16 +149,12 @@ class ModelSaver(ModelSaverBase):
             torch.save(checkpoint, checkpoint_path)
             tmp_checkpoint_paths.append(checkpoint_path)
 
-        encoders, decoders, attention_bridge, generators, model_frame = explode_model(
-            checkpoint
-        )
+        encoders, decoders, attention_bridge, generators, model_frame = explode_model(checkpoint)
 
         # TODO: refactor (in a dedicated saver class?)
         # encoder modules
         for i, encoder in enumerate(encoders):
-            checkpoint_path = "{}_step_{}_{}_enc.pt".format(
-                self.base_path, step, encoder_ids[i]
-            )
+            checkpoint_path = "{}_step_{}_{}_enc.pt".format(self.base_path, step, encoder_ids[i])
             if os.path.isfile(checkpoint_path):
                 logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
             else:
@@ -173,9 +163,7 @@ class ModelSaver(ModelSaverBase):
                 tmp_checkpoint_paths.append(checkpoint_path)
         # decoder modules
         for i, decoder in enumerate(decoders):
-            checkpoint_path = "{}_step_{}_{}_dec.pt".format(
-                self.base_path, step, decoder_ids[i]
-            )
+            checkpoint_path = "{}_step_{}_{}_dec.pt".format(self.base_path, step, decoder_ids[i])
             if os.path.isfile(checkpoint_path):
                 logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
             else:
@@ -184,9 +172,7 @@ class ModelSaver(ModelSaverBase):
                 tmp_checkpoint_paths.append(checkpoint_path)
         # generator modules
         for i, generator in enumerate(generators):
-            checkpoint_path = "{}_step_{}_{}_gen.pt".format(
-                self.base_path, step, decoder_ids[i]
-            )
+            checkpoint_path = "{}_step_{}_{}_gen.pt".format(self.base_path, step, decoder_ids[i])
             if os.path.isfile(checkpoint_path):
                 logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
             else:

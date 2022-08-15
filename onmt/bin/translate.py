@@ -35,8 +35,8 @@ def translate(opt):
             batch_size=opt.batch_size,
             batch_type=opt.batch_type,
             attn_debug=opt.attn_debug,
-            align_debug=opt.align_debug
-            )
+            align_debug=opt.align_debug,
+        )
 
 
 def _get_parser():

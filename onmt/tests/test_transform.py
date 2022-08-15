@@ -41,7 +41,8 @@ class TestTransform(unittest.TestCase):
 
     def test_transform_specials(self):
         transforms_cls = get_transforms_cls(["prefix"])
-        corpora = yaml.safe_load("""
+        corpora = yaml.safe_load(
+            """
             trainset:
                 path_src: data/src-train.txt
                 path_tgt: data/tgt-train.txt
@@ -49,7 +50,8 @@ class TestTransform(unittest.TestCase):
                 weight: 1
                 src_prefix: "｟_pf_src｠"
                 tgt_prefix: "｟_pf_tgt｠"
-        """)
+        """
+        )
         opt = Namespace(data=corpora)
         specials = get_specials(opt, transforms_cls)
         specials_expected = {"src": {"｟_pf_src｠"}, "tgt": {"｟_pf_tgt｠"}}
@@ -58,7 +60,8 @@ class TestTransform(unittest.TestCase):
     def test_transform_pipe(self):
         # 1. Init first transform in the pipe
         prefix_cls = get_transforms_cls(["prefix"])["prefix"]
-        corpora = yaml.safe_load("""
+        corpora = yaml.safe_load(
+            """
             trainset:
                 path_src: data/src-train.txt
                 path_tgt: data/tgt-train.txt
@@ -66,7 +69,8 @@ class TestTransform(unittest.TestCase):
                 weight: 1
                 src_prefix: "｟_pf_src｠"
                 tgt_prefix: "｟_pf_tgt｠"
-        """)
+        """
+        )
         opt = Namespace(data=corpora, seed=-1)
         prefix_transform = prefix_cls(opt)
         prefix_transform.warm_up()
@@ -75,17 +79,13 @@ class TestTransform(unittest.TestCase):
         opt = Namespace(src_seq_length=4, tgt_seq_length=4)
         filter_transform = filter_cls(opt)
         # 3. Sequential combine them into a transform pipe
-        transform_pipe = TransformPipe.build_from(
-            [prefix_transform, filter_transform]
-        )
+        transform_pipe = TransformPipe.build_from([prefix_transform, filter_transform])
         ex = {
             "src": ["Hello", ",", "world", "."],
             "tgt": ["Bonjour", "le", "monde", "."],
         }
         # 4. apply transform pipe for example
-        ex_after = transform_pipe.apply(
-            copy.deepcopy(ex), corpus_name="trainset"
-        )
+        ex_after = transform_pipe.apply(copy.deepcopy(ex), corpus_name="trainset")
         # 5. example after the pipe exceed the length limit, thus filtered
         self.assertIsNone(ex_after)
         # 6. Transform statistics registed (here for filtertoolong)
@@ -99,7 +99,8 @@ class TestTransform(unittest.TestCase):
 class TestMiscTransform(unittest.TestCase):
     def test_prefix(self):
         prefix_cls = get_transforms_cls(["prefix"])["prefix"]
-        corpora = yaml.safe_load("""
+        corpora = yaml.safe_load(
+            """
             trainset:
                 path_src: data/src-train.txt
                 path_tgt: data/tgt-train.txt
@@ -107,7 +108,8 @@ class TestMiscTransform(unittest.TestCase):
                 weight: 1
                 src_prefix: "｟_pf_src｠"
                 tgt_prefix: "｟_pf_tgt｠"
-        """)
+        """
+        )
         opt = Namespace(data=corpora, seed=-1)
         prefix_transform = prefix_cls(opt)
         prefix_transform.warm_up()
@@ -179,8 +181,19 @@ class TestSubwordTransform(unittest.TestCase):
         tokens = ["Another", "world", "."]
         gold_bpe = ["A@@", "no@@", "ther", "world", "."]
         gold_dropout = [
-            "A@@", "n@@", "o@@", "t@@", "h@@", "e@@", "r",
-            "w@@", "o@@", "r@@", "l@@", "d", ".",
+            "A@@",
+            "n@@",
+            "o@@",
+            "t@@",
+            "h@@",
+            "e@@",
+            "r",
+            "w@@",
+            "o@@",
+            "r@@",
+            "l@@",
+            "d",
+            ".",
         ]
         # 1. disable bpe dropout for not training example
         after_bpe = bpe_transform._tokenize(tokens, is_train=False)
@@ -427,9 +440,7 @@ class TestBARTNoising(unittest.TestCase):
         n_masked = math.ceil(n_tokens * bart_noise.mask_ratio)
         # print(f"token mask: {masked} / {tokens}")
         self.assertEqual(len(masked), n_tokens)
-        self.assertEqual(
-            sum([1 if tok == self.MASK_TOK else 0 for tok in masked]), n_masked
-        )
+        self.assertEqual(sum([1 if tok == self.MASK_TOK else 0 for tok in masked]), n_masked)
 
     def test_whole_word_mask(self):
         """Mask will be done on whole word that may across multiply token.
@@ -468,9 +479,7 @@ class TestBARTNoising(unittest.TestCase):
         # len(masked) depend on number of tokens in select word
         n_words = sum(token_starts)
         n_masked = math.ceil(n_words * bart_noise.mask_ratio)
-        self.assertEqual(
-            sum(1 if tok == self.MASK_TOK else 0 for tok in masked), n_masked
-        )
+        self.assertEqual(sum(1 if tok == self.MASK_TOK else 0 for tok in masked), n_masked)
 
         # 3. replace_length -1: all tokens in "words" are replaced with MASK
         bart_noise.replace_length = -1
@@ -481,9 +490,7 @@ class TestBARTNoising(unittest.TestCase):
         n_masked = math.ceil(n_words * bart_noise.mask_ratio)
         # number of mask_tok depend on number of tokens in selected word
         # number of MASK_TOK can be greater than n_masked
-        self.assertTrue(
-            sum(1 if tok == self.MASK_TOK else 0 for tok in masked) > n_masked
-        )
+        self.assertTrue(sum(1 if tok == self.MASK_TOK else 0 for tok in masked) > n_masked)
 
     def test_span_infilling(self):
         bart_noise = BARTNoising(
@@ -513,38 +520,72 @@ class TestBARTNoising(unittest.TestCase):
 class TestFeaturesTransform(unittest.TestCase):
     def test_inferfeats(self):
         inferfeats_cls = get_transforms_cls(["inferfeats"])["inferfeats"]
-        opt = Namespace(
-            reversible_tokenization="joiner",
-            prior_tokenization=False)
+        opt = Namespace(reversible_tokenization="joiner", prior_tokenization=False)
         inferfeats_transform = inferfeats_cls(opt)
 
         ex_in = {
-            "src": ['however', '￭,', 'according', 'to', 'the', 'logs',
-                    '￭,', 'she', 'is', 'hard', '￭-￭', 'working', '￭.'],
-            "tgt": ['however', '￭,', 'according', 'to', 'the', 'logs',
-                    '￭,', 'she', 'is', 'hard', '￭-￭', 'working', '￭.']
+            "src": [
+                'however',
+                '￭,',
+                'according',
+                'to',
+                'the',
+                'logs',
+                '￭,',
+                'she',
+                'is',
+                'hard',
+                '￭-￭',
+                'working',
+                '￭.',
+            ],
+            "tgt": [
+                'however',
+                '￭,',
+                'according',
+                'to',
+                'the',
+                'logs',
+                '￭,',
+                'she',
+                'is',
+                'hard',
+                '￭-￭',
+                'working',
+                '￭.',
+            ],
         }
         ex_out = inferfeats_transform.apply(ex_in)
         self.assertIs(ex_out, ex_in)
 
-        ex_in["src_feats"] = {
-            "feat_0": ["A", "A", "A", "A", "B", "A", "A", "C"]
-        }
+        ex_in["src_feats"] = {"feat_0": ["A", "A", "A", "A", "B", "A", "A", "C"]}
         ex_out = inferfeats_transform.apply(ex_in)
         self.assertEqual(
             ex_out["src_feats"]["feat_0"],
-            ["A", "<null>", "A", "A", "A", "B", "<null>", "A",
-             "A", "C", "<null>", "C", "<null>"])
+            ["A", "<null>", "A", "A", "A", "B", "<null>", "A", "A", "C", "<null>", "C", "<null>"],
+        )
 
-        ex_in["src"] = ['｟mrk_case_modifier_C｠', 'however', '￭,',
-                        'according', 'to', 'the', 'logs', '￭,',
-                        '｟mrk_begin_case_region_U｠', 'she', 'is', 'hard',
-                        '￭-￭', 'working', '｟mrk_end_case_region_U｠', '￭.']
-        ex_in["src_feats"] = {
-            "feat_0": ["A", "A", "A", "A", "B", "A", "A", "C"]
-        }
+        ex_in["src"] = [
+            '｟mrk_case_modifier_C｠',
+            'however',
+            '￭,',
+            'according',
+            'to',
+            'the',
+            'logs',
+            '￭,',
+            '｟mrk_begin_case_region_U｠',
+            'she',
+            'is',
+            'hard',
+            '￭-￭',
+            'working',
+            '｟mrk_end_case_region_U｠',
+            '￭.',
+        ]
+        ex_in["src_feats"] = {"feat_0": ["A", "A", "A", "A", "B", "A", "A", "C"]}
         ex_out = inferfeats_transform.apply(ex_in)
         self.assertEqual(
             ex_out["src_feats"]["feat_0"],
-            ["A", "A", "<null>", "A", "A", "A", "B", "<null>",
-             "A", "A", "A", "C", "<null>", "C", "C", "<null>"])
+            ["A", "A", "<null>", "A", "A", "A", "B", "<null>", "A", "A", "A", "C", "<null>", "C", "C", "<null>"],
+        )

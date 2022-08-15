@@ -1,3 +1,4 @@
 pyrouge
 sentencepiece>=0.1.94
 subword-nmt>=0.3.7
+jsonargparse==4.13.1

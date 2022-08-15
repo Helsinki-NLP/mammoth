@@ -25,7 +25,7 @@ setup(
         "torchtext==0.5.0",
         "configargparse",
         "tensorboard>=2.3",
-        "flask",
+        "flask==2.1.3",
         "waitress",
         "pyonmttok>=1.23,<2",
         "pyyaml",

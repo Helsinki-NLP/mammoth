@@ -22,11 +22,11 @@ jobs:
         pip install --upgrade setuptools
         pip install -e .
         pip install -r requirements.opt.txt
-        pip install flake8
+        pip install flake8==4.0.1
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Lint with flake8
       run: |
-        flake8 .
+        flake8 --max-line-length 120 .
     - name: Unit tests
       run: |
         python -m unittest discover

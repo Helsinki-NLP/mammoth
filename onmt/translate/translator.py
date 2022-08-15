@@ -306,7 +306,7 @@ class Inference(object):
             report_align=report_align,
             report_score=report_score,
             logger=logger,
-            seed=opt.seed, langpair = langpair, 
+            seed=opt.seed, langpair = langpair,
         )
 
     def _log(self, msg):
@@ -795,7 +795,7 @@ class Translator(Inference):
 
         memory_bank, alphas = self.model.attention_bridge(memory_bank, mask)
 
-        if src_lengths is None:
+        if src_lengths is None or self.model.attention_bridge.is_fixed_length:
             assert not isinstance(
                 memory_bank, tuple
             ), "Ensemble decoding only supported for text data"

@@ -218,6 +218,45 @@ class TestTraining(TestCase):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
 
+    def test_training_1gpu_4pairs_ab_perceiver(self):
+        out_model_prefix = "wmt_1gpu_4pairs_perceiver"
+        opt, _ = self.parser.parse_known_args(
+            [
+                "-config",
+                "config/wmt_4pairs.yml",
+                "-ab_layers",
+                "perceiver",
+                "-hidden_ab_size",
+                "512",
+                "-save_model",
+                "models/{}".format(out_model_prefix),
+                "-world_size",
+                "1",
+                "-gpu_ranks",
+                "0",
+                "-node_gpu",
+                "0:0",
+                "0:0",
+                "0:0",
+                "0:0",
+            ]
+        )
+        components = self._get_model_components(opt)
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+            logger.info("Launch training")
+        train(opt)
+        for cmp in components:
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+
     def test_training_2gpus_4pairs(self):
         out_model_prefix = "wmt_2gpus_4pairs"
         opt, _ = self.parser.parse_known_args(
@@ -388,6 +427,46 @@ class TestTraining(TestCase):
                 "512",
                 "-ab_fixed_length",
                 "50",
+                "-save_model",
+                "models/{}".format(out_model_prefix),
+                "-world_size",
+                "2",
+                "-gpu_ranks",
+                "0",
+                "1",
+                "-node_gpu",
+                "0:0",
+                "0:1",
+                "0:0",
+                "0:1",
+            ]
+        )
+        components = self._get_model_components(opt)
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+        logger.info("Launch training")
+        train(opt)
+        for cmp in components:
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+
+    def test_training_2gpus_4pairs_ab_perceiver(self):
+        out_model_prefix = "wmt_2gpus_4pairs_perceiver"
+        opt, _ = self.parser.parse_known_args(
+            [
+                "-config",
+                "config/wmt_4pairs.yml",
+                "-ab_layers",
+                "perceiver",
+                "-hidden_ab_size",
+                "512",
                 "-save_model",
                 "models/{}".format(out_model_prefix),
                 "-world_size",

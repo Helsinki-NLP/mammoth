@@ -11,23 +11,17 @@ STATUS_OK = "ok"
 STATUS_ERROR = "error"
 
 
-def start(config_file,
-          url_root="./translator",
-          host="0.0.0.0",
-          port=5000,
-          debug=False):
+def start(config_file, url_root="./translator", host="0.0.0.0", port=5000, debug=False):
     def prefix_route(route_function, prefix='', mask='{0}{1}'):
         def newroute(route, *args, **kwargs):
             return route_function(mask.format(prefix, route), *args, **kwargs)
+
         return newroute
 
     if debug:
         logger = logging.getLogger("main")
-        log_format = logging.Formatter(
-            "[%(asctime)s %(levelname)s] %(message)s")
-        file_handler = RotatingFileHandler(
-            "debug_requests.log",
-            maxBytes=1000000, backupCount=10)
+        log_format = logging.Formatter("[%(asctime)s %(levelname)s] %(message)s")
+        file_handler = RotatingFileHandler("debug_requests.log", maxBytes=1000000, backupCount=10)
         file_handler.setFormatter(log_format)
         logger.addHandler(file_handler)
 
@@ -58,8 +52,7 @@ def start(config_file,
 
         opt = data.get('opt', None)
         try:
-            model_id, load_time = translation_server.clone_model(
-                model_id, opt, timeout)
+            model_id, load_time = translation_server.clone_model(model_id, opt, timeout)
         except ServerModelError as e:
             out['status'] = STATUS_ERROR
             out['error'] = str(e)
@@ -97,16 +90,19 @@ def start(config_file,
 
             out = [[] for _ in range(n_best)]
             for i in range(len(trans)):
-                response = {"src": inputs[i // n_best]['src'], "tgt": trans[i],
-                            "n_best": n_best, "pred_score": scores[i]}
+                response = {
+                    "src": inputs[i // n_best]['src'],
+                    "tgt": trans[i],
+                    "n_best": n_best,
+                    "pred_score": scores[i],
+                }
                 if len(aligns[i]) > 0 and aligns[i][0] is not None:
                     response["align"] = aligns[i]
                 out[i % n_best].append(response)
         except ServerModelError as e:
             model_id = inputs[0].get("id")
             if debug:
-                logger.warning("Unload model #{} "
-                               "because of an error".format(model_id))
+                logger.warning("Unload model #{} because of an error".format(model_id))
             translation_server.models[model_id].unload()
             out['error'] = str(e)
             out['status'] = STATUS_ERROR
@@ -135,22 +131,20 @@ def start(config_file,
 
 def _get_parser():
     parser = configargparse.ArgumentParser(
-        config_file_parser_class=configargparse.YAMLConfigFileParser,
-        description="OpenNMT-py REST Server")
+        config_file_parser_class=configargparse.YAMLConfigFileParser, description="OpenNMT-py REST Server"
+    )
     parser.add_argument("--ip", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default="5000")
     parser.add_argument("--url_root", type=str, default="/translator")
     parser.add_argument("--debug", "-d", action="store_true")
-    parser.add_argument("--config", "-c", type=str,
-                        default="./available_models/conf.json")
+    parser.add_argument("--config", "-c", type=str, default="./available_models/conf.json")
     return parser
 
 
 def main():
     parser = _get_parser()
     args = parser.parse_args()
-    start(args.config, url_root=args.url_root, host=args.ip, port=args.port,
-          debug=args.debug)
+    start(args.config, url_root=args.url_root, host=args.ip, port=args.port, debug=args.debug)
 
 
 if __name__ == "__main__":

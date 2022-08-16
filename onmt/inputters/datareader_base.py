@@ -37,8 +37,8 @@ class DataReaderBase(object):
     def _raise_missing_dep(*missing_deps):
         """Raise missing dep exception with standard error message."""
         raise MissingDependencyException(
-            "Could not create reader. Be sure to install "
-            "the following dependencies: " + ", ".join(missing_deps))
+            "Could not create reader. Be sure to install the following dependencies: " + ", ".join(missing_deps)
+        )
 
     def read(self, data, side):
         """Read data from file system and yield as dicts."""

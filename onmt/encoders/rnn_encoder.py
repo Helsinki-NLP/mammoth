@@ -10,7 +10,7 @@ from onmt.utils.rnn_factory import rnn_factory
 
 
 class RNNEncoder(EncoderBase):
-    """ A generic recurrent neural network encoder.
+    """A generic recurrent neural network encoder.
 
     Args:
        rnn_type (str):
@@ -22,9 +22,9 @@ class RNNEncoder(EncoderBase):
        embeddings (onmt.modules.Embeddings): embedding module to use
     """
 
-    def __init__(self, rnn_type, bidirectional, num_layers,
-                 hidden_size, dropout=0.0, embeddings=None,
-                 use_bridge=False):
+    def __init__(
+        self, rnn_type, bidirectional, num_layers, hidden_size, dropout=0.0, embeddings=None, use_bridge=False
+    ):
         super(RNNEncoder, self).__init__()
         assert embeddings is not None
 
@@ -33,20 +33,19 @@ class RNNEncoder(EncoderBase):
         hidden_size = hidden_size // num_directions
         self.embeddings = embeddings
 
-        self.rnn, self.no_pack_padded_seq = \
-            rnn_factory(rnn_type,
-                        input_size=embeddings.embedding_size,
-                        hidden_size=hidden_size,
-                        num_layers=num_layers,
-                        dropout=dropout,
-                        bidirectional=bidirectional)
+        self.rnn, self.no_pack_padded_seq = rnn_factory(
+            rnn_type,
+            input_size=embeddings.embedding_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+            bidirectional=bidirectional,
+        )
 
         # Initialize the bridge layer
         self.use_bridge = use_bridge
         if self.use_bridge:
-            self._initialize_bridge(rnn_type,
-                                    hidden_size,
-                                    num_layers)
+            self._initialize_bridge(rnn_type, hidden_size, num_layers)
 
     @classmethod
     def from_opt(cls, opt, embeddings):
@@ -58,7 +57,8 @@ class RNNEncoder(EncoderBase):
             opt.enc_rnn_size,
             opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
             embeddings,
-            opt.bridge)
+            opt.bridge,
+        )
 
     def forward(self, src, lengths=None):
         """See :func:`EncoderBase.forward()`"""
@@ -82,9 +82,7 @@ class RNNEncoder(EncoderBase):
             encoder_final = self._bridge(encoder_final)
         return encoder_final, memory_bank, lengths
 
-    def _initialize_bridge(self, rnn_type,
-                           hidden_size,
-                           num_layers):
+    def _initialize_bridge(self, rnn_type, hidden_size, num_layers):
 
         # LSTM has hidden and cell state, other only one
         number_of_states = 2 if rnn_type == "LSTM" else 1
@@ -92,13 +90,13 @@ class RNNEncoder(EncoderBase):
         self.total_hidden_dim = hidden_size * num_layers
 
         # Build a linear layer for each
-        self.bridge = nn.ModuleList([nn.Linear(self.total_hidden_dim,
-                                               self.total_hidden_dim,
-                                               bias=True)
-                                     for _ in range(number_of_states)])
+        self.bridge = nn.ModuleList(
+            [nn.Linear(self.total_hidden_dim, self.total_hidden_dim, bias=True) for _ in range(number_of_states)]
+        )
 
     def _bridge(self, hidden):
         """Forward hidden state through bridge."""
+
         def bottle_hidden(linear, states):
             """
             Transform from 3D to 2D, apply linear and return initial size
@@ -108,8 +106,7 @@ class RNNEncoder(EncoderBase):
             return F.relu(result).view(size)
 
         if isinstance(hidden, tuple):  # LSTM
-            outs = tuple([bottle_hidden(layer, hidden[ix])
-                          for ix, layer in enumerate(self.bridge)])
+            outs = tuple([bottle_hidden(layer, hidden[ix]) for ix, layer in enumerate(self.bridge)])
         else:
             outs = bottle_hidden(self.bridge[0], hidden)
         return outs

@@ -1,0 +1,3 @@
+[tool.pytest.ini_options]
+addopts = "--flake8 -v --ignore-glob docs/**"
+flake8-max-line-length = "120"

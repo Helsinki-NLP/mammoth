@@ -52,15 +52,11 @@ def build_trainer(
         tgt_field = fields['tgt'].fields[0][1]
         train_loss_md.add_module(
             f'trainloss{lang}',
-            onmt.utils.loss.build_loss_compute(
-                model, tgt_field, opt, train=True, generator=generator
-            ),
+            onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=True, generator=generator),
         )
         valid_loss_md.add_module(
             f'valloss{lang}',
-            onmt.utils.loss.build_loss_compute(
-                model, tgt_field, opt, train=False, generator=generator
-            ),
+            onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False, generator=generator),
         )
 
     trunc_size = opt.truncated_decoder  # Badly named...
@@ -80,9 +76,11 @@ def build_trainer(
         n_gpu = 0
     gpu_verbose_level = opt.gpu_verbose_level
 
-    earlystopper = onmt.utils.EarlyStopping(
-        opt.early_stopping, scorers=onmt.utils.scorers_from_opts(opt)) \
-        if opt.early_stopping > 0 else None
+    earlystopper = (
+        onmt.utils.EarlyStopping(opt.early_stopping, scorers=onmt.utils.scorers_from_opts(opt))
+        if opt.early_stopping > 0
+        else None
+    )
 
     report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
     trainer = onmt.Trainer(
@@ -108,7 +106,7 @@ def build_trainer(
         dropout=dropout,
         dropout_steps=dropout_steps,
         scheduler=scheduler,
-        lca_loginterval=opt.lca_loginterval
+        lca_loginterval=opt.lca_loginterval,
     )
     return trainer
 
@@ -139,15 +137,32 @@ class Trainer(object):
                 Thus nothing will be saved if this parameter is None
     """
 
-    def __init__(self, model, train_loss_md, valid_loss_md, optim,
-                 trunc_size=0, shard_size=32,
-                 norm_method="sents", accum_count=[1],
-                 accum_steps=[0],
-                 n_gpu=1, gpu_rank=1, gpu_verbose_level=0,
-                 report_manager=None, with_align=False, model_saver=None,
-                 average_decay=0, average_every=1, model_dtype='fp32',
-                 earlystopper=None, dropout=[0.3], dropout_steps=[0],
-                 scheduler=None, lca_loginterval=-1):
+    def __init__(
+        self,
+        model,
+        train_loss_md,
+        valid_loss_md,
+        optim,
+        trunc_size=0,
+        shard_size=32,
+        norm_method="sents",
+        accum_count=[1],
+        accum_steps=[0],
+        n_gpu=1,
+        gpu_rank=1,
+        gpu_verbose_level=0,
+        report_manager=None,
+        with_align=False,
+        model_saver=None,
+        average_decay=0,
+        average_every=1,
+        model_dtype='fp32',
+        earlystopper=None,
+        dropout=[0.3],
+        dropout_steps=[0],
+        scheduler=None,
+        lca_loginterval=-1,
+    ):
         # Basic attributes.
         self.model = model
         self.train_loss_md = train_loss_md
@@ -179,14 +194,15 @@ class Trainer(object):
         self.my_decoder_groups = my_component_groups['decoder']
         self.my_src_emb_groups = my_component_groups['src_emb']
         self.my_tgt_emb_groups = my_component_groups['tgt_emb']
-        
+
         self.lca_loginterval = lca_loginterval
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
             if self.accum_count_l[i] > 1:
-                assert self.trunc_size == 0, \
-                    """To enable accumulated gradients,
+                assert (
+                    self.trunc_size == 0
+                ), """To enable accumulated gradients,
                        you must disable target sequence truncating."""
 
         # Set model in training mode.
@@ -202,8 +218,7 @@ class Trainer(object):
         for i in range(len(self.dropout_steps)):
             if step > 1 and step == self.dropout_steps[i] + 1:
                 self.model.update_dropout(self.dropout[i])
-                logger.info("Updated dropout to %f from step %d"
-                            % (self.dropout[i], step))
+                logger.info("Updated dropout to %f from step %d" % (self.dropout[i], step))
 
     def _accum_batches(self, iterator):
         batches = []
@@ -231,8 +246,9 @@ class Trainer(object):
             # logger.info(f'appending batch with {metadata}, communication_batch_id {communication_batch_id}')
             batches.append((batch, metadata))
             if self.norm_method == "tokens":
-                num_tokens = batch.tgt[1:, :, 0].ne(
-                    self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
+                num_tokens = (
+                    batch.tgt[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
+                )
                 normalization += num_tokens.item()
             else:
                 normalization += batch.batch_size
@@ -241,25 +257,16 @@ class Trainer(object):
 
     def _update_average(self, step):
         if self.moving_average is None:
-            copy_params = [params.detach().float()
-                           for params in self.model.parameters()]
+            copy_params = [params.detach().float() for params in self.model.parameters()]
             self.moving_average = copy_params
         else:
-            average_decay = max(self.average_decay,
-                                1 - (step + 1) / (step + 10))
-            for (i, avg), cpt in zip(enumerate(self.moving_average),
-                                     self.model.parameters()):
-                self.moving_average[i] = \
-                    (1 - average_decay) * avg + \
-                    cpt.detach().float() * average_decay
+            average_decay = max(self.average_decay, 1 - (step + 1) / (step + 10))
+            for (i, avg), cpt in zip(enumerate(self.moving_average), self.model.parameters()):
+                self.moving_average[i] = (1 - average_decay) * avg + cpt.detach().float() * average_decay
 
-    def train(self,
-              train_iter,
-              train_steps,
-              save_checkpoint_steps=5000,
-              valid_iter=None,
-              valid_steps=10000,
-              global_rank=None):
+    def train(
+        self, train_iter, train_steps, save_checkpoint_steps=5000, valid_iter=None, valid_steps=10000, global_rank=None
+    ):
         """
         The main training loop by iterating over `train_iter` and possibly
         running validation on `valid_iter`.
@@ -278,16 +285,21 @@ class Trainer(object):
         if valid_iter is None:
             logger.info('Start training loop without validation...')
         else:
-            logger.info('Start training loop and validate every %d steps...',
-                        valid_steps)
+            logger.info('Start training loop and validate every %d steps...', valid_steps)
 
         total_stats = onmt.utils.Statistics()
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
         # LCA
         if self.lca_loginterval > 0:
-            lca_logs = {k: dict() for k, v in self.model.named_parameters() if v.requires_grad and 'attention_bridge' in k}
-            lca_params = {k: torch.zeros_like(v.data) for k, v in self.model.named_parameters() if v.requires_grad and 'attention_bridge' in k}
+            lca_logs = {
+                k: dict() for k, v in self.model.named_parameters() if v.requires_grad and 'attention_bridge' in k
+            }
+            lca_params = {
+                k: torch.zeros_like(v.data)
+                for k, v in self.model.named_parameters()
+                if v.requires_grad and 'attention_bridge' in k
+            }
         # /LCA
         self.optim.zero_grad()
         trainEnum = enumerate(self._accum_batches(train_iter))
@@ -302,9 +314,11 @@ class Trainer(object):
             #   2. train step; grad = ∇_t, params: θ_{t+1}
             #   3. log changelca_params = (θ_{t+1} - θ_t) * ∇_t
             if self.lca_loginterval > 0:
-                theta_t = {k: v.data.clone() 
-                    for k, v in self.model.named_parameters() 
-                    if v.requires_grad and k.find('attention_bridge') >= 0}
+                theta_t = {
+                    k: v.data.clone()
+                    for k, v in self.model.named_parameters()
+                    if v.requires_grad and k.find('attention_bridge') >= 0
+                }
             # /LCA
 
             i, (batches_with_meta, normalization) = next(trainEnum)
@@ -319,72 +333,55 @@ class Trainer(object):
 
             for encoder_id, (_, group) in self.my_encoder_groups:
                 grads = [
-                    p.grad.data for name, p
-                    in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
+                    p.grad.data
+                    for name, p in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
                     if 'embeddings' not in name and p.requires_grad and p.grad is not None
                 ]
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                    grads, rescale_denom=1.0, group=group
-                )
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
             for decoder_id, (_, group) in self.my_decoder_groups:
                 grads = [
-                    p.grad.data for name, p
-                    in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
+                    p.grad.data
+                    for name, p in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
                     if 'embeddings' not in name and p.requires_grad and p.grad is not None
                 ]
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                    grads, rescale_denom=1.0, group=group
-                )
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
             for src_emb_id, (_, group) in self.my_src_emb_groups:
                 src_lang, encoder_id = src_emb_id
                 embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
-                grads = [
-                    p.grad.data for p in embs.parameters()
-                    if p.requires_grad and p.grad is not None
-                ]
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                    grads, rescale_denom=1.0, group=group
-                )
+                grads = [p.grad.data for p in embs.parameters() if p.requires_grad and p.grad is not None]
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
             for tgt_emb_id, (_, group) in self.my_tgt_emb_groups:
                 tgt_lang, decoder_id = tgt_emb_id
                 embs = self.model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
+                grads = [p.grad.data for p in embs.parameters() if p.requires_grad and p.grad is not None]
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
                 grads = [
-                    p.grad.data for p in embs.parameters()
+                    p.grad.data
+                    for p in self.model.generator[f'generator{tgt_lang}'].parameters()
                     if p.requires_grad and p.grad is not None
                 ]
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                    grads, rescale_denom=1.0, group=group
-                )
-                grads = [
-                    p.grad.data for p
-                    in self.model.generator[f'generator{tgt_lang}'].parameters()
-                    if p.requires_grad and p.grad is not None
-                ]
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                    grads, rescale_denom=1.0, group=group
-                )
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
 
             grads = [
-                p.grad.data for p in self.model.attention_bridge.parameters()
-                if p.requires_grad and p.grad is not None
+                p.grad.data for p in self.model.attention_bridge.parameters() if p.requires_grad and p.grad is not None
             ]
             if grads and self.scheduler.node_rank is not None and self.scheduler.local_rank is not None:
                 # a group is not specified: reduce across all devices
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(
-                    grads, rescale_denom=1.0
-                )
+                onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0)
 
             # LCA
-            if (self.lca_loginterval>0) and (step%self.lca_loginterval==0) and (global_rank==0):
+            if (self.lca_loginterval > 0) and (step % self.lca_loginterval == 0) and (global_rank == 0):
                 for k, v in self.model.named_parameters():
                     if not v.requires_grad or isinstance(v.grad, type(None)) or k.find('attention_bridge') < 0:
                         continue
                     lca_params[k] = (v.data - theta_t[k]) * v.grad
-                
-                # dump logs at each checkpoint and 10 times during training            
-                dump_logs=((step%(train_steps//10) == 0) or (save_checkpoint_steps!=0 and step%save_checkpoint_steps==0))
+
+                # dump logs at each checkpoint and 10 times during training
+                dump_logs = (step % (train_steps // 10) == 0) or (
+                    save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0
+                )
                 dumppath = f'{self.model_saver.base_path}_lca_logs.json'
-                onmt.utils.logging.log_lca_values(step, lca_logs, lca_params, dumppath, dump_logs)                    
+                onmt.utils.logging.log_lca_values(step, lca_logs, lca_params, dumppath, dump_logs)
 
             # /LCA
 
@@ -395,8 +392,7 @@ class Trainer(object):
                 logger.info(f'After gradient sync {step}')
                 for name, p in self.model.named_parameters():
                     logger.info(
-                        f'{self.scheduler.node_rank}:{self.scheduler.local_rank}'
-                        f' {name}: {p.flatten()[:10]}'
+                        f'{self.scheduler.node_rank}:{self.scheduler.local_rank}' f' {name}: {p.flatten()[:10]}'
                     )
 
             if self.average_decay > 0 and i % self.average_every == 0:
@@ -431,9 +427,7 @@ class Trainer(object):
             #         if self.earlystopper.has_stopped():
             #             break
 
-            if (self.model_saver is not None
-                    and (save_checkpoint_steps != 0
-                         and step % save_checkpoint_steps == 0)):
+            if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
                 self.model_saver.save(step, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
@@ -444,7 +438,7 @@ class Trainer(object):
         return total_stats
 
     def validate(self, valid_iter, moving_average=None, sourceLang=None, targetLang=None):
-        """ Validate model.
+        """Validate model.
             valid_iter: validate data iterator
         Returns:
             :obj:`nmt.Statistics`: validation loss statistics
@@ -454,41 +448,38 @@ class Trainer(object):
             # swap model params w/ moving average
             # (and keep the original parameters)
             model_params_data = []
-            for avg, param in zip(self.moving_average,
-                                  valid_model.parameters()):
+            for avg, param in zip(self.moving_average, valid_model.parameters()):
                 model_params_data.append(param.data)
-                param.data = avg.data.half() if self.optim._fp16 == "legacy" \
-                    else avg.data
-    
+                param.data = avg.data.half() if self.optim._fp16 == "legacy" else avg.data
+
         # Set model in validating mode.
         valid_model.eval()
-    
+
         with torch.no_grad():
             stats = onmt.utils.Statistics()
-    
+
             for batch in valid_iter:
-                src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                    else (batch.src, None)
+                src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
                 tgt = batch.tgt
-    
+
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     # F-prop through the model.
-                    outputs, attns = valid_model(src, tgt, src_lengths,
-                                                 with_align=self.with_align, src_task=sourceLang, tgt_task=targetLang)
-    
+                    outputs, attns = valid_model(
+                        src, tgt, src_lengths, with_align=self.with_align, src_task=sourceLang, tgt_task=targetLang
+                    )
+
                     # Compute loss.
                     _, batch_stats = self.valid_loss_md["valloss" + targetLang](batch, outputs, attns)
-    
+
                 # Update statistics.
                 stats.update(batch_stats)
         if moving_average:
-            for param_data, param in zip(model_params_data,
-                                         self.model.parameters()):
+            for param_data, param in zip(model_params_data, self.model.parameters()):
                 param.data = param_data
-    
+
         # Set model back to training mode.
         valid_model.train()
-    
+
         return stats
 
     def _gradient_accumulation_overLangPair(
@@ -508,8 +499,7 @@ class Trainer(object):
             else:
                 trunc_size = target_size
 
-            src, src_lengths = batch.src if isinstance(batch.src, tuple) \
-                else (batch.src, None)
+            src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
 
@@ -518,13 +508,11 @@ class Trainer(object):
             bptt = False
             for j in range(0, target_size - 1, trunc_size):
                 # 1. Create truncated target.
-                tgt = tgt_outer[j: j + trunc_size]
+                tgt = tgt_outer[j:(j + trunc_size)]
                 # TODO: AMP == TRUE If fp16
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     outputs, attns = self.model(
-                        src, tgt, src_lengths, bptt=bptt,
-                        with_align=self.with_align,
-                        metadata=metadata
+                        src, tgt, src_lengths, bptt=bptt, with_align=self.with_align, metadata=metadata
                     )
                     bptt = True
 
@@ -536,7 +524,8 @@ class Trainer(object):
                         normalization=normalization,
                         shard_size=self.shard_size,
                         trunc_start=j,
-                        trunc_size=trunc_size)
+                        trunc_size=trunc_size,
+                    )
                     # logger.info(loss)
 
                 try:
@@ -548,8 +537,7 @@ class Trainer(object):
 
                 except Exception:
                     traceback.print_exc()
-                    logger.info("At step %d, we removed a batch - accum %d",
-                                self.training_step_all, k)
+                    logger.info("At step %d, we removed a batch - accum %d", self.training_step_all, k)
 
                 # If truncated, don't backprop fully.
                 if self.model.decoder[f'decoder{metadata.decoder_id}'].state is not None:
@@ -580,8 +568,7 @@ class Trainer(object):
             return onmt.utils.Statistics.all_gather_stats(stat)
         return stat
 
-    def _maybe_report_training(self, step, num_steps, learning_rate,
-                               report_stats):
+    def _maybe_report_training(self, step, num_steps, learning_rate, report_stats):
         """
         Simple function to report training stats (if report_manager is set)
         see `onmt.utils.ReportManagerBase.report_training` for doc
@@ -591,13 +578,12 @@ class Trainer(object):
                 step,
                 num_steps,
                 learning_rate,
-                None if self.earlystopper is None
-                else self.earlystopper.current_tolerance,
+                None if self.earlystopper is None else self.earlystopper.current_tolerance,
                 report_stats,
-                multigpu=self.n_gpu > 1)
+                multigpu=self.n_gpu > 1,
+            )
 
-    def _report_step(self, learning_rate, step, train_stats=None,
-                     valid_stats=None):
+    def _report_step(self, learning_rate, step, train_stats=None, valid_stats=None):
         """
         Simple function to report stats (if report_manager is set)
         see `onmt.utils.ReportManagerBase.report_step` for doc
@@ -605,7 +591,8 @@ class Trainer(object):
         if self.report_manager is not None:
             return self.report_manager.report_step(
                 learning_rate,
-                None if self.earlystopper is None
-                else self.earlystopper.current_tolerance,
-                step, train_stats=train_stats,
-                valid_stats=valid_stats)
+                None if self.earlystopper is None else self.earlystopper.current_tolerance,
+                step,
+                train_stats=train_stats,
+                valid_stats=valid_stats,
+            )

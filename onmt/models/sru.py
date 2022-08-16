@@ -40,17 +40,14 @@ def check_sru_requirement(abort=False):
     try:
         if platform.system() == 'Windows':
             subprocess.check_output('pip freeze | findstr cupy', shell=True)
-            subprocess.check_output('pip freeze | findstr pynvrtc',
-                                    shell=True)
+            subprocess.check_output('pip freeze | findstr pynvrtc', shell=True)
         else:  # Unix-like systems
             subprocess.check_output('pip freeze | grep -w cupy', shell=True)
-            subprocess.check_output('pip freeze | grep -w pynvrtc',
-                                    shell=True)
+            subprocess.check_output('pip freeze | grep -w pynvrtc', shell=True)
     except subprocess.CalledProcessError:
         if not abort:
             return False
-        raise AssertionError("Using SRU requires 'cupy' and 'pynvrtc' "
-                             "python packages installed.")
+        raise AssertionError("Using SRU requires 'cupy' and 'pynvrtc' python packages installed.")
 
     # Check 2.
     if torch.cuda.is_available() is False:
@@ -64,8 +61,9 @@ def check_sru_requirement(abort=False):
     if re.match(pattern, ld_path) is None:
         if not abort:
             return False
-        raise AssertionError("Using SRU requires setting cuda lib path, e.g. "
-                             "export LD_LIBRARY_PATH=/usr/local/cuda/lib64.")
+        raise AssertionError(
+            "Using SRU requires setting cuda lib path, e.g. export LD_LIBRARY_PATH=/usr/local/cuda/lib64."
+        )
 
     return True
 
@@ -362,8 +360,7 @@ def load_sru_mod():
         device = torch.device("cuda")
         tmp_ = torch.rand(1, 1).to(device)
 
-        sru_prog = Program(SRU_CODE.encode('utf-8'),
-                           'sru_prog.cu'.encode('utf-8'))
+        sru_prog = Program(SRU_CODE.encode('utf-8'), 'sru_prog.cu'.encode('utf-8'))
         sru_ptx = sru_prog.compile()
         sru_mod = function.Module()
         sru_mod.load(bytes(sru_ptx.encode()))
@@ -378,7 +375,6 @@ def load_sru_mod():
 
 
 class SRU_Compute(Function):
-
     def __init__(self, activation_type, d_out, bidirectional=False):
         SRU_Compute.maybe_load_sru_mod()
         super(SRU_Compute, self).__init__()
@@ -411,21 +407,24 @@ class SRU_Compute(Function):
         h = x.new(*size)
 
         FUNC = SRU_FWD_FUNC if not self.bidirectional else SRU_BiFWD_FUNC
-        FUNC(args=[
-            u.contiguous().data_ptr(),
-            x.contiguous().data_ptr() if k_ == 3 else 0,
-            bias.data_ptr(),
-            init_.contiguous().data_ptr(),
-            mask_h.data_ptr() if mask_h is not None else 0,
-            length,
-            batch,
-            d,
-            k_,
-            h.data_ptr(),
-            c.data_ptr(),
-            self.activation_type],
-            block=(thread_per_block, 1, 1), grid=(num_block, 1, 1),
-            stream=SRU_STREAM
+        FUNC(
+            args=[
+                u.contiguous().data_ptr(),
+                x.contiguous().data_ptr() if k_ == 3 else 0,
+                bias.data_ptr(),
+                init_.contiguous().data_ptr(),
+                mask_h.data_ptr() if mask_h is not None else 0,
+                length,
+                batch,
+                d,
+                k_,
+                h.data_ptr(),
+                c.data_ptr(),
+                self.activation_type,
+            ],
+            block=(thread_per_block, 1, 1),
+            grid=(num_block, 1, 1),
+            stream=SRU_STREAM,
         )
 
         self.save_for_backward(u, x, bias, init, mask_h)
@@ -469,33 +468,35 @@ class SRU_Compute(Function):
         grad_x = x.new(*x.size()) if k_ == 3 else None
 
         FUNC = SRU_BWD_FUNC if not self.bidirectional else SRU_BiBWD_FUNC
-        FUNC(args=[
-            u.contiguous().data_ptr(),
-            x.contiguous().data_ptr() if k_ == 3 else 0,
-            bias.data_ptr(),
-            init_.contiguous().data_ptr(),
-            mask_h.data_ptr() if mask_h is not None else 0,
-            c.data_ptr(),
-            grad_h.contiguous().data_ptr(),
-            grad_last.contiguous().data_ptr(),
-            length,
-            batch,
-            d,
-            k_,
-            grad_u.data_ptr(),
-            grad_x.data_ptr() if k_ == 3 else 0,
-            grad_bias.data_ptr(),
-            grad_init.data_ptr(),
-            self.activation_type],
-            block=(thread_per_block, 1, 1), grid=(num_block, 1, 1),
-            stream=SRU_STREAM
+        FUNC(
+            args=[
+                u.contiguous().data_ptr(),
+                x.contiguous().data_ptr() if k_ == 3 else 0,
+                bias.data_ptr(),
+                init_.contiguous().data_ptr(),
+                mask_h.data_ptr() if mask_h is not None else 0,
+                c.data_ptr(),
+                grad_h.contiguous().data_ptr(),
+                grad_last.contiguous().data_ptr(),
+                length,
+                batch,
+                d,
+                k_,
+                grad_u.data_ptr(),
+                grad_x.data_ptr() if k_ == 3 else 0,
+                grad_bias.data_ptr(),
+                grad_init.data_ptr(),
+                self.activation_type,
+            ],
+            block=(thread_per_block, 1, 1),
+            grid=(num_block, 1, 1),
+            stream=SRU_STREAM,
         )
         return grad_u, grad_x, grad_bias.sum(1).view(-1), grad_init, None
 
 
 class SRUCell(nn.Module):
-    def __init__(self, n_in, n_out, dropout=0, rnn_dropout=0,
-                 bidirectional=False, use_tanh=1, use_relu=0):
+    def __init__(self, n_in, n_out, dropout=0, rnn_dropout=0, bidirectional=False, use_tanh=1, use_relu=0):
         super(SRUCell, self).__init__()
         self.n_in = n_in
         self.n_out = n_out
@@ -507,24 +508,19 @@ class SRUCell(nn.Module):
         out_size = n_out * 2 if bidirectional else n_out
         k = 4 if n_in != out_size else 3
         self.size_per_dir = n_out * k
-        self.weight = nn.Parameter(torch.Tensor(
-            n_in,
-            self.size_per_dir * 2 if bidirectional else self.size_per_dir
-        ))
-        self.bias = nn.Parameter(torch.Tensor(
-            n_out * 4 if bidirectional else n_out * 2
-        ))
+        self.weight = nn.Parameter(torch.Tensor(n_in, self.size_per_dir * 2 if bidirectional else self.size_per_dir))
+        self.bias = nn.Parameter(torch.Tensor(n_out * 4 if bidirectional else n_out * 2))
         self.init_weight()
 
     def init_weight(self):
-        val_range = (3.0 / self.n_in)**0.5
+        val_range = (3.0 / self.n_in) ** 0.5
         self.weight.data.uniform_(-val_range, val_range)
         self.bias.data.zero_()
 
     def set_bias(self, bias_val=0):
         n_out = self.n_out
         if self.bidirectional:
-            self.bias.data[n_out * 2:].zero_().add_(bias_val)
+            self.bias.data[n_out * 2 :].zero_().add_(bias_val)
         else:
             self.bias.data[n_out:].zero_().add_(bias_val)
 
@@ -533,9 +529,7 @@ class SRUCell(nn.Module):
         n_in, n_out = self.n_in, self.n_out
         batch = input.size(-2)
         if c0 is None:
-            c0 = input.data.new(
-                batch, n_out if not self.bidirectional else n_out * 2
-            ).zero_()
+            c0 = input.data.new(batch, n_out if not self.bidirectional else n_out * 2).zero_()
 
         if self.training and (self.rnn_dropout > 0):
             mask = self.get_dropout_mask_((batch, n_in), self.rnn_dropout)
@@ -548,17 +542,10 @@ class SRUCell(nn.Module):
 
         if self.training and (self.dropout > 0):
             bidir = 2 if self.bidirectional else 1
-            mask_h = self.get_dropout_mask_(
-                (batch, n_out * bidir), self.dropout)
-            h, c = SRU_Compute(self.activation_type, n_out,
-                               self.bidirectional)(
-                                   u, input, self.bias, c0, mask_h
-            )
+            mask_h = self.get_dropout_mask_((batch, n_out * bidir), self.dropout)
+            h, c = SRU_Compute(self.activation_type, n_out, self.bidirectional)(u, input, self.bias, c0, mask_h)
         else:
-            h, c = SRU_Compute(self.activation_type, n_out,
-                               self.bidirectional)(
-                                   u, input, self.bias, c0
-            )
+            h, c = SRU_Compute(self.activation_type, n_out, self.bidirectional)(u, input, self.bias, c0)
 
         return h, c
 
@@ -588,9 +575,17 @@ class SRU(nn.Module):
       use_relu (bool): activation
     """
 
-    def __init__(self, input_size, hidden_size,
-                 num_layers=2, dropout=0, rnn_dropout=0,
-                 bidirectional=False, use_tanh=1, use_relu=0):
+    def __init__(
+        self,
+        input_size,
+        hidden_size,
+        num_layers=2,
+        dropout=0,
+        rnn_dropout=0,
+        bidirectional=False,
+        use_tanh=1,
+        use_relu=0,
+    ):
         # An entry check here, will catch on train side and translate side
         # if requirements are not satisfied.
         check_sru_requirement(abort=True)
@@ -624,15 +619,13 @@ class SRU(nn.Module):
         assert input.dim() == 3  # (len, batch, n_in)
         dir_ = 2 if self.bidirectional else 1
         if c0 is None:
-            zeros = input.data.new(
-                input.size(1), self.n_out * dir_
-            ).zero_()
+            zeros = input.data.new(input.size(1), self.n_out * dir_).zero_()
             c0 = [zeros for i in range(self.depth)]
         else:
             if isinstance(c0, tuple):
                 # RNNDecoderState wraps hidden as a tuple.
                 c0 = c0[0]
-            assert c0.dim() == 3    # (depth, batch, dir_*n_out)
+            assert c0.dim() == 3  # (depth, batch, dir_*n_out)
             c0 = [h.squeeze(0) for h in c0.chunk(self.depth, 0)]
 
         prevx = input

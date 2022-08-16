@@ -12,6 +12,7 @@ from torchtext.vocab import Vocab
 from onmt.constants import DefaultTokens, ModelTask
 from onmt.inputters.text_dataset import text_fields
 from onmt.utils.logging import logger
+
 # backwards compatibility
 from onmt.inputters.text_dataset import _feature_tokenize  # noqa: F401
 
@@ -46,7 +47,7 @@ def make_tgt(data, vocab):
     tgt_size = max([t.size(0) for t in data])
     alignment = torch.zeros(tgt_size, len(data)).long()
     for i, sent in enumerate(data):
-        alignment[:sent.size(0), i] = sent
+        alignment[: sent.size(0), i] = sent
     return alignment
 
 
@@ -61,7 +62,7 @@ class AlignField(LabelField):
         super(AlignField, self).__init__(**kwargs)
 
     def process(self, batch, device=None):
-        """ Turn a batch of align-idx to a sparse align idx Tensor"""
+        """Turn a batch of align-idx to a sparse align idx Tensor"""
         sparse_idx = []
         for i, example in enumerate(batch):
             for src, tgt in example:
@@ -120,7 +121,7 @@ def get_fields(
     with_align=False,
     src_truncate=None,
     tgt_truncate=None,
-    data_task=ModelTask.SEQ2SEQ
+    data_task=ModelTask.SEQ2SEQ,
 ):
     """
     Args:
@@ -148,10 +149,8 @@ def get_fields(
         the dataset example attributes.
     """
 
-    assert src_data_type in ['text'], \
-        "Data type not implemented"
-    assert not dynamic_dict or src_data_type == 'text', \
-        'it is not possible to use dynamic_dict with non-text input'
+    assert src_data_type in ['text'], "Data type not implemented"
+    assert not dynamic_dict or src_data_type == 'text', 'It is not possible to use dynamic_dict with non-text input'
     fields = {}
 
     fields_getters = {"text": text_fields}
@@ -183,17 +182,13 @@ def get_fields(
     fields["indices"] = indices
 
     if dynamic_dict:
-        src_map = Field(
-            use_vocab=False, dtype=torch.float,
-            postprocessing=make_src, sequential=False)
+        src_map = Field(use_vocab=False, dtype=torch.float, postprocessing=make_src, sequential=False)
         fields["src_map"] = src_map
 
         src_ex_vocab = RawField()
         fields["src_ex_vocab"] = src_ex_vocab
 
-        align = Field(
-            use_vocab=False, dtype=torch.long,
-            postprocessing=make_tgt, sequential=False)
+        align = Field(use_vocab=False, dtype=torch.long, postprocessing=make_tgt, sequential=False)
         fields["alignment"] = align
 
     if with_align:
@@ -215,22 +210,17 @@ class IterOnDevice(object):
         """Move `batch` to `device_id`, cpu if `device_id` < 0."""
         curr_device = batch.tgt.device
         device_id = device_id if device_id is not None else -1
-        device = torch.device(device_id) if device_id >= 0 \
-            else torch.device('cpu')
+        device = torch.device(device_id) if device_id >= 0 else torch.device('cpu')
         if curr_device != device:
             if isinstance(batch.src, tuple):
                 batch.src = tuple([_.to(device) for _ in batch.src])
             else:
                 batch.src = batch.src.to(device)
             batch.tgt = batch.tgt.to(device)
-            batch.indices = batch.indices.to(device) \
-                if hasattr(batch, 'indices') else None
-            batch.alignment = batch.alignment.to(device) \
-                if hasattr(batch, 'alignment') else None
-            batch.src_map = batch.src_map.to(device) \
-                if hasattr(batch, 'src_map') else None
-            batch.align = batch.align.to(device) \
-                if hasattr(batch, 'align') else None
+            batch.indices = batch.indices.to(device) if hasattr(batch, 'indices') else None
+            batch.alignment = batch.alignment.to(device) if hasattr(batch, 'alignment') else None
+            batch.src_map = batch.src_map.to(device) if hasattr(batch, 'src_map') else None
+            batch.align = batch.align.to(device) if hasattr(batch, 'align') else None
 
     def __iter__(self):
         for batch, metadata, communication_batch_id in self.iterable:
@@ -238,9 +228,15 @@ class IterOnDevice(object):
             yield batch, metadata, communication_batch_id
 
 
-def filter_example(ex, use_src_len=True, use_tgt_len=True,
-                   min_src_len=1, max_src_len=float('inf'),
-                   min_tgt_len=1, max_tgt_len=float('inf')):
+def filter_example(
+    ex,
+    use_src_len=True,
+    use_tgt_len=True,
+    min_src_len=1,
+    max_src_len=float('inf'),
+    min_tgt_len=1,
+    max_tgt_len=float('inf'),
+):
     """Return whether an example is an acceptable length.
 
     If used with a dataset as ``filter_pred``, use :func:`partial()`
@@ -262,8 +258,9 @@ def filter_example(ex, use_src_len=True, use_tgt_len=True,
 
     src_len = len(ex.src[0])
     tgt_len = len(ex.tgt[0])
-    return (not use_src_len or min_src_len <= src_len <= max_src_len) and \
-        (not use_tgt_len or min_tgt_len <= tgt_len <= max_tgt_len)
+    return (not use_src_len or min_src_len <= src_len <= max_src_len) and (
+        not use_tgt_len or min_tgt_len <= tgt_len <= max_tgt_len
+    )
 
 
 def _pad_vocab_to_multiple(vocab, multiple):
@@ -271,20 +268,16 @@ def _pad_vocab_to_multiple(vocab, multiple):
     if vocab_size % multiple == 0:
         return
     target_size = int(math.ceil(vocab_size / multiple)) * multiple
-    padding_tokens = ["{}{}".format(DefaultTokens.VOCAB_PAD, i)
-                      for i in range(target_size - vocab_size)]
+    padding_tokens = ["{}{}".format(DefaultTokens.VOCAB_PAD, i) for i in range(target_size - vocab_size)]
     vocab.extend(Vocab(Counter(), specials=padding_tokens))
     return vocab
 
 
 def _build_field_vocab(field, counter, size_multiple=1, **kwargs):
     # this is basically copy-pasted from torchtext.
-    all_special = [
-        field.unk_token, field.pad_token, field.init_token, field.eos_token
-    ]
+    all_special = [field.unk_token, field.pad_token, field.init_token, field.eos_token]
     all_special.extend(list(kwargs.pop('specials', [])))
-    specials = list(OrderedDict.fromkeys(
-        tok for tok in all_special if tok is not None))
+    specials = list(OrderedDict.fromkeys(tok for tok in all_special if tok is not None))
     field.vocab = field.vocab_cls(counter, specials=specials, **kwargs)
     if size_multiple > 1:
         _pad_vocab_to_multiple(field.vocab, size_multiple)
@@ -317,45 +310,40 @@ def _load_vocab(vocab_path, name, counters, min_freq=0):
     return vocab, vocab_size
 
 
-def _build_fv_from_multifield(multifield, counters, build_fv_kwargs,
-                              size_multiple=1):
+def _build_fv_from_multifield(multifield, counters, build_fv_kwargs, size_multiple=1):
     for name, field in multifield:
-        _build_field_vocab(
-            field,
-            counters[name],
-            size_multiple=size_multiple,
-            **build_fv_kwargs[name])
+        _build_field_vocab(field, counters[name], size_multiple=size_multiple, **build_fv_kwargs[name])
         logger.info(" * %s vocab size: %d." % (name, len(field.vocab)))
 
 
-def _build_fields_vocab(fields, counters, data_type, share_vocab,
-                        vocab_size_multiple,
-                        src_vocab_size, src_words_min_frequency,
-                        tgt_vocab_size, tgt_words_min_frequency,
-                        src_specials=None, tgt_specials=None):
+def _build_fields_vocab(
+    fields,
+    counters,
+    data_type,
+    share_vocab,
+    vocab_size_multiple,
+    src_vocab_size,
+    src_words_min_frequency,
+    tgt_vocab_size,
+    tgt_words_min_frequency,
+    src_specials=None,
+    tgt_specials=None,
+):
     src_specials = list(src_specials) if src_specials is not None else []
     tgt_specials = list(tgt_specials) if tgt_specials is not None else []
     build_fv_kwargs = defaultdict(dict)
-    build_fv_kwargs["src"] = dict(
-        max_size=src_vocab_size, min_freq=src_words_min_frequency,
-        specials=src_specials)
-    build_fv_kwargs["tgt"] = dict(
-        max_size=tgt_vocab_size, min_freq=tgt_words_min_frequency,
-        specials=tgt_specials)
+    build_fv_kwargs["src"] = dict(max_size=src_vocab_size, min_freq=src_words_min_frequency, specials=src_specials)
+    build_fv_kwargs["tgt"] = dict(max_size=tgt_vocab_size, min_freq=tgt_words_min_frequency, specials=tgt_specials)
     tgt_multifield = fields["tgt"]
     _build_fv_from_multifield(
-        tgt_multifield,
-        counters,
-        build_fv_kwargs,
-        size_multiple=vocab_size_multiple if not share_vocab else 1)
+        tgt_multifield, counters, build_fv_kwargs, size_multiple=vocab_size_multiple if not share_vocab else 1
+    )
 
     if data_type == 'text':
         src_multifield = fields["src"]
         _build_fv_from_multifield(
-            src_multifield,
-            counters,
-            build_fv_kwargs,
-            size_multiple=vocab_size_multiple if not share_vocab else 1)
+            src_multifield, counters, build_fv_kwargs, size_multiple=vocab_size_multiple if not share_vocab else 1
+        )
 
         if share_vocab:
             # `tgt_vocab_size` is ignored when sharing vocabularies
@@ -364,19 +352,31 @@ def _build_fields_vocab(fields, counters, data_type, share_vocab,
             tgt_field = tgt_multifield.base_field
             _all_specials = [item for item in src_specials + tgt_specials]
             _merge_field_vocabs(
-                src_field, tgt_field, vocab_size=src_vocab_size,
+                src_field,
+                tgt_field,
+                vocab_size=src_vocab_size,
                 min_freq=src_words_min_frequency,
                 vocab_size_multiple=vocab_size_multiple,
-                specials=_all_specials)
+                specials=_all_specials,
+            )
             logger.info(" * merged vocab size: %d." % len(src_field.vocab))
 
     return fields
 
 
-def build_vocab(train_dataset_files, fields, data_type, share_vocab,
-                src_vocab_path, src_vocab_size, src_words_min_frequency,
-                tgt_vocab_path, tgt_vocab_size, tgt_words_min_frequency,
-                vocab_size_multiple=1):
+def build_vocab(
+    train_dataset_files,
+    fields,
+    data_type,
+    share_vocab,
+    src_vocab_path,
+    src_vocab_size,
+    src_words_min_frequency,
+    tgt_vocab_path,
+    tgt_vocab_size,
+    tgt_words_min_frequency,
+    vocab_size_multiple=1,
+):
     """Build the fields for all data sides.
 
     Args:
@@ -415,16 +415,12 @@ def build_vocab(train_dataset_files, fields, data_type, share_vocab,
 
     # Load vocabulary
     if src_vocab_path:
-        src_vocab, src_vocab_size = _load_vocab(
-            src_vocab_path, "src", counters,
-            src_words_min_frequency)
+        src_vocab, src_vocab_size = _load_vocab(src_vocab_path, "src", counters, src_words_min_frequency)
     else:
         src_vocab = None
 
     if tgt_vocab_path:
-        tgt_vocab, tgt_vocab_size = _load_vocab(
-            tgt_vocab_path, "tgt", counters,
-            tgt_words_min_frequency)
+        tgt_vocab, tgt_vocab_size = _load_vocab(tgt_vocab_path, "tgt", counters, tgt_words_min_frequency)
     else:
         tgt_vocab = None
 
@@ -440,10 +436,8 @@ def build_vocab(train_dataset_files, fields, data_type, share_vocab,
                     all_data = [getattr(ex, name, None)]
                 else:
                     all_data = getattr(ex, name)
-                for (sub_n, sub_f), fd in zip(
-                        f_iter, all_data):
-                    has_vocab = (sub_n == 'src' and src_vocab) or \
-                                (sub_n == 'tgt' and tgt_vocab)
+                for (sub_n, sub_f), fd in zip(f_iter, all_data):
+                    has_vocab = (sub_n == 'src' and src_vocab) or (sub_n == 'tgt' and tgt_vocab)
                     if sub_f.sequential and not has_vocab:
                         val = fd
                         counters[sub_n].update(val)
@@ -458,30 +452,27 @@ def build_vocab(train_dataset_files, fields, data_type, share_vocab,
             gc.collect()
 
     fields = _build_fields_vocab(
-        fields, counters, data_type,
-        share_vocab, vocab_size_multiple,
-        src_vocab_size, src_words_min_frequency,
-        tgt_vocab_size, tgt_words_min_frequency)
+        fields,
+        counters,
+        data_type,
+        share_vocab,
+        vocab_size_multiple,
+        src_vocab_size,
+        src_words_min_frequency,
+        tgt_vocab_size,
+        tgt_words_min_frequency,
+    )
 
     return fields  # is the return necessary?
 
 
-def _merge_field_vocabs(src_field, tgt_field, vocab_size, min_freq,
-                        vocab_size_multiple, specials):
+def _merge_field_vocabs(src_field, tgt_field, vocab_size, min_freq, vocab_size_multiple, specials):
     # in the long run, shouldn't it be possible to do this by calling
     # build_vocab with both the src and tgt data?
-    init_specials = [tgt_field.unk_token, tgt_field.pad_token,
-                     tgt_field.init_token, tgt_field.eos_token]
-    all_specials = list(OrderedDict.fromkeys(
-        tok for tok in init_specials + specials
-        if tok is not None))
-    merged = sum(
-        [src_field.vocab.freqs, tgt_field.vocab.freqs], Counter()
-    )
-    merged_vocab = Vocab(
-        merged, specials=all_specials,
-        max_size=vocab_size, min_freq=min_freq
-    )
+    init_specials = [tgt_field.unk_token, tgt_field.pad_token, tgt_field.init_token, tgt_field.eos_token]
+    all_specials = list(OrderedDict.fromkeys(tok for tok in init_specials + specials if tok is not None))
+    merged = sum([src_field.vocab.freqs, tgt_field.vocab.freqs], Counter())
+    merged_vocab = Vocab(merged, specials=all_specials, max_size=vocab_size, min_freq=min_freq)
     if vocab_size_multiple > 1:
         _pad_vocab_to_multiple(merged_vocab, vocab_size_multiple)
     src_field.vocab = merged_vocab
@@ -502,13 +493,12 @@ def _read_vocab_file(vocab_path, tag):
     logger.info("Loading {} vocabulary from {}".format(tag, vocab_path))
 
     if not os.path.exists(vocab_path):
-        raise RuntimeError(
-            "{} vocabulary not found at {}".format(tag, vocab_path))
+        raise RuntimeError("{} vocabulary not found at {}".format(tag, vocab_path))
     else:
         with codecs.open(vocab_path, 'r', 'utf-8') as f:
             lines = [line.strip() for line in f if line.strip()]
             first_line = lines[0].split(None, 1)
-            has_count = (len(first_line) == 2 and first_line[-1].isdigit())
+            has_count = len(first_line) == 2 and first_line[-1].isdigit()
             if has_count:
                 vocab = [line.split(None, 1) for line in lines]
             else:

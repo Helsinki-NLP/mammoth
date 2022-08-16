@@ -24,13 +24,11 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
         if not os.path.isdir(os.path.dirname(opt.output)):
             logger.info('WARNING: output file directory does not exist... creating it.')
-            os.makedirs( os.path.dirname(opt.output), exist_ok=True )
+            os.makedirs(os.path.dirname(opt.output), exist_ok=True)
         out_file = codecs.open(opt.output, "w+", "utf-8")
 
     load_test_model = (
-        onmt.decoders.ensemble.load_test_model
-        if len(opt.models) > 3
-        else onmt.model_builder.load_test_multitask_model
+        onmt.decoders.ensemble.load_test_model if len(opt.models) > 3 else onmt.model_builder.load_test_multitask_model
     )
     fields, model, model_opt = load_test_model(opt)
 
@@ -58,7 +56,8 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
             out_file=out_file,
             report_align=opt.report_align,
             report_score=report_score,
-            logger=logger, langpair=opt.lang_pair,
+            logger=logger,
+            langpair=opt.lang_pair,
         )
     return translator
 
@@ -154,7 +153,8 @@ class Inference(object):
         report_align=False,
         report_score=True,
         logger=None,
-        seed=-1, langpair = None,
+        seed=-1,
+        langpair=None,
     ):
         self.langpair = langpair
         self.langENC = str(langpair).split("-")[0]
@@ -174,11 +174,7 @@ class Inference(object):
 
         self._gpu = gpu
         self._use_cuda = gpu > -1
-        self._dev = (
-            torch.device("cuda", self._gpu)
-            if self._use_cuda
-            else torch.device("cpu")
-        )
+        self._dev = torch.device("cuda", self._gpu) if self._use_cuda else torch.device("cpu")
 
         self.n_best = n_best
         self.max_length = max_length
@@ -195,9 +191,7 @@ class Inference(object):
         self.dump_beam = dump_beam
         self.block_ngram_repeat = block_ngram_repeat
         self.ignore_when_blocking = ignore_when_blocking
-        self._exclusion_idxs = {
-            self._tgt_vocab.stoi[t] for t in self.ignore_when_blocking
-        }
+        self._exclusion_idxs = {self._tgt_vocab.stoi[t] for t in self.ignore_when_blocking}
         self.src_reader = src_reader
         self.tgt_reader = tgt_reader
         self.replace_unk = replace_unk
@@ -212,13 +206,8 @@ class Inference(object):
         self.copy_attn = copy_attn
 
         self.global_scorer = global_scorer
-        if (
-            self.global_scorer.has_cov_pen
-            and not self.model.decoder.attentional
-        ):
-            raise ValueError(
-                "Coverage penalty requires an attentional decoder."
-            )
+        if self.global_scorer.has_cov_pen and not self.model.decoder.attentional:
+            raise ValueError("Coverage penalty requires an attentional decoder.")
         self.out_file = out_file
         self.report_align = report_align
         self.report_score = report_score
@@ -251,7 +240,8 @@ class Inference(object):
         out_file=None,
         report_align=False,
         report_score=True,
-        logger=None, langpair = None,
+        logger=None,
+        langpair=None,
     ):
         """Alternate constructor.
 
@@ -306,7 +296,8 @@ class Inference(object):
             report_align=report_align,
             report_score=report_score,
             logger=logger,
-            seed=opt.seed, langpair = langpair,
+            seed=opt.seed,
+            langpair=langpair,
         )
 
     def _log(self, msg):
@@ -334,7 +325,7 @@ class Inference(object):
                 src_vocabs,
                 batch.src_map if use_src_map else None,
             )
-            self.model.decoder["decoder"+self.langDEC].init_state(src, memory_bank, enc_states)
+            self.model.decoder["decoder" + self.langDEC].init_state(src, memory_bank, enc_states)
         else:
             gs = [0] * batch_size
         return gs
@@ -374,19 +365,9 @@ class Inference(object):
         if self.tgt_prefix and tgt is None:
             raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
 
-        src_data = {
-            "reader": self.src_reader,
-            "data": src,
-            "features": src_feats
-        }
-        tgt_data = {
-            "reader": self.tgt_reader,
-            "data": tgt,
-            "features": {}
-        }
-        _readers, _data = inputters.Dataset.config(
-            [("src", src_data), ("tgt", tgt_data)]
-        )
+        src_data = {"reader": self.src_reader, "data": src, "features": src_feats}
+        tgt_data = {"reader": self.tgt_reader, "data": tgt, "features": {}}
+        _readers, _data = inputters.Dataset.config([("src", src_data), ("tgt", tgt_data)])
 
         data = inputters.Dataset(
             self.fields,
@@ -427,9 +408,7 @@ class Inference(object):
         start_time = time.time()
 
         for batch in data_iter:
-            batch_data = self.translate_batch(
-                batch, data.src_vocabs, attn_debug
-            )
+            batch_data = self.translate_batch(batch, data.src_vocabs, attn_debug)
             translations = xlation_builder.from_batch(batch_data)
 
             for trans in translations:
@@ -440,22 +419,13 @@ class Inference(object):
                     gold_score_total += trans.gold_score
                     gold_words_total += len(trans.gold_sent) + 1
 
-                n_best_preds = [
-                    " ".join(pred) for pred in trans.pred_sents[: self.n_best]
-                ]
+                n_best_preds = [" ".join(pred) for pred in trans.pred_sents[: self.n_best]]
                 if self.report_align:
-                    align_pharaohs = [
-                        build_align_pharaoh(align)
-                        for align in trans.word_aligns[: self.n_best]
-                    ]
-                    n_best_preds_align = [
-                        " ".join(align) for align in align_pharaohs
-                    ]
+                    align_pharaohs = [build_align_pharaoh(align) for align in trans.word_aligns[: self.n_best]]
+                    n_best_preds_align = [" ".join(align) for align in align_pharaohs]
                     n_best_preds = [
                         pred + DefaultTokens.ALIGNMENT_SEPARATOR + align
-                        for pred, align in zip(
-                            n_best_preds, n_best_preds_align
-                        )
+                        for pred, align in zip(n_best_preds, n_best_preds_align)
                     ]
                 all_predictions += [n_best_preds]
                 self.out_file.write("\n".join(n_best_preds) + "\n")
@@ -499,26 +469,17 @@ class Inference(object):
         end_time = time.time()
 
         if self.report_score:
-            msg = self._report_score(
-                "PRED", pred_score_total, pred_words_total
-            )
+            msg = self._report_score("PRED", pred_score_total, pred_words_total)
             self._log(msg)
             if tgt is not None:
-                msg = self._report_score(
-                    "GOLD", gold_score_total, gold_words_total
-                )
+                msg = self._report_score("GOLD", gold_score_total, gold_words_total)
                 self._log(msg)
 
         if self.report_time:
             total_time = end_time - start_time
             self._log("Total translation time (s): %f" % total_time)
-            self._log(
-                "Average translation time (s): %f"
-                % (total_time / len(all_predictions))
-            )
-            self._log(
-                "Tokens per second: %f" % (pred_words_total / total_time)
-            )
+            self._log("Average translation time (s): %f" % (total_time / len(all_predictions)))
+            self._log("Tokens per second: %f" % (pred_words_total / total_time))
 
         if self.dump_beam:
             import json
@@ -544,21 +505,15 @@ class Inference(object):
             batched_nbest_predict (torch.LongTensor): `(batch, n_best, tgt_l)`
         """
         dtype, device = predictions[0][0].dtype, predictions[0][0].device
-        flatten_tgt = [
-            best.tolist() for bests in predictions for best in bests
-        ]
+        flatten_tgt = [best.tolist() for bests in predictions for best in bests]
         paded_tgt = torch.tensor(
             list(zip_longest(*flatten_tgt, fillvalue=pad)),
             dtype=dtype,
             device=device,
         ).T
-        bos_tensor = torch.full(
-            [paded_tgt.size(0), 1], bos, dtype=dtype, device=device
-        )
+        bos_tensor = torch.full([paded_tgt.size(0), 1], bos, dtype=dtype, device=device)
         full_tgt = torch.cat((bos_tensor, paded_tgt), dim=-1)
-        batched_nbest_predict = full_tgt.view(
-            len(predictions), -1, full_tgt.size(-1)
-        )  # (batch, n_best, tgt_l)
+        batched_nbest_predict = full_tgt.view(len(predictions), -1, full_tgt.size(-1))  # (batch, n_best, tgt_l)
         return batched_nbest_predict
 
     def _report_score(self, name, score_total, words_total):
@@ -588,21 +543,18 @@ class Inference(object):
     ):
         if self.copy_attn:
             # Turn any copied words into UNKs.
-            decoder_in = decoder_in.masked_fill(
-                decoder_in.gt(self._tgt_vocab_len - 1), self._tgt_unk_idx
-            )
+            decoder_in = decoder_in.masked_fill(decoder_in.gt(self._tgt_vocab_len - 1), self._tgt_unk_idx)
 
         # Decoder forward, takes [tgt_len, batch, nfeats] as input
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
-#        dec_out, dec_attn = self.model.decoder(
-#            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
-#        )
-        dec_out, dec_attn = self.model.decoder["decoder"+str(self.langDEC)](
+        #        dec_out, dec_attn = self.model.decoder(
+        #            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
+        #        )
+        dec_out, dec_attn = self.model.decoder["decoder" + str(self.langDEC)](
             decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
         )
-
 
         # Generator forward.
         if not self.copy_attn:
@@ -610,12 +562,12 @@ class Inference(object):
                 attn = dec_attn["std"]
             else:
                 attn = None
-            log_probs = self.model.generator["generator"+str(self.langDEC)](dec_out.squeeze(0))
+            log_probs = self.model.generator["generator" + str(self.langDEC)](dec_out.squeeze(0))
             # returns [(batch_size x beam_size) , vocab ] when 1 step
             # or [ tgt_len, batch_size, vocab ] when full sentence
         else:
             attn = dec_attn["copy"]
-            scores = self.model.generator["generator"+str(self.langDEC)](
+            scores = self.model.generator["generator" + str(self.langDEC)](
                 dec_out.view(-1, dec_out.size(2)),
                 attn.view(-1, attn.size(2)),
                 src_map,
@@ -644,9 +596,7 @@ class Inference(object):
         """Translate a batch of sentences."""
         raise NotImplementedError
 
-    def _score_target(
-        self, batch, memory_bank, src_lengths, src_vocabs, src_map
-    ):
+    def _score_target(self, batch, memory_bank, src_lengths, src_vocabs, src_map):
         raise NotImplementedError
 
     def report_results(
@@ -672,9 +622,7 @@ class Inference(object):
         results["predictions"] = decode_strategy.predictions
         results["attention"] = decode_strategy.attention
         if self.report_align:
-            results["alignment"] = self._align_forward(
-                batch, decode_strategy.predictions
-            )
+            results["alignment"] = self._align_forward(batch, decode_strategy.predictions)
         else:
             results["alignment"] = [[] for _ in range(batch_size)]
         return results
@@ -684,10 +632,7 @@ class Translator(Inference):
     @classmethod
     def validate_task(cls, task):
         if task != ModelTask.SEQ2SEQ:
-            raise ValueError(
-                f"Translator does not support task {task}."
-                f" Tasks supported: {ModelTask.SEQ2SEQ}"
-            )
+            raise ValueError(f"Translator does not support task {task}. Tasks supported: {ModelTask.SEQ2SEQ}")
 
     def _align_forward(self, batch, predictions):
         """
@@ -695,9 +640,7 @@ class Translator(Inference):
         alignment src indice Tensor in size ``(batch, n_best,)``.
         """
         # (0) add BOS and padding to tgt prediction
-        batch_tgt_idxs = self._align_pad_prediction(
-            predictions, bos=self._tgt_bos_idx, pad=self._tgt_pad_idx
-        )
+        batch_tgt_idxs = self._align_pad_prediction(predictions, bos=self._tgt_bos_idx, pad=self._tgt_pad_idx)
         tgt_mask = (
             batch_tgt_idxs.eq(self._tgt_pad_idx)
             | batch_tgt_idxs.eq(self._tgt_eos_idx)
@@ -723,18 +666,14 @@ class Translator(Inference):
         # reshape tgt to ``(len, batch * n_best, nfeat)``
         tgt = batch_tgt_idxs.view(-1, batch_tgt_idxs.size(-1)).T.unsqueeze(-1)
         dec_in = tgt[:-1]  # exclude last target from inputs
-        _, attns = self.model.decoder(
-            dec_in, memory_bank, memory_lengths=src_lengths, with_align=True
-        )
+        _, attns = self.model.decoder(dec_in, memory_bank, memory_lengths=src_lengths, with_align=True)
 
         alignment_attn = attns["align"]  # ``(B, tgt_len-1, src_len)``
         # masked_select
         align_tgt_mask = tgt_mask.view(-1, tgt_mask.size(-1))
         prediction_mask = align_tgt_mask[:, 1:]  # exclude bos to match pred
         # get aligned src id for each prediction's valid tgt tokens
-        alignement = extract_alignment(
-            alignment_attn, prediction_mask, src_lengths, n_best
-        )
+        alignement = extract_alignment(alignment_attn, prediction_mask, src_lengths, n_best)
         return alignement
 
     def translate_batch(self, batch, src_vocabs, attn_debug):
@@ -780,36 +719,21 @@ class Translator(Inference):
                     ratio=self.ratio,
                     ban_unk_token=self.ban_unk_token,
                 )
-            return self._translate_batch_with_strategy(
-                batch, src_vocabs, decode_strategy
-            )
+            return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
 
     def _run_encoder(self, batch):
-        src, src_lengths = (
-            batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-        )
+        src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
 
-        enc_states, memory_bank, src_lengths, mask = self.model.encoder["encoder"+str(self.langENC)](
-            src, src_lengths
-        )
+        enc_states, memory_bank, src_lengths, mask = self.model.encoder["encoder" + str(self.langENC)](src, src_lengths)
 
         memory_bank, alphas = self.model.attention_bridge(memory_bank, mask)
 
         if src_lengths is None or self.model.attention_bridge.is_fixed_length:
-            assert not isinstance(
-                memory_bank, tuple
-            ), "Ensemble decoding only supported for text data"
-            src_lengths = (
-                torch.Tensor(batch.batch_size)
-                .type_as(memory_bank)
-                .long()
-                .fill_(memory_bank.size(0))
-            )
+            assert not isinstance(memory_bank, tuple), "Ensemble decoding only supported for text data"
+            src_lengths = torch.Tensor(batch.batch_size).type_as(memory_bank).long().fill_(memory_bank.size(0))
         return src, enc_states, memory_bank, src_lengths
 
-    def _translate_batch_with_strategy(
-        self, batch, src_vocabs, decode_strategy
-    ):
+    def _translate_batch_with_strategy(self, batch, src_vocabs, decode_strategy):
         """Translate a batch of sentences step by step using cache.
 
         Args:
@@ -828,7 +752,7 @@ class Translator(Inference):
 
         # (1) Run the encoder on the src.
         src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
-        self.model.decoder["decoder"+str(self.langDEC)].init_state(src, memory_bank, enc_states)
+        self.model.decoder["decoder" + str(self.langDEC)].init_state(src, memory_bank, enc_states)
 
         gold_score = self._gold_score(
             batch,
@@ -849,11 +773,9 @@ class Translator(Inference):
             memory_bank,
             memory_lengths,
             src_map,
-        ) = decode_strategy.initialize(
-            memory_bank, src_lengths, src_map, target_prefix=target_prefix
-        )
+        ) = decode_strategy.initialize(memory_bank, src_lengths, src_map, target_prefix=target_prefix)
         if fn_map_state is not None:
-            self.model.decoder["decoder"+str(self.langDEC)].map_state(fn_map_state)
+            self.model.decoder["decoder" + str(self.langDEC)].map_state(fn_map_state)
 
         # (3) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
@@ -882,9 +804,7 @@ class Translator(Inference):
             if any_finished:
                 # Reorder states.
                 if isinstance(memory_bank, tuple):
-                    memory_bank = tuple(
-                        x.index_select(1, select_indices) for x in memory_bank
-                    )
+                    memory_bank = tuple(x.index_select(1, select_indices) for x in memory_bank)
                 else:
                     memory_bank = memory_bank.index_select(1, select_indices)
 
@@ -894,7 +814,7 @@ class Translator(Inference):
                     src_map = src_map.index_select(1, select_indices)
 
             if parallel_paths > 1 or any_finished:
-                self.model.decoder["decoder"+str(self.langDEC)].map_state(
+                self.model.decoder["decoder" + str(self.langDEC)].map_state(
                     lambda state, dim: state.index_select(dim, select_indices)
                 )
 
@@ -909,9 +829,7 @@ class Translator(Inference):
             decode_strategy,
         )
 
-    def _score_target(
-        self, batch, memory_bank, src_lengths, src_vocabs, src_map
-    ):
+    def _score_target(self, batch, memory_bank, src_lengths, src_vocabs, src_map):
         tgt = batch.tgt
         tgt_in = tgt[:-1]
 
@@ -937,8 +855,7 @@ class GeneratorLM(Inference):
     def validate_task(cls, task):
         if task != ModelTask.LANGUAGE_MODEL:
             raise ValueError(
-                f"GeneratorLM does not support task {task}."
-                f" Tasks supported: {ModelTask.LANGUAGE_MODEL}"
+                f"GeneratorLM does not support task {task}. Tasks supported: {ModelTask.LANGUAGE_MODEL}"
             )
 
     def _align_forward(self, batch, predictions):
@@ -960,11 +877,13 @@ class GeneratorLM(Inference):
         phrase_table="",
     ):
         if batch_size != 1:
-            warning_msg = ("GeneratorLM does not support batch_size != 1"
-                           " nicely. You can remove this limitation here."
-                           " With batch_size > 1 the end of each input is"
-                           " repeated until the input is finished. Then"
-                           " generation will start.")
+            warning_msg = (
+                "GeneratorLM does not support batch_size != 1"
+                " nicely. You can remove this limitation here."
+                " With batch_size > 1 the end of each input is"
+                " repeated until the input is finished. Then"
+                " generation will start."
+            )
             if self.logger:
                 self.logger.info(warning_msg)
             else:
@@ -1024,9 +943,7 @@ class GeneratorLM(Inference):
                     ratio=self.ratio,
                     ban_unk_token=self.ban_unk_token,
                 )
-            return self._translate_batch_with_strategy(
-                batch, src_vocabs, decode_strategy
-            )
+            return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
 
     @classmethod
     def split_src_to_prevent_padding(cls, src, src_lengths):
@@ -1045,9 +962,7 @@ class GeneratorLM(Inference):
             log_probs = log_probs[-1]
         return log_probs
 
-    def _translate_batch_with_strategy(
-        self, batch, src_vocabs, decode_strategy
-    ):
+    def _translate_batch_with_strategy(self, batch, src_vocabs, decode_strategy):
         """Translate a batch of sentences step by step using cache.
 
         Args:
@@ -1065,13 +980,9 @@ class GeneratorLM(Inference):
         batch_size = batch.batch_size
 
         # (1) split src into src and target_prefix to avoid padding.
-        src, src_lengths = (
-            batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-        )
+        src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
 
-        src, src_lengths, target_prefix = self.split_src_to_prevent_padding(
-            src, src_lengths
-        )
+        src, src_lengths, target_prefix = self.split_src_to_prevent_padding(src, src_lengths)
 
         # (2) init decoder
         self.model.decoder.init_state(src, None, None)
@@ -1088,12 +999,7 @@ class GeneratorLM(Inference):
 
         # (3) prep decode_strategy. Possibly repeat src objects.
         src_map = batch.src_map if use_src_map else None
-        (
-            fn_map_state,
-            src,
-            memory_lengths,
-            src_map,
-        ) = decode_strategy.initialize(
+        (fn_map_state, src, memory_lengths, src_map,) = decode_strategy.initialize(
             src,
             src_lengths,
             src_map,
@@ -1102,11 +1008,7 @@ class GeneratorLM(Inference):
 
         # (4) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
-            decoder_input = (
-                src
-                if step == 0
-                else decode_strategy.current_predictions.view(1, -1, 1)
-            )
+            decoder_input = src if step == 0 else decode_strategy.current_predictions.view(1, -1, 1)
 
             log_probs, attn = self._decode_and_generate(
                 decoder_input,
@@ -1120,8 +1022,7 @@ class GeneratorLM(Inference):
             )
 
             if step == 0:
-                log_probs = self.tile_to_beam_size_after_initial_step(
-                    fn_map_state, log_probs)
+                log_probs = self.tile_to_beam_size_after_initial_step(fn_map_state, log_probs)
 
             decode_strategy.advance(log_probs, attn)
             any_finished = decode_strategy.is_finished.any()
@@ -1141,9 +1042,7 @@ class GeneratorLM(Inference):
 
             if parallel_paths > 1 or any_finished:
                 # select indexes in model state/cache
-                self.model.decoder.map_state(
-                    lambda state, dim: state.index_select(dim, select_indices)
-                )
+                self.model.decoder.map_state(lambda state, dim: state.index_select(dim, select_indices))
 
         return self.report_results(
             gold_score,
@@ -1156,13 +1055,9 @@ class GeneratorLM(Inference):
             decode_strategy,
         )
 
-    def _score_target(
-        self, batch, memory_bank, src_lengths, src_vocabs, src_map
-    ):
+    def _score_target(self, batch, memory_bank, src_lengths, src_vocabs, src_map):
         tgt = batch.tgt
-        src, src_lengths = (
-            batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-        )
+        src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
 
         log_probs, attn = self._decode_and_generate(
             src,

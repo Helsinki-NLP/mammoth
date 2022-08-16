@@ -31,19 +31,15 @@ def average_models(model_files, fp32=False):
             for (k, v) in avg_generator.items():
                 avg_generator[k].mul_(i).add_(generator_weights[k]).div_(i + 1)
 
-    final = {"vocab": vocab, "opt": opt, "optim": None,
-             "generator": avg_generator, "model": avg_model}
+    final = {"vocab": vocab, "opt": opt, "optim": None, "generator": avg_generator, "model": avg_model}
     return final
 
 
 def main():
     parser = argparse.ArgumentParser(description="")
-    parser.add_argument("-models", "-m", nargs="+", required=True,
-                        help="List of models")
-    parser.add_argument("-output", "-o", required=True,
-                        help="Output file")
-    parser.add_argument("-fp32", "-f", action="store_true",
-                        help="Cast params to float32")
+    parser.add_argument("-models", "-m", nargs="+", required=True, help="List of models")
+    parser.add_argument("-output", "-o", required=True, help="Output file")
+    parser.add_argument("-fp32", "-f", action="store_true", help="Cast params to float32")
     opt = parser.parse_args()
 
     final = average_models(opt.models, opt.fp32)

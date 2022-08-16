@@ -17,12 +17,11 @@ from onmt.inputters.dynamic_iterator import DynamicDatasetIter
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
 from onmt.inputters.corpus import save_transformed_sample
-from onmt.inputters.fields import build_dynamic_fields, save_fields, \
-    load_fields, build_dynamic_fields_langspec
-from onmt.transforms import make_transforms, save_transforms, \
-    get_specials, get_transforms_cls
+from onmt.inputters.fields import build_dynamic_fields, save_fields, load_fields, build_dynamic_fields_langspec
+from onmt.transforms import make_transforms, save_transforms, get_specials, get_transforms_cls
 from collections import OrderedDict
 from onmt.constants import ModelTask
+
 # Set sharing strategy manually instead of default based on the OS.
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -32,8 +31,7 @@ def prepare_fields_transforms(opt):
     transforms_cls = get_transforms_cls(opt._all_transform)
     specials = get_specials(opt, transforms_cls)
 
-    fields = build_dynamic_fields(
-        opt, src_specials=specials['src'], tgt_specials=specials['tgt'])
+    fields = build_dynamic_fields(opt, src_specials=specials['src'], tgt_specials=specials['tgt'])
 
     # maybe prepare pretrained embeddings, if any
     prepare_pretrained_embeddings(opt, fields)
@@ -46,11 +44,10 @@ def prepare_fields_transforms(opt):
         save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
     if opt.n_sample != 0:
         logger.warning(
-            "`-n_sample` != 0: Training will not be started. "
-            f"Stop after saving {opt.n_sample} samples/corpus.")
+            f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
+        )
         save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
-        logger.info(
-            "Sample saved, please check it before restart training.")
+        logger.info("Sample saved, please check it before restart training.")
         sys.exit()
     return fields, transforms_cls
 
@@ -64,14 +61,13 @@ def _init_train(opt):
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
         fields = load_fields(opt.save_data, checkpoint)
         transforms_cls = get_transforms_cls(opt._all_transform)
-        if (hasattr(checkpoint["opt"], '_all_transform') and
-                len(opt._all_transform.symmetric_difference(
-                    checkpoint["opt"]._all_transform)) != 0):
+        if (
+            hasattr(checkpoint["opt"], '_all_transform')
+            and len(opt._all_transform.symmetric_difference(checkpoint["opt"]._all_transform)) != 0
+        ):
             _msg = "configured transforms is different from checkpoint:"
-            new_transf = opt._all_transform.difference(
-                checkpoint["opt"]._all_transform)
-            old_transf = checkpoint["opt"]._all_transform.difference(
-                opt._all_transform)
+            new_transf = opt._all_transform.difference(checkpoint["opt"]._all_transform)
+            old_transf = checkpoint["opt"]._all_transform.difference(opt._all_transform)
             if len(new_transf) != 0:
                 _msg += f" +{new_transf}"
             if len(old_transf) != 0:
@@ -112,11 +108,10 @@ def init_train_prepare_fields_transforms(opt, vocab_path, side):
         save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
     if opt.n_sample != 0:
         logger.warning(
-            "`-n_sample` != 0: Training will not be started. "
-            f"Stop after saving {opt.n_sample} samples/corpus.")
+            f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
+        )
         save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
-        logger.info(
-            "Sample saved, please check it before restart training.")
+        logger.info("Sample saved, please check it before restart training.")
         sys.exit()
 
     for name, field in fields[side].fields:
@@ -157,16 +152,11 @@ def train(opt):
 
     for side in ('src', 'tgt'):
         for lang, vocab_path in global_scheduler.get_vocabularies(opt, side=side):
-            fields_dict[(side, lang)] = init_train_prepare_fields_transforms(
-                opt, vocab_path=vocab_path, side=side
-            )
+            fields_dict[(side, lang)] = init_train_prepare_fields_transforms(opt, vocab_path=vocab_path, side=side)
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
-    train_process = partial(
-        single_main,
-        fields_dict=fields_dict
-    )
+    train_process = partial(single_main, fields_dict=fields_dict)
 
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 
@@ -197,10 +187,8 @@ def train(opt):
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(
-                        train_process, opt, global_rank, error_queue, q, semaphore, node_rank, local_rank
-                    ),
-                    daemon=True
+                    args=(train_process, opt, global_rank, error_queue, q, semaphore, node_rank, local_rank),
+                    daemon=True,
                 )
             )
             procs[local_rank].start()
@@ -216,18 +204,15 @@ def train(opt):
                 opts=opt,
                 is_train=True,
                 stride=1,
-                offset=0
+                offset=0,
             )
 
             producer = mp.Process(
-                target=batch_producer,
-                args=(train_iter, queues[local_rank], semaphore, opt, local_rank),
-                daemon=True
+                target=batch_producer, args=(train_iter, queues[local_rank], semaphore, opt, local_rank), daemon=True
             )
             producers.append(producer)
             producers[local_rank].start()
-            logger.info(" Starting producer process pid: {}  ".format(
-                producers[local_rank].pid))
+            logger.info(" Starting producer process pid: {}  ".format(producers[local_rank].pid))
             error_handler.add_child(producers[local_rank].pid)
 
         for p in procs:
@@ -239,7 +224,7 @@ def train(opt):
 
     elif n_gpu == 1:  # case 1 GPU only
         train_process(opt, global_rank=0, local_rank=0)
-    else:   # case only CPU
+    else:  # case only CPU
         train_process(opt, global_rank=None, local_rank=None)
 
 

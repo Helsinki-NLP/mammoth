@@ -22,9 +22,7 @@ def is_master(global_rank):
 
 
 def multi_init(opt, global_rank):
-    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(
-        master_ip=opt.master_ip, master_port=opt.master_port
-    )
+    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(master_ip=opt.master_ip, master_port=opt.master_port)
 
     dist_world_size = opt.world_size
     torch.distributed.init_process_group(
@@ -47,8 +45,7 @@ def broadcast_tensors(tensors, src=0, group=None):
             torch.distributed.broadcast(t, src, group=group)
 
 
-def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None,
-                                   buffer_size=10485760):
+def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None, buffer_size=10485760):
     """
     All-reduce and rescale tensors in chunks of the specified size.
 
@@ -58,8 +55,7 @@ def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None,
         buffer_size: all-reduce chunk size in bytes
     """
     # buffer size in bytes, determine equiv. # of elements based on data type
-    buffer_t = tensors[0].new(
-        math.ceil(buffer_size / tensors[0].element_size())).zero_()
+    buffer_t = tensors[0].new(math.ceil(buffer_size / tensors[0].element_size())).zero_()
     buffer = []
 
     def all_reduce_buffer():
@@ -67,7 +63,7 @@ def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None,
         offset = 0
         for t in buffer:
             numel = t.numel()
-            buffer_t[offset:offset+numel].copy_(t.view(-1))
+            buffer_t[offset:offset + numel].copy_(t.view(-1))
             offset += numel
 
         # all-reduce and rescale
@@ -81,7 +77,7 @@ def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None,
         offset = 0
         for t in buffer:
             numel = t.numel()
-            t.view(-1).copy_(buffer_t[offset:offset+numel])
+            t.view(-1).copy_(buffer_t[offset:offset + numel])
             offset += numel
 
     filled = 0
@@ -111,25 +107,20 @@ def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None,
 def all_gather_list(data, max_size=4096):
     """Gathers arbitrary data from all nodes into a list."""
     world_size = torch.distributed.get_world_size()
-    if not hasattr(all_gather_list, '_in_buffer') or \
-            max_size != all_gather_list._in_buffer.size():
+    if not hasattr(all_gather_list, '_in_buffer') or max_size != all_gather_list._in_buffer.size():
         all_gather_list._in_buffer = torch.cuda.ByteTensor(max_size)
-        all_gather_list._out_buffers = [
-            torch.cuda.ByteTensor(max_size)
-            for i in range(world_size)
-        ]
+        all_gather_list._out_buffers = [torch.cuda.ByteTensor(max_size) for i in range(world_size)]
     in_buffer = all_gather_list._in_buffer
     out_buffers = all_gather_list._out_buffers
 
     enc = pickle.dumps(data)
     enc_size = len(enc)
     if enc_size + 2 > max_size:
-        raise ValueError(
-            'encoded data exceeds max_size: {}'.format(enc_size + 2))
-    assert max_size < 255*256
+        raise ValueError('encoded data exceeds max_size: {}'.format(enc_size + 2))
+    assert max_size < 255 * 256
     in_buffer[0] = enc_size // 255  # this encoding works for max_size < 65k
     in_buffer[1] = enc_size % 255
-    in_buffer[2:enc_size+2] = torch.ByteTensor(list(enc))
+    in_buffer[2:enc_size + 2] = torch.ByteTensor(list(enc))
 
     torch.distributed.all_gather(out_buffers, in_buffer.cuda())
 
@@ -138,7 +129,7 @@ def all_gather_list(data, max_size=4096):
         out_buffer = out_buffers[i]
         size = (255 * out_buffer[0].item()) + out_buffer[1].item()
 
-        bytes_list = bytes(out_buffer[2:size+2].tolist())
+        bytes_list = bytes(out_buffer[2:size + 2].tolist())
         result = pickle.loads(bytes_list)
         results.append(result)
     return results
@@ -149,28 +140,28 @@ class ErrorHandler(object):
     the tracebacks to the parent process."""
 
     def __init__(self, error_queue):
-        """ init error handler """
+        """init error handler"""
         import signal
         import threading
+
         self.error_queue = error_queue
         self.children_pids = []
-        self.error_thread = threading.Thread(
-            target=self.error_listener, daemon=True)
+        self.error_thread = threading.Thread(target=self.error_listener, daemon=True)
         self.error_thread.start()
         signal.signal(signal.SIGUSR1, self.signal_handler)
 
     def add_child(self, pid):
-        """ error handler """
+        """error handler"""
         self.children_pids.append(pid)
 
     def error_listener(self):
-        """ error listener """
+        """error listener"""
         (rank, original_trace) = self.error_queue.get()
         self.error_queue.put((rank, original_trace))
         os.kill(os.getpid(), signal.SIGUSR1)
 
     def signal_handler(self, signalnum, stackframe):
-        """ signal handler """
+        """signal handler"""
         for pid in self.children_pids:
             os.kill(pid, signal.SIGINT)  # kill children processes
         (rank, original_trace) = self.error_queue.get()
@@ -197,9 +188,7 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
         queue.put((batch, metadata, communication_batch_id))
 
 
-def consumer(
-    process_fn, opt, global_rank, error_queue, batch_queue, semaphore, node_rank, local_rank
-):  # noqa: E501
+def consumer(process_fn, opt, global_rank, error_queue, batch_queue, semaphore, node_rank, local_rank):  # noqa: E501
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
         logger.info(f'global_rank {global_rank} node_rank {node_rank} local_rank {local_rank}')
@@ -224,12 +213,7 @@ def consumer(
 
 
 class Scheduler:
-    def __init__(
-        self,
-        opt: Namespace,
-        node_rank: Optional[int] = None,
-        local_rank: Optional[int] = None
-    ):
+    def __init__(self, opt: Namespace, node_rank: Optional[int] = None, local_rank: Optional[int] = None):
         """
         Has the responsibility for all resources that need to be
         consistently assigned to nodes and GPUs.
@@ -280,10 +264,7 @@ class Scheduler:
         self._selector = self._get_selector(self.node_rank, self.local_rank)
 
     def __repr__(self):
-        return (
-            f'{self.__class__.__name__}('
-            f'..., node_rank={self.node_rank}, local_rank={self.local_rank})'
-        )
+        return f'{self.__class__.__name__}(' f'..., node_rank={self.node_rank}, local_rank={self.local_rank})'
 
     def _get_selector(self, node_rank: Optional[int], local_rank: Optional[int]):
         if node_rank is None or local_rank is None:
@@ -382,7 +363,8 @@ class Scheduler:
             if encoder_id not in components_to_group['encoder']:
                 logger.info(f'encoder {encoder_id} is on a single device')
         my_encoder_groups = [
-            (encoder_id, group) for (encoder_id, group) in components_to_group['encoder'].items()
+            (encoder_id, group)
+            for (encoder_id, group) in components_to_group['encoder'].items()
             if encoder_id in my_encoder_ids
         ]
 
@@ -391,7 +373,8 @@ class Scheduler:
             if decoder_id not in components_to_group['decoder']:
                 logger.info(f'decoder {decoder_id} is on a single device')
         my_decoder_groups = [
-            (decoder_id, group) for (decoder_id, group) in components_to_group['decoder'].items()
+            (decoder_id, group)
+            for (decoder_id, group) in components_to_group['decoder'].items()
             if decoder_id in my_decoder_ids
         ]
 
@@ -400,7 +383,8 @@ class Scheduler:
             if src_emb_id not in components_to_group['src_emb']:
                 logger.info(f'src_emb {src_emb_id} is on a single device')
         my_src_emb_groups = [
-            (src_emb_id, group) for (src_emb_id, group) in components_to_group['src_emb'].items()
+            (src_emb_id, group)
+            for (src_emb_id, group) in components_to_group['src_emb'].items()
             if src_emb_id in my_src_emb_ids
         ]
 
@@ -409,37 +393,33 @@ class Scheduler:
             if tgt_emb_id not in components_to_group['tgt_emb']:
                 logger.info(f'tgt_emb {tgt_emb_id} is on a single device')
         my_tgt_emb_groups = [
-            (tgt_emb_id, group) for (tgt_emb_id, group) in components_to_group['tgt_emb'].items()
+            (tgt_emb_id, group)
+            for (tgt_emb_id, group) in components_to_group['tgt_emb'].items()
             if tgt_emb_id in my_tgt_emb_ids
         ]
 
         gpu_str = f'{self.node_rank}:{self.local_rank}'
-        logger.info("{} my_encoder_ids: {}, my_decoder_ids: {}".format(
-            gpu_str, my_encoder_ids, my_decoder_ids)
+        logger.info("{} my_encoder_ids: {}, my_decoder_ids: {}".format(gpu_str, my_encoder_ids, my_decoder_ids))
+        logger.info("{} my_src_emb_ids: {}, my_tgt_emb_ids: {}".format(gpu_str, my_src_emb_ids, my_tgt_emb_ids))
+        logger.info(
+            "{} my_decoder groups: {}, my_encoder groups: {}".format(gpu_str, my_decoder_groups, my_encoder_groups)
         )
-        logger.info("{} my_src_emb_ids: {}, my_tgt_emb_ids: {}".format(
-            gpu_str, my_src_emb_ids, my_tgt_emb_ids)
-        )
-        logger.info("{} my_decoder groups: {}, my_encoder groups: {}".format(
-            gpu_str, my_decoder_groups, my_encoder_groups)
-        )
-        logger.info("{} my_src_emb groups: {}, my_tgt_emb_groups groups: {}".format(
-            gpu_str, my_src_emb_groups, my_tgt_emb_groups)
+        logger.info(
+            "{} my_src_emb groups: {}, my_tgt_emb_groups groups: {}".format(
+                gpu_str, my_src_emb_groups, my_tgt_emb_groups
+            )
         )
         return {
             'encoder': my_encoder_groups,
             'decoder': my_decoder_groups,
             'src_emb': my_src_emb_groups,
-            'tgt_emb': my_tgt_emb_groups
+            'tgt_emb': my_tgt_emb_groups,
         }
 
     def get_corpora(self, is_train=False) -> Dict[str, Any]:
         corpus_ids = self.opt.data.keys()
         my_corpus_ids = compress(corpus_ids, self._selector)
-        return {
-            corpus_id: get_corpus(self.opt, corpus_id, is_train=is_train)
-            for corpus_id in my_corpus_ids
-        }
+        return {corpus_id: get_corpus(self.opt, corpus_id, is_train=is_train) for corpus_id in my_corpus_ids}
 
     def get_vocabularies(self, opt: Namespace, side: str):
         my_lang_pairs = compress(self.lang_pairs, self._selector)
@@ -487,16 +467,18 @@ class Scheduler:
         result = []
         for lang_pair, encoder_id, decoder_id, corpus_id in zip(*selected):
             src_lang, tgt_lang = lang_pair
-            result.append((
-                src_lang,
-                tgt_lang,
-                encoder_id,
-                decoder_id,
-                corpus_id,
-                corpus_dict[corpus_id],
-                fields_dict[('src', src_lang)],
-                fields_dict[('tgt', tgt_lang)],
-            ))
+            result.append(
+                (
+                    src_lang,
+                    tgt_lang,
+                    encoder_id,
+                    decoder_id,
+                    corpus_id,
+                    corpus_dict[corpus_id],
+                    fields_dict[('src', src_lang)],
+                    fields_dict[('tgt', tgt_lang)],
+                )
+            )
         return result
 
     def get_encoders(self):
@@ -509,20 +491,14 @@ class Scheduler:
         return my_decoder_ids
 
     def get_src_embs(self):
-        my_lang_pairs = list(compress(self.lang_pairs,  self._selector))
+        my_lang_pairs = list(compress(self.lang_pairs, self._selector))
         my_encoder_ids = list(compress(self.encoder_ids, self._selector))
-        return [
-            (lang_pair[0], encoder_id) for (lang_pair, encoder_id)
-            in zip(my_lang_pairs, my_encoder_ids)
-        ]
+        return [(lang_pair[0], encoder_id) for (lang_pair, encoder_id) in zip(my_lang_pairs, my_encoder_ids)]
 
     def get_tgt_embs(self):
-        my_lang_pairs = compress(self.lang_pairs,  self._selector)
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
         my_decoder_ids = compress(self.decoder_ids, self._selector)
-        return [
-            (lang_pair[1], decoder_id) for (lang_pair, decoder_id)
-            in zip(my_lang_pairs, my_decoder_ids)
-        ]
+        return [(lang_pair[1], decoder_id) for (lang_pair, decoder_id) in zip(my_lang_pairs, my_decoder_ids)]
 
     def get_generators(self):
         my_lang_pairs = compress(self.lang_pairs, self._selector)

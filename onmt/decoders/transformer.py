@@ -65,13 +65,9 @@ class TransformerDecoderLayerBase(nn.Module):
                 max_relative_positions=max_relative_positions,
             )
         elif self_attn_type == "average":
-            self.self_attn = AverageAttention(
-                d_model, dropout=attention_dropout, aan_useffn=aan_useffn
-            )
+            self.self_attn = AverageAttention(d_model, dropout=attention_dropout, aan_useffn=aan_useffn)
 
-        self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout,
-                                                    pos_ffn_activation_fn
-                                                    )
+        self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout, pos_ffn_activation_fn)
         self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
         self.drop = nn.Dropout(dropout)
         self.full_context_alignment = full_context_alignment
@@ -150,13 +146,9 @@ class TransformerDecoderLayerBase(nn.Module):
                 attn_type="self",
             )
         elif isinstance(self.self_attn, AverageAttention):
-            return self.self_attn(
-                inputs_norm, mask=dec_mask, layer_cache=layer_cache, step=step
-            )
+            return self.self_attn(inputs_norm, mask=dec_mask, layer_cache=layer_cache, step=step)
         else:
-            raise ValueError(
-                f"self attention {type(self.self_attn)} not supported"
-            )
+            raise ValueError(f"self attention {type(self.self_attn)} not supported")
 
 
 class TransformerDecoderLayer(TransformerDecoderLayerBase):
@@ -210,15 +202,11 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             alignment_heads,
             pos_ffn_activation_fn=pos_ffn_activation_fn,
         )
-        self.context_attn = MultiHeadedAttention(
-            heads, d_model, dropout=attention_dropout
-        )
+        self.context_attn = MultiHeadedAttention(heads, d_model, dropout=attention_dropout)
         self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
 
     def update_dropout(self, dropout, attention_dropout):
-        super(TransformerDecoderLayer, self).update_dropout(
-            dropout, attention_dropout
-        )
+        super(TransformerDecoderLayer, self).update_dropout(dropout, attention_dropout)
         self.context_attn.update_dropout(attention_dropout)
 
     def _forward(
@@ -259,9 +247,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
         inputs_norm = self.layer_norm_1(inputs)
 
-        query, _ = self._forward_self_attn(
-            inputs_norm, dec_mask, layer_cache, step
-        )
+        query, _ = self._forward_self_attn(inputs_norm, dec_mask, layer_cache, step)
 
         query = self.drop(query) + inputs
 
@@ -307,9 +293,7 @@ class TransformerDecoderBase(DecoderBase):
             opt.copy_attn,
             opt.self_attn_type,
             opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
-            opt.attention_dropout[0]
-            if type(opt.attention_dropout) is list
-            else opt.attention_dropout,
+            opt.attention_dropout[0] if type(opt.attention_dropout) is list else opt.attention_dropout,
             embeddings,
             opt.max_relative_positions,
             opt.aan_useffn,
@@ -407,9 +391,7 @@ class TransformerDecoder(TransformerDecoderBase):
         alignment_heads,
         pos_ffn_activation_fn=ActivationFunction.relu,
     ):
-        super(TransformerDecoder, self).__init__(
-            d_model, copy_attn, embeddings, alignment_layer
-        )
+        super(TransformerDecoder, self).__init__(d_model, copy_attn, embeddings, alignment_layer)
 
         self.transformer_layers = nn.ModuleList(
             [
@@ -462,11 +444,7 @@ class TransformerDecoder(TransformerDecoderBase):
         attn_aligns = []
 
         for i, layer in enumerate(self.transformer_layers):
-            layer_cache = (
-                self.state["cache"]["layer_{}".format(i)]
-                if step is not None
-                else None
-            )
+            layer_cache = self.state["cache"]["layer_{}".format(i)] if step is not None else None
             output, attn, attn_align = layer(
                 output,
                 src_memory_bank,
@@ -501,9 +479,7 @@ class TransformerDecoder(TransformerDecoderBase):
         for i, layer in enumerate(self.transformer_layers):
             layer_cache = {"memory_keys": None, "memory_values": None}
             if isinstance(layer.self_attn, AverageAttention):
-                layer_cache["prev_g"] = torch.zeros(
-                    (batch_size, 1, depth), device=memory_bank.device
-                )
+                layer_cache["prev_g"] = torch.zeros((batch_size, 1, depth), device=memory_bank.device)
             else:
                 layer_cache["self_keys"] = None
                 layer_cache["self_values"] = None
@@ -529,9 +505,7 @@ class TransformerLMDecoderLayer(TransformerDecoderLayerBase):
         See TransformerDecoderLayerBase
     """
 
-    def _forward(
-        self, inputs, tgt_pad_mask, layer_cache=None, step=None, future=False
-    ):
+    def _forward(self, inputs, tgt_pad_mask, layer_cache=None, step=None, future=False):
         """A naive forward pass for transformer decoder.
 
         # T: could be 1 in the case of stepwise decoding or tgt_len
@@ -558,9 +532,7 @@ class TransformerLMDecoderLayer(TransformerDecoderLayerBase):
 
         inputs_norm = self.layer_norm_1(inputs)
 
-        query, attns = self._forward_self_attn(
-            inputs_norm, dec_mask, layer_cache, step
-        )
+        query, attns = self._forward_self_attn(inputs_norm, dec_mask, layer_cache, step)
 
         output = self.drop(query) + inputs
 
@@ -618,9 +590,7 @@ class TransformerLMDecoder(TransformerDecoderBase):
         alignment_heads=None,
         pos_ffn_activation_fn=ActivationFunction.relu,
     ):
-        super(TransformerLMDecoder, self).__init__(
-            d_model, copy_attn, embeddings, None
-        )
+        super(TransformerLMDecoder, self).__init__(d_model, copy_attn, embeddings, None)
         self.transformer_layers = nn.ModuleList(
             [
                 TransformerLMDecoderLayer(
@@ -665,11 +635,7 @@ class TransformerLMDecoder(TransformerDecoderBase):
         assert not with_align, "TransformerLMDecoder does not support align"
 
         for i, layer in enumerate(self.transformer_layers):
-            layer_cache = (
-                self.state["cache"]["layer_{}".format(i)]
-                if step is not None
-                else None
-            )
+            layer_cache = self.state["cache"]["layer_{}".format(i)] if step is not None else None
             output, attn, _ = layer(
                 output,
                 tgt_pad_mask,

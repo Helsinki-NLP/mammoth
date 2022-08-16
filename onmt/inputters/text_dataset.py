@@ -58,8 +58,7 @@ def text_sort_key(ex):
 
 # Legacy function. Currently it only truncates input if truncate is set.
 # mix this with partial
-def _feature_tokenize(
-        string, layer=0, tok_delim=None, feat_delim=None, truncate=None):
+def _feature_tokenize(string, layer=0, tok_delim=None, feat_delim=None, truncate=None):
     """Split apart word features (like POS/NER tags) from the tokens.
 
     Args:
@@ -138,8 +137,7 @@ class TextMultiField(RawField):
             # lengths: batch_size
             base_data, lengths = base_data
 
-        feats = [ff.process(batch_by_feat[i], device=device)
-                 for i, (_, ff) in enumerate(self.fields[1:], 1)]
+        feats = [ff.process(batch_by_feat[i], device=device) for i, (_, ff) in enumerate(self.fields[1:], 1)]
         levels = [base_data] + feats
         # data: seq_len x batch_size x len(self.fields)
         data = torch.stack(levels, 2)
@@ -193,30 +191,16 @@ def text_fields(**kwargs):
     feat_delim = None  # u"￨" if n_feats > 0 else None
 
     # Base field
-    tokenize = partial(
-        _feature_tokenize,
-        layer=None,
-        truncate=truncate,
-        feat_delim=feat_delim)
-    feat = Field(
-        init_token=bos, eos_token=eos,
-        pad_token=pad, tokenize=tokenize,
-        include_lengths=include_lengths)
+    tokenize = partial(_feature_tokenize, layer=None, truncate=truncate, feat_delim=feat_delim)
+    feat = Field(init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize, include_lengths=include_lengths)
     fields_.append((base_name, feat))
 
     # Feats fields
     if feats:
         for feat_name in feats.keys():
             # Legacy function, it is not really necessary
-            tokenize = partial(
-                _feature_tokenize,
-                layer=None,
-                truncate=truncate,
-                feat_delim=feat_delim)
-            feat = Field(
-                init_token=bos, eos_token=eos,
-                pad_token=pad, tokenize=tokenize,
-                include_lengths=False)
+            tokenize = partial(_feature_tokenize, layer=None, truncate=truncate, feat_delim=feat_delim)
+            feat = Field(init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize, include_lengths=False)
             fields_.append((feat_name, feat))
 
     assert fields_[0][0] == base_name  # sanity check

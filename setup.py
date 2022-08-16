@@ -17,17 +17,18 @@ setup(
         "Documentation": "http://opennmt.net/OpenNMT-py/",
         "Forum": "http://forum.opennmt.net/",
         "Gitter": "https://gitter.im/OpenNMT/OpenNMT-py",
-        "Source": "https://github.com/OpenNMT/OpenNMT-py/"
+        "Source": "https://github.com/OpenNMT/OpenNMT-py/",
     },
     python_requires=">=3.5",
     install_requires=[
-        "torch>=1.6.0",
-        "torchtext==0.5.0",
+        "torch>=1.10.2",
+        "torchtext==0.11.2",
         "configargparse",
-        "tensorboard>=2.3",
-        "flask",
+        "tensorboard>=2.9",
+        "flask==2.0.3",
+        "flake8==4.0.1",
         "waitress",
-        "pyonmttok>=1.23,<2",
+        "pyonmttok>=1.32,<2",
         "pyyaml",
     ],
     entry_points={
@@ -37,7 +38,7 @@ setup(
             "onmt_translate=onmt.bin.translate:main",
             "onmt_release_model=onmt.bin.release_model:main",
             "onmt_average_models=onmt.bin.average_models:main",
-            "onmt_build_vocab=onmt.bin.build_vocab:main"
+            "onmt_build_vocab=onmt.bin.build_vocab:main",
         ],
-    }
+    },
 )

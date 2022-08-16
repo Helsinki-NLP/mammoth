@@ -63,10 +63,22 @@ class DecodeStrategy(object):
         done (bool): See above.
     """
 
-    def __init__(self, pad, bos, eos, unk, batch_size, parallel_paths,
-                 global_scorer, min_length, block_ngram_repeat,
-                 exclusion_tokens, return_attention, max_length,
-                 ban_unk_token):
+    def __init__(
+        self,
+        pad,
+        bos,
+        eos,
+        unk,
+        batch_size,
+        parallel_paths,
+        global_scorer,
+        min_length,
+        block_ngram_repeat,
+        exclusion_tokens,
+        return_attention,
+        max_length,
+        ban_unk_token,
+    ):
 
         # magic indices
         self.pad = pad
@@ -106,14 +118,12 @@ class DecodeStrategy(object):
             mb_device = memory_bank.device
         return mb_device
 
-    def initialize_tile(self, memory_bank, src_lengths, src_map=None,
-                        target_prefix=None):
+    def initialize_tile(self, memory_bank, src_lengths, src_map=None, target_prefix=None):
         def fn_map_state(state, dim):
             return tile(state, self.beam_size, dim=dim)
 
         if isinstance(memory_bank, tuple):
-            memory_bank = tuple(tile(x, self.beam_size, dim=1)
-                                for x in memory_bank)
+            memory_bank = tuple(tile(x, self.beam_size, dim=1) for x in memory_bank)
         elif memory_bank is not None:
             memory_bank = tile(memory_bank, self.beam_size, dim=1)
         if src_map is not None:
@@ -125,8 +135,7 @@ class DecodeStrategy(object):
 
         return fn_map_state, memory_bank, src_map, target_prefix
 
-    def initialize(self, memory_bank, src_lengths, src_map=None, device=None,
-                   target_prefix=None):
+    def initialize(self, memory_bank, src_lengths, src_map=None, device=None, target_prefix=None):
         """DecodeStrategy subclasses should override :func:`initialize()`.
 
         `initialize` should be called before all actions.
@@ -135,22 +144,21 @@ class DecodeStrategy(object):
         if device is None:
             device = torch.device('cpu')
         self.alive_seq = torch.full(
-            [self.batch_size * self.parallel_paths, 1], self.bos,
-            dtype=torch.long, device=device)
-        self.is_finished = torch.zeros(
-            [self.batch_size, self.parallel_paths],
-            dtype=torch.uint8, device=device)
+            [self.batch_size * self.parallel_paths, 1], self.bos, dtype=torch.long, device=device
+        )
+        self.is_finished = torch.zeros([self.batch_size, self.parallel_paths], dtype=torch.uint8, device=device)
         if target_prefix is not None:
             seq_len, batch_size, n_feats = target_prefix.size()
-            assert batch_size == self.batch_size * self.parallel_paths,\
-                "forced target_prefix should've extend to same number of path!"
+            assert (
+                batch_size == self.batch_size * self.parallel_paths
+            ), "forced target_prefix should've extend to same number of path!"
             target_prefix_words = target_prefix[:, :, 0].transpose(0, 1)
             target_prefix = target_prefix_words[:, 1:]  # remove bos
 
             # fix length constraint and remove eos from count
             prefix_non_pad = target_prefix.ne(self.pad).sum(dim=-1).tolist()
-            self.max_length += max(prefix_non_pad)-1
-            self.min_length += min(prefix_non_pad)-1
+            self.max_length += max(prefix_non_pad) - 1
+            self.min_length += min(prefix_non_pad) - 1
 
         self.target_prefix = target_prefix  # NOTE: forced prefix words
         return None, memory_bank, src_lengths, src_map
@@ -205,8 +213,7 @@ class DecodeStrategy(object):
             # we check paths one by one
 
             current_ngram = tuple(self.alive_seq[path_idx, -n:].tolist())
-            forbidden_tokens = self.forbidden_tokens[path_idx].get(
-                current_ngram, None)
+            forbidden_tokens = self.forbidden_tokens[path_idx].get(current_ngram, None)
             if forbidden_tokens is not None:
                 log_probs[path_idx, list(forbidden_tokens)] = -10e20
 
@@ -228,8 +235,7 @@ class DecodeStrategy(object):
 
             # Reordering forbidden_tokens following beam selection
             # We rebuild a dict to ensure we get the value and not the pointer
-            forbidden_tokens.append(
-                deepcopy(self.forbidden_tokens[path_idx]))
+            forbidden_tokens.append(deepcopy(self.forbidden_tokens[path_idx]))
 
             # Grabing the newly selected tokens and associated ngram
             current_ngram = tuple(seq[-n:].tolist())
@@ -254,21 +260,17 @@ class DecodeStrategy(object):
         """
         _B, vocab_size = log_probs.size()
         step = len(self)
-        if (self.target_prefix is not None and
-                step <= self.target_prefix.size(1)):
+        if self.target_prefix is not None and step <= self.target_prefix.size(1):
             pick_idx = self.target_prefix[:, step - 1].tolist()  # (B)
-            pick_coo = [[path_i, pick] for path_i, pick in enumerate(pick_idx)
-                        if pick not in [self.eos, self.pad]]
-            mask_pathid = [path_i for path_i, pick in enumerate(pick_idx)
-                           if pick in [self.eos, self.pad]]
+            pick_coo = [[path_i, pick] for path_i, pick in enumerate(pick_idx) if pick not in [self.eos, self.pad]]
+            mask_pathid = [path_i for path_i, pick in enumerate(pick_idx) if pick in [self.eos, self.pad]]
             if len(pick_coo) > 0:
                 pick_coo = torch.tensor(pick_coo).to(self.target_prefix)
-                pick_fill_value = torch.ones(
-                    [pick_coo.size(0)], dtype=log_probs.dtype)
+                pick_fill_value = torch.ones([pick_coo.size(0)], dtype=log_probs.dtype)
                 # pickups: Tensor where specified index were set to 1, others 0
                 pickups = torch.sparse_coo_tensor(
-                    pick_coo.t(), pick_fill_value,
-                    size=log_probs.size(), device=log_probs.device).to_dense()
+                    pick_coo.t(), pick_fill_value, size=log_probs.size(), device=log_probs.device
+                ).to_dense()
                 # dropdowns: opposite of pickups, 1 for those shouldn't pick
                 dropdowns = torch.ones_like(pickups) - pickups
                 if len(mask_pathid) > 0:
@@ -278,7 +280,7 @@ class DecodeStrategy(object):
                     dropdowns = dropdowns.masked_fill(path_mask, 0)
                 # Minus dropdowns to log_probs making probabilities of
                 # unspecified index close to 0
-                log_probs -= 10000*dropdowns
+                log_probs -= 10000 * dropdowns
         return log_probs
 
     def maybe_update_target_prefix(self, select_index):

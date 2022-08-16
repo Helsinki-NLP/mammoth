@@ -6,14 +6,16 @@ import torch
 import torch.nn as nn
 from onmt.rmsnorm_torch import RMSNorm
 from onmt.encoders.transformer import TransformerEncoderLayer
-#from onmt.modules.position_ffn import ActivationFunction
-#import math
+
+# from onmt.modules.position_ffn import ActivationFunction
+# import math
 
 
 class BaseAttentionBridgeLayer(nn.Module):
     """
     Base class for attention bridge layers
     """
+
     @property
     def is_fixed_length(self) -> bool:
         """whether this layer always produce output of the same size"""
@@ -22,6 +24,7 @@ class BaseAttentionBridgeLayer(nn.Module):
 
 class AttentionBridgeNorm(nn.Module):
     """Norm component (shared implementation across architectures)."""
+
     def __init__(self, normalized_shape, ab_layer_norm_type):
         super().__init__()
         if ab_layer_norm_type == 'rmsnorm':
@@ -34,21 +37,24 @@ class AttentionBridgeNorm(nn.Module):
             raise ValueError(f"ab_layer_norm_type `{ab_layer_norm_type}` is not recognized.")
 
     def forward(self, input):
-        return self.norm(input) # possibly an nn.Identity
+        return self.norm(input)  # possibly an nn.Identity
 
 
 class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
     """
-    Multi-headed attention. Bridge between encoders->decoders. Based on Lin et al. (2017) A structured self-attentive sentence embedding
+    Multi-headed attention. Bridge between encoders->decoders.
+    Based on Lin et al. (2017) A structured self-attentive sentence embedding
     """
-    def __init__(self,
-                 hidden_size,
-                 attention_heads,
-                 hidden_ab_size,
-                 model_type,
-                 dec_rnn_size,
-                 ab_layer_norm=None,
-        ):
+
+    def __init__(
+        self,
+        hidden_size,
+        attention_heads,
+        hidden_ab_size,
+        model_type,
+        dec_rnn_size,
+        ab_layer_norm=None,
+    ):
         """Attention Heads Layer:"""
         super(LinAttentionBridgeLayer, self).__init__()
         d = hidden_size
@@ -63,7 +69,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         self.relu = nn.ReLU()
         self.softmax = nn.Softmax(dim=1)
         self.attention_hops = r
-        self.M = None # TODO : remove
+        self.M = None  # TODO : remove
         self.norm = AttentionBridgeNorm(d, ab_layer_norm)
 
     @classmethod
@@ -77,7 +83,6 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
             opt.dec_rnn_size,
             opt.ab_layer_norm,
         )
-
 
     def forward(self, enc_output, mask):
         """
@@ -95,8 +100,8 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         # previously, we would penalize alphas if "text" and only the 1st AB-layer
         # but we should only consider penalizing if there's something to mask
         if mask is not None:
-            mask_reshaped = mask.view(B, 1, L).expand(B, self.attention_hops, L) # [bsz, hop, len]
-            penalized_alphas = alphas + (-10000 * (mask_reshaped == 1).float()) # [bsz, hop, len] + [bsz, hop, len]
+            mask_reshaped = mask.view(B, 1, L).expand(B, self.attention_hops, L)  # [bsz, hop, len]
+            penalized_alphas = alphas + (-10000 * (mask_reshaped == 1).float())  # [bsz, hop, len] + [bsz, hop, len]
             alphas = penalized_alphas
 
         alphas = self.softmax(alphas.view(-1, L))  # [bsz*hop, len]
@@ -105,7 +110,9 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
 
         output = self.norm(output)
         # TODO: why cache? not sure what else is looking at layer.M
-        self.M = torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]       torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
+        self.M = torch.transpose(
+            output, 0, 1
+        ).contiguous()  # [r,bsz,nhid]       torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]
         return alphas, output
 
     @property
@@ -113,18 +120,18 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         return True
 
 
-
 class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
     """Simple attention based bridge layer using a fixed query matrix.
     This matrix is a learned parameter: the model should learn to probe the
     latent key space to produce coherent mixtures of value vectors.
     """
+
     def __init__(self, input_size, hidden_size, fixed_seqlen, ab_layer_norm):
         super().__init__()
         self.query_matrix = nn.Parameter(torch.zeros(fixed_seqlen, hidden_size))
         self.keys_proj = nn.Linear(input_size, hidden_size)
         self.values_proj = nn.Linear(input_size, input_size)
-        self.d_sqrt = hidden_size ** 0.5
+        self.d_sqrt = hidden_size**0.5
         self.R = fixed_seqlen
         self.softmax = nn.Softmax(dim=-1)
         self.norm = AttentionBridgeNorm(input_size, ab_layer_norm)
@@ -147,7 +154,7 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
         if mask is not None:
             mask_reshaped = mask.view(B, 1, L)
             raw_scores = raw_scores.masked_fill(mask_reshaped, -float('inf'))
-        attention_weights =  self.softmax(raw_scores / self.d_sqrt)
+        attention_weights = self.softmax(raw_scores / self.d_sqrt)
         output = self.norm(attention_weights @ values)
         return attention_weights, output
 
@@ -166,6 +173,7 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
 # us to control the norm and return alphas if necessary.
 class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncoderLayer):
     """Using a Transformer encoder layer as a shared component in the attention bridge"""
+
     def __init__(self, *args, **kwargs):
         TransformerEncoderLayer.__init__(self, *args, **kwargs)
 
@@ -187,7 +195,7 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
         return cls(
             opt.enc_rnn_size,
             opt.heads,
-            opt.hidden_ab_size, # d_ff
+            opt.hidden_ab_size,  # d_ff
             # TODO: that list indexing things seems suspicious to me...
             opt.dropout[0],
             opt.attention_dropout[0],
@@ -197,6 +205,7 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
 
 class FeedForwardAttentionBridgeLayer(BaseAttentionBridgeLayer):
     """Simple feedforward bridge component"""
+
     def __init__(self, input_size, hidden_size, ab_layer_norm):
         super().__init__()
         self.module = nn.Sequential(
@@ -230,11 +239,12 @@ class AttentionBridge(nn.Module):
     """
     N-layered attention-bridge between encoders->decoders
     """
+
     def __init__(self, layers):
         """Attention Heads Layer"""
         super(AttentionBridge, self).__init__()
         self.layers = nn.ModuleList(layers)
-        self.is_fixed_length = any(l.is_fixed_length for l in layers)
+        self.is_fixed_length = any(x.is_fixed_length for x in layers)
 
     @classmethod
     def from_opt(cls, opt):
@@ -248,10 +258,7 @@ class AttentionBridge(nn.Module):
         }
 
         # preconstruct layers using .from_opt(...)
-        layers = [
-            layer_type_to_cls[layer_type].from_opt(opt)
-            for layer_type in opt.ab_layers
-        ]
+        layers = [layer_type_to_cls[layer_type].from_opt(opt) for layer_type in opt.ab_layers]
 
         return cls(layers)
 
@@ -260,10 +267,10 @@ class AttentionBridge(nn.Module):
         out = enc_output.transpose(0, 1)
         alphas = None
         for layer in self.layers:
-            alphas, out  = layer(out, mask)
+            alphas, out = layer(out, mask)
             if layer.is_fixed_length:
                 # In this case, we've ensured all batch items have a constant
                 # sequence length, so the mask is no longer required.
                 mask = None
-        out =  torch.transpose(out, 0, 1).contiguous() # [hop, bsz, nhid]
-        return out, alphas # [hop, bsz, nhid], [bsz, hop, srcseqlen]
+        out = torch.transpose(out, 0, 1).contiguous()  # [hop, bsz, nhid]
+        return out, alphas  # [hop, bsz, nhid], [bsz, hop, srcseqlen]

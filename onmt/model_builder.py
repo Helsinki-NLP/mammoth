@@ -23,10 +23,6 @@ from onmt.utils.parse import ArgumentParser
 from onmt.utils.module_splitter import create_bilingual_statedict
 from onmt.constants import ModelTask
 
-from onmt.transforms import make_transforms, save_transforms, \
-    get_specials, get_transforms_cls
-from onmt.inputters.fields import build_dynamic_fields, save_fields, \
-    load_fields
 from onmt.attention_bridge import AttentionBridge
 
 
@@ -46,8 +42,7 @@ def build_embeddings(opt, text_field, for_encoder=True):
     num_embs = [len(f.vocab) for _, f in text_field]
     num_word_embeddings, num_feat_embeddings = num_embs[0], num_embs[1:]
 
-    freeze_word_vecs = opt.freeze_word_vecs_enc if for_encoder \
-        else opt.freeze_word_vecs_dec
+    freeze_word_vecs = opt.freeze_word_vecs_enc if for_encoder else opt.freeze_word_vecs_dec
 
     emb = Embeddings(
         word_vec_size=emb_dim,
@@ -61,7 +56,7 @@ def build_embeddings(opt, text_field, for_encoder=True):
         word_vocab_size=num_word_embeddings,
         feat_vocab_sizes=num_feat_embeddings,
         sparse=opt.optim == "sparseadam",
-        freeze_word_vecs=freeze_word_vecs
+        freeze_word_vecs=freeze_word_vecs,
     )
     return emb
 
@@ -84,17 +79,16 @@ def build_decoder(opt, embeddings):
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
-    dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed \
-               else opt.decoder_type
+    dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed else opt.decoder_type
     return str2dec[dec_type].from_opt(opt, embeddings)
 
 
 def load_test_multitask_model(opt, model_path=None):
-    """ If a checkpoint ending with ".pt" returns a full model 
-        otherwise it builds a bilingual model"""
+    """If a checkpoint ending with ".pt" returns a full model
+    otherwise it builds a bilingual model"""
     if model_path is None:
         model_path = opt.models[0]
-    
+
     opt.lang_pair = opt.lang_pair if opt.lang_pair else f'{opt.src_lang}-{opt.tgt_lang}'
 
     if model_path.endswith('.pt'):
@@ -106,7 +100,6 @@ def load_test_multitask_model(opt, model_path=None):
         opt.generator = model_path + opt.tgt_lang + '_gen.pt' if opt.generator is None else opt.generator
         opt.bridge = model_path + 'bridge.pt' if opt.bridge is None else opt.bridge
         opt.model_frame = model_path + 'frame.pt' if opt.model_frame is None else opt.model_frame
-
 
         encoder = torch.load(enc_path, map_location=lambda storage, loc: storage)
         decoder = torch.load(dec_path, map_location=lambda storage, loc: storage)
@@ -123,7 +116,6 @@ def load_test_multitask_model(opt, model_path=None):
             gen_module=generator,
         )
 
-
         fields = {
             'src': frame["vocab"].get(('src', opt.src_lang))['src'],
             'tgt': frame["vocab"].get(('tgt', opt.tgt_lang))['tgt'],
@@ -133,12 +125,7 @@ def load_test_multitask_model(opt, model_path=None):
         model_opt = ArgumentParser.ckpt_model_opts(frame['opt'])
         # Avoid functionality on inference
         model_opt.update_vocab = False
-        model = create_bilingual_model(
-            src_lang=opt.src_lang,
-            tgt_lang=opt.tgt_lang,
-            model_opt=model_opt,
-            fields=fields
-            )
+        model = create_bilingual_model(src_lang=opt.src_lang, tgt_lang=opt.tgt_lang, model_opt=model_opt, fields=fields)
         model.load_state_dict(ckpt_state_dict)
         device = torch.device("cuda" if use_gpu(opt) else "cpu")
         model.to(device)
@@ -146,6 +133,7 @@ def load_test_multitask_model(opt, model_path=None):
         model.eval()
 
         return fields, model, model_opt
+
 
 def load_test_model(opt, model_path=None):
     if model_path is None:
@@ -175,7 +163,7 @@ def load_test_model(opt, model_path=None):
         model.to(device)
 
     lang_pair = opt.lang_pair
-    src_lang, tgt_lang = lang_pair.split("-") 
+    src_lang, tgt_lang = lang_pair.split("-")
     fields = {}
     fields['src'] = fields_dict[('src', src_lang)]['src']
     fields['tgt'] = fields_dict[('tgt', tgt_lang)]['tgt']
@@ -189,25 +177,25 @@ def load_test_model(opt, model_path=None):
         model.float()
     elif opt.int8:
         if opt.gpu >= 0:
-            raise ValueError(
-                "Dynamic 8-bit quantization is not supported on GPU")
+            raise ValueError("Dynamic 8-bit quantization is not supported on GPU")
         torch.quantization.quantize_dynamic(model, inplace=True)
     model.eval()
     model.generator.eval()
     return fields, model, model_opt
 
+
 def create_bilingual_model(src_lang, tgt_lang, model_opt, fields):
     """For translation - state dict to be loaded to this model."""
-    
+
     encoder = nn.ModuleDict()
     decoder = nn.ModuleDict()
     generator = nn.ModuleDict()
 
     src_emb = build_src_emb(model_opt, fields)
     tgt_emb = build_tgt_emb(model_opt, fields)
-    pluggable_src_emb = PluggableEmbeddings({f'{src_lang}':src_emb})
-    pluggable_tgt_emb = PluggableEmbeddings({f'{tgt_lang}':tgt_emb})
-    
+    pluggable_src_emb = PluggableEmbeddings({f'{src_lang}': src_emb})
+    pluggable_tgt_emb = PluggableEmbeddings({f'{tgt_lang}': tgt_emb})
+
     pluggable_src_emb.activate(src_lang)
     pluggable_tgt_emb.activate(tgt_lang)
     encoder.add_module(f'encoder{src_lang}', build_only_enc(model_opt, pluggable_src_emb))
@@ -216,14 +204,11 @@ def create_bilingual_model(src_lang, tgt_lang, model_opt, fields):
 
     attention_bridge = AttentionBridge.from_opt(model_opt)
 
-    nmt_model = onmt.models.NMTModel(
-        encoder=encoder,
-        decoder=decoder,
-        attention_bridge=attention_bridge
-    )
+    nmt_model = onmt.models.NMTModel(encoder=encoder, decoder=decoder, attention_bridge=attention_bridge)
 
     nmt_model.generator = generator
     return nmt_model
+
 
 def build_src_emb(model_opt, fields):
     # Build embeddings.
@@ -264,9 +249,7 @@ def build_task_specific_model(
     decoders_md = nn.ModuleDict()
     generators_md = nn.ModuleDict()
 
-    for side, lang, encoder_id, fields in scheduler.get_fields(
-        side='src', fields_dict=fields_dict
-    ):
+    for side, lang, encoder_id, fields in scheduler.get_fields(side='src', fields_dict=fields_dict):
         src_emb = build_src_emb(model_opt, fields)
         src_embs_by_encoder[encoder_id][lang] = src_emb
 
@@ -275,15 +258,10 @@ def build_task_specific_model(
         encoder = build_only_enc(model_opt, pluggable_src_emb)
         encoders_md.add_module(f'encoder{encoder_id}', encoder)
 
-    for side, lang, decoder_id, fields in scheduler.get_fields(
-        side='tgt', fields_dict=fields_dict
-    ):
+    for side, lang, decoder_id, fields in scheduler.get_fields(side='tgt', fields_dict=fields_dict):
         tgt_emb = build_tgt_emb(model_opt, fields)
         tgt_embs_by_decoder[decoder_id][lang] = tgt_emb
-        generator = build_generator(
-            model_opt,
-            fields,
-            tgt_emb)
+        generator = build_generator(model_opt, fields, tgt_emb)
         generators_md.add_module(f'generator{lang}', generator)
 
     for decoder_id in scheduler.get_decoders():
@@ -304,11 +282,7 @@ def build_task_specific_model(
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         attention_bridge.half()
 
-    nmt_model = onmt.models.NMTModel(
-        encoder=encoders_md,
-        decoder=decoders_md,
-        attention_bridge=attention_bridge
-    )
+    nmt_model = onmt.models.NMTModel(encoder=encoders_md, decoder=decoders_md, attention_bridge=attention_bridge)
     return nmt_model, generators_md
 
 
@@ -353,12 +327,7 @@ def build_generator(model_opt, fields, tgt_emb):
     else:
         gen_func = nn.LogSoftmax(dim=-1)
     generator = nn.Sequential(
-        nn.Linear(
-            model_opt.dec_rnn_size,
-            len(fields["tgt"].base_field.vocab)
-        ),
-        Cast(torch.float32),
-        gen_func
+        nn.Linear(model_opt.dec_rnn_size, len(fields["tgt"].base_field.vocab)), Cast(torch.float32), gen_func
     )
 
     if model_opt.share_decoder_embeddings:
@@ -387,23 +356,15 @@ def use_embeddings_from_checkpoint(fields, model, generator, checkpoint):
             continue
         multifield = fields[field_name]
         checkpoint_multifield = checkpoint["vocab"][field_name]
-        for (name, field), (checkpoint_name, checkpoint_field) in zip(
-            multifield, checkpoint_multifield
-        ):
+        for (name, field), (checkpoint_name, checkpoint_field) in zip(multifield, checkpoint_multifield):
             new_tokens = []
             for i, tok in enumerate(field.vocab.itos):
                 if tok in checkpoint_field.vocab.stoi:
                     old_i = checkpoint_field.vocab.stoi[tok]
-                    model.state_dict()[emb_name][i] = checkpoint["model"][
-                        emb_name
-                    ][old_i]
+                    model.state_dict()[emb_name][i] = checkpoint["model"][emb_name][old_i]
                     if field_name == "tgt":
-                        generator.state_dict()["0.weight"][i] = checkpoint[
-                            "generator"
-                        ]["0.weight"][old_i]
-                        generator.state_dict()["0.bias"][i] = checkpoint[
-                            "generator"
-                        ]["0.bias"][old_i]
+                        generator.state_dict()["0.weight"][i] = checkpoint["generator"]["0.weight"][old_i]
+                        generator.state_dict()["0.bias"][i] = checkpoint["generator"]["0.bias"][old_i]
                 else:
                     # Just for debugging purposes
                     new_tokens.append(tok)

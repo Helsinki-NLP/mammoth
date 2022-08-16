@@ -112,16 +112,12 @@ class ObservableStats:
         raise NotImplementedError
 
     def __str__(self) -> str:
-        return "{}({})".format(
-            self.name(),
-            ", ".join(
-                f"{name}={getattr(self, name)}" for name in self.__slots__
-            )
-        )
+        return "{}({})".format(self.name(), ", ".join(f"{name}={getattr(self, name)}" for name in self.__slots__))
 
 
 class TransformStatistics:
     """A observer containing runing statistics."""
+
     def __init__(self):
         self.observables = {}
 
@@ -159,8 +155,7 @@ class TransformPipe(Transform):
     def build_from(cls, transform_list):
         """Return a `TransformPipe` instance build from `transform_list`."""
         for transform in transform_list:
-            assert isinstance(transform, Transform), \
-                "transform should be a instance of Transform."
+            assert isinstance(transform, Transform), "transform should be a instance of Transform."
         transform_pipe = cls(None, transform_list)
         return transform_pipe
 
@@ -187,8 +182,7 @@ class TransformPipe(Transform):
 
         """
         for transform in self.transforms:
-            example = transform.apply(
-                example, is_train=is_train, stats=self.statistics, **kwargs)
+            example = transform.apply(example, is_train=is_train, stats=self.statistics, **kwargs)
             if example is None:
                 break
         return example
@@ -219,9 +213,7 @@ def make_transforms(opts, transforms_cls, fields):
     transforms = {}
     for name, transform_cls in transforms_cls.items():
         if transform_cls.require_vocab() and vocabs is None:
-            logger.warning(
-                f"{transform_cls.__name__} require vocab to apply, skip it."
-            )
+            logger.warning(f"{transform_cls.__name__} require vocab to apply, skip it.")
             continue
         transform_obj = transform_cls(opts)
         transform_obj.warm_up(vocabs)

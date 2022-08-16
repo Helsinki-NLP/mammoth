@@ -25,18 +25,17 @@ from collections import defaultdict
 
 # hack for python2/3 compatibility
 from io import open
+
 argparse.open = open
 
 
 class BPE(object):
-
     def __init__(self, codes, separator='@@', vocab=None, glossaries=None):
 
         # check version information
         firstline = codes.readline()
         if firstline.startswith('#version:'):
-            self.version = tuple([int(x) for x in re.sub(
-                r'(\.0+)*$', '', firstline.split()[-1]).split(".")])
+            self.version = tuple([int(x) for x in re.sub(r'(\.0+)*$', '', firstline.split()[-1]).split(".")])
         else:
             self.version = (0, 1)
             codes.seek(0)
@@ -44,11 +43,9 @@ class BPE(object):
         self.bpe_codes = [tuple(item.split()) for item in codes]
 
         # some hacking to deal with duplicates (only consider first instance)
-        self.bpe_codes = dict(
-            [(code, i) for (i, code) in reversed(list(enumerate(self.bpe_codes)))])
+        self.bpe_codes = dict([(code, i) for (i, code) in reversed(list(enumerate(self.bpe_codes)))])
 
-        self.bpe_codes_reverse = dict(
-            [(pair[0] + pair[1], pair) for pair, i in self.bpe_codes.items()])
+        self.bpe_codes_reverse = dict([(pair[0] + pair[1], pair) for pair, i in self.bpe_codes.items()])
 
         self.separator = separator
 
@@ -62,15 +59,20 @@ class BPE(object):
         """segment single sentence (whitespace-tokenized string) with BPE encoding"""
         output = []
         for word in sentence.split():
-            new_word = [out for segment in self._isolate_glossaries(word)
-                        for out in encode(segment,
-                                          self.bpe_codes,
-                                          self.bpe_codes_reverse,
-                                          self.vocab,
-                                          self.separator,
-                                          self.version,
-                                          self.cache,
-                                          self.glossaries)]
+            new_word = [
+                out
+                for segment in self._isolate_glossaries(word)
+                for out in encode(
+                    segment,
+                    self.bpe_codes,
+                    self.bpe_codes_reverse,
+                    self.vocab,
+                    self.separator,
+                    self.version,
+                    self.cache,
+                    self.glossaries,
+                )
+            ]
 
             for item in new_word[:-1]:
                 output.append(item + self.separator)
@@ -81,44 +83,72 @@ class BPE(object):
     def _isolate_glossaries(self, word):
         word_segments = [word]
         for gloss in self.glossaries:
-            word_segments = [out_segments for segment in word_segments
-                             for out_segments in isolate_glossary(segment, gloss)]
+            word_segments = [
+                out_segments for segment in word_segments for out_segments in isolate_glossary(segment, gloss)
+            ]
         return word_segments
 
 
 def create_parser():
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="learn BPE-based word segmentation")
+        formatter_class=argparse.RawDescriptionHelpFormatter, description="learn BPE-based word segmentation"
+    )
 
     parser.add_argument(
-        '--input', '-i', type=argparse.FileType('r'), default=sys.stdin,
+        '--input',
+        '-i',
+        type=argparse.FileType('r'),
+        default=sys.stdin,
         metavar='PATH',
-        help="Input file (default: standard input).")
+        help="Input file (default: standard input).",
+    )
     parser.add_argument(
-        '--codes', '-c', type=argparse.FileType('r'), metavar='PATH',
+        '--codes',
+        '-c',
+        type=argparse.FileType('r'),
+        metavar='PATH',
         required=True,
-        help="File with BPE codes (created by learn_bpe.py).")
+        help="File with BPE codes (created by learn_bpe.py).",
+    )
     parser.add_argument(
-        '--output', '-o', type=argparse.FileType('w'), default=sys.stdout,
+        '--output',
+        '-o',
+        type=argparse.FileType('w'),
+        default=sys.stdout,
         metavar='PATH',
-        help="Output file (default: standard output)")
+        help="Output file (default: standard output)",
+    )
     parser.add_argument(
-        '--separator', '-s', type=str, default='@@', metavar='STR',
-        help="Separator between non-final subword units (default: '%(default)s'))")
+        '--separator',
+        '-s',
+        type=str,
+        default='@@',
+        metavar='STR',
+        help="Separator between non-final subword units (default: '%(default)s'))",
+    )
     parser.add_argument(
-        '--vocabulary', type=argparse.FileType('r'), default=None,
+        '--vocabulary',
+        type=argparse.FileType('r'),
+        default=None,
         metavar="PATH",
-        help="Vocabulary file (built with get_vocab.py). If provided, this script reverts any merge operations that produce an OOV.")
+        help="Vocabulary file (built with get_vocab.py). If provided, this script reverts any merge operations that produce an OOV.",
+    )
     parser.add_argument(
-        '--vocabulary-threshold', type=int, default=None,
+        '--vocabulary-threshold',
+        type=int,
+        default=None,
         metavar="INT",
-        help="Vocabulary threshold. If vocabulary is provided, any word with frequency < threshold will be treated as OOV")
+        help="Vocabulary threshold. If vocabulary is provided, any word with frequency < threshold will be treated as OOV",
+    )
     parser.add_argument(
-        '--glossaries', type=str, nargs='+', default=None,
+        '--glossaries',
+        type=str,
+        nargs='+',
+        default=None,
         metavar="STR",
-        help="Glossaries. The strings provided in glossaries will not be affected" +
-             "by the BPE (i.e. they will neither be broken into subwords, nor concatenated with other subwords")
+        help="Glossaries. The strings provided in glossaries will not be affected"
+        + "by the BPE (i.e. they will neither be broken into subwords, nor concatenated with other subwords",
+    )
 
     return parser
 
@@ -137,8 +167,7 @@ def get_pairs(word):
 
 
 def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache, glossaries=None):
-    """Encode word based on list of BPE merge operations, which are applied consecutively
-    """
+    """Encode word based on list of BPE merge operations, which are applied consecutively"""
 
     if orig in cache:
         return cache[orig]
@@ -212,7 +241,7 @@ def recursive_split(segment, bpe_codes, vocab, separator, final=False):
         else:
             left, right = bpe_codes[segment]
     except:
-        #sys.stderr.write('cannot split {0} further.\n'.format(segment))
+        # sys.stderr.write('cannot split {0} further.\n'.format(segment))
         yield segment
         return
 
@@ -239,7 +268,7 @@ def check_vocab_and_split(orig, bpe_codes, vocab, separator):
         if segment + separator in vocab:
             out.append(segment)
         else:
-            #sys.stderr.write('OOV: {0}\n'.format(segment))
+            # sys.stderr.write('OOV: {0}\n'.format(segment))
             for item in recursive_split(segment, bpe_codes, vocab, separator, False):
                 out.append(item)
 
@@ -247,7 +276,7 @@ def check_vocab_and_split(orig, bpe_codes, vocab, separator):
     if segment in vocab:
         out.append(segment)
     else:
-        #sys.stderr.write('OOV: {0}\n'.format(segment))
+        # sys.stderr.write('OOV: {0}\n'.format(segment))
         for item in recursive_split(segment, bpe_codes, vocab, separator, True):
             out.append(item)
 
@@ -255,8 +284,7 @@ def check_vocab_and_split(orig, bpe_codes, vocab, separator):
 
 
 def read_vocabulary(vocab_file, threshold):
-    """read vocabulary file produced by get_vocab.py, and filter according to frequency threshold.
-    """
+    """read vocabulary file produced by get_vocab.py, and filter according to frequency threshold."""
 
     vocabulary = set()
 
@@ -273,7 +301,7 @@ def isolate_glossary(word, glossary):
     """
     Isolate a glossary present inside a word.
 
-    Returns a list of subwords. In which all 'glossary' glossaries are isolated 
+    Returns a list of subwords. In which all 'glossary' glossaries are isolated
 
     For example, if 'USA' is the glossary and '1934USABUSA' the word, the return value is:
         ['1934', 'USA', 'B', 'USA']
@@ -282,8 +310,7 @@ def isolate_glossary(word, glossary):
         return [word]
     else:
         splits = word.split(glossary)
-        segments = [segment.strip() for split in splits[:-1]
-                    for segment in [split, glossary] if segment != '']
+        segments = [segment.strip() for split in splits[:-1] for segment in [split, glossary] if segment != '']
         return segments + [splits[-1].strip()] if splits[-1] != '' else segments
 
 
@@ -297,8 +324,7 @@ if __name__ == '__main__':
     else:
         sys.stdin = io.TextIOWrapper(sys.stdin.buffer, encoding='utf-8')
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
-        sys.stdout = io.TextIOWrapper(
-            sys.stdout.buffer, encoding='utf-8', write_through=True, line_buffering=True)
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', write_through=True, line_buffering=True)
 
     parser = create_parser()
     args = parser.parse_args()
@@ -313,8 +339,7 @@ if __name__ == '__main__':
         args.vocabulary = codecs.open(args.vocabulary.name, encoding='utf-8')
 
     if args.vocabulary:
-        vocabulary = read_vocabulary(
-            args.vocabulary, args.vocabulary_threshold)
+        vocabulary = read_vocabulary(args.vocabulary, args.vocabulary_threshold)
     else:
         vocabulary = None
 

@@ -3,6 +3,7 @@ import os
 import json
 import logging
 from logging.handlers import RotatingFileHandler
+
 logger = logging.getLogger()
 
 
@@ -22,8 +23,7 @@ def init_logger(
 
     if log_file and log_file != '':
         if rotate:
-            file_handler = RotatingFileHandler(
-                log_file, maxBytes=1000000, backupCount=10)
+            file_handler = RotatingFileHandler(log_file, maxBytes=1000000, backupCount=10)
         else:
             file_handler = logging.FileHandler(log_file)
         file_handler.setLevel(log_file_level)
@@ -32,12 +32,13 @@ def init_logger(
 
     return logger
 
+
 def log_lca_values(step, lca_logs, lca_params, opath, dump_logs=False):
     for k, v in lca_params.items():
         lca_sum = v.sum().item()
         lca_mean = v.mean().item()
-        lca_logs[k][f'STEP_{step}'] = {'sum': lca_sum, 'mean':lca_mean}
-                                        
+        lca_logs[k][f'STEP_{step}'] = {'sum': lca_sum, 'mean': lca_mean}
+
     if dump_logs:
         if os.path.exists(opath):
             os.system(f'cp {opath} {opath}.previous')

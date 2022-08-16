@@ -36,22 +36,29 @@ def read_files_batch(file_list):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-file_type', default='text',
-                        choices=['text', 'field'], required=True,
-                        help="""Options for vocabulary extraction.
-                               The default is 'text' where the user passes
-                               a corpus or a list of corpora files for which
-                               they want to create a vocabulary from.
-                               If choosing the option 'field', we assume
-                               the file passed is a torch file created during
-                               the preprocessing stage of an already
-                               preprocessed corpus. The vocabulary file created
-                               will just be the vocabulary inside the field
-                               corresponding to the argument 'side'.""")
+    parser.add_argument(
+        '-file_type',
+        default='text',
+        choices=['text', 'field'],
+        required=True,
+        help="""Options for vocabulary extraction.
+                The default is 'text' where the user passes
+                a corpus or a list of corpora files for which
+                they want to create a vocabulary from.
+                If choosing the option 'field', we assume
+                the file passed is a torch file created during
+                the preprocessing stage of an already
+                preprocessed corpus. The vocabulary file created
+                will just be the vocabulary inside the field
+                corresponding to the argument 'side'.""",
+    )
     parser.add_argument("-file", type=str, nargs="+", required=True)
     parser.add_argument("-out_file", type=str, required=True)
-    parser.add_argument("-side", choices=['src', 'tgt'], help="""Specifies
-                               'src' or 'tgt' side for 'field' file_type.""")
+    parser.add_argument(
+        "-side",
+        choices=['src', 'tgt'],
+        help="""Specifies 'src' or 'tgt' side for 'field' file_type.""",
+    )
 
     opt = parser.parse_args()
 
@@ -68,19 +75,16 @@ def main():
 
         print("Writing vocabulary file...")
         with open(opt.out_file, "w") as f:
-            for w, count in sorted(vocabulary.items(), key=lambda x: x[1],
-                                   reverse=True):
+            for w, count in sorted(vocabulary.items(), key=lambda x: x[1], reverse=True):
                 f.write("{0}\n".format(w))
     else:
         if opt.side not in ['src', 'tgt']:
-            raise ValueError("If using -file_type='field', specifies "
-                             "'src' or 'tgt' argument for -side.")
+            raise ValueError("If using -file_type='field', specifies 'src' or 'tgt' argument for -side.")
         import torch
 
         print("Reading input file...")
         if not len(opt.file) == 1:
-            raise ValueError("If using -file_type='field', only pass one "
-                             "argument for -file.")
+            raise ValueError("If using -file_type='field', only pass one argument for -file.")
         vocabs = torch.load(opt.file[0])
         voc = dict(vocabs)[opt.side]
 

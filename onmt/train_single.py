@@ -29,8 +29,7 @@ def _get_model_opts(opt, checkpoint=None):
         model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
         ArgumentParser.update_model_opts(model_opt)
         ArgumentParser.validate_model_opts(model_opt)
-        if (opt.tensorboard_log_dir == model_opt.tensorboard_log_dir and
-                hasattr(model_opt, 'tensorboard_log_dir_dated')):
+        if opt.tensorboard_log_dir == model_opt.tensorboard_log_dir and hasattr(model_opt, 'tensorboard_log_dir_dated'):
             # ensure tensorboard output is written in the directory
             # of previous checkpoints
             opt.tensorboard_log_dir_dated = model_opt.tensorboard_log_dir_dated
@@ -45,7 +44,7 @@ def _build_valid_iter(opt, fields, transforms_cls):
     """Build iterator used for validation."""
     # valid_iter = DynamicDatasetIter(
     #     fields, transforms_cls, opt, is_train=False)
-    valid_iter = iter([])   # FIXME: validation temporarily disabled
+    valid_iter = iter([])  # FIXME: validation temporarily disabled
     return valid_iter
 
 
@@ -53,15 +52,13 @@ def init_distributed(model, scheduler):
     my_component_groups = scheduler.get_distributed_groups()
     for encoder_id, (min_rank, group) in my_component_groups['encoder']:
         weights = [
-            p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters()
-            if 'embeddings' not in name
+            p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters() if 'embeddings' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
     for decoder_id, (min_rank, group) in my_component_groups['decoder']:
         weights = [
-            p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters()
-            if 'embeddings' not in name
+            p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters() if 'embeddings' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
@@ -160,8 +157,7 @@ def main(
         )
         train_iter = IterOnDevice(_train_iter, local_rank)
     else:
-        assert semaphore is not None, \
-            "Using batch_queue requires semaphore as well"
+        assert semaphore is not None, "Using batch_queue requires semaphore as well"
 
         def _train_iter():
             while True:
@@ -194,7 +190,7 @@ def main(
         save_checkpoint_steps=opt.save_checkpoint_steps,
         valid_iter=valid_iter,
         valid_steps=opt.valid_steps,
-        global_rank=global_rank
+        global_rank=global_rank,
     )
 
     if trainer.report_manager.tensorboard_writer is not None:

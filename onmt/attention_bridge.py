@@ -40,10 +40,17 @@ class AttentionBridgeNorm(nn.Module):
 
 
 class PerceiverAttentionBridgeLayer(BaseAttentionBridgeLayer):
-    def __init__(self, latent_size, ff_size, fixed_seqlen, n_heads, attention_dropout, max_relative_positions, norm_type):
+    def __init__(
+        self, latent_size, ff_size, fixed_seqlen, n_heads, attention_dropout, max_relative_positions, norm_type
+    ):
         super().__init__()
         self.latent_array = nn.Parameter(torch.zeros(fixed_seqlen, latent_size))
-        self.cross_attention_block = MultiHeadedAttention(n_heads, latent_size, attention_dropout, max_relative_positions)
+        self.cross_attention_block = MultiHeadedAttention(
+            n_heads,
+            latent_size,
+            attention_dropout,
+            max_relative_positions
+        )
         self.cross_attention_norm = AttentionBridgeNorm(latent_size, norm_type)
         self.cross_ff_block = nn.Sequential(
             nn.Linear(latent_size, ff_size),
@@ -51,7 +58,12 @@ class PerceiverAttentionBridgeLayer(BaseAttentionBridgeLayer):
             nn.Linear(ff_size, latent_size),
         )
         self.cross_ff_norm = AttentionBridgeNorm(latent_size, norm_type)
-        self.self_attention_block = MultiHeadedAttention(n_heads, latent_size, attention_dropout, max_relative_positions)
+        self.self_attention_block = MultiHeadedAttention(
+            n_heads,
+            latent_size,
+            attention_dropout,
+            max_relative_positions
+        )
         self.self_attention_norm = AttentionBridgeNorm(latent_size, norm_type)
         self.self_ff_block = nn.Sequential(
             nn.Linear(latent_size, ff_size),
@@ -84,18 +96,27 @@ class PerceiverAttentionBridgeLayer(BaseAttentionBridgeLayer):
         zero/non-zero attention ``(batch, query_len, key_len)`` -> # [bsz, 1, len]
         """
         S, B, F = encoder_output.shape
-        cross_query = self.latent_array.unsqueeze(0).expand(B, -1, -1) if intermediate_output is None else intermediate_output
+        if intermediate_output is not None:
+            cross_query = intermediate_output
+        else:
+            cross_query = self.latent_array.unsqueeze(0).expand(B, -1, -1)
         encoder_output = encoder_output.transpose(0, 1)
 
         # sublayer 1: projects to fixed size
-        cross_attention_output, alphas = self.cross_attention_block(encoder_output, encoder_output, cross_query, mask=mask, attn_type='context')
+        cross_attention_output, alphas = self.cross_attention_block(
+            encoder_output, encoder_output, cross_query, mask=mask, attn_type='context'
+        )
         cross_attention_output = self.cross_attention_norm(cross_attention_output + cross_query)
-        cross_attention_output = self.cross_ff_norm(self.cross_ff_block(cross_attention_output) + cross_attention_output)
+        cross_attention_output = self.cross_ff_block(cross_attention_output) + cross_attention_output
+        cross_attention_output = self.cross_ff_norm(cross_attention_output)
 
         # sublayer 2: performs self-attention
-        self_attention_output, _ = self.self_attention_block(cross_attention_output, cross_attention_output, cross_attention_output, mask=None, attn_type='self')
+        self_attention_output, _ = self.self_attention_block(
+            cross_attention_output, cross_attention_output, cross_attention_output, mask=None, attn_type='self'
+        )
         self_attention_output = self.self_attention_norm(self_attention_output + cross_attention_output)
-        self_attention_output = self.self_ff_norm(self.self_ff_block(self_attention_output) + self_attention_output)
+        self_attention_output = self.self_ff_block(self_attention_output) + self_attention_output
+        self_attention_output = self.self_ff_norm(self_attention_output)
 
         return alphas, self_attention_output
 
@@ -328,7 +349,8 @@ class AttentionBridge(nn.Module):
         if any(layer == 'perceiver' for layer in opt.ab_layers):
             first_perceiver_index = next(idx for idx, layer in enumerate(opt.ab_layers) if layer == 'perceiver')
             if first_perceiver_index != 0:
-                assert any(layer.is_fixed_length for layer in layers[:first_perceiver_index]), 'Unsupported attention bridge configuration: at least one layer must be fixed-size before a perceiver'
+                assert any(layer.is_fixed_length for layer in layers[:first_perceiver_index]), \
+                    'Unsupported bridge configuration: at least one layer must be fixed-size before perceiver'
             if not all(layer == 'perceiver' for layer in opt.ab_layers):
                 warnings.warn('Architecture-mixing not fully supported with perceiver.')
             # FIXME: deleting unused params manually
@@ -346,10 +368,10 @@ class AttentionBridge(nn.Module):
         orig_mask = mask
         for layer in self.layers:
             mask_ = orig_mask if isinstance(layer, PerceiverAttentionBridgeLayer) else mask
-            alphas, out  = layer(out, enc_output, mask_)
+            alphas, out = layer(out, enc_output, mask_)
             if layer.is_fixed_length:
                 # In this case, we've ensured all batch items have a constant
                 # sequence length, so the mask is no longer required.
                 mask = None
-        out =  torch.transpose(out, 0, 1).contiguous()
-        return out, alphas # [hop, bsz, nhid], [bsz, hop, srcseqlen]
+        out = torch.transpose(out, 0, 1).contiguous()
+        return out, alphas  # [hop, bsz, nhid], [bsz, hop, srcseqlen]

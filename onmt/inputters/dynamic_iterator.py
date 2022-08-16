@@ -9,7 +9,7 @@ from onmt.transforms import make_transforms
 from onmt.utils.logging import logger
 
 
-DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id'.split())
+DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
 
 
 class MixingStrategy(object):

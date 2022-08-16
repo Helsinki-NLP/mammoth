@@ -150,7 +150,7 @@ def get_fields(
     """
 
     assert src_data_type in ['text'], "Data type not implemented"
-    assert not dynamic_dict or src_data_type == 'text', 'it is not possible to use dynamic_dict with non-text input'
+    assert not dynamic_dict or src_data_type == 'text', 'It is not possible to use dynamic_dict with non-text input'
     fields = {}
 
     fields_getters = {"text": text_fields}

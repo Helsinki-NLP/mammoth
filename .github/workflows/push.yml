@@ -30,6 +30,7 @@ jobs:
     - name: Unit tests
       run: |
         python -m unittest discover
+# ## Broken in FoTraNMT
 #    - name: Test vocabulary build
 #      run: |
 #        python onmt/bin/build_vocab.py \

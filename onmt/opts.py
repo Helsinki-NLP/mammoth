@@ -652,7 +652,7 @@ def model_opts(parser):
         '-ab_layers',
         nargs='*',
         default=[],
-        choices=['lin', 'simple', 'transformer', 'feedforward'],
+        choices=['lin', 'simple', 'transformer', 'perceiver', 'feedforward'],
         help="Composition of the attention bridge",
     )
     group.add(

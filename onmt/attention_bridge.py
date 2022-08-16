@@ -362,7 +362,7 @@ class AttentionBridge(nn.Module):
     def forward(self, enc_output, mask):
         """Forward pass for the bridge layers"""
         out = enc_output.transpose(0, 1)
-        if isinstance(self.layers[0], PerceiverAttentionBridgeLayer):
+        if self.layers and isinstance(self.layers[0], PerceiverAttentionBridgeLayer):
             out = None
         alphas = None
         orig_mask = mask

@@ -200,6 +200,6 @@ if onmt.models.sru.check_sru_requirement():
     # SRU doesn't support input_feed.
     tests_nmtmodel.append([('rnn_type', 'SRU'), ('input_feed', 0)])
 
-# ## Broken in FoTraNMT
+# ## FIXME: Broken in FoTraNMT
 # for p in tests_nmtmodel:
 #     _add_test(p, 'nmtmodel_forward')

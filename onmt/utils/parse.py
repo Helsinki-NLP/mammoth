@@ -122,7 +122,7 @@ class DataOptsCheckerMixin(object):
             if not all_transforms.isdisjoint({'sentencepiece', 'bpe', 'onmt_tokenize'}):
                 raise ValueError('lambda_align is not compatible with on-the-fly tokenization.')
             if not all_transforms.isdisjoint({'tokendrop', 'prefix', 'bart'}):
-                raise ValueError('lambda_align is not compatible yet with potentiel token deletion/addition.')
+                raise ValueError('lambda_align is not compatible yet with potential token deletion/addition.')
         opt._all_transform = all_transforms
 
     @classmethod

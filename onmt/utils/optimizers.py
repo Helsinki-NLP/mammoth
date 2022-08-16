@@ -167,7 +167,6 @@ class MultipleOptimizer(object):
     """Implement multiple optimizers needed for sparse adam"""
 
     def __init__(self, op, multiOptims_Langs=None):
-        """?"""
         self.optimizers = op
         self.multiOptims_Langs = multiOptims_Langs
         # self.size = len(self.optimizers)
@@ -183,7 +182,7 @@ class MultipleOptimizer(object):
         return param_groups
 
     def zero_grad(self):
-        """?"""
+        """Reset the gradient of all sub-optimizers to zero"""
         for name in self.optimizers:
             self.optimizers[name].zero_grad()
 
@@ -191,40 +190,11 @@ class MultipleOptimizer(object):
     #            op.zero_grad()
 
     def step(self, langsEnc=None, langsDec=None):
-        """?"""
+        """Step through all the suboptimizers"""
         #        for op in self.optimizers:
         #            op.step()
         for name in self.optimizers:
             self.optimizers[name].step()
-        """
-        for lang in langsEnc:
-            idx = self.multiOptims_Langs.index('ENC_'+str(lang))
-            self.optimizers[idx].step()
-        for lang in langsDec:
-            idx = self.multiOptims_Langs.index('DEC_'+str(lang))
-            self.optimizers[idx].step()
-            idx = self.multiOptims_Langs.index('GEN_'+str(lang))
-            self.optimizers[idx].step()
-
-        idx = self.multiOptims_Langs.index('ATT')
-        self.optimizers[idx].step()
-        """
-
-
-#    @property
-#    def state(self):
-#        """ ? """
-#        return {k: v for op in self.optimizers for k, v in op.state.items()}
-
-#    def state_dict(self):
-#        """ ? """
-#        return [op.state_dict() for op in self.optimizers]
-
-#    def load_state_dict(self, state_dicts):
-#        """ ? """
-#        assert len(state_dicts) == len(self.optimizers)
-#        for i in range(len(state_dicts)):
-#            self.optimizers[i].load_state_dict(state_dicts[i])
 
 
 class Optimizer(object):

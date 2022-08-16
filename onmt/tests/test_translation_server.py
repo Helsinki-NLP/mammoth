@@ -13,7 +13,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class TestServerModel(unittest.TestCase):
-    @unittest.skip('Broken in FoTraNMT')
+    @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_deferred_loading_model_and_unload(self):
         model_id = 0
         opt = {"models": ["test_model.pt"]}
@@ -26,7 +26,7 @@ class TestServerModel(unittest.TestCase):
         sm.unload()
         self.assertFalse(sm.loaded)
 
-    @unittest.skip('Broken in FoTraNMT')
+    @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_load_model_on_init_and_unload(self):
         model_id = 0
         opt = {"models": ["test_model.pt"]}
@@ -37,7 +37,7 @@ class TestServerModel(unittest.TestCase):
         sm.unload()
         self.assertFalse(sm.loaded)
 
-    @unittest.skip('Broken in FoTraNMT')
+    @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_tokenizing_with_no_tokenizer_fails(self):
         model_id = 0
         opt = {"models": ["test_model.pt"]}
@@ -46,7 +46,7 @@ class TestServerModel(unittest.TestCase):
         with self.assertRaises(ValueError):
             sm.tokenize("hello world")
 
-    @unittest.skip('Broken in FoTraNMT')
+    @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_detokenizing_with_no_tokenizer_fails(self):
         model_id = 0
         opt = {"models": ["test_model.pt"]}
@@ -109,7 +109,7 @@ class TestServerModel(unittest.TestCase):
                 for p in sm.translator.model.parameters():
                     self.assertEqual(p.device.type, "cpu")
 
-    @unittest.skip('Broken in FoTraNMT')
+    @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_run(self):
         model_id = 0
         opt = {"models": ["test_model.pt"]}
@@ -198,7 +198,7 @@ class TestTranslationServer(unittest.TestCase):
         % TEST_DIR
     )
 
-    @unittest.skip('Broken in FoTraNMT')
+    @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_start_with_initial_loading(self):
         self.write(self.CFG_LOAD)
         sv = TranslationServer()
@@ -237,7 +237,7 @@ class TestTranslationServer(unittest.TestCase):
         % TEST_DIR
     )
 
-    @unittest.skip('Broken in FoTraNMT')
+    @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_start_with_two_models(self):
         self.write(self.CFG_2_MODELS)
         sv = TranslationServer()

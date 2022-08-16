@@ -445,7 +445,7 @@ def model_opts(parser):
               help="Number of attention heads in attention bridge (fixed length"
               " of output)")
     group.add('--ab_layers', '-ab_layers', nargs='*', default=[],
-              choices=['lin', 'simple', 'transformer', 'feedforward'],
+              choices=['lin', 'perceiver', 'simple', 'transformer', 'feedforward'],
               help="Composition of the attention bridge")
     group.add('--ab_layer_norm', '-ab_layer_norm', type=str, default='layernorm',
               choices=['none', 'rmsnorm', 'layernorm'],

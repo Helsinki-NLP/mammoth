@@ -1,6 +1,6 @@
-"""Multi-headed attention"""
-
 from __future__ import division
+
+import warnings
 
 import torch
 import torch.nn as nn
@@ -319,6 +319,17 @@ class AttentionBridge(nn.Module):
             for layer_type in opt.ab_layers
         ]
 
+        # FIXME: locking-in edge case behavior
+        if any(layer == 'perceiver' for layer in opt.ab_layers):
+            first_perceiver_index = next(idx for idx, layer in enumerate(opt.ab_layers) if layer == 'perceiver')
+            if first_perceiver_index != 0:
+                assert any(layer.is_fixed_length for layer in layers[:first_perceiver_index]), 'Unsupported attention bridge configuration: at least one layer must be fixed-size before a perceiver'
+            if not all(layer == 'perceiver' for layer in opt.ab_layers):
+                warnings.warn('Architecture-mixing not fully supported with perceiver.')
+            # FIXME: deleting unused params manually
+            for perceiver_layer in layers[1:]:
+                perceiver_layer.latent_array = None
+
         return cls(layers)
 
     def forward(self, enc_output, mask):
@@ -335,5 +346,5 @@ class AttentionBridge(nn.Module):
                 # In this case, we've ensured all batch items have a constant
                 # sequence length, so the mask is no longer required.
                 mask = None
-        out =  torch.transpose(out, 0, 1).contiguous() # [hop, bsz, nhid]
+        out =  torch.transpose(out, 0, 1).contiguous()
         return out, alphas # [hop, bsz, nhid], [bsz, hop, srcseqlen]

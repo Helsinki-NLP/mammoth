@@ -108,7 +108,7 @@ class TestEmbeddings(unittest.TestCase):
                         assert init_case["position_encoding"]
                         continue
                     else:
-                        self.fail("Param {:s} is unexpectedly not " "trainable.".format(key))
+                        self.fail("Param {:s} is unexpectedly not trainable.".format(key))
             # then check nothing unexpectedly trainable
             if init_case["freeze_word_vecs"]:
                 self.assertFalse(

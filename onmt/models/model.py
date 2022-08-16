@@ -118,7 +118,7 @@ class LanguageModel(BaseModel):
     def __init__(self, encoder=None, decoder=None):
         super(LanguageModel, self).__init__(encoder, decoder)
         if encoder is not None:
-            raise ValueError("LanguageModel should not be used" "with an encoder")
+            raise ValueError("LanguageModel should not be used with an encoder")
         self.decoder = decoder
 
     def forward(self, src, tgt, lengths, bptt=False, with_align=False):

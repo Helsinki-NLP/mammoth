@@ -143,7 +143,7 @@ def load_test_model(opt):
                             sh_f_iter = [(key, sh_field)]
                         sh_f_dict = dict(sh_f_iter)
                         assert sf.vocab.stoi == sh_f_dict[sn].vocab.stoi, (
-                            "Ensemble models must use the same " "preprocessed data"
+                            "Ensemble models must use the same preprocessed data"
                         )
         models.append(model)
         if shared_model_opt is None:

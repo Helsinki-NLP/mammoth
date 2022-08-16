@@ -35,7 +35,7 @@ def _add_logging_opts(parser, is_train=True):
         '--verbose',
         '-verbose',
         action="store_true",
-        help='Print data loading and statistics for all process' '(default only log the first process shard)'
+        help='Print data loading and statistics for all process (default only log the first process shard)'
         if is_train
         else 'Print scores and predictions for each sentence',
     )
@@ -49,14 +49,14 @@ def _add_logging_opts(parser, is_train=True):
             '--tensorboard',
             '-tensorboard',
             action="store_true",
-            help="Use tensorboard for visualization during training. " "Must have the library tensorboard >= 1.14.",
+            help="Use tensorboard for visualization during training. Must have the library tensorboard >= 1.14.",
         )
         group.add(
             "--tensorboard_log_dir",
             "-tensorboard_log_dir",
             type=str,
             default="runs/onmt",
-            help="Log directory for Tensorboard. " "This is also the name of the run.",
+            help="Log directory for Tensorboard. This is also the name of the run.",
         )
         group.add(
             '--lca_loginterval',
@@ -76,7 +76,7 @@ def _add_logging_opts(parser, is_train=True):
             '-n_best',
             type=int,
             default=1,
-            help="If verbose is set, will output the n_best " "decoded sentences",
+            help="If verbose is set, will output the n_best decoded sentences",
         )
 
 
@@ -87,7 +87,7 @@ def _add_reproducibility_opts(parser):
         '-seed',
         type=int,
         default=-1,
-        help="Set random seed used for better " "reproducibility between experiments.",
+        help="Set random seed used for better reproducibility between experiments.",
     )
 
 
@@ -98,7 +98,7 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         "-data",
         "--data",
         required=True,
-        help="List of datasets and their specifications. " "See examples/*.yaml for further details.",
+        help="List of datasets and their specifications. See examples/*.yaml for further details.",
     )
     group.add(
         "-src_tgt", "--src_tgt", required=True, nargs='+', help="List of source and target language for each dataset. "
@@ -119,14 +119,14 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         default=[],
         nargs="+",
         choices=AVAILABLE_TRANSFORMS.keys(),
-        help="Default transform pipeline to apply to data. " "Can be specified in each corpus of data to override.",
+        help="Default transform pipeline to apply to data. Can be specified in each corpus of data to override.",
     )
 
     group.add(
         "-save_data",
         "--save_data",
         required=build_vocab_only,
-        help="Output base path for objects that will " "be saved (vocab, transforms, embeddings, ...).",
+        help="Output base path for objects that will be saved (vocab, transforms, embeddings, ...).",
     )
     group.add("-overwrite", "--overwrite", action="store_true", help="Overwrite existing objects if any.")
     group.add(
@@ -144,20 +144,20 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
             '-dump_fields',
             '--dump_fields',
             action='store_true',
-            help="Dump fields `*.vocab.pt` to disk." " -save_data should be set as saving prefix.",
+            help="Dump fields `*.vocab.pt` to disk. -save_data should be set as saving prefix.",
         )
         group.add(
             '-dump_transforms',
             '--dump_transforms',
             action='store_true',
-            help="Dump transforms `*.transforms.pt` to disk." " -save_data should be set as saving prefix.",
+            help="Dump transforms `*.transforms.pt` to disk. -save_data should be set as saving prefix.",
         )
     else:
         group.add(
             '-dump_samples',
             '--dump_samples',
             action='store_true',
-            help="Dump samples when building vocab. " "Warning: this may slow down the process.",
+            help="Dump samples when building vocab. Warning: this may slow down the process.",
         )
         group.add(
             '-num_threads', '--num_threads', type=int, default=1, help="Number of parallel threads to build the vocab."
@@ -263,7 +263,7 @@ def _add_dynamic_fields_opts(parser, build_vocab_only=False):
         group.add(
             '-both_embeddings',
             '--both_embeddings',
-            help="Path to the embeddings file to use " "for both source and target tokens.",
+            help="Path to the embeddings file to use for both source and target tokens.",
         )
         group.add('-src_embeddings', '--src_embeddings', help="Path to the embeddings file to use for source tokens.")
         group.add('-tgt_embeddings', '--tgt_embeddings', help="Path to the embeddings file to use for target tokens.")
@@ -315,7 +315,7 @@ def model_opts(parser):
         '--share_decoder_embeddings',
         '-share_decoder_embeddings',
         action='store_true',
-        help="Use a shared weight matrix for the input and " "output word  embeddings in the decoder.",
+        help="Use a shared weight matrix for the input and output word  embeddings in the decoder.",
     )
     group.add(
         '--share_embeddings',
@@ -329,7 +329,7 @@ def model_opts(parser):
         '--position_encoding',
         '-position_encoding',
         action='store_true',
-        help="Use a sin to mark relative words positions. " "Necessary for non-RNN style models.",
+        help="Use a sin to mark relative words positions. Necessary for non-RNN style models.",
     )
     group.add(
         "-update_vocab", "--update_vocab", action="store_true", help="Update source and target existing vocabularies"
@@ -342,7 +342,7 @@ def model_opts(parser):
         type=str,
         default='concat',
         choices=['concat', 'sum', 'mlp'],
-        help="Merge action for incorporating features embeddings. " "Options [concat|sum|mlp].",
+        help="Merge action for incorporating features embeddings. Options [concat|sum|mlp].",
     )
     group.add(
         '--feat_vec_size',
@@ -380,7 +380,7 @@ def model_opts(parser):
         '-model_type',
         default='text',
         choices=['text'],
-        help="Type of source model to use. Allows " "the system to incorporate non-text inputs. " "Options are [text].",
+        help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
     )
     group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
 
@@ -427,7 +427,7 @@ def model_opts(parser):
         '-rnn_size',
         type=int,
         default=-1,
-        help="Size of rnn hidden states. Overwrites " "enc_rnn_size and dec_rnn_size",
+        help="Size of rnn hidden states. Overwrites enc_rnn_size and dec_rnn_size",
     )
     group.add('--enc_rnn_size', '-enc_rnn_size', type=int, default=500, help="Size of encoder rnn hidden states.")
     group.add('--dec_rnn_size', '-dec_rnn_size', type=int, default=500, help="Size of decoder rnn hidden states.")
@@ -436,7 +436,7 @@ def model_opts(parser):
         '-cnn_kernel_width',
         type=int,
         default=3,
-        help="Size of windows in the cnn, the kernel_size is " "(cnn_kernel_width, 1) in conv layer",
+        help="Size of windows in the cnn, the kernel_size is (cnn_kernel_width, 1) in conv layer",
     )
 
     group.add(
@@ -464,7 +464,7 @@ def model_opts(parser):
         '--bridge',
         '-bridge',
         action="store_true",
-        help="Have an additional layer between the last encoder " "state and the first decoder state",
+        help="Have an additional layer between the last encoder state and the first decoder state",
     )
     group.add(
         '--rnn_type',
@@ -486,7 +486,7 @@ def model_opts(parser):
         type=str,
         default=None,
         choices=['source', 'target', 'both'],
-        help="Type of context gate to use. " "Do not select for no context gate.",
+        help="Type of context gate to use. Do not select for no context gate.",
     )
 
     # The following options (bridge_extra_node to n_steps) are used
@@ -523,7 +523,7 @@ def model_opts(parser):
         type=str,
         default='general',
         choices=['dot', 'general', 'mlp', 'none'],
-        help="The attention type to use: " "dotprod or general (Luong) or MLP (Bahdanau)",
+        help="The attention type to use: dotprod or general (Luong) or MLP (Bahdanau)",
     )
     group.add(
         '--global_attention_function',
@@ -537,7 +537,7 @@ def model_opts(parser):
         '-self_attn_type',
         type=str,
         default="scaled-dot",
-        help='Self attention type in Transformer decoder ' 'layer -- currently "scaled-dot" or "average" ',
+        help='Self attention type in Transformer decoder layer -- currently "scaled-dot" or "average" ',
     )
     group.add(
         '--max_relative_positions',
@@ -592,7 +592,7 @@ def model_opts(parser):
         type=str,
         default=None,
         choices=['dot', 'general', 'mlp', 'none'],
-        help="The copy attention type to use. Leave as None to use " "the same as -global_attention.",
+        help="The copy attention type to use. Leave as None to use the same as -global_attention.",
     )
     group.add(
         '--generator_function',
@@ -624,7 +624,7 @@ def model_opts(parser):
         '-loss_scale',
         type=float,
         default=0,
-        help="For FP16 training, the static loss scale to use. If not " "set, the loss scale is dynamically computed.",
+        help="For FP16 training, the static loss scale to use. If not set, the loss scale is dynamically computed.",
     )
     group.add(
         '--apex_opt_level',
@@ -632,7 +632,7 @@ def model_opts(parser):
         type=str,
         default="O1",
         choices=["O0", "O1", "O2", "O3"],
-        help="For FP16 training, the opt_level to use." "See https://nvidia.github.io/apex/amp.html#opt-levels.",
+        help="For FP16 training, the opt_level to use. See https://nvidia.github.io/apex/amp.html#opt-levels.",
     )
 
     # attention bridge options
@@ -645,7 +645,7 @@ def model_opts(parser):
         '-ab_fixed_length',
         type=int,
         default=50,
-        help="Number of attention heads in attention bridge (fixed length" " of output)",
+        help="Number of attention heads in attention bridge (fixed length of output)",
     )
     group.add(
         '--ab_layers',
@@ -668,13 +668,13 @@ def model_opts(parser):
 def _add_train_general_opts(parser):
     """General options for training"""
     group = parser.add_argument_group('General')
-    group.add('--data_type', '-data_type', default="text", help="Type of the source input. " "Options are [text].")
+    group.add('--data_type', '-data_type', default="text", help="Type of the source input. Options are [text].")
 
     group.add(
         '--save_model',
         '-save_model',
         default='model',
-        help="Model filename (the model will be saved as " "<save_model>_N.pt where N is the number " "of steps",
+        help="Model filename (the model will be saved as <save_model>_N.pt where N is the number of steps",
     )
     group.add(
         "--save_all_gpus",
@@ -732,7 +732,7 @@ def _add_train_general_opts(parser):
         '--param_init_glorot',
         '-param_init_glorot',
         action='store_true',
-        help="Init parameters with xavier_uniform. " "Required for transformer.",
+        help="Init parameters with xavier_uniform. Required for transformer.",
     )
 
     group.add(
@@ -740,7 +740,7 @@ def _add_train_general_opts(parser):
         '-train_from',
         default='',
         type=str,
-        help="If training from a checkpoint then this is the " "path to the pretrained model's state_dict.",
+        help="If training from a checkpoint then this is the path to the pretrained model's state_dict.",
     )
     group.add(
         '--reset_optim',
@@ -794,7 +794,7 @@ def _add_train_general_opts(parser):
         '-batch_type',
         default='sents',
         choices=["sents", "tokens"],
-        help="Batch grouping for batch_size. Standard " "is sents. Tokens will do dynamic batching",
+        help="Batch grouping for batch_size. Standard is sents. Tokens will do dynamic batching",
     )
     group.add(
         '--pool_factor',
@@ -962,7 +962,7 @@ def _add_train_general_opts(parser):
         '-average_every',
         type=int,
         default=1,
-        help="Step for moving average. " "Default is every update, " "if -average_decay is set.",
+        help="Step for moving average. Default is every update, if -average_decay is set.",
     )
 
     # learning rate
@@ -972,7 +972,7 @@ def _add_train_general_opts(parser):
         '-learning_rate',
         type=float,
         default=1.0,
-        help="Starting learning rate. " "Recommended settings: sgd = 1, adagrad = 0.1, " "adadelta = 1, adam = 0.001",
+        help="Starting learning rate. Recommended settings: sgd = 1, adagrad = 0.1, adadelta = 1, adam = 0.001",
     )
     group.add(
         '--learning_rate_decay',
@@ -988,7 +988,7 @@ def _add_train_general_opts(parser):
         '-start_decay_steps',
         type=int,
         default=50000,
-        help="Start decaying every decay_steps after " "start_decay_steps",
+        help="Start decaying every decay_steps after start_decay_steps",
     )
     group.add('--decay_steps', '-decay_steps', type=int, default=10000, help="Decay every decay_steps")
 
@@ -1058,7 +1058,7 @@ def _add_decoding_opts(parser):
         '-random_sampling_temp',
         default=1.0,
         type=float,
-        help="If doing random sampling, divide the logits by " "this before computing softmax during decoding.",
+        help="If doing random sampling, divide the logits by this before computing softmax during decoding.",
     )
     group._group_actions.append(beam_size)
     _add_reproducibility_opts(parser)
@@ -1079,7 +1079,7 @@ def _add_decoding_opts(parser):
         '-alpha',
         type=float,
         default=0.0,
-        help="Google NMT length penalty parameter " "(higher = longer generation)",
+        help="Google NMT length penalty parameter (higher = longer generation)",
     )
     # Coverage penalty options
     group.add(
@@ -1094,11 +1094,11 @@ def _add_decoding_opts(parser):
         '--stepwise_penalty',
         '-stepwise_penalty',
         action='store_true',
-        help="Apply coverage penalty at every decoding step. " "Helpful for summary penalty.",
+        help="Apply coverage penalty at every decoding step. Helpful for summary penalty.",
     )
 
     group = parser.add_argument_group(
-        'Decoding tricks', '.. Tip:: Following options can be used to limit the decoding length ' 'or content.'
+        'Decoding tricks', '.. Tip:: Following options can be used to limit the decoding length or content.'
     )
     # Decoding Length constraint
     group.add('--min_length', '-min_length', type=int, default=0, help='Minimum prediction length')
@@ -1120,7 +1120,7 @@ def _add_decoding_opts(parser):
         nargs='+',
         type=str,
         default=[],
-        help="Ignore these strings when blocking repeats. " "You want to block sentence delimiters.",
+        help="Ignore these strings when blocking repeats. You want to block sentence delimiters.",
     )
     group.add(
         '--replace_unk',
@@ -1165,13 +1165,13 @@ def translate_opts(parser):
         type=str,
         default=[],
         required=True,
-        help="Path to model .pt file(s). " "Multiple models can be specified, " "for ensemble decoding.",
+        help="Path to model .pt file(s). Multiple models can be specified, for ensemble decoding.",
     )
     group.add(
         '--fp32',
         '-fp32',
         action='store_true',
-        help="Force the model to be in FP32 " "because FP16 is very slow on GTX1080(ti).",
+        help="Force the model to be in FP32 because FP16 is very slow on GTX1080(ti).",
     )
     group.add('--int8', '-int8', action='store_true', help="Enable dynamic 8-bit quantization (CPU only).")
     group.add(
@@ -1193,7 +1193,7 @@ def translate_opts(parser):
     #    group.add('--lang_pair', '-lang_pair',
     #              help="language pair to translate")
 
-    group.add('--src', '-src', required=True, help="Source sequence to decode (one line per " "sequence)")
+    group.add('--src', '-src', required=True, help="Source sequence to decode (one line per sequence)")
     group.add(
         "-src_feats",
         "--src_feats",
@@ -1222,7 +1222,7 @@ def translate_opts(parser):
         '--output',
         '-output',
         default='pred.txt',
-        help="Path to output the predictions (each line will " "be the decoded sequence",
+        help="Path to output the predictions (each line will be the decoded sequence",
     )
     group.add('--report_align', '-report_align', action='store_true', help="Report alignment for each translation.")
     group.add('--report_time', '-report_time', action='store_true', help="Report some translation time metrics")
@@ -1240,7 +1240,7 @@ def translate_opts(parser):
         '-batch_type',
         default='sents',
         choices=["sents", "tokens"],
-        help="Batch grouping for batch_size. Standard " "is sents. Tokens will do dynamic batching",
+        help="Batch grouping for batch_size. Standard is sents. Tokens will do dynamic batching",
     )
     group.add('--gpu', '-gpu', type=int, default=-1, help="Device to run on")
 
@@ -1265,13 +1265,13 @@ def build_bilingual_model(parser):
         "--encoder",
         "-encoder",
         required=False,
-        help="Path to the encoder module .pt file" "NOT NEEDED IF --model gives a path+model_preffix",
+        help="Path to the encoder module .pt file NOT NEEDED IF --model gives a path+model_preffix",
     )
     group.add(
         "--decoder",
         "-decoder",
         required=False,
-        help="Path to the decoder module .pt file" "NOT NEEDED IF --model gives a path+model_preffix",
+        help="Path to the decoder module .pt file NOT NEEDED IF --model gives a path+model_preffix",
     )
     group.add(
         "--bridge",

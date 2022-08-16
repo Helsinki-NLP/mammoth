@@ -632,7 +632,7 @@ class Translator(Inference):
     @classmethod
     def validate_task(cls, task):
         if task != ModelTask.SEQ2SEQ:
-            raise ValueError(f"Translator does not support task {task}." f" Tasks supported: {ModelTask.SEQ2SEQ}")
+            raise ValueError(f"Translator does not support task {task}. Tasks supported: {ModelTask.SEQ2SEQ}")
 
     def _align_forward(self, batch, predictions):
         """
@@ -855,7 +855,7 @@ class GeneratorLM(Inference):
     def validate_task(cls, task):
         if task != ModelTask.LANGUAGE_MODEL:
             raise ValueError(
-                f"GeneratorLM does not support task {task}." f" Tasks supported: {ModelTask.LANGUAGE_MODEL}"
+                f"GeneratorLM does not support task {task}. Tasks supported: {ModelTask.LANGUAGE_MODEL}"
             )
 
     def _align_forward(self, batch, predictions):

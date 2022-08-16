@@ -834,7 +834,7 @@ class ServerModel(object):
             src_marker = self.tokenizer_marker(side='src')
             tgt_marker = self.tokenizer_marker(side='tgt')
             if src_marker is None or tgt_marker is None:
-                raise ValueError("To get decoded alignment, joiner/spacer " "should be used in both side's tokenizer.")
+                raise ValueError("To get decoded alignment, joiner/spacer should be used in both side's tokenizer.")
             elif ''.join(tgt.split()) != '':
                 align = to_word_align(src, tgt, align, src_marker, tgt_marker)
         return align

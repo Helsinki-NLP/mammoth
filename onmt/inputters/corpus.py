@@ -357,7 +357,7 @@ def build_vocab(opts, corpus_id, transforms, n_sample=3):
         raise ValueError(f"n_sample should > 0 or == -1, get {n_sample}.")
 
     if opts.dump_samples:
-        logger.info("The samples on which the vocab is built will be " "dumped to disk. It may slow down the process.")
+        logger.info("The samples on which the vocab is built will be dumped to disk. It may slow down the process.")
     corpora = {corpus_id: get_corpus(opts, corpus_id, is_train=True)}
     counter_src = Counter()
     counter_tgt = Counter()

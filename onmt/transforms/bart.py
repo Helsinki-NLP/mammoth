@@ -356,7 +356,7 @@ class BARTNoiseTransform(Transform):
             "-random_ratio",
             type=float,
             default=0.0,
-            help="Instead of using {}, use random token " "this often.".format(DefaultTokens.MASK),
+            help="Instead of using {}, use random token this often.".format(DefaultTokens.MASK),
         )
 
         group.add(
@@ -379,7 +379,7 @@ class BARTNoiseTransform(Transform):
             "-poisson_lambda",
             type=float,
             default=3.0,
-            help="Lambda for Poisson distribution to sample span length " "if `-mask_length` set to span-poisson.",
+            help="Lambda for Poisson distribution to sample span length if `-mask_length` set to span-poisson.",
         )
         group.add(
             "--replace_length",
@@ -387,7 +387,7 @@ class BARTNoiseTransform(Transform):
             type=int,
             default=-1,
             choices=[-1, 0, 1],
-            help="When masking N tokens, replace with 0, 1, " "or N tokens. (use -1 for N)",
+            help="When masking N tokens, replace with 0, 1, or N tokens. (use -1 for N)",
         )
 
     @classmethod

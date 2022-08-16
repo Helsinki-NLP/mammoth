@@ -32,7 +32,7 @@ class DataOptsCheckerMixin(object):
             # Check Transforms
             _transforms = corpus.get('transforms', None)
             if _transforms is None:
-                logger.info(f"Missing transforms field for {cname} data, " f"set to default: {default_transforms}.")
+                logger.info(f"Missing transforms field for {cname} data, set to default: {default_transforms}.")
                 corpus['transforms'] = default_transforms
             opt.data_task = ModelTask.SEQ2SEQ
             """
@@ -61,7 +61,7 @@ class DataOptsCheckerMixin(object):
             path_align = corpus.get('path_align', None)
             if path_align is None:
                 if hasattr(opt, 'lambda_align') and opt.lambda_align > 0.0:
-                    raise ValueError(f'Corpus {cname} alignment file path are ' 'required when lambda_align > 0.0')
+                    raise ValueError(f'Corpus {cname} alignment file path are required when lambda_align > 0.0')
                 corpus['path_align'] = None
             else:
                 cls._validate_file(path_align, info=f'{cname}/path_align')
@@ -76,7 +76,7 @@ class DataOptsCheckerMixin(object):
             if weight is not None:
                 if cname != CorpusName.VALID:
                     logger.warning(
-                        f"Corpus {cname}'s weight is set, but weights are not supported." " We reset it to 1 for you."
+                        f"Corpus {cname}'s weight is set, but weights are not supported. We reset it to 1 for you."
                     )
             corpus['weight'] = 1
 
@@ -86,9 +86,9 @@ class DataOptsCheckerMixin(object):
                 for feature_name, feature_file in src_feats.items():
                     cls._validate_file(feature_file, info=f'{cname}/path_{feature_name}')
                 if 'inferfeats' not in corpus["transforms"]:
-                    raise ValueError("'inferfeats' transform is required " "when setting source features")
+                    raise ValueError("'inferfeats' transform is required when setting source features")
                 if 'filterfeats' not in corpus["transforms"]:
-                    raise ValueError("'filterfeats' transform is required " "when setting source features")
+                    raise ValueError("'filterfeats' transform is required when setting source features")
             else:
                 corpus["src_feats"] = None
 
@@ -120,9 +120,9 @@ class DataOptsCheckerMixin(object):
                 all_transforms.update(_transforms)
         if hasattr(opt, 'lambda_align') and opt.lambda_align > 0.0:
             if not all_transforms.isdisjoint({'sentencepiece', 'bpe', 'onmt_tokenize'}):
-                raise ValueError('lambda_align is not compatible with' ' on-the-fly tokenization.')
+                raise ValueError('lambda_align is not compatible with on-the-fly tokenization.')
             if not all_transforms.isdisjoint({'tokendrop', 'prefix', 'bart'}):
-                raise ValueError('lambda_align is not compatible yet with' ' potentiel token deletion/addition.')
+                raise ValueError('lambda_align is not compatible yet with potentiel token deletion/addition.')
         opt._all_transform = all_transforms
 
     @classmethod
@@ -296,10 +296,10 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if torch.cuda.is_available() and not opt.gpu_ranks:
             logger.warn("You have a CUDA device, should run with -gpu_ranks")
         if opt.world_size < len(opt.gpu_ranks):
-            raise AssertionError("parameter counts of -gpu_ranks must be less or equal " "than -world_size.")
+            raise AssertionError("parameter counts of -gpu_ranks must be less or equal than -world_size.")
         if opt.world_size == len(opt.gpu_ranks) and min(opt.gpu_ranks) > 0:
             raise AssertionError(
-                "-gpu_ranks should have master(=0) rank " "unless -world_size is greater than len(gpu_ranks)."
+                "-gpu_ranks should have master(=0) rank unless -world_size is greater than len(gpu_ranks)."
             )
 
         assert len(opt.dropout) == len(opt.dropout_steps), "Number of dropout values must match accum_steps values"

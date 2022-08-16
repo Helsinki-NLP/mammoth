@@ -413,7 +413,7 @@ class InputFeedRNNDecoder(RNNDecoderBase):
         return dec_state, dec_outs, attns
 
     def _build_rnn(self, rnn_type, input_size, hidden_size, num_layers, dropout):
-        assert rnn_type != "SRU", "SRU doesn't support input feed! " "Please set -input_feed 0!"
+        assert rnn_type != "SRU", "SRU doesn't support input feed! Please set -input_feed 0!"
         stacked_cell = StackedLSTM if rnn_type == "LSTM" else StackedGRU
         return stacked_cell(num_layers, input_size, hidden_size, dropout)
 

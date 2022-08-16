@@ -47,7 +47,7 @@ def check_sru_requirement(abort=False):
     except subprocess.CalledProcessError:
         if not abort:
             return False
-        raise AssertionError("Using SRU requires 'cupy' and 'pynvrtc' " "python packages installed.")
+        raise AssertionError("Using SRU requires 'cupy' and 'pynvrtc' python packages installed.")
 
     # Check 2.
     if torch.cuda.is_available() is False:
@@ -62,7 +62,7 @@ def check_sru_requirement(abort=False):
         if not abort:
             return False
         raise AssertionError(
-            "Using SRU requires setting cuda lib path, e.g. " "export LD_LIBRARY_PATH=/usr/local/cuda/lib64."
+            "Using SRU requires setting cuda lib path, e.g. export LD_LIBRARY_PATH=/usr/local/cuda/lib64."
         )
 
     return True

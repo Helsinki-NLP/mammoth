@@ -29,7 +29,7 @@ class PositionalEncoding(nn.Module):
 
     def __init__(self, dropout, dim, max_len=5000):
         if dim % 2 != 0:
-            raise ValueError("Cannot use sin/cos positional encoding with " "odd dim (got dim={:d})".format(dim))
+            raise ValueError("Cannot use sin/cos positional encoding with odd dim (got dim={:d})".format(dim))
         pe = torch.zeros(max_len, dim)
         position = torch.arange(0, max_len).unsqueeze(1)
         div_term = torch.exp((torch.arange(0, dim, 2, dtype=torch.float) * -(math.log(10000.0) / dim)))
@@ -183,9 +183,9 @@ class Embeddings(nn.Module):
         if feat_merge == "sum":
             # features must use word_vec_size
             if feat_vec_exponent != 0.7:
-                warnings.warn("Merging with sum, but got non-default " "feat_vec_exponent. It will be unused.")
+                warnings.warn("Merging with sum, but got non-default feat_vec_exponent. It will be unused.")
             if feat_vec_size != -1:
-                warnings.warn("Merging with sum, but got non-default " "feat_vec_size. It will be unused.")
+                warnings.warn("Merging with sum, but got non-default feat_vec_size. It will be unused.")
         elif feat_vec_size > 0:
             # features will use feat_vec_size
             if feat_vec_exponent != -1:

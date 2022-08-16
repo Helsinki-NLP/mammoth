@@ -44,7 +44,7 @@ def prepare_fields_transforms(opt):
         save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
     if opt.n_sample != 0:
         logger.warning(
-            "`-n_sample` != 0: Training will not be started. " f"Stop after saving {opt.n_sample} samples/corpus."
+            f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
         )
         save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
         logger.info("Sample saved, please check it before restart training.")
@@ -108,7 +108,7 @@ def init_train_prepare_fields_transforms(opt, vocab_path, side):
         save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
     if opt.n_sample != 0:
         logger.warning(
-            "`-n_sample` != 0: Training will not be started. " f"Stop after saving {opt.n_sample} samples/corpus."
+            f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
         )
         save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
         logger.info("Sample saved, please check it before restart training.")

@@ -29,7 +29,7 @@ class FilterFeatsTransform(Transform):
 
         for feat_name, feat_values in example['src_feats'].items():
             if len(example['src']) != len(feat_values):
-                logger.warning(f"Skipping example due to mismatch " f"between source and feature {feat_name}")
+                logger.warning(f"Skipping example due to mismatch between source and feature {feat_name}")
                 return None
         return example
 
@@ -53,7 +53,7 @@ class InferFeatsTransform(Transform):
             "-reversible_tokenization",
             default="joiner",
             choices=["joiner", "spacer"],
-            help="Type of reversible tokenization " "applied on the tokenizer.",
+            help="Type of reversible tokenization applied on the tokenizer.",
         )
         group.add(
             "--prior_tokenization",

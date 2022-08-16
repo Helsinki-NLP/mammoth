@@ -27,7 +27,7 @@ def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
     unk_idx = tgt_field.vocab.stoi[tgt_field.unk_token]
 
     if opt.lambda_coverage != 0:
-        assert opt.coverage_attn, "--coverage_attn needs to be set in " "order to use --lambda_coverage != 0"
+        assert opt.coverage_attn, "--coverage_attn needs to be set in order to use --lambda_coverage != 0"
 
     if opt.copy_attn:
         criterion = onmt.modules.CopyGeneratorLoss(
@@ -258,7 +258,7 @@ class CommonLossCompute(LossComputeBase):
             " Transformer decoders do not implement coverage"
         )
         assert std is not None, (
-            "lambda_coverage != 0.0 requires attention mechanism" " that could not be found in the model."
+            "lambda_coverage != 0.0 requires attention mechanism that could not be found in the model."
         )
         shard_state.update({"std_attn": attns.get("std"), "coverage_attn": coverage})
 
@@ -297,8 +297,8 @@ class CommonLossCompute(LossComputeBase):
         # ['sent_N°_in_batch', 'tgt_id+1', 'src_id'] (check AlignField)
         align_idx = batch.align
         assert attns is not None
-        assert attn_align is not None, "lambda_align != 0.0 requires " "alignement attention head"
-        assert align_idx is not None, "lambda_align != 0.0 requires " "provide guided alignement"
+        assert attn_align is not None, "lambda_align != 0.0 requires alignement attention head"
+        assert align_idx is not None, "lambda_align != 0.0 requires provide guided alignement"
         pad_tgt_size, batch_size, _ = batch.tgt.size()
         pad_src_size = batch.src[0].size(0)
         align_matrix_size = [batch_size, pad_tgt_size, pad_src_size]

@@ -75,28 +75,28 @@ class TokenizerTransform(Transform):
             '--src_subword_vocab',
             type=str,
             default="",
-            help="Path to the vocabulary file for src subword. " "Format: <word>\t<count> per line.",
+            help="Path to the vocabulary file for src subword. Format: <word>\t<count> per line.",
         )
         group.add(
             "-tgt_subword_vocab",
             "--tgt_subword_vocab",
             type=str,
             default="",
-            help="Path to the vocabulary file for tgt subword. " "Format: <word>\t<count> per line.",
+            help="Path to the vocabulary file for tgt subword. Format: <word>\t<count> per line.",
         )
         group.add(
             '-src_vocab_threshold',
             '--src_vocab_threshold',
             type=int,
             default=0,
-            help="Only produce src subword in src_subword_vocab with " " frequency >= src_vocab_threshold.",
+            help="Only produce src subword in src_subword_vocab with frequency >= src_vocab_threshold.",
         )
         group.add(
             "-tgt_vocab_threshold",
             "--tgt_vocab_threshold",
             type=int,
             default=0,
-            help="Only produce tgt subword in tgt_subword_vocab with " " frequency >= tgt_vocab_threshold.",
+            help="Only produce tgt subword in tgt_subword_vocab with frequency >= tgt_vocab_threshold.",
         )
 
     @classmethod
@@ -308,7 +308,7 @@ class ONMTTokenizerTransform(TokenizerTransform):
             type=str,
             default='none',
             choices=['none', 'sentencepiece', 'bpe'],
-            help="Type of subword model for src (or shared) " "in pyonmttok.",
+            help="Type of subword model for src (or shared) in pyonmttok.",
         )
         group.add(
             '-tgt_subword_type',
@@ -323,14 +323,14 @@ class ONMTTokenizerTransform(TokenizerTransform):
             '--src_onmttok_kwargs',
             type=str,
             default="{'mode': 'none'}",
-            help="Other pyonmttok options for src in dict string, " "except subword related options listed earlier.",
+            help="Other pyonmttok options for src in dict string, except subword related options listed earlier.",
         )
         group.add(
             '-tgt_onmttok_kwargs',
             '--tgt_onmttok_kwargs',
             type=str,
             default="{'mode': 'none'}",
-            help="Other pyonmttok options for tgt in dict string, " "except subword related options listed earlier.",
+            help="Other pyonmttok options for tgt in dict string, except subword related options listed earlier.",
         )
 
     @classmethod

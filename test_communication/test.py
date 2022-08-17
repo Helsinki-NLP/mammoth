@@ -868,6 +868,7 @@ class TestTraining(TestCase):
             logger.info("Removing folder {}".format("tensorboard/{}".format(out_model_prefix)))
             shutil.rmtree("tensorboard/{}".format(out_model_prefix))
 
+
 class TestTranslate(TestCase):
     @classmethod
     def setUpClass(cls) -> None:

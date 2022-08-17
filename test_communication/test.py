@@ -1,6 +1,7 @@
 import ast
 import logging
 import os
+import shutil
 from typing import List
 from unittest import TestCase
 
@@ -774,6 +775,98 @@ class TestTraining(TestCase):
                 logger.info("Removing file {}".format(out_file))
                 os.remove(out_file)
 
+    def test_training_1gpu_tensorboard(self):
+        out_model_prefix = "wmt_1gpu_tb"
+        opt, _ = self.parser.parse_known_args(
+            [
+                "-config",
+                "config/wmt_4pairs.yml",
+                "-tensorboard",
+                "-tensorboard_log_dir",
+                "tensorboard/{}".format(out_model_prefix),
+                "-report_stats_from_parameters",
+                "-save_model",
+                "models/{}".format(out_model_prefix),
+                "-world_size",
+                "1",
+                "-gpu_ranks",
+                "0",
+                "-node_gpu",
+                "0:0",
+                "0:0",
+                "0:0",
+                "0:0",
+            ]
+        )
+        components = self._get_model_components(opt)
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+            logger.info("Launch training")
+        train(opt)
+        for cmp in components:
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+        self.assertIn(out_model_prefix, os.listdir("tensorboard"))
+        self.assertEqual(1, len(os.listdir("tensorboard/{}".format(out_model_prefix))))
+        self.assertEqual("-rankNone:0", os.listdir("tensorboard/{}".format(out_model_prefix))[0][-11:])
+        if os.path.exists("tensorboard/{}".format(out_model_prefix)):
+            logger.info("Removing folder {}".format("tensorboard/{}".format(out_model_prefix)))
+            shutil.rmtree("tensorboard/{}".format(out_model_prefix))
+
+    def test_training_2gpus_tensorboard(self):
+        out_model_prefix = "wmt_2gpus_tb"
+        opt, _ = self.parser.parse_known_args(
+            [
+                "-config",
+                "config/wmt_4pairs.yml",
+                "-tensorboard",
+                "-tensorboard_log_dir",
+                "tensorboard/{}".format(out_model_prefix),
+                "-report_stats_from_parameters",
+                "-save_model",
+                "models/{}".format(out_model_prefix),
+                "-world_size",
+                "2",
+                "-gpu_ranks",
+                "0",
+                "1",
+                "-node_gpu",
+                "0:0",
+                "0:1",
+                "0:0",
+                "0:1",
+            ]
+        )
+        components = self._get_model_components(opt)
+        out_files = ["models/{}_step_4_{}.pt".format(out_model_prefix, cmp) for cmp in components]
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+            logger.info("Launch training")
+        train(opt)
+        for cmp in components:
+            self.assertNotIn("{}_step_2_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+            self.assertIn("{}_step_4_{}.pt".format(out_model_prefix, cmp), os.listdir("models"))
+        for out_file in out_files:
+            if os.path.exists(out_file):
+                logger.info("Removing file {}".format(out_file))
+                os.remove(out_file)
+        self.assertIn(out_model_prefix, os.listdir("tensorboard"))
+        tensorboard_run_folders = sorted(os.listdir("tensorboard/{}".format(out_model_prefix)), key=lambda x: x[::-1])
+        self.assertEqual(2, len(os.listdir("tensorboard/{}".format(out_model_prefix))))
+        self.assertEqual("-rank0:0", tensorboard_run_folders[0][-8:])
+        self.assertEqual("-rank0:1", tensorboard_run_folders[1][-8:])
+        if os.path.exists("tensorboard/{}".format(out_model_prefix)):
+            logger.info("Removing folder {}".format("tensorboard/{}".format(out_model_prefix)))
+            shutil.rmtree("tensorboard/{}".format(out_model_prefix))
 
 class TestTranslate(TestCase):
     @classmethod

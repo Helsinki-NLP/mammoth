@@ -82,7 +82,7 @@ def build_trainer(
         else None
     )
 
-    report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
+    report_manager = onmt.utils.build_report_manager(opt, scheduler.node_rank, scheduler.local_rank)
     trainer = onmt.Trainer(
         model,
         train_loss_md,

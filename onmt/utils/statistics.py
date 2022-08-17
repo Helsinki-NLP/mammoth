@@ -95,14 +95,11 @@ class Statistics(object):
         if update_n_src_words:
             self.n_src_words += stat.n_src_words
 
-    def update_task_loss(self, loss, metadata, global_rank):
+    def update_task_loss(self, loss, metadata):
         if not loss:
-            logger.info('not loss', f'{global_rank}_{metadata.src_lang}_{metadata.tgt_lang}')
+            logger.info(f'not loss {metadata.src_lang}_{metadata.tgt_lang}')
             return
-        if global_rank is not None:
-            key = f'{global_rank}_{metadata.src_lang}_{metadata.tgt_lang}'
-        else:
-            key = f'{metadata.src_lang}_{metadata.tgt_lang}'
+        key = f'{metadata.src_lang}_{metadata.tgt_lang}'
         self.loss_per_task[key] += loss
 
     def update_from_parameters(self, named_parameters):

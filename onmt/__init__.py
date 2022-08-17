@@ -1,5 +1,5 @@
 """ Main entry point of the ONMT library """
-import onmt.inputters
+import onmt.inputters_mvp
 import onmt.encoders
 import onmt.decoders
 import onmt.models
@@ -14,6 +14,6 @@ onmt.utils.optimizers.Optim = onmt.utils.optimizers.Optimizer
 sys.modules["onmt.Optim"] = onmt.utils.optimizers
 
 # For Flake
-__all__ = [onmt.inputters, onmt.encoders, onmt.decoders, onmt.models, onmt.utils, onmt.modules, onmt.opts, "Trainer"]
+__all__ = [onmt.inputters_mvp, onmt.encoders, onmt.decoders, onmt.models, onmt.utils, onmt.modules, onmt.opts, "Trainer"]
 
 __version__ = "2.2.0"

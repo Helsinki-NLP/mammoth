@@ -11,11 +11,11 @@ import torch.distributed
 from argparse import Namespace
 from collections import OrderedDict
 from itertools import compress, cycle, islice
-from onmt.inputters.corpus import get_corpus
+from onmt.inputters_mvp import get_corpus
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
 from typing import Any, Dict, Optional
-
+import torch
 
 def is_master(global_rank):
     return global_rank == 0
@@ -184,7 +184,7 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
         batch.dataset = None
         # Move batch to correspond device_id when consumer iterate
         # hack to dodge unpicklable `dict_keys`
-        batch.fields = list(batch.fields)
+        # batch.fields = list(batch.fields)
         queue.put((batch, metadata, communication_batch_id))
 
 
@@ -419,8 +419,13 @@ class Scheduler:
     def get_corpora(self, is_train=False) -> Dict[str, Any]:
         corpus_ids = self.opt.data.keys()
         my_corpus_ids = compress(corpus_ids, self._selector)
-        return {corpus_id: get_corpus(self.opt, corpus_id, is_train=is_train) for corpus_id in my_corpus_ids}
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
+        return {
+            corpus_id: get_corpus(self.opt, corpus_id, src_lang, tgt_lang, is_train=is_train).to(torch.device(self.local_rank))
+            for (corpus_id, (src_lang, tgt_lang)) in zip(my_corpus_ids, my_lang_pairs)
+        }
 
+    # FIXME: merge with below
     def get_vocabularies(self, opt: Namespace, side: str):
         my_lang_pairs = compress(self.lang_pairs, self._selector)
         result = []
@@ -431,7 +436,7 @@ class Scheduler:
             result.append((lang, vocab_path))
         return result
 
-    def get_fields(self, side: str, fields_dict):
+    def get_vocabs(self, side: str, vocabs_dict):
         """Returns a list of tuples: (side, lang, component_id, fields).
         side:           Either 'src' or 'tgt'.
         lang:           The language code. Vocabularies are language specific.
@@ -450,11 +455,11 @@ class Scheduler:
             src_lang, tgt_lang = lang_pair
             lang = src_lang if side == 'src' else tgt_lang
             if not (side, lang, component_id) in seen:
-                result.append((side, lang, component_id, fields_dict[(side, lang)]))
+                result.append((side, lang, component_id, vocabs_dict[(side, lang)]))
             seen.add((side, lang, component_id))
         return result
 
-    def get_dataset_specs(self, fields_dict):
+    def get_dataset_specs(self):
         my_lang_pairs = compress(self.lang_pairs, self._selector)
         my_encoder_ids = compress(self.encoder_ids, self._selector)
         my_decoder_ids = compress(self.decoder_ids, self._selector)
@@ -475,8 +480,8 @@ class Scheduler:
                     decoder_id,
                     corpus_id,
                     corpus_dict[corpus_id],
-                    fields_dict[('src', src_lang)],
-                    fields_dict[('tgt', tgt_lang)],
+                    # vocabs_dict[('src', src_lang)]
+                    # vocabs_dict[('tgt', tgt_lang)]
                 )
             )
         return result

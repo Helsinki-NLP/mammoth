@@ -4,7 +4,7 @@ from onmt.utils.logging import logger
 from onmt.constants import CorpusName
 from onmt.transforms import TransformPipe
 from onmt.inputters.dataset_base import _dynamic_dict
-from torchtext.legacy.data import Dataset as TorchtextDataset, Example as TorchtextExample
+# from torchtext.legacy.data import Dataset as TorchtextDataset, Example as TorchtextExample
 
 from collections import Counter, defaultdict
 from contextlib import contextmanager
@@ -168,6 +168,7 @@ class ParallelCorpus(object):
 
 
 def get_corpus(opts, corpus_id: str, is_train: bool = False):
+    import pdb; pdb.set_trace()
     if not is_train:
         corpus_id = CorpusName.VALID
     if corpus_id in opts.data.keys():

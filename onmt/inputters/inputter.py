@@ -6,7 +6,7 @@ import math
 from collections import Counter, defaultdict, OrderedDict
 
 import torch
-from torchtext.legacy.data import Field, RawField, LabelField
+# from torchtext.legacy.data import Field, RawField, LabelField
 from torchtext.vocab import Vocab
 
 from onmt.constants import DefaultTokens, ModelTask

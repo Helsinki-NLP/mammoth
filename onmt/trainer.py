@@ -46,17 +46,15 @@ def build_trainer(
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
-    for (side, lang, component_id, fields) in scheduler.get_fields('tgt', fields_dict):
+    for (side, lang, component_id, tgt_vocab) in scheduler.get_vocabs('tgt', fields_dict):
         generator = generators_md[f"generator{lang}"]
-        # This retrieves the primary field of this crappy datastructure
-        tgt_field = fields['tgt'].fields[0][1]
         train_loss_md.add_module(
             f'trainloss{lang}',
-            onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=True, generator=generator),
+            onmt.utils.loss.build_loss_compute(model, tgt_vocab, opt, train=True, generator=generator),
         )
         valid_loss_md.add_module(
             f'valloss{lang}',
-            onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False, generator=generator),
+            onmt.utils.loss.build_loss_compute(model, tgt_vocab, opt, train=False, generator=generator),
         )
 
     trunc_size = opt.truncated_decoder  # Badly named...

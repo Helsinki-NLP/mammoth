@@ -1,0 +1,14 @@
+"""The point of this package is to provide a minimal viable product with:
+    - vocab loading (cf. vocab.py)
+    - token-counts based batch sampler (cf. dataloader.py)
+    - on the fly pad, bos, eos, unk handling (cf. dataset.py)
+    - handling of transforms (cf. dataset.py)
+    - multiple parallel corpora, in accordance with TaskDistributor (cf. distributed.py)
+"""
+
+from onmt.inputters_mvp.dataloader import build_dataloader, DynamicDatasetIter
+from onmt.inputters_mvp.dataset import get_corpus
+from onmt.inputters_mvp.vocab import get_vocab
+
+
+__all__ = ['build_dataloader', 'DynamicDatasetIter', 'get_corpus']

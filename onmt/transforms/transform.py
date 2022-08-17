@@ -2,7 +2,7 @@
 import torch
 from onmt.utils.logging import logger
 from onmt.utils.misc import check_path
-from onmt.inputters.fields import get_vocabs
+# from onmt.inputters.fields import get_vocabs
 
 
 class Transform(object):
@@ -209,7 +209,7 @@ class TransformPipe(Transform):
 
 def make_transforms(opts, transforms_cls, fields):
     """Build transforms in `transforms_cls` with vocab of `fields`."""
-    vocabs = get_vocabs(fields) if fields is not None else None
+    vocabs = None #get_vocabs(fields) if fields is not None else None
     transforms = {}
     for name, transform_cls in transforms_cls.items():
         if transform_cls.require_vocab() and vocabs is None:
@@ -220,6 +220,17 @@ def make_transforms(opts, transforms_cls, fields):
         transforms[name] = transform_obj
     return transforms
 
+def make_transforms_with_vocabs(opts, transforms_cls, vocabs):
+    """Build transforms in `transforms_cls` with `vocabs`."""
+    transforms = {}
+    for name, transform_cls in transforms_cls.items():
+        if transform_cls.require_vocab() and vocabs is None:
+            logger.warning(f"{transform_cls.__name__} require vocab to apply, skip it.")
+            continue
+        transform_obj = transform_cls(opts)
+        transform_obj.warm_up(vocabs)
+        transforms[name] = transform_obj
+    return transforms
 
 def get_specials(opts, transforms_cls_dict):
     """Get specials of transforms that should be registed in Vocab."""

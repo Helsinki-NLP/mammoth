@@ -9,10 +9,10 @@ import torch.nn.functional as F
 import onmt
 from onmt.modules.sparse_losses import SparsemaxLoss
 from onmt.modules.sparse_activations import LogSparsemax
-from onmt.constants import ModelTask
+from onmt.constants import ModelTask, DefaultTokens
 
 
-def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
+def build_loss_compute(model, tgt_vocab, opt, train=True, generator=None):
     """
     Returns a LossCompute subclass which wraps around an nn.Module subclass
     (such as nn.NLLLoss) which defines the loss criterion. The LossCompute
@@ -23,18 +23,18 @@ def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
     """
     device = torch.device("cuda" if onmt.utils.misc.use_gpu(opt) else "cpu")
 
-    padding_idx = tgt_field.vocab.stoi[tgt_field.pad_token]
-    unk_idx = tgt_field.vocab.stoi[tgt_field.unk_token]
+    padding_idx = tgt_vocab.stoi[DefaultTokens.PAD]
+    unk_idx = tgt_vocab.stoi[DefaultTokens.UNK]
 
     if opt.lambda_coverage != 0:
         assert opt.coverage_attn, "--coverage_attn needs to be set in order to use --lambda_coverage != 0"
 
     if opt.copy_attn:
         criterion = onmt.modules.CopyGeneratorLoss(
-            len(tgt_field.vocab), opt.copy_attn_force, unk_index=unk_idx, ignore_index=padding_idx
+            len(tgt_field_vocab), opt.copy_attn_force, unk_index=unk_idx, ignore_index=padding_idx
         )
     elif opt.label_smoothing > 0 and train:
-        criterion = LabelSmoothingLoss(opt.label_smoothing, len(tgt_field.vocab), ignore_index=padding_idx)
+        criterion = LabelSmoothingLoss(opt.label_smoothing, len(tgt_vocab), ignore_index=padding_idx)
     elif isinstance(generator[-1], LogSparsemax):  # elif isinstance(model.generator[-1], LogSparsemax):
         criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
     else:
@@ -51,11 +51,11 @@ def build_loss_compute(model, tgt_field, opt, train=True, generator=None):
     if opt.copy_attn:
         if opt.model_task == ModelTask.SEQ2SEQ:
             compute = onmt.modules.CopyGeneratorLossCompute(
-                criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
+                criterion, loss_gen, tgt_vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
             )
         elif opt.model_task == ModelTask.LANGUAGE_MODEL:
             compute = onmt.modules.CopyGeneratorLMLossCompute(
-                criterion, loss_gen, tgt_field.vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
+                criterion, loss_gen, tgt_vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
             )
         else:
             raise ValueError(f"No copy generator loss defined for task {opt.model_task}")

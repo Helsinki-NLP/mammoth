@@ -1,10 +1,8 @@
 import collections
 import itertools
-import warnings
 
 import torch
-from torch.utils.data import BatchSampler, SequentialSampler, DataLoader
-from torch.nn.utils.rnn import pad_sequence
+# from torch.utils.data import BatchSampler, SequentialSampler, DataLoader
 
 from onmt.constants import DefaultTokens
 
@@ -13,60 +11,9 @@ def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
 
-# for compliance with previous code
-Batch = collections.namedtuple('Batch', 'src tgt')
-
-
-class TokenBatchSampler(BatchSampler):
-    """
-    A Sampler that batches data so that tokens in examples total at or below batch size.
-    """
-    def __init__(self, source_iterable, batch_size):
-        self.source = source_iterable
-        self.batch_size = batch_size
-
-    # FIXME: unsure whether necessary
-    def __len__(self):
-        return float('inf')
-
-    def __iter__(self):
-        accum, cur_batch_size = [], 0
-        for example in self.source:
-            length = len(example['src']) + len(example['tgt'])
-            if length > self.batch_size:
-                warnings.warn(f'Example {example} larger than requested batch size, dropping it.')
-            else:
-                if cur_batch_size + length > self.batch_size:
-                    yield accum
-                    accum, cur_batch_size = [], 0
-                cur_batch_size += length
-                # FIXME: iterable-style dataset quirk: only considers the number of calls to __next__.
-                # For this impl to work, we need to guarantee that the iteration in the sampler is the same as in the
-                # dataset; so this is a fairly brittle solution for now.
-                accum.append(examples)
-        if accum:
-            yield accum
-
 def build_dataloader(dataset, batch_size, batch_type):
     """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
-
-    if batch_type == 'tokens':
-        batch_sampler = TokenBatchSampler(dataset, batch_size)
-    else:
-        batch_sampler = BatchSampler(SequentialSampler(dataset), batch_size=batch_size, drop_last=False)
-    src_pad_idx = dataset.vocabs['src'][DefaultTokens.PAD]
-    tgt_pad_idx = dataset.vocabs['tgt'][DefaultTokens.PAD]
-    device = dataset.device
-
-    # FIXME: some RNN archs require sorting src's by length
-    def collate_fn(examples):
-        src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device=device)
-        src = (pad_sequence([ex['src'] for ex in examples], pad_value=src_pad_idx), src_lengths)
-        tgt = pad_sequence([ex['src'] for ex in examples], pad_value=src_pad_idx)
-        return Batch(src, tgt)
-
-    dataloader = DataLoader(dataset, batch_sampler=batch_sampler, collate_fn=collate_fn)
-    return infinite_iterator(dataloader)
+    return infinite_iterator(dataset)
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')

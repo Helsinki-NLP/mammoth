@@ -7,9 +7,11 @@ import os
 from onmt.utils.logging import logger
 from onmt.constants import DefaultTokens
 
+
 @functools.lru_cache()
 def get_vocab(path, lang, size, specials=[DefaultTokens.BOS, DefaultTokens.EOS, DefaultTokens.UNK, DefaultTokens.PAD]):
     return Vocab(path, items=None, tag=lang, size=size, specials=list(specials))
+
 
 class Vocab():
     def __init__(self, path, items=None, tag='', size=None, specials=[]):
@@ -23,11 +25,11 @@ class Vocab():
         size = None if size is None else size + len(specials)
         self.stoi = collections.defaultdict(itertools.count().__next__)
         self.itos = {
-            self.stoi[elem]:elem
-            for elem in (specials + items)[:size]
+            self.stoi[elem]: elem
+            for elem in (specials + items)[: size]
         }
         self.stoi = dict(self.stoi)
-        self.specials = {elem:self.stoi[elem] for elem in specials}
+        self.specials = {elem: self.stoi[elem] for elem in specials}
 
     def __getitem__(self, key_str):
         return self.stoi[key_str]
@@ -52,6 +54,7 @@ class Vocab():
             for elem in vocab.specials:
                 specials[elem] = None
         specials = [elem for elem in specials.keys()]
+
         # from itertools recipes https://docs.python.org/3/library/itertools.html#itertools-recipes
         # FIXME: would rather install more-itertools, but for now I'm trying to keep deps as minimal as possible
         def roundrobin(*iterables):
@@ -67,8 +70,10 @@ class Vocab():
                     # Remove the iterator we just exhausted from the cycle.
                     num_active -= 1
                     nexts = itertools.cycle(itertools.islice(nexts, num_active))
+
         items = list(roundrobin(*[vocab.stoi.keys() for vocab in vocabs]))
         return cls(None, items=items, tag='', size=size, specials=specials)
+
 
 def _read_vocab_file(vocab_path, tag):
     """Loads a vocabulary from the given path.

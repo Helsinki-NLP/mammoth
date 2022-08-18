@@ -51,7 +51,7 @@ def make_tgt(data, vocab):
     return alignment
 
 
-class AlignField(LabelField):
+class AlignField():
     """
     Parse ['<src>-<tgt>', ...] into ['<src>','<tgt>', ...]
     """
@@ -178,21 +178,21 @@ def get_fields(
     }
     fields["tgt"] = fields_getters["text"](**tgt_field_kwargs)
 
-    indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
+    indices = None  # Field(use_vocab=False, dtype=torch.long, sequential=False)
     fields["indices"] = indices
 
     if dynamic_dict:
-        src_map = Field(use_vocab=False, dtype=torch.float, postprocessing=make_src, sequential=False)
+        src_map = None  # Field(use_vocab=False, dtype=torch.float, postprocessing=make_src, sequential=False)
         fields["src_map"] = src_map
 
-        src_ex_vocab = RawField()
+        src_ex_vocab = None  # RawField()
         fields["src_ex_vocab"] = src_ex_vocab
 
-        align = Field(use_vocab=False, dtype=torch.long, postprocessing=make_tgt, sequential=False)
+        align = None  # Field(use_vocab=False, dtype=torch.long, postprocessing=make_tgt, sequential=False)
         fields["alignment"] = align
 
     if with_align:
-        word_align = AlignField()
+        word_align = None  # AlignField()
         fields["align"] = word_align
 
     return fields

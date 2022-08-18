@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 """Train models with dynamic data."""
-import sys
 import torch
 from functools import partial
 import os
 
 from onmt.utils.distributed import ErrorHandler, consumer, batch_producer, Scheduler
 from onmt.utils.misc import set_random_seed
-from onmt.modules.embeddings import prepare_pretrained_embeddings
+# from onmt.modules.embeddings import prepare_pretrained_embeddings
 from onmt.utils.logging import init_logger, logger
 
 from onmt.models.model_saver import load_checkpoint
@@ -19,7 +18,7 @@ from onmt.opts import train_opts
 from onmt.inputters_mvp import get_vocab
 # from onmt.inputters.corpus import save_transformed_sample
 # from onmt.inputters.fields import build_dynamic_fields, save_fields, load_fields, build_dynamic_fields_langspec
-from onmt.transforms import make_transforms, save_transforms, get_specials, get_transforms_cls
+from onmt.transforms import get_transforms_cls
 from collections import OrderedDict
 from onmt.constants import ModelTask
 
@@ -60,7 +59,7 @@ def _init_train(opt):
     if opt.train_from:
         # Load checkpoint if we resume from a previous training.
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
-        fields = None # load_fields(opt.save_data, checkpoint)
+        fields = None  # load_fields(opt.save_data, checkpoint)
         transforms_cls = get_transforms_cls(opt._all_transform)
         if (
             hasattr(checkpoint["opt"], '_all_transform')

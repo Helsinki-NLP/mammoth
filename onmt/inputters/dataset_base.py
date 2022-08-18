@@ -66,7 +66,7 @@ def _dynamic_dict(example, src_field, tgt_field):
     return example
 
 
-class Dataset(TorchtextDataset):
+class Dataset():
     """Contain data and process it.
 
     A dataset is an object that accepts sequences of raw data (sentence pairs
@@ -128,7 +128,7 @@ class Dataset(TorchtextDataset):
                 ex_dict = _dynamic_dict(ex_dict, src_field.base_field, tgt_field.base_field)
                 self.src_vocabs.append(ex_dict["src_ex_vocab"])
             ex_fields = {k: [(k, v)] for k, v in fields.items() if k in ex_dict}
-            ex = Example.fromdict(ex_dict, ex_fields)
+            ex = (ex_dict, ex_fields)
             examples.append(ex)
 
         # fields needs to have only keys that examples have as attrs

@@ -163,8 +163,9 @@ def main(
             while True:
                 batch, metadata, communication_batch_id = batch_queue.get()
                 semaphore.release()
+                # FIXME
                 # Move batch to specified device
-                IterOnDevice.batch_to_device(batch, local_rank)
+                # IterOnDevice.batch_to_device(batch, local_rank)
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()

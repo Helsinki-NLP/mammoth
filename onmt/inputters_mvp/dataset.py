@@ -8,7 +8,7 @@ from torch.utils.data import IterableDataset
 
 from onmt.constants import DefaultTokens
 from onmt.transforms import TransformPipe, get_transforms_cls, make_transforms_with_vocabs
-from onmt.inputters_mvp.vocab import get_vocab
+from onmt.inputters_mvp.vocab import get_vocab, Vocab
 from onmt.utils.logging import logger
 
 
@@ -30,11 +30,10 @@ class ParallelCorpus(IterableDataset):
         self.batch_size = batch_size
         self.batch_type = batch_type
 
-    #FIXME: most likely redundant with onmt.transforms.tokenize
+    # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
         """Convert string into list of indices"""
         vocab = self.vocabs[side]
-        unk = DefaultTokens.UNK
         tokens = [
             DefaultTokens.BOS,
             *(
@@ -50,13 +49,13 @@ class ParallelCorpus(IterableDataset):
         indices = torch.tensor(list(map(vocab.__getitem__, tokens)), device=self.device)
         return indices
 
-
     def to(self, device):
         self.device = device
         return self
 
     def __iter__(self):
         """Read file, produce batches of examples"""
+
         def _make_example_dict(packed):
             src_str, tgt_str = packed
             return {
@@ -64,12 +63,14 @@ class ParallelCorpus(IterableDataset):
                 'tgt': self._tokenize(tgt_str),
                 # 'align': None,
             }
+
         def _cast(example_dict):
             return {
                 k: self._numericalize(v, side=k)
                 for k, v in example_dict.items()
                 # if v is not None
             }
+
         with open(self.src_file) as src_fh, open(self.tgt_file) as tgt_fh:
             examples = zip(src_fh, tgt_fh)
             examples = map(_make_example_dict, examples)
@@ -86,13 +87,9 @@ class ParallelCorpus(IterableDataset):
                         yield self.collate_fn(accum)
                         accum, cur_batch_size = [], 0
                     cur_batch_size += length
-                    # FIXME: iterable-style dataset quirk: only considers the number of calls to __next__.
-                    # For this impl to work, we need to guarantee that the iteration in the sampler is the same as in the
-                    # dataset; so this is a fairly brittle solution for now.
                     accum.append(example)
             if accum:
                 yield self.collate_fn(accum)
-
 
     # FIXME: some RNN archs require sorting src's by length
     def collate_fn(self, examples):
@@ -100,7 +97,7 @@ class ParallelCorpus(IterableDataset):
         tgt_pad_idx = self.vocabs['tgt'][DefaultTokens.PAD]
         src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device=self.device)
         src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_pad_idx).unsqueeze(-1), src_lengths)
-        tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=src_pad_idx).unsqueeze(-1)
+        tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_pad_idx).unsqueeze(-1)
         batch = Batch(src, tgt)
         return batch
 
@@ -119,7 +116,13 @@ def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: boo
         tgt_specials = sorted(itertools.chain.from_iterable(tgt_specials))
     else:
         logger.info('No transforms found')
-        src_specials = tgt_specials = [DefaultTokens.BOS, DefaultTokens.EOS, DefaultTokens.UNK, DefaultTokens.PAD, DefaultTokens.MASK]
+        src_specials = tgt_specials = [
+            DefaultTokens.BOS,
+            DefaultTokens.EOS,
+            DefaultTokens.UNK,
+            DefaultTokens.PAD,
+            DefaultTokens.MASK,
+        ]
     src_vocab_size = opts.src_vocab_size or None
     tgt_vocab_size = opts.tgt_vocab_size or None
     src_vocab = get_vocab(opts.src_vocab[src_lang], src_lang, src_vocab_size)

@@ -11,4 +11,4 @@ from onmt.inputters_mvp.dataset import get_corpus
 from onmt.inputters_mvp.vocab import get_vocab
 
 
-__all__ = ['build_dataloader', 'DynamicDatasetIter', 'get_corpus']
+__all__ = ['build_dataloader', 'DynamicDatasetIter', 'get_corpus', 'get_vocab']

@@ -95,13 +95,13 @@ class DatasetAdapter(object):
             if maybe_example is not None:
                 example = self._maybe_add_dynamic_dict(maybe_example, self.fields_dict)
                 ex_fields = {k: [(k, v)] for k, v in self.fields_dict.items() if k in example}
-                ex = TorchtextExample.fromdict(example, ex_fields)
+                ex = (example, ex_fields)
                 examples.append(ex)
         return examples
 
     def __call__(self, bucket):
         examples = self._to_examples(bucket, is_train=self.is_train)
-        dataset = TorchtextDataset(examples, self.fields_dict)
+        dataset = (examples, self.fields_dict)
         return dataset
 
     def wrap(self, iterable):
@@ -111,7 +111,7 @@ class DatasetAdapter(object):
         """
         for bucket in iterable:
             examples = self._to_examples(bucket, is_train=self.is_train)
-            dataset = TorchtextDataset(examples, self.fields_dict)
+            dataset = (examples, self.fields_dict)
             yield dataset
 
 
@@ -168,7 +168,6 @@ class ParallelCorpus(object):
 
 
 def get_corpus(opts, corpus_id: str, is_train: bool = False):
-    import pdb; pdb.set_trace()
     if not is_train:
         corpus_id = CorpusName.VALID
     if corpus_id in opts.data.keys():

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-from functools import partial
+# from functools import partial
 
 import torch
 # from torchtext.legacy.data import Field, RawField
 
-from onmt.constants import DefaultTokens
+# from onmt.constants import DefaultTokens
 from onmt.inputters.datareader_base import DataReaderBase
 
 
@@ -83,7 +83,7 @@ def _feature_tokenize(string, layer=0, tok_delim=None, feat_delim=None, truncate
     return tokens
 
 
-class TextMultiField(RawField):
+class TextMultiField():
     """Container for subfields.
 
     Text data might use POS/NER/etc labels in addition to tokens.
@@ -163,46 +163,47 @@ class TextMultiField(RawField):
         return self.fields[item]
 
 
-def text_fields(**kwargs):
-    """Create text fields.
-
-    Args:
-        base_name (str): Name associated with the field.
-        feats (Optional[Dict]): Word level feats
-        include_lengths (bool): Optionally return the sequence lengths.
-        pad (str, optional): Defaults to ``"<blank>"``.
-        bos (str or NoneType, optional): Defaults to ``"<s>"``.
-        eos (str or NoneType, optional): Defaults to ``"</s>"``.
-        truncate (bool or NoneType, optional): Defaults to ``None``.
-
-    Returns:
-        TextMultiField
-    """
-
-    feats = kwargs["feats"]
-    include_lengths = kwargs["include_lengths"]
-    base_name = kwargs["base_name"]
-    pad = kwargs.get("pad", DefaultTokens.PAD)
-    bos = kwargs.get("bos", DefaultTokens.BOS)
-    eos = kwargs.get("eos", DefaultTokens.EOS)
-    truncate = kwargs.get("truncate", None)
-    fields_ = []
-
-    feat_delim = None  # u"￨" if n_feats > 0 else None
-
-    # Base field
-    tokenize = partial(_feature_tokenize, layer=None, truncate=truncate, feat_delim=feat_delim)
-    feat = Field(init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize, include_lengths=include_lengths)
-    fields_.append((base_name, feat))
-
-    # Feats fields
-    if feats:
-        for feat_name in feats.keys():
-            # Legacy function, it is not really necessary
-            tokenize = partial(_feature_tokenize, layer=None, truncate=truncate, feat_delim=feat_delim)
-            feat = Field(init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize, include_lengths=False)
-            fields_.append((feat_name, feat))
-
-    assert fields_[0][0] == base_name  # sanity check
-    field = TextMultiField(fields_[0][0], fields_[0][1], fields_[1:])
-    return field
+# def text_fields(**kwargs):
+#     """Create text fields.
+#
+#     Args:
+#         base_name (str): Name associated with the field.
+#         feats (Optional[Dict]): Word level feats
+#         include_lengths (bool): Optionally return the sequence lengths.
+#         pad (str, optional): Defaults to ``"<blank>"``.
+#         bos (str or NoneType, optional): Defaults to ``"<s>"``.
+#         eos (str or NoneType, optional): Defaults to ``"</s>"``.
+#         truncate (bool or NoneType, optional): Defaults to ``None``.
+#
+#     Returns:
+#         TextMultiField
+#     """
+#
+#     feats = kwargs["feats"]
+#     # include_lengths = kwargs["include_lengths"]
+#     base_name = kwargs["base_name"]
+#     # pad = kwargs.get("pad", DefaultTokens.PAD)
+#     # bos = kwargs.get("bos", DefaultTokens.BOS)
+#     # eos = kwargs.get("eos", DefaultTokens.EOS)
+#     truncate = kwargs.get("truncate", None)
+#     fields_ = []
+#
+#     feat_delim = None  # u"￨" if n_feats > 0 else None
+#
+#     # Base field
+#     # tokenize = partial(_feature_tokenize, layer=None, truncate=truncate, feat_delim=feat_delim)
+#     feat = None
+#     # feat = Field(init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize, include_lengths=include_lengths)
+#     fields_.append((base_name, feat))
+#
+#     # Feats fields
+#     if feats:
+#         for feat_name in feats.keys():
+#             # Legacy function, it is not really necessary
+#             # tokenize = partial(_feature_tokenize, layer=None, truncate=truncate, feat_delim=feat_delim)
+#             feat = Field(init_token=bos, eos_token=eos, pad_token=pad, tokenize=tokenize, include_lengths=False)
+#             fields_.append((feat_name, feat))
+#
+#     assert fields_[0][0] == base_name  # sanity check
+#     field = None  # TextMultiField(fields_[0][0], fields_[0][1], fields_[1:])
+#     return field

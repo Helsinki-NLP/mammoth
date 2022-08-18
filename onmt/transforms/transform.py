@@ -207,9 +207,10 @@ class TransformPipe(Transform):
         return ', '.join(info_args)
 
 
+# TODO: Remove this function
 def make_transforms(opts, transforms_cls, fields):
     """Build transforms in `transforms_cls` with vocab of `fields`."""
-    vocabs = None #get_vocabs(fields) if fields is not None else None
+    vocabs = None  # get_vocabs(fields) if fields is not None else None
     transforms = {}
     for name, transform_cls in transforms_cls.items():
         if transform_cls.require_vocab() and vocabs is None:
@@ -219,6 +220,7 @@ def make_transforms(opts, transforms_cls, fields):
         transform_obj.warm_up(vocabs)
         transforms[name] = transform_obj
     return transforms
+
 
 def make_transforms_with_vocabs(opts, transforms_cls, vocabs):
     """Build transforms in `transforms_cls` with `vocabs`."""
@@ -231,6 +233,7 @@ def make_transforms_with_vocabs(opts, transforms_cls, vocabs):
         transform_obj.warm_up(vocabs)
         transforms[name] = transform_obj
     return transforms
+
 
 def get_specials(opts, transforms_cls_dict):
     """Get specials of transforms that should be registed in Vocab."""

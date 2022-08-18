@@ -37,7 +37,6 @@ def build_embeddings(opt, vocab, for_encoder=True):
     word_padding_idx = vocab.stoi[DefaultTokens.PAD]
     opt.word_padding_idx = word_padding_idx
 
-
     freeze_word_vecs = opt.freeze_word_vecs_enc if for_encoder else opt.freeze_word_vecs_dec
 
     emb = Embeddings(
@@ -107,11 +106,13 @@ def load_test_multitask_model(opt, model_path=None):
             gen_module=generator,
         )
 
-        fields = {
-            'src': frame["vocab"].get(('src', opt.src_lang))['src'],
-            'tgt': frame["vocab"].get(('tgt', opt.tgt_lang))['tgt'],
-        }
-        fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
+        # FIXME
+        # fields = {
+        #     'src': frame["vocab"].get(('src', opt.src_lang))['src'],
+        #     'tgt': frame["vocab"].get(('tgt', opt.tgt_lang))['tgt'],
+        # }
+        # fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
+        fields = None
 
         model_opt = ArgumentParser.ckpt_model_opts(frame['opt'])
         # Avoid functionality on inference
@@ -155,10 +156,11 @@ def load_test_model(opt, model_path=None):
 
     lang_pair = opt.lang_pair
     src_lang, tgt_lang = lang_pair.split("-")
+    # FIXME
     fields = {}
     fields['src'] = fields_dict[('src', src_lang)]['src']
     fields['tgt'] = fields_dict[('tgt', tgt_lang)]['tgt']
-    indices = Field(use_vocab=False, dtype=torch.long, sequential=False)
+    indices = None  # Field(use_vocab=False, dtype=torch.long, sequential=False)
     fields["indices"] = indices
 
     # Avoid functionality on inference

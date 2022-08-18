@@ -6,6 +6,7 @@ import math
 import os
 import pickle
 import signal
+import torch
 import torch.distributed
 
 from argparse import Namespace
@@ -15,7 +16,7 @@ from onmt.inputters_mvp import get_corpus
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
 from typing import Any, Dict, Optional
-import torch
+
 
 def is_master(global_rank):
     return global_rank == 0
@@ -420,8 +421,9 @@ class Scheduler:
         corpus_ids = self.opt.data.keys()
         my_corpus_ids = compress(corpus_ids, self._selector)
         my_lang_pairs = compress(self.lang_pairs, self._selector)
+        device = torch.device(self.local_rank)
         return {
-            corpus_id: get_corpus(self.opt, corpus_id, src_lang, tgt_lang, is_train=is_train).to(torch.device(self.local_rank))
+            corpus_id: get_corpus(self.opt, corpus_id, src_lang, tgt_lang, is_train=is_train).to(device)
             for (corpus_id, (src_lang, tgt_lang)) in zip(my_corpus_ids, my_lang_pairs)
         }
 

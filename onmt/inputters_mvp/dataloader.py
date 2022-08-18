@@ -1,11 +1,6 @@
 import collections
 import itertools
 
-import torch
-# from torch.utils.data import BatchSampler, SequentialSampler, DataLoader
-
-from onmt.constants import DefaultTokens
-
 
 def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
@@ -17,6 +12,7 @@ def build_dataloader(dataset, batch_size, batch_type):
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
+
 
 class DynamicDatasetIter(object):
     """Yield batch from (multiple) plain text corpus.

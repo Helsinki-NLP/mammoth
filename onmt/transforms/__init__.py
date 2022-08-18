@@ -2,7 +2,8 @@
 import os
 import importlib
 
-from .transform import make_transforms, make_transforms_with_vocabs, get_specials, save_transforms, load_transforms, TransformPipe, Transform
+from .transform import make_transforms, make_transforms_with_vocabs, get_specials, save_transforms, load_transforms, \
+    TransformPipe, Transform
 
 
 AVAILABLE_TRANSFORMS = {}

@@ -8,8 +8,11 @@ from onmt.utils.logging import logger
 from onmt.constants import DefaultTokens
 
 
+DEFAULT_SPECIALS = (DefaultTokens.BOS, DefaultTokens.EOS, DefaultTokens.UNK, DefaultTokens.PAD)
+
+
 @functools.lru_cache()
-def get_vocab(path, lang, size, specials=[DefaultTokens.BOS, DefaultTokens.EOS, DefaultTokens.UNK, DefaultTokens.PAD]):
+def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS):
     return Vocab(path, items=None, tag=lang, size=size, specials=list(specials))
 
 

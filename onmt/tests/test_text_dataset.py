@@ -1,6 +1,5 @@
 # FIXME, or rather TODO in FoTran
 # import unittest
-# from onmt.inputters.text_dataset import TextMultiField, TextDataReader
 #
 # import itertools
 # import os

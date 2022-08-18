@@ -2,10 +2,10 @@
 import os
 import torch
 from onmt.constants import DefaultTokens
-from onmt.inputters.text_dataset import TextMultiField
 from onmt.utils.alignment import build_align_pharaoh
 
 
+# FIXME
 class TranslationBuilder(object):
     """
     Build a word-based translation from the batch output
@@ -15,7 +15,7 @@ class TranslationBuilder(object):
     Problem in Neural Machine Translation" :cite:`Luong2015b`
 
     Args:
-       data (onmt.inputters.Dataset): Data.
+       data (onmt.inputters_mvp.None): Data.
        fields (List[Tuple[str, torchtext.data.Field]]): data fields
        n_best (int): number of translations producedTextMultiField
        replace_unk (bool): replace unknown words using attention
@@ -25,7 +25,7 @@ class TranslationBuilder(object):
     def __init__(self, data, fields, n_best=1, replace_unk=False, has_tgt=False, phrase_table=""):
         self.data = data
         self.fields = fields
-        self._has_text_src = isinstance(dict(self.fields)["src"], TextMultiField)
+        self._has_text_src = isinstance(dict(self.fields)["src"], None)
         self.n_best = n_best
         self.replace_unk = replace_unk
         self.phrase_table_dict = {}

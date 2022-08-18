@@ -10,7 +10,6 @@ import torch
 
 from onmt.constants import DefaultTokens
 import onmt.model_builder
-import onmt.inputters as inputters
 import onmt.decoders.ensemble
 from onmt.translate.beam_search import BeamSearch, BeamSearchLM
 from onmt.translate.greedy_search import GreedySearch, GreedySearchLM
@@ -263,8 +262,9 @@ class Inference(object):
         # TODO: maybe add dynamic part
         cls.validate_task(model_opt.model_task)
 
-        src_reader = inputters.str2reader[opt.data_type].from_opt(opt)
-        tgt_reader = inputters.str2reader["text"].from_opt(opt)
+        # FIXME
+        src_reader = None  # inputters.str2reader[opt.data_type].from_opt(opt)
+        tgt_reader = None  # inputters.str2reader["text"].from_opt(opt)
         return cls(
             model,
             fields,
@@ -365,28 +365,31 @@ class Inference(object):
         if self.tgt_prefix and tgt is None:
             raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
 
+        # FIXME
         src_data = {"reader": self.src_reader, "data": src, "features": src_feats}
         tgt_data = {"reader": self.tgt_reader, "data": tgt, "features": {}}
-        _readers, _data = inputters.Dataset.config([("src", src_data), ("tgt", tgt_data)])
+        _readers, _data = None, None  # inputters.Dataset.config([("src", src_data), ("tgt", tgt_data)])
 
-        data = inputters.Dataset(
-            self.fields,
-            readers=_readers,
-            data=_data,
-            sort_key=inputters.str2sortkey[self.data_type],
-            filter_pred=self._filter_pred,
-        )
+        # data = inputters.Dataset(
+        #     self.fields,
+        #     readers=_readers,
+        #     data=_data,
+        #     sort_key=inputters.str2sortkey[self.data_type],
+        #     filter_pred=self._filter_pred,
+        # )
+        data = None
 
-        data_iter = inputters.OrderedIterator(
-            dataset=data,
-            device=self._dev,
-            batch_size=batch_size,
-            batch_size_fn=max_tok_len if batch_type == "tokens" else None,
-            train=False,
-            sort=False,
-            sort_within_batch=True,
-            shuffle=False,
-        )
+        # data_iter = inputters.OrderedIterator(
+        #     dataset=data,
+        #     device=self._dev,
+        #     batch_size=batch_size,
+        #     batch_size_fn=max_tok_len if batch_type == "tokens" else None,
+        #     train=False,
+        #     sort=False,
+        #     sort_within_batch=True,
+        #     shuffle=False,
+        # )
+        data_iter = None
 
         xlation_builder = onmt.translate.TranslationBuilder(
             data,

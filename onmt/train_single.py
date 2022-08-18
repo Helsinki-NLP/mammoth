@@ -2,7 +2,6 @@
 """Training on a single process."""
 import torch
 
-# from onmt.inputters.inputter import IterOnDevice
 from onmt.model_builder import build_model
 from onmt.utils.optimizers import Optimizer
 from onmt.utils.misc import set_random_seed

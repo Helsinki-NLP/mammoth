@@ -4,7 +4,6 @@ import unittest
 import torch
 
 import onmt
-import onmt.inputters
 import onmt.opts
 from onmt.model_builder import build_embeddings, build_encoder, build_decoder
 from onmt.utils.parse import ArgumentParser
@@ -23,9 +22,7 @@ class TestModel(unittest.TestCase):
         self.opt = opt
 
     def get_field(self):
-        src = onmt.inputters.get_fields("text", 0, 0)["src"]
-        src.base_field.build_vocab([])
-        return src
+        return None
 
     def get_batch(self, source_l=3, bsize=1):
         # len x batch x nfeat

@@ -8,12 +8,32 @@ from torch.utils.data import IterableDataset
 
 from onmt.constants import DefaultTokens
 from onmt.transforms import TransformPipe, get_transforms_cls, make_transforms_with_vocabs
-from onmt.inputters_mvp.vocab import get_vocab, Vocab
+from onmt.inputters_mvp.vocab import get_vocab, Vocab, DEFAULT_SPECIALS
 from onmt.utils.logging import logger
 
 
 # for compliance with previous code
 Batch = collections.namedtuple('Batch', 'src tgt')
+
+
+def _read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):
+    """Helper function to read examples"""
+
+    def _make_example_dict(packed):
+        """Helper function to convert lines to dicts"""
+        src_str, tgt_str = packed
+        return {
+            'src': tokenize_fn(src_str),
+            'tgt': tokenize_fn(tgt_str),
+            # 'align': None,
+        }
+
+    with open(src_path) as src_fh, open(tgt_path) as tgt_fh:
+        examples = zip(src_fh, tgt_fh)
+        examples = map(_make_example_dict, examples)
+        examples = map(transforms_fn, examples)
+        examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
+        yield from examples
 
 
 class ParallelCorpus(IterableDataset):
@@ -56,14 +76,6 @@ class ParallelCorpus(IterableDataset):
     def __iter__(self):
         """Read file, produce batches of examples"""
 
-        def _make_example_dict(packed):
-            src_str, tgt_str = packed
-            return {
-                'src': self._tokenize(src_str),
-                'tgt': self._tokenize(tgt_str),
-                # 'align': None,
-            }
-
         def _cast(example_dict):
             return {
                 k: self._numericalize(v, side=k)
@@ -71,25 +83,26 @@ class ParallelCorpus(IterableDataset):
                 # if v is not None
             }
 
-        with open(self.src_file) as src_fh, open(self.tgt_file) as tgt_fh:
-            examples = zip(src_fh, tgt_fh)
-            examples = map(_make_example_dict, examples)
-            examples = map(self.transforms.apply, examples)
-            examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
-            examples = map(_cast, examples)
-            accum, cur_batch_size = [], 0
-            for example in examples:
-                length = 1 if self.batch_type == 'sents' else (len(example['src']) + len(example['tgt']))
-                if length > self.batch_size:
-                    warnings.warn(f'Example {example} larger than requested batch size, dropping it.')
-                else:
-                    if cur_batch_size + length > self.batch_size:
-                        yield self.collate_fn(accum)
-                        accum, cur_batch_size = [], 0
-                    cur_batch_size += length
-                    accum.append(example)
-            if accum:
-                yield self.collate_fn(accum)
+        examples = _read_examples_from_files(
+            self.src_file,
+            self.tgt_file,
+            tokenize_fn=self._tokenize,
+            transforms_fn=self.transforms.apply,
+        )
+        examples = map(_cast, examples)
+        accum, cur_batch_size = [], 0
+        for example in examples:
+            length = 1 if self.batch_type == 'sents' else (len(example['src']) + len(example['tgt']))
+            if length > self.batch_size:
+                warnings.warn(f'Example {example} larger than requested batch size, dropping it.')
+            else:
+                if cur_batch_size + length > self.batch_size:
+                    yield self.collate_fn(accum)
+                    accum, cur_batch_size = [], 0
+                cur_batch_size += length
+                accum.append(example)
+        if accum:
+            yield self.collate_fn(accum)
 
     # FIXME: some RNN archs require sorting src's by length
     def collate_fn(self, examples):
@@ -116,13 +129,7 @@ def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: boo
         tgt_specials = sorted(itertools.chain.from_iterable(tgt_specials))
     else:
         logger.info('No transforms found')
-        src_specials = tgt_specials = [
-            DefaultTokens.BOS,
-            DefaultTokens.EOS,
-            DefaultTokens.UNK,
-            DefaultTokens.PAD,
-            DefaultTokens.MASK,
-        ]
+        src_specials = tgt_specials = list(DEFAULT_SPECIALS)
     src_vocab_size = opts.src_vocab_size or None
     tgt_vocab_size = opts.tgt_vocab_size or None
     src_vocab = get_vocab(opts.src_vocab[src_lang], src_lang, src_vocab_size)
@@ -143,3 +150,65 @@ def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: boo
         opts.batch_type,
     )
     return dataset
+
+
+def build_sub_vocab(examples, n_sample):
+    """Build vocab counts on (strided) subpart of the data."""
+    sub_counter_src = collections.Counter()
+    sub_counter_tgt = collections.Counter()
+    for i, item in enumerate(examples):
+        src, tgt = item['src'], item['tgt']
+        # for feat_name, feat_line in maybe_example["src"].items():
+        #     if feat_name not in ["src", "src_original"]:
+        #         sub_counter_src_feats[feat_name].update(feat_line.split(' '))
+        #         if opts.dump_samples:
+        #             src_line_pretty = append_features_to_example(src_line_pretty, feat_line)
+        sub_counter_src.update(src)
+        sub_counter_tgt.update(tgt)
+        if n_sample > 0 and (i + 1) >= n_sample:
+            break
+    return sub_counter_src, sub_counter_tgt
+
+
+def init_pool(queues):
+    """Add the queues as attribute of the pooled function."""
+    build_sub_vocab.queues = queues
+
+
+def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
+    """Build vocabulary counts from data."""
+
+    from functools import partial
+    import multiprocessing as mp
+
+    if n_sample == -1:
+        logger.info(f"n_sample={n_sample}: Build vocab on full datasets.")
+    elif n_sample > 0:
+        logger.info(f"Build vocab on {n_sample} transformed examples/corpus.")
+    else:
+        raise ValueError(f"n_sample should > 0 or == -1, get {n_sample}.")
+
+    # FIXME
+    assert not opts.dump_samples, 'Not implemented'
+
+    corpora = {
+        corpus_id: _read_examples_from_files(
+                opts.data[corpus_id]["path_src"],
+                opts.data[corpus_id]["path_tgt"],
+                transforms_fn=TransformPipe(transforms).apply if transforms else lambda x: x,
+            )
+        }
+    counter_src = collections.Counter()
+    counter_tgt = collections.Counter()
+
+    queues = {
+        c_name: [mp.Queue(opts.vocab_sample_queue_size) for i in range(opts.num_threads)] for c_name in corpora.keys()
+    }
+    # sample_path = os.path.join(os.path.dirname(opts.save_data), CorpusName.SAMPLE)
+    with mp.Pool(opts.num_threads, init_pool, [queues]) as p:
+        func = partial(build_sub_vocab, corpora[corpus_id], n_sample, opts.num_threads)
+        for sub_counter_src, sub_counter_tgt in p.imap(func, range(0, opts.num_threads)):
+            counter_src.update(sub_counter_src)
+            counter_tgt.update(sub_counter_tgt)
+
+    return counter_src, counter_tgt

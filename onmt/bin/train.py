@@ -16,8 +16,6 @@ from onmt.inputters_mvp import DynamicDatasetIter
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
 from onmt.inputters_mvp import get_vocab
-# from onmt.inputters.corpus import save_transformed_sample
-# from onmt.inputters.fields import build_dynamic_fields, save_fields, load_fields, build_dynamic_fields_langspec
 from onmt.transforms import get_transforms_cls
 from collections import OrderedDict
 from onmt.constants import ModelTask

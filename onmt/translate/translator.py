@@ -377,9 +377,9 @@ class Inference(object):
         #     sort_key=inputters.str2sortkey[self.data_type],
         #     filter_pred=self._filter_pred,
         # )
-        data = ParallelCorpus(
-            self.src_file_path,  # WARNING: to be defined
-            self.tgt_file_path,  # WARNING: to be defined
+        corpus = ParallelCorpus(
+            self.src_file_path,
+            self.tgt_file_path,  # may be None
             self.vocabs['src'],
             self.vocabs['tgt'],
             transforms=[],
@@ -401,11 +401,11 @@ class Inference(object):
         # data_iter = None
 
         xlation_builder = onmt.translate.TranslationBuilder(
-            data,
+            corpus,
             self.vocabs,
             self.n_best,
             self.replace_unk,
-            has_tgt=tgt is None,
+            has_tgt=tgt is not None,
             phrasE_table=self.phrase_table,
         )
 
@@ -419,8 +419,8 @@ class Inference(object):
 
         start_time = time.time()
 
-        for batch in data_iter:
-            batch_data = self.translate_batch(batch, data.src_vocabs, attn_debug)
+        for batch in corpus:
+            batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
 
             for trans in translations:

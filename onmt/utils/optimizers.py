@@ -1,13 +1,14 @@
 """ Optimizers class """
+import functools
+import importlib
+import math
 import torch
 import torch.optim as optim
-from torch.nn.utils import clip_grad_norm_
-import functools
-from math import sqrt
 import types
-import importlib
+from collections import Counter
+from math import sqrt
 from onmt.utils.misc import fn_args
-import math
+from torch.nn.utils import clip_grad_norm_
 
 
 def attention_bridge_optimizer(model, scheduler, base_optimizer):
@@ -165,11 +166,13 @@ def rsqrt_decay(step, warmup_steps):
 
 class MultipleOptimizer(object):
     """Implement multiple optimizers needed for sparse adam"""
+    # Indicate to the amp GradScaler that we use customized scale-handling logic
+    _step_supports_amp_scaling = True
 
     def __init__(self, op, multiOptims_Langs=None):
         self.optimizers = op
         self.multiOptims_Langs = multiOptims_Langs
-        # self.size = len(self.optimizers)
+        self._steps = Counter()
 
     @property
     def param_groups(self):
@@ -177,8 +180,6 @@ class MultipleOptimizer(object):
         for name in self.optimizers:
             optimizer = self.optimizers[name]
             param_groups.extend(optimizer.param_groups)
-        #        for optimizer in self.optimizers:
-        #            param_groups.extend(optimizer.param_groups)
         return param_groups
 
     def zero_grad(self):
@@ -186,15 +187,40 @@ class MultipleOptimizer(object):
         for name in self.optimizers:
             self.optimizers[name].zero_grad()
 
-    #        for op in self.optimizers:
-    #            op.zero_grad()
-
-    def step(self, langsEnc=None, langsDec=None):
+    def step(self, grad_scaler=None):
         """Step through all the suboptimizers"""
-        #        for op in self.optimizers:
-        #            op.step()
         for name in self.optimizers:
-            self.optimizers[name].step()
+            if self._any_param_has_grad(self.optimizers[name]):
+                self._steps[name] += 1
+                print(f'Stepping Optimizer {name}')
+                if grad_scaler is not None:
+                    print('uses amp')
+                    grad_scaler.unscale_(self.optimizers[name])
+                    grad_scaler.step(self.optimizers[name])
+                else:
+                    print('does not use amp')
+                    self.optimizers[name].step()
+            else:
+                print(f'Optimizer {name} had no grads: skipped step')
+
+    @staticmethod
+    def _any_param_has_grad(optimizer):
+        for group in optimizer.param_groups:
+            for param in group['params']:
+                if not hasattr(param, 'has_grad'):
+                    # if there are parameters not tracked by the hook,
+                    # then always perform the step
+                    return True
+                if param.has_grad:
+                    return True
+        return False
+
+    def report_steps(self):
+        result = []
+        for name in self.optimizers:
+            count = self._steps[name]
+            result.append(f'Optimizer "{name}" has been stepped {count} times')
+        return result
 
 
 class Optimizer(object):
@@ -337,7 +363,7 @@ class Optimizer(object):
         else:
             loss.backward()
 
-    def step(self, langsEnc=None, langsDec=None):
+    def step(self):
         """Update the model parameters based on current gradients.
 
         Optionally, will employ gradient modification or update learning
@@ -346,9 +372,8 @@ class Optimizer(object):
         learning_rate = self.learning_rate()
 
         if self.amp:
-            dict_opts = self._optimizer.optimizers
-            for name in dict_opts:
-                self._scaler.unscale_(dict_opts[name])
+            for suboptimizer in self._optimizer.optimizers.values():
+                self._scaler.unscale_(suboptimizer)
         elif self._fp16 == "legacy":
             if hasattr(self._optimizer, "update_master_grads"):
                 self._optimizer.update_master_grads()
@@ -361,16 +386,12 @@ class Optimizer(object):
                 clip_grad_norm_(group['params'], self._max_grad_norm)
 
         if self.amp:
-            dict_opts = self._optimizer.optimizers
-            for name in dict_opts:
-                self._scaler.step(dict_opts[name])
+            self._scaler.step(self._optimizer)
 
             # Updates the scale for next iteration.
             self._scaler.update()
         else:
-            dict_opts = self._optimizer.optimizers
-            for name in dict_opts:
-                dict_opts[name].step()
+            self._optimizer.step()
         self._decay_step += 1
         self._training_step += 1
 

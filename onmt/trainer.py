@@ -385,8 +385,11 @@ class Trainer(object):
                 logger.info(f'After gradient sync {step}')
                 for name, p in self.model.named_parameters():
                     logger.info(
-                        f'{self.scheduler.node_rank}:{self.scheduler.local_rank}' f' {name}: {p.flatten()[:10]}'
+                        f'{self.scheduler.node_rank}:{self.scheduler.local_rank} {name}: {p.flatten()[:10]}'
                     )
+                if hasattr(self.optim._optimizer, 'report_steps'):
+                    for line in self.optim._optimizer.report_steps():
+                        logger.info(f'{self.scheduler.node_rank}:{self.scheduler.local_rank} {line}')
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)

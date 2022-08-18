@@ -88,8 +88,8 @@ class Inference(object):
         model (onmt.modules.NMTModel): NMT model to use for translation
         vocabs (dict[str, onmt.inputters_mvp.Vocab]): A dict
             mapping each side to its Vocab.
-        src_reader (onmt.inputters.DataReaderBase): Source reader.
-        tgt_reader (onmt.inputters.TextDataReader): Target reader.
+        src_file_path (str): Source file to read.
+        tgt_reader (src): Target file, if necessary.
         gpu (int): GPU device. Set to negative for no GPU.
         n_best (int): How many beams to wait for.
         min_length (int): See
@@ -125,8 +125,8 @@ class Inference(object):
         self,
         model,
         vocabs,
-        src_reader,
-        tgt_reader,
+        src_file_path,
+        tgt_file_path=None,
         gpu=-1,
         n_best=1,
         min_length=0,
@@ -161,6 +161,8 @@ class Inference(object):
         self.langDEC = str(langpair).split("-")[1]
         print(self.langENC)
         print(self.langDEC)
+        self.src_file_path = src_file_path
+        self.tgt_file_path = tgt_file_path
 
         self.model = model
         self.vocabs = vocabs
@@ -192,8 +194,8 @@ class Inference(object):
         self.block_ngram_repeat = block_ngram_repeat
         self.ignore_when_blocking = ignore_when_blocking
         self._exclusion_idxs = {self._tgt_vocab.stoi[t] for t in self.ignore_when_blocking}
-        self.src_reader = src_reader
-        self.tgt_reader = tgt_reader
+        # self.src_reader = src_reader
+        # self.tgt_reader = tgt_reader
         self.replace_unk = replace_unk
         if self.replace_unk and not self.model.decoder.attentional:
             raise ValueError("replace_unk requires an attentional decoder.")
@@ -263,15 +265,11 @@ class Inference(object):
         # TODO: maybe add dynamic part
         cls.validate_task(model_opt.model_task)
 
-        # FIXME: probably suffices to simply provid a path to src and optionally target,
-        # and let ParallelCorpus handle the rest
-        src_reader = None  # inputters.str2reader[opt.data_type].from_opt(opt)
-        tgt_reader = None  # inputters.str2reader["text"].from_opt(opt)
         return cls(
             model,
             vocabs,
-            src_reader,
-            tgt_reader,
+            opt.src,
+            tgt_file_path=opt.tgt,
             gpu=opt.gpu,
             n_best=opt.n_best,
             min_length=opt.min_length,
@@ -400,15 +398,15 @@ class Inference(object):
         #     sort_within_batch=True,
         #     shuffle=False,
         # )
-        data_iter = None
+        # data_iter = None
 
         xlation_builder = onmt.translate.TranslationBuilder(
             data,
             self.vocabs,
             self.n_best,
             self.replace_unk,
-            tgt,
-            self.phrase_table,
+            has_tgt=tgt is None,
+            phrasE_table=self.phrase_table,
         )
 
         # Statistics

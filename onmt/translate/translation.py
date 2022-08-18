@@ -15,8 +15,8 @@ class TranslationBuilder(object):
     Problem in Neural Machine Translation" :cite:`Luong2015b`
 
     Args:
-       data (onmt.inputters_mvp.None): Data.
-       vocabs (?): data vocabs
+       data (onmt.inputters_mvp.ParallelCorpus): Data.
+       vocabs (dict[str, onmt.inputters_mvp.Vocab]): data vocabs
        n_best (int): number of translations produced
        replace_unk (bool): replace unknown words using attention
        has_tgt (bool): will the batch have gold targets

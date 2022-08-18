@@ -7,7 +7,7 @@ from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import IterableDataset
 
 from onmt.constants import DefaultTokens
-from onmt.transforms import TransformPipe, get_transforms_cls, make_transforms_with_vocabs
+from onmt.transforms import TransformPipe, get_transforms_cls, make_transforms
 from onmt.inputters_mvp.vocab import get_vocab, Vocab, DEFAULT_SPECIALS
 from onmt.utils.logging import logger
 
@@ -16,7 +16,7 @@ from onmt.utils.logging import logger
 Batch = collections.namedtuple('Batch', 'src tgt')
 
 
-def _read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):
+def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):
     """Helper function to read examples"""
 
     def _make_example_dict(packed):
@@ -24,20 +24,26 @@ def _read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transfo
         src_str, tgt_str = packed
         return {
             'src': tokenize_fn(src_str),
-            'tgt': tokenize_fn(tgt_str),
+            'tgt': tokenize_fn(tgt_str) if tgt_str is not None else None,
             # 'align': None,
         }
 
-    with open(src_path) as src_fh, open(tgt_path) as tgt_fh:
-        examples = zip(src_fh, tgt_fh)
-        examples = map(_make_example_dict, examples)
-        examples = map(transforms_fn, examples)
-        examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
-        yield from examples
+    src_fh = open(src_path)
+    tgt_fh = open(tgt_path) if tgt_path is not None else itertools.repeat(None)
+
+    examples = zip(src_fh, tgt_fh)
+    examples = map(_make_example_dict, examples)
+    examples = map(transforms_fn, examples)
+    examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
+    yield from examples
+
+    src_fh.close()
+    if tgt_path is not None:
+        tgt_fh.close()
 
 
 class ParallelCorpus(IterableDataset):
-    """Torch-style dataset """
+    """Torch-style dataset"""
     def __init__(self, src_file, tgt_file, src_vocab, tgt_vocab, transforms, batch_size, batch_type, device='cpu'):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -83,7 +89,7 @@ class ParallelCorpus(IterableDataset):
                 # if v is not None
             }
 
-        examples = _read_examples_from_files(
+        examples = read_examples_from_files(
             self.src_file,
             self.tgt_file,
             tokenize_fn=self._tokenize,
@@ -145,7 +151,7 @@ def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: boo
         opts.data[corpus_id]["path_tgt"],
         src_vocab,
         tgt_vocab,
-        TransformPipe(opts, make_transforms_with_vocabs(opts, transforms_cls, vocabs)),
+        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs)),
         opts.batch_size,
         opts.batch_type,
     )
@@ -192,7 +198,7 @@ def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
     assert not opts.dump_samples, 'Not implemented'
 
     corpora = {
-        corpus_id: _read_examples_from_files(
+        corpus_id: read_examples_from_files(
                 opts.data[corpus_id]["path_src"],
                 opts.data[corpus_id]["path_tgt"],
                 transforms_fn=TransformPipe(transforms).apply if transforms else lambda x: x,

@@ -2,7 +2,7 @@
 import os
 import importlib
 
-from .transform import make_transforms, make_transforms_with_vocabs, get_specials, save_transforms, load_transforms, \
+from .transform import make_transforms, get_specials, save_transforms, load_transforms, \
     TransformPipe, Transform
 
 
@@ -23,7 +23,6 @@ __all__ = [
     "get_transforms_cls",
     "get_specials",
     "make_transforms",
-    "make_transforms_with_vocabs",  # FIXME: will replace default make_transforms when fields are gone
     "load_transforms",
     "save_transforms",
     "TransformPipe",

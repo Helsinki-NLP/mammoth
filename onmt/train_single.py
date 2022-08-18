@@ -39,10 +39,10 @@ def _get_model_opts(opt, checkpoint=None):
     return model_opt
 
 
-def _build_valid_iter(opt, fields, transforms_cls):
+def _build_valid_iter(opt, vocabs, transforms_cls):
     """Build iterator used for validation."""
     # valid_iter = DynamicDatasetIter(
-    #     fields, transforms_cls, opt, is_train=False)
+    #     vocabs, transforms_cls, opt, is_train=False)
     valid_iter = iter([])  # FIXME: validation temporarily disabled
     return valid_iter
 
@@ -162,9 +162,7 @@ def main(
             while True:
                 batch, metadata, communication_batch_id = batch_queue.get()
                 semaphore.release()
-                # FIXME
-                # Move batch to specified device
-                # IterOnDevice.batch_to_device(batch, local_rank)
+                # TODO: confirm that batch-providing corpus has already been to'd to the correct place
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()

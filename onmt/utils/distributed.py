@@ -439,14 +439,14 @@ class Scheduler:
         return result
 
     def get_vocabs(self, side: str, vocabs_dict):
-        """Returns a list of tuples: (side, lang, component_id, fields).
+        """Returns a list of tuples: (side, lang, component_id, vocabs).
         side:           Either 'src' or 'tgt'.
         lang:           The language code. Vocabularies are language specific.
         component_id:   The encoder or decoder id. Embeddings are stored in
                         the encoders/decoders, so that component needs to be identified
                         in order to access the correct embeddings,
                         even if the embeddings are language specific.
-        fields:         The actual Fields.
+        vocabs_dict:         The actual vocabs.
         """
         my_lang_pairs = compress(self.lang_pairs, self._selector)
         component_ids = self.encoder_ids if side == 'src' else self.decoder_ids

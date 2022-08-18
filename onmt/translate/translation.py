@@ -16,16 +16,16 @@ class TranslationBuilder(object):
 
     Args:
        data (onmt.inputters_mvp.None): Data.
-       fields (List[Tuple[str, torchtext.data.Field]]): data fields
-       n_best (int): number of translations producedTextMultiField
+       vocabs (?): data vocabs
+       n_best (int): number of translations produced
        replace_unk (bool): replace unknown words using attention
        has_tgt (bool): will the batch have gold targets
     """
 
-    def __init__(self, data, fields, n_best=1, replace_unk=False, has_tgt=False, phrase_table=""):
+    def __init__(self, data, vocabs, n_best=1, replace_unk=False, has_tgt=False, phrase_table=""):
         self.data = data
-        self.fields = fields
-        self._has_text_src = isinstance(dict(self.fields)["src"], None)
+        self.vocabs = vocabs
+        self._has_text_src = True  # isinstance(dict(self.fields)["src"], None)
         self.n_best = n_best
         self.replace_unk = replace_unk
         self.phrase_table_dict = {}
@@ -37,8 +37,7 @@ class TranslationBuilder(object):
         self.has_tgt = has_tgt
 
     def _build_target_tokens(self, src, src_vocab, src_raw, pred, attn):
-        tgt_field = dict(self.fields)["tgt"].base_field
-        vocab = tgt_field.vocab
+        vocab = self.vocabs['tgt']
         tokens = []
 
         for tok in pred:
@@ -46,12 +45,12 @@ class TranslationBuilder(object):
                 tokens.append(vocab.itos[tok])
             else:
                 tokens.append(src_vocab.itos[tok - len(vocab)])
-            if tokens[-1] == tgt_field.eos_token:
+            if tokens[-1] == DefaultTokens.EOS:
                 tokens = tokens[:-1]
                 break
         if self.replace_unk and attn is not None and src is not None:
             for i in range(len(tokens)):
-                if tokens[i] == tgt_field.unk_token:
+                if tokens[i] == DefaultTokens.UNK:
                     _, max_index = attn[i][: len(src_raw)].max(0)
                     tokens[i] = src_raw[max_index.item()]
                     if self.phrase_table_dict:

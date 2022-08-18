@@ -8,7 +8,6 @@ from itertools import count, zip_longest
 
 import torch
 
-from onmt.constants import DefaultTokens
 import onmt.model_builder
 import onmt.decoders.ensemble
 from onmt.translate.beam_search import BeamSearch, BeamSearchLM
@@ -16,12 +15,14 @@ from onmt.translate.greedy_search import GreedySearch, GreedySearchLM
 from onmt.utils.misc import tile, set_random_seed, report_matrix
 from onmt.utils.alignment import extract_alignment, build_align_pharaoh
 from onmt.modules.copy_generator import collapse_copy_scores
-from onmt.constants import ModelTask
+from onmt.constants import ModelTask, DefaultTokens
+from onmt.inputters_mvp.dataset import ParallelCorpus
 
 
 def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
         if not os.path.isdir(os.path.dirname(opt.output)):
+            # FIXME use warnings instead
             logger.info('WARNING: output file directory does not exist... creating it.')
             os.makedirs(os.path.dirname(opt.output), exist_ok=True)
         out_file = codecs.open(opt.output, "w+", "utf-8")
@@ -29,14 +30,14 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     load_test_model = (
         onmt.decoders.ensemble.load_test_model if len(opt.models) > 3 else onmt.model_builder.load_test_multitask_model
     )
-    fields, model, model_opt = load_test_model(opt)
+    vocabs, model, model_opt = load_test_model(opt)
 
     scorer = onmt.translate.GNMTGlobalScorer.from_opt(opt)
 
     if model_opt.model_task == ModelTask.LANGUAGE_MODEL:
         translator = GeneratorLM.from_opt(
             model,
-            fields,
+            vocabs,
             opt,
             model_opt,
             global_scorer=scorer,
@@ -48,7 +49,7 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     else:
         translator = Translator.from_opt(
             model,
-            fields,
+            vocabs,
             opt,
             model_opt,
             global_scorer=scorer,
@@ -85,8 +86,8 @@ class Inference(object):
 
     Args:
         model (onmt.modules.NMTModel): NMT model to use for translation
-        fields (dict[str, torchtext.data.Field]): A dict
-            mapping each side to its list of name-Field pairs.
+        vocabs (dict[str, onmt.inputters_mvp.Vocab]): A dict
+            mapping each side to its Vocab.
         src_reader (onmt.inputters.DataReaderBase): Source reader.
         tgt_reader (onmt.inputters.TextDataReader): Target reader.
         gpu (int): GPU device. Set to negative for no GPU.
@@ -123,7 +124,7 @@ class Inference(object):
     def __init__(
         self,
         model,
-        fields,
+        vocabs,
         src_reader,
         tgt_reader,
         gpu=-1,
@@ -162,13 +163,13 @@ class Inference(object):
         print(self.langDEC)
 
         self.model = model
-        self.fields = fields
-        tgt_field = dict(self.fields)["tgt"].base_field
-        self._tgt_vocab = tgt_field.vocab
-        self._tgt_eos_idx = self._tgt_vocab.stoi[tgt_field.eos_token]
-        self._tgt_pad_idx = self._tgt_vocab.stoi[tgt_field.pad_token]
-        self._tgt_bos_idx = self._tgt_vocab.stoi[tgt_field.init_token]
-        self._tgt_unk_idx = self._tgt_vocab.stoi[tgt_field.unk_token]
+        self.vocabs = vocabs
+        tgt_vocab = dict(self.vocabs)["tgt"]
+        self._tgt_vocab = tgt_vocab
+        self._tgt_eos_idx = self._tgt_vocab.stoi[DefaultTokens.EOS]
+        self._tgt_pad_idx = self._tgt_vocab.stoi[DefaultTokens.PAD]
+        self._tgt_bos_idx = self._tgt_vocab.stoi[DefaultTokens.BOS]
+        self._tgt_unk_idx = self._tgt_vocab.stoi[DefaultTokens.UNK]
         self._tgt_vocab_len = len(self._tgt_vocab)
 
         self._gpu = gpu
@@ -232,7 +233,7 @@ class Inference(object):
     def from_opt(
         cls,
         model,
-        fields,
+        vocabs,
         opt,
         model_opt,
         global_scorer=None,
@@ -246,7 +247,7 @@ class Inference(object):
 
         Args:
             model (onmt.modules.NMTModel): See :func:`__init__()`.
-            fields (dict[str, torchtext.data.Field]): See
+            vocabs (dict[str, onmt.inputters_mvp.Vocab]): See
                 :func:`__init__()`.
             opt (argparse.Namespace): Command line options
             model_opt (argparse.Namespace): Command line options saved with
@@ -262,12 +263,13 @@ class Inference(object):
         # TODO: maybe add dynamic part
         cls.validate_task(model_opt.model_task)
 
-        # FIXME
+        # FIXME: probably suffices to simply provid a path to src and optionally target,
+        # and let ParallelCorpus handle the rest
         src_reader = None  # inputters.str2reader[opt.data_type].from_opt(opt)
         tgt_reader = None  # inputters.str2reader["text"].from_opt(opt)
         return cls(
             model,
-            fields,
+            vocabs,
             src_reader,
             tgt_reader,
             gpu=opt.gpu,
@@ -366,9 +368,9 @@ class Inference(object):
             raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
 
         # FIXME
-        src_data = {"reader": self.src_reader, "data": src, "features": src_feats}
-        tgt_data = {"reader": self.tgt_reader, "data": tgt, "features": {}}
-        _readers, _data = None, None  # inputters.Dataset.config([("src", src_data), ("tgt", tgt_data)])
+        # src_data = {"reader": self.src_reader, "data": src, "features": src_feats}
+        # tgt_data = {"reader": self.tgt_reader, "data": tgt, "features": {}}
+        # _readers, _data = None, None  # inputters.Dataset.config([("src", src_data), ("tgt", tgt_data)])
 
         # data = inputters.Dataset(
         #     self.fields,
@@ -377,7 +379,16 @@ class Inference(object):
         #     sort_key=inputters.str2sortkey[self.data_type],
         #     filter_pred=self._filter_pred,
         # )
-        data = None
+        data = ParallelCorpus(
+            self.src_file_path,  # WARNING: to be defined
+            self.tgt_file_path,  # WARNING: to be defined
+            self.vocabs['src'],
+            self.vocabs['tgt'],
+            transforms=[],
+            batch_size=batch_size,
+            batch_type=batch_type,
+        )
+        # read_examples_from_files(None, None)
 
         # data_iter = inputters.OrderedIterator(
         #     dataset=data,
@@ -393,7 +404,7 @@ class Inference(object):
 
         xlation_builder = onmt.translate.TranslationBuilder(
             data,
-            self.fields,
+            self.vocabs,
             self.n_best,
             self.replace_unk,
             tgt,

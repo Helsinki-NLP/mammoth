@@ -22,7 +22,7 @@ def build_trainer(
     opt,
     device_id,
     model,
-    fields_dict,
+    vocabs_dict,
     optim,
     scheduler,
     model_saver=None,
@@ -34,7 +34,7 @@ def build_trainer(
     Args:
         opt (:obj:`Namespace`): user options (usually from argument parsing)
         model (:obj:`onmt.models.NMTModel`): the model to train
-        fields (dict): dict of fields
+        vocabs_dict (dict): dict of vocabs
         optim (:obj:`onmt.utils.Optimizer`): optimizer used during training
         data_type (str): string describing the type of data
             e.g. "text"
@@ -46,7 +46,7 @@ def build_trainer(
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
-    for (side, lang, component_id, tgt_vocab) in scheduler.get_vocabs('tgt', fields_dict):
+    for (side, lang, component_id, tgt_vocab) in scheduler.get_vocabs('tgt', vocabs_dict):
         generator = generators_md[f"generator{lang}"]
         train_loss_md.add_module(
             f'trainloss{lang}',

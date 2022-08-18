@@ -21,7 +21,6 @@ class DynamicDatasetIter(object):
         corpora (dict[str, ParallelCorpus]): collections of corpora to iterate;
         corpora_info (dict[str, dict]): corpora infos correspond to corpora;
         transforms (dict[str, Transform]): transforms may be used by corpora;
-        fields (dict[str, Field]): fields dict for convert corpora into Tensor;
         is_train (bool): True when generate data for training;
         batch_type (str): batching type to count on, choices=[tokens, sents];
         batch_size (int): numbers of examples in a batch;

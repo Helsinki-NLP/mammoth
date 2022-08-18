@@ -30,7 +30,7 @@ def build_embeddings(opt, vocab, for_encoder=True):
     """
     Args:
         opt: the option in current environment.
-        vocab: word and feats field.
+        vocab: stoi-ish object.
         for_encoder(bool): build Embeddings for encoder or decoder?
     """
     emb_dim = opt.src_word_vec_size if for_encoder else opt.tgt_word_vec_size
@@ -106,25 +106,29 @@ def load_test_multitask_model(opt, model_path=None):
             gen_module=generator,
         )
 
+        vocabs_dict = {
+            'src': frame["vocab"].get(('src', opt.src_lang)),
+            'tgt': frame["vocab"].get(('tgt', opt.tgt_lang)),
+        }
         # FIXME
-        # fields = {
-        #     'src': frame["vocab"].get(('src', opt.src_lang))['src'],
-        #     'tgt': frame["vocab"].get(('tgt', opt.tgt_lang))['tgt'],
-        # }
         # fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
-        fields = None
 
         model_opt = ArgumentParser.ckpt_model_opts(frame['opt'])
         # Avoid functionality on inference
         model_opt.update_vocab = False
-        model = create_bilingual_model(src_lang=opt.src_lang, tgt_lang=opt.tgt_lang, model_opt=model_opt, fields=fields)
+        model = create_bilingual_model(
+            src_lang=opt.src_lang,
+            tgt_lang=opt.tgt_lang,
+            model_opt=model_opt,
+            vocabs_dict=vocabs_dict
+        )
         model.load_state_dict(ckpt_state_dict)
         device = torch.device("cuda" if use_gpu(opt) else "cpu")
         model.to(device)
 
         model.eval()
 
-        return fields, model, model_opt
+        return vocabs_dict, model, model_opt
 
 
 def load_test_model(opt, model_path=None):
@@ -147,9 +151,9 @@ def load_test_model(opt, model_path=None):
     model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opt'])
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
-    fields_dict = checkpoint['vocab']
-    print("FIELDS")
-    print(fields_dict)
+    vocabs = checkpoint['vocab']
+    print("VOCABS")
+    print(vocabs)
     if opt.gpu != -1:
         device = torch.device("cuda")
         model.to(device)
@@ -157,11 +161,11 @@ def load_test_model(opt, model_path=None):
     lang_pair = opt.lang_pair
     src_lang, tgt_lang = lang_pair.split("-")
     # FIXME
-    fields = {}
-    fields['src'] = fields_dict[('src', src_lang)]['src']
-    fields['tgt'] = fields_dict[('tgt', tgt_lang)]['tgt']
-    indices = None  # Field(use_vocab=False, dtype=torch.long, sequential=False)
-    fields["indices"] = indices
+    vocabs_dict = {}
+    vocabs_dict['src'] = vocabs[('src', src_lang)]
+    vocabs_dict['tgt'] = vocabs[('tgt', tgt_lang)]
+    # indices = None  # Field(use_vocab=False, dtype=torch.long, sequential=False)
+    # fields["indices"] = indices
 
     # Avoid functionality on inference
     model_opt.update_vocab = False
@@ -174,26 +178,26 @@ def load_test_model(opt, model_path=None):
         torch.quantization.quantize_dynamic(model, inplace=True)
     model.eval()
     model.generator.eval()
-    return fields, model, model_opt
+    return vocabs_dict, model, model_opt
 
 
-def create_bilingual_model(src_lang, tgt_lang, model_opt, fields):
+def create_bilingual_model(src_lang, tgt_lang, model_opt, vocabs_dict):
     """For translation - state dict to be loaded to this model."""
 
     encoder = nn.ModuleDict()
     decoder = nn.ModuleDict()
     generator = nn.ModuleDict()
 
-    src_emb = build_src_emb(model_opt, fields)
-    tgt_emb = build_tgt_emb(model_opt, fields)
-    pluggable_src_emb = PluggableEmbeddings({f'{src_lang}': src_emb})
-    pluggable_tgt_emb = PluggableEmbeddings({f'{tgt_lang}': tgt_emb})
+    src_emb = build_src_emb(model_opt, vocabs_dict['src'])
+    tgt_emb = build_tgt_emb(model_opt, vocabs_dict['tgt'])
+    pluggable_src_emb = PluggableEmbeddings({src_lang: src_emb})
+    pluggable_tgt_emb = PluggableEmbeddings({tgt_lang: tgt_emb})
 
     pluggable_src_emb.activate(src_lang)
     pluggable_tgt_emb.activate(tgt_lang)
     encoder.add_module(f'encoder{src_lang}', build_only_enc(model_opt, pluggable_src_emb))
     decoder.add_module(f'decoder{tgt_lang}', build_only_dec(model_opt, pluggable_tgt_emb))
-    generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, fields, tgt_emb))
+    generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, vocabs_dict['tgt'], tgt_emb))
 
     attention_bridge = AttentionBridge.from_opt(model_opt)
 
@@ -336,34 +340,35 @@ def build_generator(model_opt, n_tgts, tgt_emb):
     return generator
 
 
-def use_embeddings_from_checkpoint(fields, model, generator, checkpoint):
-    # Update vocabulary embeddings with checkpoint embeddings
-    logger.info("Updating vocabulary embeddings with checkpoint embeddings")
-    # Embedding layers
-    enc_emb_name = "encoder.embeddings.make_embedding.emb_luts.0.weight"
-    dec_emb_name = "decoder.embeddings.make_embedding.emb_luts.0.weight"
-
-    for field_name, emb_name in [("src", enc_emb_name), ("tgt", dec_emb_name)]:
-        if emb_name not in checkpoint["model"]:
-            continue
-        multifield = fields[field_name]
-        checkpoint_multifield = checkpoint["vocab"][field_name]
-        for (name, field), (checkpoint_name, checkpoint_field) in zip(multifield, checkpoint_multifield):
-            new_tokens = []
-            for i, tok in enumerate(field.vocab.itos):
-                if tok in checkpoint_field.vocab.stoi:
-                    old_i = checkpoint_field.vocab.stoi[tok]
-                    model.state_dict()[emb_name][i] = checkpoint["model"][emb_name][old_i]
-                    if field_name == "tgt":
-                        generator.state_dict()["0.weight"][i] = checkpoint["generator"]["0.weight"][old_i]
-                        generator.state_dict()["0.bias"][i] = checkpoint["generator"]["0.bias"][old_i]
-                else:
-                    # Just for debugging purposes
-                    new_tokens.append(tok)
-            logger.info("%s: %d new tokens" % (name, len(new_tokens)))
-        # Remove old vocabulary associated embeddings
-        del checkpoint["model"][emb_name]
-    del checkpoint["generator"]["0.weight"], checkpoint["generator"]["0.bias"]
+# TODO: confirm this was dead code
+# def use_embeddings_from_checkpoint(fields, model, generator, checkpoint):
+#     # Update vocabulary embeddings with checkpoint embeddings
+#     logger.info("Updating vocabulary embeddings with checkpoint embeddings")
+#     # Embedding layers
+#     enc_emb_name = "encoder.embeddings.make_embedding.emb_luts.0.weight"
+#     dec_emb_name = "decoder.embeddings.make_embedding.emb_luts.0.weight"
+#
+#     for field_name, emb_name in [("src", enc_emb_name), ("tgt", dec_emb_name)]:
+#         if emb_name not in checkpoint["model"]:
+#             continue
+#         multifield = fields[field_name]
+#         checkpoint_multifield = checkpoint["vocab"][field_name]
+#         for (name, field), (checkpoint_name, checkpoint_field) in zip(multifield, checkpoint_multifield):
+#             new_tokens = []
+#             for i, tok in enumerate(field.vocab.itos):
+#                 if tok in checkpoint_field.vocab.stoi:
+#                     old_i = checkpoint_field.vocab.stoi[tok]
+#                     model.state_dict()[emb_name][i] = checkpoint["model"][emb_name][old_i]
+#                     if field_name == "tgt":
+#                         generator.state_dict()["0.weight"][i] = checkpoint["generator"]["0.weight"][old_i]
+#                         generator.state_dict()["0.bias"][i] = checkpoint["generator"]["0.bias"][old_i]
+#                 else:
+#                     # Just for debugging purposes
+#                     new_tokens.append(tok)
+#             logger.info("%s: %d new tokens" % (name, len(new_tokens)))
+#         # Remove old vocabulary associated embeddings
+#         del checkpoint["model"][emb_name]
+#     del checkpoint["generator"]["0.weight"], checkpoint["generator"]["0.bias"]
 
 
 def build_base_model_langspec(
@@ -379,8 +384,8 @@ def build_base_model_langspec(
         model_opt: the option loaded from checkpoint. It's important that
             the opts have been updated and validated. See
             :class:`onmt.utils.parse.ArgumentParser`.
-        fields (dict[str, torchtext.data.Field]):
-            `Field` objects for the model.
+        vocabs_dict (dict[str, onmt.inputters_mvp.Vocab]):
+            `Vocab` objects for the model.
         gpu (bool): whether to use gpu.
         checkpoint: the model gnerated by train phase, or a resumed snapshot
                     model from a stopped training.

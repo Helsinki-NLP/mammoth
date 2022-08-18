@@ -27,9 +27,8 @@ def build_vocab_main(opts):
     logger = init_logger()
     set_random_seed(opts.seed, False)
     transforms_cls = get_transforms_cls(opts._all_transform)
-    fields = None
 
-    transforms = make_transforms(opts, transforms_cls, fields)
+    transforms = make_transforms(opts, transforms_cls, None)
 
     src_counters_by_lang = defaultdict(Counter)
     tgt_counters_by_lang = defaultdict(Counter)

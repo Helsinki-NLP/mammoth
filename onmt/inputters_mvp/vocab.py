@@ -77,6 +77,9 @@ class Vocab():
         items = list(roundrobin(*[vocab.stoi.keys() for vocab in vocabs]))
         return cls(None, items=items, tag='', size=size, specials=specials)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__} ({len(self)} items)"
+
 
 def _read_vocab_file(vocab_path, tag):
     """Loads a vocabulary from the given path.

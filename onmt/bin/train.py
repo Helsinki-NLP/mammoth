@@ -57,7 +57,7 @@ def _init_train(opt):
     if opt.train_from:
         # Load checkpoint if we resume from a previous training.
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
-        fields = None  # load_fields(opt.save_data, checkpoint)
+        # fields = load_fields(opt.save_data, checkpoint)
         transforms_cls = get_transforms_cls(opt._all_transform)
         if (
             hasattr(checkpoint["opt"], '_all_transform')
@@ -79,16 +79,16 @@ def _init_train(opt):
         # fields, transforms_cls = prepare_fields_transforms(opt)
 
     # Report src and tgt vocab sizes
-    for side in ['src', 'tgt']:
-        f = fields[side]
-        try:
-            f_iter = iter(f)
-        except TypeError:
-            f_iter = [(side, f)]
-        for sn, sf in f_iter:
-            if sf.use_vocab:
-                logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
-    return checkpoint, fields, transforms_cls
+    # for side in ['src', 'tgt']:
+    #     f = fields[side]
+    #     try:
+    #         f_iter = iter(f)
+    #     except TypeError:
+    #         f_iter = [(side, f)]
+    #     for sn, sf in f_iter:
+    #         if sf.use_vocab:
+    #             logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
+    return checkpoint, None, transforms_cls
 
 
 # def init_train_prepare_fields_transforms(opt, vocab_path, side):

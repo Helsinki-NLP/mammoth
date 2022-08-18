@@ -99,10 +99,9 @@ class ParallelCorpus(IterableDataset):
         src_pad_idx = self.vocabs['src'][DefaultTokens.PAD]
         tgt_pad_idx = self.vocabs['tgt'][DefaultTokens.PAD]
         src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device=self.device)
-        src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_pad_idx), src_lengths)
-        tgt = pad_sequence([ex['src'] for ex in examples], padding_value=src_pad_idx)
+        src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_pad_idx).unsqueeze(-1), src_lengths)
+        tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=src_pad_idx).unsqueeze(-1)
         batch = Batch(src, tgt)
-        import pdb; pdb.set_trace()
         return batch
 
 

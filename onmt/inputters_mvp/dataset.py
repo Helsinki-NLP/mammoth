@@ -13,7 +13,12 @@ from onmt.utils.logging import logger
 
 
 # for compliance with previous code
-Batch = collections.namedtuple('Batch', 'src tgt batch_size')
+class Batch(object):
+    def __init__(self, src, tgt, batch_size):
+        self.src = src
+        self.tgt = tgt
+        self.batch_size = batch_size
+        self.dataset = None  # mock attr for onmt/utils/distributed.py
 
 
 def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):

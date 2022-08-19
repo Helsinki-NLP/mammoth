@@ -136,9 +136,9 @@ def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: boo
     # 2. build src/tgt vocabs
     if transforms_cls:
         logger.info(f'Transforms: {transforms_cls}')
-        src_specials, tgt_specials = zip(*(cls.get_specials() for cls in transforms_cls))
-        src_specials = sorted(itertools.chain.from_iterable(src_specials))
-        tgt_specials = sorted(itertools.chain.from_iterable(tgt_specials))
+        src_specials, tgt_specials = zip(*(cls.get_specials(opts) for cls in transforms_cls.values()))
+        src_specials = sorted(itertools.chain.from_iterable(src_specials + (DEFAULT_SPECIALS,)))
+        tgt_specials = sorted(itertools.chain.from_iterable(tgt_specials + (DEFAULT_SPECIALS,)))
     else:
         logger.info('No transforms found')
         src_specials = tgt_specials = list(DEFAULT_SPECIALS)
@@ -157,7 +157,7 @@ def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: boo
         opts.data[corpus_id]["path_tgt"],
         src_vocab,
         tgt_vocab,
-        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs)),
+        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs).values()),
         opts.batch_size,
         opts.batch_type,
     )

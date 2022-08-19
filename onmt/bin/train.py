@@ -1,24 +1,22 @@
 #!/usr/bin/env python
 """Train models with dynamic data."""
-import sys
 import torch
 from functools import partial
 import os
 
 from onmt.utils.distributed import ErrorHandler, consumer, batch_producer, Scheduler
 from onmt.utils.misc import set_random_seed
-from onmt.modules.embeddings import prepare_pretrained_embeddings
+# from onmt.modules.embeddings import prepare_pretrained_embeddings
 from onmt.utils.logging import init_logger, logger
 
 from onmt.models.model_saver import load_checkpoint
 from onmt.train_single import main as single_main
-from onmt.inputters.dynamic_iterator import DynamicDatasetIter
+from onmt.inputters_mvp import DynamicDatasetIter
 
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
-from onmt.inputters.corpus import save_transformed_sample
-from onmt.inputters.fields import build_dynamic_fields, save_fields, load_fields, build_dynamic_fields_langspec
-from onmt.transforms import make_transforms, save_transforms, get_specials, get_transforms_cls
+from onmt.inputters_mvp import get_vocab
+from onmt.transforms import get_transforms_cls
 from collections import OrderedDict
 from onmt.constants import ModelTask
 
@@ -26,30 +24,30 @@ from onmt.constants import ModelTask
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
-def prepare_fields_transforms(opt):
-    """Prepare or dump fields & transforms before training."""
-    transforms_cls = get_transforms_cls(opt._all_transform)
-    specials = get_specials(opt, transforms_cls)
-
-    fields = build_dynamic_fields(opt, src_specials=specials['src'], tgt_specials=specials['tgt'])
-
-    # maybe prepare pretrained embeddings, if any
-    prepare_pretrained_embeddings(opt, fields)
-
-    if opt.dump_fields:
-        save_fields(fields, opt.save_data, overwrite=opt.overwrite)
-    if opt.dump_transforms or opt.n_sample != 0:
-        transforms = make_transforms(opt, transforms_cls, fields)
-    if opt.dump_transforms:
-        save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
-    if opt.n_sample != 0:
-        logger.warning(
-            f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
-        )
-        save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
-        logger.info("Sample saved, please check it before restart training.")
-        sys.exit()
-    return fields, transforms_cls
+# def prepare_fields_transforms(opt):
+#     """Prepare or dump fields & transforms before training."""
+#     transforms_cls = get_transforms_cls(opt._all_transform)
+#     specials = get_specials(opt, transforms_cls)
+#
+#     fields = build_dynamic_fields(opt, src_specials=specials['src'], tgt_specials=specials['tgt'])
+#
+#     # maybe prepare pretrained embeddings, if any
+#     prepare_pretrained_embeddings(opt, fields)
+#
+#     if opt.dump_fields:
+#         save_fields(fields, opt.save_data, overwrite=opt.overwrite)
+#     if opt.dump_transforms or opt.n_sample != 0:
+#         transforms = make_transforms(opt, transforms_cls, fields)
+#     if opt.dump_transforms:
+#         save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
+#     if opt.n_sample != 0:
+#         logger.warning(
+#             f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
+#         )
+#         save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
+#         logger.info("Sample saved, please check it before restart training.")
+#         sys.exit()
+#     return fields, transforms_cls
 
 
 def _init_train(opt):
@@ -59,7 +57,7 @@ def _init_train(opt):
     if opt.train_from:
         # Load checkpoint if we resume from a previous training.
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
-        fields = load_fields(opt.save_data, checkpoint)
+        # fields = load_fields(opt.save_data, checkpoint)
         transforms_cls = get_transforms_cls(opt._all_transform)
         if (
             hasattr(checkpoint["opt"], '_all_transform')
@@ -75,49 +73,49 @@ def _init_train(opt):
             logger.warning(_msg)
         if opt.update_vocab:
             logger.info("Updating checkpoint vocabulary with new vocabulary")
-            fields, transforms_cls = prepare_fields_transforms(opt)
+            # fields, transforms_cls = prepare_fields_transforms(opt)
     else:
         checkpoint = None
-        fields, transforms_cls = prepare_fields_transforms(opt)
+        # fields, transforms_cls = prepare_fields_transforms(opt)
 
     # Report src and tgt vocab sizes
-    for side in ['src', 'tgt']:
-        f = fields[side]
-        try:
-            f_iter = iter(f)
-        except TypeError:
-            f_iter = [(side, f)]
-        for sn, sf in f_iter:
-            if sf.use_vocab:
-                logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
-    return checkpoint, fields, transforms_cls
+    # for side in ['src', 'tgt']:
+    #     f = fields[side]
+    #     try:
+    #         f_iter = iter(f)
+    #     except TypeError:
+    #         f_iter = [(side, f)]
+    #     for sn, sf in f_iter:
+    #         if sf.use_vocab:
+    #             logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
+    return checkpoint, None, transforms_cls
 
 
-def init_train_prepare_fields_transforms(opt, vocab_path, side):
-    """Prepare or dump fields & transforms before training."""
-
-    fields = build_dynamic_fields_langspec(opt, vocab_path, side)
-    transforms_cls = get_transforms_cls(opt._all_transform)
-    # TODO: maybe prepare pretrained embeddings, if any, with `prepare_pretrained_embeddings(opt, fields)`
-
-    if opt.dump_fields:
-        save_fields(fields, opt.save_data, overwrite=opt.overwrite)
-    if opt.dump_transforms or opt.n_sample != 0:
-        transforms = make_transforms(opt, transforms_cls, fields)
-    if opt.dump_transforms:
-        save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
-    if opt.n_sample != 0:
-        logger.warning(
-            f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
-        )
-        save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
-        logger.info("Sample saved, please check it before restart training.")
-        sys.exit()
-
-    for name, field in fields[side].fields:
-        logger.debug(f'prepped: {name}  {len(field.vocab)}')
-
-    return fields
+# def init_train_prepare_fields_transforms(opt, vocab_path, side):
+#     """Prepare or dump fields & transforms before training."""
+#
+#     fields = None # build_dynamic_fields_langspec(opt, vocab_path, side)
+#     transforms_cls = get_transforms_cls(opt._all_transform)
+#     # TODO: maybe prepare pretrained embeddings, if any, with `prepare_pretrained_embeddings(opt, fields)`
+#
+#     # if opt.dump_fields:
+#     #     save_fields(fields, opt.save_data, overwrite=opt.overwrite)
+#     if opt.dump_transforms or opt.n_sample != 0:
+#         transforms = make_transforms(opt, transforms_cls, fields)
+#     if opt.dump_transforms:
+#         save_transforms(transforms, opt.save_data, overwrite=opt.overwrite)
+#     if opt.n_sample != 0:
+#         logger.warning(
+#             f"`-n_sample` != 0: Training will not be started. Stop after saving {opt.n_sample} samples/corpus."
+#         )
+#         save_transformed_sample(opt, transforms, n_sample=opt.n_sample)
+#         logger.info("Sample saved, please check it before restart training.")
+#         sys.exit()
+#
+#     for name, field in fields[side].fields:
+#         logger.debug(f'prepped: {name}  {len(field.vocab)}')
+#
+#     return fields
 
 
 def train(opt):
@@ -146,17 +144,18 @@ def train(opt):
     opt.data_task = ModelTask.SEQ2SEQ
     transforms_cls = get_transforms_cls(opt._all_transform)
 
-    fields_dict = OrderedDict()
+    vocabs_dict = OrderedDict()
     # For creating fields, we use a scheduler that doesn't filter by node and gpu
     global_scheduler = Scheduler(opt, node_rank=None, local_rank=None)
 
+    vocab_size = {'src': opt.src_vocab_size or None, 'tgt': opt.tgt_vocab_size or None}
     for side in ('src', 'tgt'):
         for lang, vocab_path in global_scheduler.get_vocabularies(opt, side=side):
-            fields_dict[(side, lang)] = init_train_prepare_fields_transforms(opt, vocab_path=vocab_path, side=side)
+            vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side])
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
-    train_process = partial(single_main, fields_dict=fields_dict)
+    train_process = partial(single_main, vocabs_dict=vocabs_dict)
 
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 
@@ -200,7 +199,7 @@ def train(opt):
             train_iter = DynamicDatasetIter.from_opts(
                 scheduler=scheduler,
                 transforms_cls=transforms_cls,
-                fields_dict=fields_dict,
+                vocabs_dict=vocabs_dict,
                 opts=opt,
                 is_train=True,
                 stride=1,

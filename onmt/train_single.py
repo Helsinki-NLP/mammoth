@@ -2,7 +2,6 @@
 """Training on a single process."""
 import torch
 
-from onmt.inputters.inputter import IterOnDevice
 from onmt.model_builder import build_model
 from onmt.utils.optimizers import Optimizer
 from onmt.utils.misc import set_random_seed
@@ -12,7 +11,7 @@ from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
 from onmt.utils.distributed import broadcast_tensors, Scheduler, is_master
-from onmt.inputters.dynamic_iterator import DynamicDatasetIter
+from onmt.inputters_mvp import DynamicDatasetIter
 from onmt.transforms import get_transforms_cls
 
 
@@ -40,10 +39,10 @@ def _get_model_opts(opt, checkpoint=None):
     return model_opt
 
 
-def _build_valid_iter(opt, fields, transforms_cls):
+def _build_valid_iter(opt, vocabs, transforms_cls):
     """Build iterator used for validation."""
     # valid_iter = DynamicDatasetIter(
-    #     fields, transforms_cls, opt, is_train=False)
+    #     vocabs, transforms_cls, opt, is_train=False)
     valid_iter = iter([])  # FIXME: validation temporarily disabled
     return valid_iter
 
@@ -87,7 +86,7 @@ def init_distributed(model, scheduler):
 
 def main(
     opt,
-    fields_dict,
+    vocabs_dict,
     global_rank,
     error_queue=None,
     batch_queue=None,
@@ -111,7 +110,7 @@ def main(
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.
-    model, generators_md = build_model(model_opt, opt, fields_dict, scheduler, checkpoint)
+    model, generators_md = build_model(model_opt, opt, vocabs_dict, scheduler, checkpoint)
 
     logger.info("GPU {} - Init model".format(global_rank))
     if node_rank is not None and local_rank is not None:
@@ -130,14 +129,14 @@ def main(
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, global_rank)
+    model_saver = build_model_saver(model_opt, opt, model, vocabs_dict, optim, global_rank)
 
     logger.info("GPU {} - Build trainer".format(global_rank))
     trainer = build_trainer(
         opt,
         local_rank,
         model,
-        fields_dict,
+        vocabs_dict,
         optim,
         scheduler=scheduler,
         model_saver=model_saver,
@@ -146,16 +145,16 @@ def main(
     logger.info("GPU {} - Trainer built".format(global_rank))
 
     if batch_queue is None:
-        _train_iter = DynamicDatasetIter.from_opts(
+        train_iter = DynamicDatasetIter.from_opts(
             scheduler=scheduler,
             transforms_cls=transforms_cls,
-            fields_dict=fields_dict,
+            vocabs_dict=vocabs_dict,
             opts=opt,
             is_train=True,
             stride=1,
             offset=0,
         )
-        train_iter = IterOnDevice(_train_iter, local_rank)
+
     else:
         assert semaphore is not None, "Using batch_queue requires semaphore as well"
 
@@ -163,15 +162,15 @@ def main(
             while True:
                 batch, metadata, communication_batch_id = batch_queue.get()
                 semaphore.release()
-                # Move batch to specified device
-                IterOnDevice.batch_to_device(batch, local_rank)
+                # TODO: confirm that batch-providing corpus has already been to'd to the correct place
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()
     logger.info("GPU {} - Valid iter".format(global_rank))
-    valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
+    valid_iter = _build_valid_iter(opt, vocabs_dict, transforms_cls)
     if valid_iter is not None:
-        valid_iter = IterOnDevice(valid_iter, local_rank)
+        # valid_iter = IterOnDevice(valid_iter, local_rank)
+        pass
 
     if len(opt.gpu_ranks):
         if is_master(global_rank):

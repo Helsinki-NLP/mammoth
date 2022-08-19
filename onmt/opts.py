@@ -146,12 +146,12 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
     )
 
     if not build_vocab_only:
-        group.add(
-            '-dump_fields',
-            '--dump_fields',
-            action='store_true',
-            help="Dump fields `*.vocab.pt` to disk. -save_data should be set as saving prefix.",
-        )
+        # group.add(
+        #     '-dump_fields',
+        #     '--dump_fields',
+        #     action='store_true',
+        #     help="Dump fields `*.vocab.pt` to disk. -save_data should be set as saving prefix.",
+        # )
         group.add(
             '-dump_transforms',
             '--dump_transforms',
@@ -177,11 +177,11 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         )
 
 
-def _add_dynamic_fields_opts(parser, build_vocab_only=False):
-    """Options related to vocabulary and fields.
+def _add_dynamic_vocabs_opts(parser, build_vocab_only=False):
+    """Options related to vocabulary.
 
-    Add all options relate to vocabulary or fields to parser.
-    If `build_vocab_only` set to True, do not contain fields
+    Add all options relate to vocabulary to parser.
+    If `build_vocab_only` set to True, do not contain vocab
     related options which won't be used in `bin/build_vocab.py`.
     """
     group = parser.add_argument_group("Vocab")
@@ -297,7 +297,7 @@ def dynamic_prepare_opts(parser, build_vocab_only=False):
     """
     config_opts(parser)
     _add_dynamic_corpus_opts(parser, build_vocab_only=build_vocab_only)
-    _add_dynamic_fields_opts(parser, build_vocab_only=build_vocab_only)
+    _add_dynamic_vocabs_opts(parser, build_vocab_only=build_vocab_only)
     _add_dynamic_transform_opts(parser)
 
     if build_vocab_only:

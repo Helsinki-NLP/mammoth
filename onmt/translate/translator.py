@@ -317,7 +317,7 @@ class Inference(object):
         batch_size,
         src,
     ):
-        if "tgt" in batch.__dict__:
+        if batch.tgt is not None:
             gs = self._score_target(
                 batch,
                 memory_bank,
@@ -377,12 +377,14 @@ class Inference(object):
         #     sort_key=inputters.str2sortkey[self.data_type],
         #     filter_pred=self._filter_pred,
         # )
+
+
         corpus = ParallelCorpus(
             self.src_file_path,
             self.tgt_file_path,  # may be None
             self.vocabs['src'],
             self.vocabs['tgt'],
-            transforms=[],
+            transforms=None,  # I suppose you might want *some* transforms
             batch_size=batch_size,
             batch_type=batch_type,
         )
@@ -406,7 +408,7 @@ class Inference(object):
             self.n_best,
             self.replace_unk,
             has_tgt=tgt is not None,
-            phrasE_table=self.phrase_table,
+            phrase_table=self.phrase_table,
         )
 
         # Statistics

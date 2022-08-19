@@ -13,7 +13,7 @@ from onmt.utils.logging import logger
 
 
 # for compliance with previous code
-Batch = collections.namedtuple('Batch', 'src tgt')
+Batch = collections.namedtuple('Batch', 'src tgt batch_size')
 
 
 def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):
@@ -86,14 +86,14 @@ class ParallelCorpus(IterableDataset):
             return {
                 k: self._numericalize(v, side=k)
                 for k, v in example_dict.items()
-                # if v is not None
+                if v is not None
             }
 
         examples = read_examples_from_files(
             self.src_file,
             self.tgt_file,
             tokenize_fn=self._tokenize,
-            transforms_fn=self.transforms.apply,
+            transforms_fn=self.transforms.apply if self.transforms is not None else lambda x: x,
         )
         examples = map(_cast, examples)
         accum, cur_batch_size = [], 0
@@ -112,12 +112,13 @@ class ParallelCorpus(IterableDataset):
 
     # FIXME: some RNN archs require sorting src's by length
     def collate_fn(self, examples):
-        src_pad_idx = self.vocabs['src'][DefaultTokens.PAD]
-        tgt_pad_idx = self.vocabs['tgt'][DefaultTokens.PAD]
+        has_tgt = 'tgt' in examples[0].keys()
+        src_padidx = self.vocabs['src'][DefaultTokens.PAD]
+        tgt_padidx = self.vocabs['tgt'][DefaultTokens.PAD]
         src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device=self.device)
-        src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_pad_idx).unsqueeze(-1), src_lengths)
-        tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_pad_idx).unsqueeze(-1)
-        batch = Batch(src, tgt)
+        src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx).unsqueeze(-1), src_lengths)
+        tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1) if has_tgt else None
+        batch = Batch(src, tgt, len(examples))
         return batch
 
 

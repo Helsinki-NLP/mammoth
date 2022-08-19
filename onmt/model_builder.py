@@ -197,7 +197,7 @@ def create_bilingual_model(src_lang, tgt_lang, model_opt, vocabs_dict):
     pluggable_tgt_emb.activate(tgt_lang)
     encoder.add_module(f'encoder{src_lang}', build_only_enc(model_opt, pluggable_src_emb))
     decoder.add_module(f'decoder{tgt_lang}', build_only_dec(model_opt, pluggable_tgt_emb))
-    generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, vocabs_dict['tgt'], tgt_emb))
+    generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, len(vocabs_dict['tgt']), tgt_emb))
 
     attention_bridge = AttentionBridge.from_opt(model_opt)
 

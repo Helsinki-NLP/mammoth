@@ -42,9 +42,9 @@ class TranslationBuilder(object):
 
         for tok in pred:
             if tok < len(vocab):
-                tokens.append(vocab.itos[tok])
+                tokens.append(vocab.itos[tok.item()])
             else:
-                tokens.append(src_vocab.itos[tok - len(vocab)])
+                tokens.append(src_vocab.itos[tok.item() - len(vocab)])
             if tokens[-1] == DefaultTokens.EOS:
                 tokens = tokens[:-1]
                 break
@@ -64,7 +64,7 @@ class TranslationBuilder(object):
         assert len(translation_batch["gold_score"]) == len(translation_batch["predictions"])
         batch_size = batch.batch_size
 
-        preds, pred_score, attn, align, gold_score, indices = list(
+        preds, pred_score, attn, align, gold_score = list(
             zip(
                 *sorted(
                     zip(
@@ -73,7 +73,7 @@ class TranslationBuilder(object):
                         translation_batch["attention"],
                         translation_batch["alignment"],
                         translation_batch["gold_score"],
-                        batch.indices.data,
+                        # batch.indices.data,
                     ),
                     key=lambda x: x[-1],
                 )
@@ -84,21 +84,21 @@ class TranslationBuilder(object):
             align = [None] * batch_size
 
         # Sorting
-        inds, perm = torch.sort(batch.indices)
+        # inds, perm = torch.sort(batch.indices)
         if self._has_text_src:
-            src = batch.src[0][:, :, 0].index_select(1, perm)
+            src = batch.src[0][:, :, 0]  # .index_select(1, perm)
         else:
             src = None
-        tgt = batch.tgt[:, :, 0].index_select(1, perm) if self.has_tgt else None
+        tgt = batch.tgt[:, :, 0] if self.has_tgt else None
 
         translations = []
         for b in range(batch_size):
-            if self._has_text_src:
-                src_vocab = self.data.src_vocabs[inds[b]] if self.data.src_vocabs else None
-                src_raw = self.data.examples[inds[b]].src[0]
-            else:
-                src_vocab = None
-                src_raw = None
+            # if self._has_text_src:
+            #     src_vocab = self.data.vocabs['src']
+            #     src_raw = self.data.examples[inds[b]].src[0]
+            # else:
+            src_vocab = None
+            src_raw = None
             pred_sents = [
                 self._build_target_tokens(
                     src[:, b] if src is not None else None,

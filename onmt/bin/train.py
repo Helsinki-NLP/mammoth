@@ -49,6 +49,7 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 #         sys.exit()
 #     return fields, transforms_cls
 
+# TODO: reimplement save_transformed_sample
 
 def _init_train(opt):
     """Common initilization stuff for all training process."""
@@ -151,6 +152,8 @@ def train(opt):
     vocab_size = {'src': opt.src_vocab_size or None, 'tgt': opt.tgt_vocab_size or None}
     for side in ('src', 'tgt'):
         for lang, vocab_path in global_scheduler.get_vocabularies(opt, side=side):
+            # FIXME: this should actually be fed with the transforms special keywords as well
+            # otherwise we may get different objects throughout the processes
             vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side])
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')

@@ -18,7 +18,6 @@ class Batch(object):
         self.src = src
         self.tgt = tgt
         self.batch_size = batch_size
-        self.dataset = None  # mock attr for onmt/utils/distributed.py
 
 
 def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):
@@ -77,7 +76,7 @@ class ParallelCorpus(IterableDataset):
 
     def _numericalize(self, tokens, side='src'):
         vocab = self.vocabs[side]
-        indices = torch.tensor(list(map(vocab.__getitem__, tokens)), device=self.device)
+        indices = torch.tensor(list(map(vocab.stoi.__getitem__, tokens)), device=self.device)
         return indices
 
     def to(self, device):
@@ -137,15 +136,15 @@ def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: boo
     if transforms_cls:
         logger.info(f'Transforms: {transforms_cls}')
         src_specials, tgt_specials = zip(*(cls.get_specials(opts) for cls in transforms_cls.values()))
-        src_specials = sorted(itertools.chain.from_iterable(src_specials + (DEFAULT_SPECIALS,)))
-        tgt_specials = sorted(itertools.chain.from_iterable(tgt_specials + (DEFAULT_SPECIALS,)))
+        src_specials = tuple(sorted(itertools.chain.from_iterable(src_specials + (DEFAULT_SPECIALS,))))
+        tgt_specials = tuple(sorted(itertools.chain.from_iterable(tgt_specials + (DEFAULT_SPECIALS,))))
     else:
         logger.info('No transforms found')
-        src_specials = tgt_specials = list(DEFAULT_SPECIALS)
+        src_specials = tgt_specials = DEFAULT_SPECIALS  # get_vocab produces distinct lists
     src_vocab_size = opts.src_vocab_size or None
     tgt_vocab_size = opts.tgt_vocab_size or None
-    src_vocab = get_vocab(opts.src_vocab[src_lang], src_lang, src_vocab_size)
-    tgt_vocab = get_vocab(opts.tgt_vocab[tgt_lang], tgt_lang, tgt_vocab_size)
+    src_vocab = get_vocab(opts.src_vocab[src_lang], src_lang, src_vocab_size, specials=src_specials)
+    tgt_vocab = get_vocab(opts.tgt_vocab[tgt_lang], tgt_lang, tgt_vocab_size, specials=tgt_specials)
     if opts.share_vocab:
         assert src_vocab_size == tgt_vocab_size
         src_vocab = tgt_vocab = Vocab.merge(src_vocab, tgt_vocab, size=src_vocab_size)

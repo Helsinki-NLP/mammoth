@@ -378,7 +378,6 @@ class Inference(object):
         #     filter_pred=self._filter_pred,
         # )
 
-
         corpus = ParallelCorpus(
             self.src_file_path,
             self.tgt_file_path,  # may be None

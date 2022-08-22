@@ -2,7 +2,7 @@ from argparse import Namespace
 from collections import OrderedDict
 
 from onmt.inputters.corpus import ParallelCorpus
-from onmt.utils.distributed import Scheduler
+from onmt.utils.distributed import TaskQueueManager
 
 
 def test_init_minimal():
@@ -15,14 +15,14 @@ def test_init_minimal():
         'dec_sharing_group': None,
     }
     opt = Namespace(**opt_dict)
-    scheduler = Scheduler(opt)
-    assert str(scheduler) == 'Scheduler(..., node_rank=None, local_rank=None)'
-    assert scheduler.opt.node_gpu == ['0:0', '0:1']
-    assert scheduler.encoder_ids == ['a', 'c']
-    assert scheduler.decoder_ids == ['b', 'd']
+    task_queue_manager = TaskQueueManager(opt)
+    assert str(task_queue_manager) == 'TaskQueueManager(..., node_rank=None, local_rank=None)'
+    assert task_queue_manager.opt.node_gpu == ['0:0', '0:1']
+    assert task_queue_manager.encoder_ids == ['a', 'c']
+    assert task_queue_manager.decoder_ids == ['b', 'd']
 
 
-def create_basic_scheduler(node_rank, local_rank):
+def create_basic_task_queue_manager(node_rank, local_rank):
     opt_dict = {
         'world_size': 4,
         'gpu_ranks': [0, 1],
@@ -42,17 +42,17 @@ def create_basic_scheduler(node_rank, local_rank):
         }
     }
     opt = Namespace(**opt_dict)
-    scheduler = Scheduler(opt, node_rank=node_rank, local_rank=local_rank)
-    return scheduler
+    task_queue_manager = TaskQueueManager(opt, node_rank=node_rank, local_rank=local_rank)
+    return task_queue_manager
 
 
 def test_init_basic():
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=1)
-    assert str(scheduler) == 'Scheduler(..., node_rank=0, local_rank=1)'
-    # accessing scheduler data structures directly: not filtered by rank
-    assert scheduler.lang_pairs == [['a', 'b'], ['c', 'd'], ['a', 'd'], ['e', 'b']]
-    assert scheduler.encoder_ids == ['x', 'xx', 'x', 'xxx']
-    assert scheduler.decoder_ids == ['y', 'yy', 'yy', 'y']
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=1)
+    assert str(task_queue_manager) == 'TaskQueueManager(..., node_rank=0, local_rank=1)'
+    # accessing task_queue_manager data structures directly: not filtered by rank
+    assert task_queue_manager.lang_pairs == [['a', 'b'], ['c', 'd'], ['a', 'd'], ['e', 'b']]
+    assert task_queue_manager.encoder_ids == ['x', 'xx', 'x', 'xxx']
+    assert task_queue_manager.decoder_ids == ['y', 'yy', 'yy', 'y']
 
 
 def test_distributed_groups():
@@ -65,8 +65,8 @@ def test_distributed_groups():
             self.group_idx += 1
             return result
 
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=1)
-    all_groups = scheduler.create_all_distributed_groups(new_group_func=MockGroup())
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=1)
+    all_groups = task_queue_manager.create_all_distributed_groups(new_group_func=MockGroup())
     assert all_groups == {
         'encoder': OrderedDict({
             'x': (0, 'Group 0 with GPU ranks [0, 1]'),
@@ -82,7 +82,7 @@ def test_distributed_groups():
         }),
     }
 
-    my_groups = scheduler.get_distributed_groups(new_group_func=MockGroup())
+    my_groups = task_queue_manager.get_distributed_groups(new_group_func=MockGroup())
     assert my_groups == {
         'encoder': [('x', (0, 'Group 0 with GPU ranks [0, 1]'))],
         'decoder': [],
@@ -92,19 +92,19 @@ def test_distributed_groups():
 
 
 def test_get_corpora():
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=0)
-    corpora = scheduler.get_corpora(is_train=True)
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=0)
+    corpora = task_queue_manager.get_corpora(is_train=True)
     assert isinstance(corpora['train_a-b'], ParallelCorpus)
     assert len(corpora.keys()) == 1
 
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=1)
-    corpora = scheduler.get_corpora(is_train=True)
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=1)
+    corpora = task_queue_manager.get_corpora(is_train=True)
     assert isinstance(corpora['train_c-d'], ParallelCorpus)
     assert isinstance(corpora['train_a-d'], ParallelCorpus)
     assert len(corpora.keys()) == 2
 
-    scheduler = create_basic_scheduler(node_rank=1, local_rank=0)
-    corpora = scheduler.get_corpora(is_train=True)
+    task_queue_manager = create_basic_task_queue_manager(node_rank=1, local_rank=0)
+    corpora = task_queue_manager.get_corpora(is_train=True)
     assert isinstance(corpora['train_e-b'], ParallelCorpus)
     assert len(corpora.keys()) == 1
 
@@ -114,46 +114,46 @@ def test_get_fields():
         (side, lang): f'{side} {lang}' for (side, lang) in
         [('src', 'a'), ('src', 'c'), ('src', 'e'), ('tgt', 'b'), ('tgt', 'd')]
     }
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=0)
-    fields = scheduler.get_fields('src', mock_fields)
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=0)
+    fields = task_queue_manager.get_fields('src', mock_fields)
     assert fields == [('src', 'a', 'x', 'src a')]
-    fields = scheduler.get_fields('tgt', mock_fields)
+    fields = task_queue_manager.get_fields('tgt', mock_fields)
     assert fields == [('tgt', 'b', 'y', 'tgt b')]
 
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=1)
-    fields = scheduler.get_fields('src', mock_fields)
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=1)
+    fields = task_queue_manager.get_fields('src', mock_fields)
     assert fields == [('src', 'c', 'xx', 'src c'), ('src', 'a', 'x', 'src a')]
-    fields = scheduler.get_fields('tgt', mock_fields)
+    fields = task_queue_manager.get_fields('tgt', mock_fields)
     assert fields == [('tgt', 'd', 'yy', 'tgt d')]
 
-    scheduler = create_basic_scheduler(node_rank=1, local_rank=0)
-    fields = scheduler.get_fields('src', mock_fields)
+    task_queue_manager = create_basic_task_queue_manager(node_rank=1, local_rank=0)
+    fields = task_queue_manager.get_fields('src', mock_fields)
     assert fields == [('src', 'e', 'xxx', 'src e')]
-    fields = scheduler.get_fields('tgt', mock_fields)
+    fields = task_queue_manager.get_fields('tgt', mock_fields)
     assert fields == [('tgt', 'b', 'y', 'tgt b')]
 
 
 def test_basic_getters():
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=0)
-    encoders = list(scheduler.get_encoders())
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=0)
+    encoders = list(task_queue_manager.get_encoders())
     assert encoders == ['x']
-    decoders = list(scheduler.get_decoders())
+    decoders = list(task_queue_manager.get_decoders())
     assert decoders == ['y']
-    src_embs = list(scheduler.get_src_embs())
+    src_embs = list(task_queue_manager.get_src_embs())
     assert src_embs == [('a', 'x')]
-    tgt_embs = list(scheduler.get_tgt_embs())
+    tgt_embs = list(task_queue_manager.get_tgt_embs())
     assert tgt_embs == [('b', 'y')]
-    generators = list(scheduler.get_generators())
+    generators = list(task_queue_manager.get_generators())
     assert generators == ['b']
 
-    scheduler = create_basic_scheduler(node_rank=0, local_rank=1)
-    encoders = list(scheduler.get_encoders())
+    task_queue_manager = create_basic_task_queue_manager(node_rank=0, local_rank=1)
+    encoders = list(task_queue_manager.get_encoders())
     assert encoders == ['xx', 'x']
-    decoders = list(scheduler.get_decoders())
+    decoders = list(task_queue_manager.get_decoders())
     assert decoders == ['yy', 'yy']
-    src_embs = list(scheduler.get_src_embs())
+    src_embs = list(task_queue_manager.get_src_embs())
     assert src_embs == [('c', 'xx'), ('a', 'x')]
-    tgt_embs = list(scheduler.get_tgt_embs())
+    tgt_embs = list(task_queue_manager.get_tgt_embs())
     assert tgt_embs == [('d', 'yy'), ('d', 'yy')]
-    generators = list(scheduler.get_generators())
+    generators = list(task_queue_manager.get_generators())
     assert generators == ['d', 'd']

@@ -112,7 +112,7 @@ class DynamicDatasetIter(object):
 
     def __init__(
         self,
-        scheduler,
+        task_queue_manager,
         opts,
         corpora_info,
         transforms_cls,
@@ -128,7 +128,7 @@ class DynamicDatasetIter(object):
         stride=1,
         offset=0,
     ):
-        self.scheduler = scheduler
+        self.task_queue_manager = task_queue_manager
         self.opts = opts
         self.transforms_cls = transforms_cls
         self.fields_dict = fields_dict
@@ -151,7 +151,7 @@ class DynamicDatasetIter(object):
         self.skip_empty_level = skip_empty_level
 
     @classmethod
-    def from_opts(cls, scheduler, transforms_cls, fields_dict, opts, is_train, stride=1, offset=0):
+    def from_opts(cls, task_queue_manager, transforms_cls, fields_dict, opts, is_train, stride=1, offset=0):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -159,7 +159,7 @@ class DynamicDatasetIter(object):
         else:
             batch_size_multiple = 8 if opts.model_dtype == "fp16" else 1
         return cls(
-            scheduler,
+            task_queue_manager,
             opts,
             opts.data,
             transforms_cls,
@@ -178,7 +178,7 @@ class DynamicDatasetIter(object):
 
     def _init_datasets(self):
         self.dataset_iterators = []
-        for tpl in self.scheduler.get_dataset_specs(self.fields_dict):
+        for tpl in self.task_queue_manager.get_dataset_specs(self.fields_dict):
             (src_lang, tgt_lang, encoder_id, decoder_id, corpus_id, corpus, src_fields, tgt_fields) = tpl
             merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}
             logger.debug(f'merged_fields {merged_fields}')

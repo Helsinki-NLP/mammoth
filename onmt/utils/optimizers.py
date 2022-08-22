@@ -10,12 +10,12 @@ from onmt.utils.misc import fn_args
 import math
 
 
-def attention_bridge_optimizer(model, scheduler, base_optimizer):
+def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     multiOptims = {}
     components = [
-        ('encoder', model.encoder, scheduler.get_encoders()),
-        ('decoder', model.decoder, scheduler.get_decoders()),
-        ('generator', model.generator, scheduler.get_generators()),
+        ('encoder', model.encoder, task_queue_manager.get_encoders()),
+        ('decoder', model.decoder, task_queue_manager.get_decoders()),
+        ('generator', model.generator, task_queue_manager.get_generators()),
     ]
     for component_name, components, component_ids in components:
         for component_id in component_ids:
@@ -43,7 +43,7 @@ def attention_bridge_optimizer(model, scheduler, base_optimizer):
     return optimizer
 
 
-def build_torch_optimizer(model, opt, scheduler):
+def build_torch_optimizer(model, opt, task_queue_manager):
     """Builds the PyTorch optimizer.
 
     We use the default parameters for Adam that are suggested by
@@ -73,10 +73,10 @@ def build_torch_optimizer(model, opt, scheduler):
     elif opt.optim == 'adadelta':
         optimizer = optim.Adadelta(params, lr=opt.learning_rate)
     elif opt.optim == 'adafactor':
-        optimizer = attention_bridge_optimizer(model, scheduler, AdaFactorFairSeq)
+        optimizer = attention_bridge_optimizer(model, task_queue_manager, AdaFactorFairSeq)
     elif opt.optim == 'adam':
         optimizer = attention_bridge_optimizer(
-            model, scheduler, lambda params: optim.Adam(params, lr=opt.learning_rate, betas=betas, eps=1e-9)
+            model, task_queue_manager, lambda params: optim.Adam(params, lr=opt.learning_rate, betas=betas, eps=1e-9)
         )
     elif opt.optim == 'sparseadam':
         encs = []
@@ -226,7 +226,7 @@ class Optimizer(object):
         self._scaler = None
 
     @classmethod
-    def from_opt(cls, model, opt, scheduler, checkpoint=None):
+    def from_opt(cls, model, opt, task_queue_manager, checkpoint=None):
         """Builds the optimizer from options.
 
         Args:
@@ -269,7 +269,7 @@ class Optimizer(object):
                 optim_state_dict = ckpt_state_dict
 
         optimizer = cls(
-            build_torch_optimizer(model, optim_opt, scheduler),
+            build_torch_optimizer(model, optim_opt, task_queue_manager),
             optim_opt.learning_rate,
             learning_rate_decay_fn=make_learning_rate_decay_fn(optim_opt),
             max_grad_norm=optim_opt.max_grad_norm,

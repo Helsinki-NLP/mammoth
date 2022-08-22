@@ -235,10 +235,10 @@ def build_task_specific_model(
     model_opt,
     fields_dict,
     device,
-    scheduler,
+    task_queue_manager,
     checkpoint,
 ):
-    logger.info(f'Scheduler: {scheduler}')
+    logger.info(f'TaskQueueManager: {task_queue_manager}')
     if not model_opt.model_task == ModelTask.SEQ2SEQ:
         raise ValueError(f"Only ModelTask.SEQ2SEQ works - {model_opt.model_task} task")
 
@@ -249,22 +249,22 @@ def build_task_specific_model(
     decoders_md = nn.ModuleDict()
     generators_md = nn.ModuleDict()
 
-    for side, lang, encoder_id, fields in scheduler.get_fields(side='src', fields_dict=fields_dict):
+    for side, lang, encoder_id, fields in task_queue_manager.get_fields(side='src', fields_dict=fields_dict):
         src_emb = build_src_emb(model_opt, fields)
         src_embs_by_encoder[encoder_id][lang] = src_emb
 
-    for encoder_id in scheduler.get_encoders():
+    for encoder_id in task_queue_manager.get_encoders():
         pluggable_src_emb = PluggableEmbeddings(src_embs_by_encoder[encoder_id])
         encoder = build_only_enc(model_opt, pluggable_src_emb)
         encoders_md.add_module(f'encoder{encoder_id}', encoder)
 
-    for side, lang, decoder_id, fields in scheduler.get_fields(side='tgt', fields_dict=fields_dict):
+    for side, lang, decoder_id, fields in task_queue_manager.get_fields(side='tgt', fields_dict=fields_dict):
         tgt_emb = build_tgt_emb(model_opt, fields)
         tgt_embs_by_decoder[decoder_id][lang] = tgt_emb
         generator = build_generator(model_opt, fields, tgt_emb)
         generators_md.add_module(f'generator{lang}', generator)
 
-    for decoder_id in scheduler.get_decoders():
+    for decoder_id in task_queue_manager.get_decoders():
         pluggable_tgt_emb = PluggableEmbeddings(tgt_embs_by_decoder[decoder_id])
         decoder = build_only_dec(model_opt, pluggable_tgt_emb)
         decoders_md.add_module(f'decoder{decoder_id}', decoder)
@@ -378,7 +378,7 @@ def build_base_model_langspec(
     model_opt,
     fields_dict,
     gpu,
-    scheduler,
+    task_queue_manager,
     checkpoint=None,
 ):
     """Build a model from opts.
@@ -415,7 +415,7 @@ def build_base_model_langspec(
         model_opt=model_opt,
         fields_dict=fields_dict,
         device=device,
-        scheduler=scheduler,
+        task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
     )
 
@@ -425,13 +425,13 @@ def build_base_model_langspec(
     return model, generators_md
 
 
-def build_model(model_opt, opt, fields_dict, scheduler, checkpoint):
+def build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint):
     logger.info('Building model...')
     model, generators_md = build_base_model_langspec(
         model_opt=model_opt,
         fields_dict=fields_dict,
         gpu=use_gpu(opt),
-        scheduler=scheduler,
+        task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
     )
     # logger.info(model)

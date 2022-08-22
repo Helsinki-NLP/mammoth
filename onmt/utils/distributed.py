@@ -212,7 +212,7 @@ def consumer(process_fn, opt, global_rank, error_queue, batch_queue, semaphore, 
         error_queue.put((opt.gpu_ranks[node_rank], traceback.format_exc()))
 
 
-class Scheduler:
+class TaskQueueManager:
     def __init__(self, opt: Namespace, node_rank: Optional[int] = None, local_rank: Optional[int] = None):
         """
         Has the responsibility for all resources that need to be
@@ -235,7 +235,7 @@ class Scheduler:
             self.n_nodes = 1
             self.gpus_per_node = 1
 
-        logger.info(f'in scheduler: node_rank {node_rank} local_rank {local_rank}')
+        logger.info(f'in task_queue_manager: node_rank {node_rank} local_rank {local_rank}')
         assert node_rank is None or 0 <= node_rank < self.n_nodes
         assert local_rank is None or 0 <= local_rank < self.gpus_per_node
         # TODO: All the configuration lists should be the same length

@@ -5,7 +5,7 @@ import torch
 from functools import partial
 import os
 
-from onmt.utils.distributed import ErrorHandler, consumer, batch_producer, Scheduler
+from onmt.utils.distributed import ErrorHandler, consumer, batch_producer, TaskQueueManager
 from onmt.utils.misc import set_random_seed
 from onmt.modules.embeddings import prepare_pretrained_embeddings
 from onmt.utils.logging import init_logger, logger
@@ -147,11 +147,11 @@ def train(opt):
     transforms_cls = get_transforms_cls(opt._all_transform)
 
     fields_dict = OrderedDict()
-    # For creating fields, we use a scheduler that doesn't filter by node and gpu
-    global_scheduler = Scheduler(opt, node_rank=None, local_rank=None)
+    # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
+    global_task_queue_manager = TaskQueueManager(opt, node_rank=None, local_rank=None)
 
     for side in ('src', 'tgt'):
-        for lang, vocab_path in global_scheduler.get_vocabularies(opt, side=side):
+        for lang, vocab_path in global_task_queue_manager.get_vocabularies(opt, side=side):
             fields_dict[(side, lang)] = init_train_prepare_fields_transforms(opt, vocab_path=vocab_path, side=side)
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
@@ -174,8 +174,8 @@ def train(opt):
         producers = []
 
         for local_rank in range(n_gpu):
-            # This scheduler will only yield the items that are active on this gpu
-            scheduler = Scheduler(opt, node_rank=node_rank, local_rank=local_rank)
+            # This task_queue_manager will only yield the items that are active on this gpu
+            task_queue_manager = TaskQueueManager(opt, node_rank=node_rank, local_rank=local_rank)
 
             # each process's rank
             global_rank = n_gpu * node_rank + local_rank
@@ -198,7 +198,7 @@ def train(opt):
             # Get the iterator to generate from
             # We can't stride here without losing data: each dataset only goes to one GPU
             train_iter = DynamicDatasetIter.from_opts(
-                scheduler=scheduler,
+                task_queue_manager=task_queue_manager,
                 transforms_cls=transforms_cls,
                 fields_dict=fields_dict,
                 opts=opt,

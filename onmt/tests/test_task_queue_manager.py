@@ -137,6 +137,8 @@ def test_get_distributed_groups():
             ('a', 'x'): (0, 'Group 2 with GPU ranks [0, 1]'),
         }),
         'tgt_emb': OrderedDict(),
+        'encoder_adapters': OrderedDict(),
+        'decoder_adapters': OrderedDict(),
     }
 
 

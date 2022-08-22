@@ -482,21 +482,21 @@ def build_base_model_langspec(
 
 
 def uses_adapters(opt):
-    return 'adapters' in opt
+    return 'adapters' in opt and len(opt['adapters']) > 0
 
 
-def create_adapters(model, opt, scheduler, fields_dict):
+def create_adapters(model, opt, task_queue_manager, fields_dict):
     my_enc_adapter_ids = set()
     my_dec_adapter_ids = set()
     adapter_to_encoder_ids = defaultdict(set)
     adapter_to_decoder_ids = defaultdict(set)
-    for ds in scheduler.get_dataset_specs(fields_dict):
-        for adapter_id in ds.encoder_adapter_ids:
+    for task in task_queue_manager.get_tasks():
+        for adapter_id in task.encoder_adapter_ids:
             my_enc_adapter_ids.add(adapter_id)
-            adapter_to_encoder_ids[adapter_id].add(ds.encoder_id)
-        for adapter_id in ds.decoder_adapter_ids:
+            adapter_to_encoder_ids[adapter_id].add(task.encoder_id)
+        for adapter_id in task.decoder_adapter_ids:
             my_dec_adapter_ids.add(adapter_id)
-            adapter_to_decoder_ids[adapter_id].add(ds.decoder_id)
+            adapter_to_decoder_ids[adapter_id].add(task.decoder_id)
     for adapter_group, adapter_opts in opt.adapters['encoder'].items():
         for sub_id in adapter_opts['ids']:
             adapter_id = (adapter_group, sub_id)

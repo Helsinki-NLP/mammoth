@@ -539,6 +539,7 @@ class TaskQueueManager:
         components_to_gpus=None,
         components_to_groups=None,
         task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
+        uses_adapters: bool = False,
     ):
         """
         Schedules tasks (language pairs) to devices.
@@ -556,6 +557,7 @@ class TaskQueueManager:
         self.task_distribution_strategy = task_distribution_strategy
         self.world_context = world_context
         self.device_context = device_context
+        self.uses_adapters = uses_adapters
 
         if self.world_context and self.device_context:
             logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
@@ -618,6 +620,7 @@ class TaskQueueManager:
         assert len(corpus_ids) == n_tasks, f'{len(corpus_ids)} != {n_tasks}'
 
         tasks = []
+        uses_adapters = False
         for (
             (node_rank, local_rank),
             (src_lang, tgt_lang),
@@ -636,6 +639,7 @@ class TaskQueueManager:
             if 'adapters' in corpus_opt:
                 encoder_adapter_ids = corpus_opt['adapters'].get('encoder')
                 decoder_adapter_ids = corpus_opt['adapters'].get('decoder')
+                uses_adapters = True
             else:
                 encoder_adapter_ids = None
                 decoder_adapter_ids = None
@@ -659,6 +663,7 @@ class TaskQueueManager:
             tasks,
             world_context=world_context,
             tasks_per_communication_batch=opt.accum_count,
+            uses_adapters=uses_adapters,
         )
 
     def global_to_local(self, node_rank, local_rank, opt):
@@ -674,6 +679,7 @@ class TaskQueueManager:
             components_to_gpus=self.components_to_gpus,
             components_to_groups=self.components_to_groups,
             task_distribution_strategy=task_distribution_strategy,
+            uses_adapters=self.uses_adapters,
         )
 
     def _get_strategy(self, node_rank, local_rank, opt):
@@ -695,7 +701,15 @@ class TaskQueueManager:
     def __repr__(self):
         kwargs = ',\n '.join(
             f'{key}={pformat(self.__getattribute__(key))}'
-            for key in ['tasks', 'gpus_per_node', 'n_nodes', 'node_rank', 'local_rank']
+            for key in [
+                'tasks',
+                'gpus_per_node',
+                'n_nodes',
+                'node_rank',
+                'local_rank',
+                'task_distribution_strategy',
+                'uses_adapters',
+            ]
         )
         return f'{self.__class__.__name__}(\n{kwargs}\n)'
 
@@ -735,6 +749,8 @@ class TaskQueueManager:
         # ('decoder', decoder_id)
         # ('src_emb', lang, encoder_id)
         # ('tgt_emb', lang, decoder_id)
+        # ('encoder_adapters', encoder_id, adapter_group, sub_id)
+        # ('decoder_adapters', decoder_id, adapter_group, sub_id)
         self.components_to_gpus = OrderedDict()
 
         for node_rank in range(self.n_nodes):
@@ -753,10 +769,23 @@ class TaskQueueManager:
                         # Using setdefault to treat OrderedDict as defaultdict
                         self.components_to_gpus.setdefault(key, set()).add(global_rank)
 
+                    if task.encoder_adapter_ids:
+                        for adapter_group, sub_id in task.encoder_adapter_ids:
+                            key = ('encoder_adapters', task.encoder_id, adapter_group, sub_id)
+                            self.components_to_gpus.setdefault(key, set()).add(global_rank)
+                    if task.decoder_adapter_ids:
+                        for adapter_group, sub_id in task.decoder_adapter_ids:
+                            key = ('decoder_adapters', task.decoder_id, adapter_group, sub_id)
+                            self.components_to_gpus.setdefault(key, set()).add(global_rank)
+
         # Structured, each component in a separate OrderedDict
         self.components_to_groups = {
-            component_type:  OrderedDict() for component_type in ('encoder', 'decoder', 'src_emb', 'tgt_emb')
+            component_type: OrderedDict() for component_type
+            in ('encoder', 'decoder', 'src_emb', 'tgt_emb')
         }
+        if self.uses_adapters:
+            self.components_to_groups['encoder_adapters'] = OrderedDict()
+            self.components_to_groups['decoder_adapters'] = OrderedDict()
         for key, global_ranks in self.components_to_gpus.items():
             if len(global_ranks) < 2:
                 # only create a process group if the component is on 2 or more gpus
@@ -794,6 +823,8 @@ class TaskQueueManager:
             'decoder': OrderedDict(),
             'src_emb': OrderedDict(),
             'tgt_emb': OrderedDict(),
+            'encoder_adapters': OrderedDict(),
+            'decoder_adapters': OrderedDict(),
         }
 
         if self.global_rank is None:

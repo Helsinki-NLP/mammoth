@@ -148,15 +148,16 @@ def train(opt):
 
     fields_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
-    global_task_queue_manager = TaskQueueManager(opt, node_rank=None, local_rank=None)
+    global_task_queue_manager = TaskQueueManager.from_opt(opt)
 
     for side in ('src', 'tgt'):
-        for lang, vocab_path in global_task_queue_manager.get_vocabularies(opt, side=side):
+        for lang in global_task_queue_manager.get_langs(side):
+            vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
             fields_dict[(side, lang)] = init_train_prepare_fields_transforms(opt, vocab_path=vocab_path, side=side)
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
-    train_process = partial(single_main, fields_dict=fields_dict)
+    train_process = partial(single_main, fields_dict=fields_dict, global_task_queue_manager=global_task_queue_manager)
 
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 
@@ -175,7 +176,7 @@ def train(opt):
 
         for local_rank in range(n_gpu):
             # This task_queue_manager will only yield the items that are active on this gpu
-            task_queue_manager = TaskQueueManager(opt, node_rank=node_rank, local_rank=local_rank)
+            task_queue_manager = global_task_queue_manager.global_to_local(node_rank=node_rank, local_rank=local_rank)
 
             # each process's rank
             global_rank = n_gpu * node_rank + local_rank

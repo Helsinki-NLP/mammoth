@@ -1,15 +1,11 @@
 """Module that contain iterator used for dynamic data."""
-from collections import namedtuple
 from itertools import cycle, chain, repeat
 
 from torchtext.legacy.data import batch as torchtext_batch
 from onmt.inputters import str2sortkey, max_tok_len, OrderedIterator
-from onmt.inputters.corpus import build_corpora_iter, DatasetAdapter
+from onmt.inputters.corpus import build_corpora_iter, DatasetAdapter, get_corpus
 from onmt.transforms import make_transforms
 from onmt.utils.logging import logger
-
-
-DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
 
 
 class MixingStrategy(object):
@@ -178,14 +174,13 @@ class DynamicDatasetIter(object):
 
     def _init_datasets(self):
         self.dataset_iterators = []
-        for tpl in self.task_queue_manager.get_dataset_specs(self.fields_dict):
-            (src_lang, tgt_lang, encoder_id, decoder_id, corpus_id, corpus, src_fields, tgt_fields) = tpl
+        for task in self.task_queue_manager.get_tasks():
+            src_fields = self.fields_dict[('src', task.src_lang)]
+            tgt_fields = self.fields_dict[('tgt', task.tgt_lang)]
             merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}
             logger.debug(f'merged_fields {merged_fields}')
 
-            metadata = DatasetMetadata(
-                src_lang=src_lang, tgt_lang=tgt_lang, encoder_id=encoder_id, decoder_id=decoder_id, corpus_id=corpus_id
-            )
+            metadata = task.get_serializable_metadata()
 
             logger.debug(f'self.transforms_cls {self.transforms_cls}')
             if self.transforms_cls:
@@ -194,11 +189,13 @@ class DynamicDatasetIter(object):
                 print('No transforms defined')
                 transforms = []
 
+            corpus = get_corpus(self.opts, task.corpus_id, is_train=True)
+
             raw_iter = build_corpora_iter(
-                corpus_id,
+                task.corpus_id,
                 corpus,
                 transforms,
-                self.corpora_info[corpus_id],
+                self.corpora_info[task.corpus_id],
                 skip_empty_level=self.skip_empty_level,
                 stride=self.stride,
                 offset=self.offset,

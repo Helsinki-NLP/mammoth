@@ -1,10 +1,11 @@
 import pytest
+from argparse import Namespace
 
 from onmt.utils.distributed import WeightedSamplingSchedulingStrategy, RoundRobinSchedulingStrategy
 
 
 def test_weights_all_zero():
-    opt_data = {
+    opt = Namespace(data={
         'a': {
             'weight': 0,
             'introduce_at_training_step': 0,
@@ -17,14 +18,14 @@ def test_weights_all_zero():
             'weight': 10,
             'introduce_at_training_step': 0,
         },
-    }
+    })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingSchedulingStrategy(['a', 'b'], opt_data)
+        WeightedSamplingSchedulingStrategy.from_opt(['a', 'b'], opt)
     assert 'Can not set "weight" of all corpora on a device to zero' in str(exc_info.value)
 
 
 def test_weights_all_postponed():
-    opt_data = {
+    opt = Namespace(data={
         'a': {
             'weight': 1,
             'introduce_at_training_step': 1,
@@ -37,14 +38,14 @@ def test_weights_all_postponed():
             'weight': 10,
             'introduce_at_training_step': 0,
         },
-    }
+    })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingSchedulingStrategy(['a', 'b'], opt_data)
+        WeightedSamplingSchedulingStrategy.from_opt(['a', 'b'], opt)
     assert 'Can not set "introduce_at_training_step" of all corpora on a device to nonzero' in str(exc_info.value)
 
 
 def test_invalid_curriculum():
-    opt_data = {
+    opt = Namespace(data={
         # 'a' disabled by weight
         'a': {
             'weight': 0,
@@ -59,14 +60,14 @@ def test_invalid_curriculum():
             'weight': 10,
             'introduce_at_training_step': 0,
         },
-    }
+    })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingSchedulingStrategy(['a', 'b'], opt_data)
+        WeightedSamplingSchedulingStrategy.from_opt(['a', 'b'], opt)
     assert 'Invalid curriculum' in str(exc_info.value)
 
 
 def test_sampling_scheduling_strategy():
-    opt_data = {
+    opt = Namespace(data={
         # 'a' disabled by weight
         'a': {
             'weight': 0,
@@ -87,8 +88,8 @@ def test_sampling_scheduling_strategy():
             'weight': 10,
             'introduce_at_training_step': 0,
         },
-    }
-    strategy = WeightedSamplingSchedulingStrategy(['a', 'b', 'c'], opt_data)
+    })
+    strategy = WeightedSamplingSchedulingStrategy.from_opt(['a', 'b', 'c'], opt)
     all_samples = []
     n_samples = 10
     n_batches = 1000
@@ -102,7 +103,7 @@ def test_sampling_scheduling_strategy():
 
 
 def test_round_robin_scheduling_strategy():
-    strategy = RoundRobinSchedulingStrategy(['a', 'b'], None)
+    strategy = RoundRobinSchedulingStrategy(['a', 'b'])
     first_five = strategy.sample_corpus_ids(n_samples=5, communication_batch_id=0)
     assert first_five == ['a', 'b', 'a', 'b', 'a']
     next_two = strategy.sample_corpus_ids(n_samples=2, communication_batch_id=0)

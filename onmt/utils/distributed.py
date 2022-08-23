@@ -591,11 +591,16 @@ class Scheduler:
 
 class SchedulingStrategy(ABC):
     @abstractmethod
-    def __init__(self, my_corpus_ids: List[str], opt_data: dict):
+    def __init__(self, my_corpus_ids: List[str], **kwargs):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
         pass
 
     @abstractmethod
-    def sample_corpus_ids(self, n_samples: int, communication_batch_id: int):
+    def sample_corpus_ids(self, n_samples: int, communication_batch_id: int) -> List[str]:
         pass
 
 
@@ -607,19 +612,33 @@ class WeightedSamplingSchedulingStrategy(SchedulingStrategy):
     their curriculum starting point "introduce_at_training_step".
     """
 
-    def __init__(self, my_corpus_ids: List[str], opt_data: dict):
+    def __init__(
+        self,
+        my_corpus_ids: List[str],
+        my_weights: List[float],
+        my_introduce_at_training_step: List[int]
+    ):
         self.my_corpus_ids = my_corpus_ids
-        self.opt_data = opt_data
+        self.my_weights = my_weights
+        self.my_introduce_at_training_step = my_introduce_at_training_step
 
         # Sanity check of weights and curriculum
-        my_weights = [self.opt_data[corpus_id]['weight'] for corpus_id in self.my_corpus_ids]
-        my_starts = [self.opt_data[corpus_id]['introduce_at_training_step'] for corpus_id in self.my_corpus_ids]
+        assert len(self.my_corpus_ids) == len(self.my_weights)
+        assert len(self.my_corpus_ids) == len(self.my_introduce_at_training_step)
         if sum(my_weights) <= 0:
             raise ValueError('Can not set "weight" of all corpora on a device to zero')
-        if all(x > 0 for x in my_starts):
+        if all(x > 0 for x in my_introduce_at_training_step):
             raise ValueError('Can not set "introduce_at_training_step" of all corpora on a device to nonzero')
-        if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_starts)):
+        if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_introduce_at_training_step)):
             raise ValueError('Invalid curriculum: no corpus is ready to start in the first step')
+
+    @classmethod
+    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
+        my_weights = [opt.data[corpus_id]['weight'] for corpus_id in my_corpus_ids]
+        my_introduce_at_training_step = [
+            opt.data[corpus_id]['introduce_at_training_step'] for corpus_id in my_corpus_ids
+        ]
+        return cls(my_corpus_ids, my_weights, my_introduce_at_training_step)
 
     def sample_corpus_ids(
         self,
@@ -627,10 +646,10 @@ class WeightedSamplingSchedulingStrategy(SchedulingStrategy):
         communication_batch_id: int,
     ):
         weights = [
-            self.opt_data[corpus_id]['weight']
-            if self.opt_data[corpus_id]['introduce_at_training_step'] <= communication_batch_id
-            else 0
-            for corpus_id in self.my_corpus_ids
+            weight if introduce_at_training_step <= communication_batch_id else 0
+            for (corpus_id, weight, introduce_at_training_step) in zip(
+                self.my_corpus_ids, self.my_weights, self.my_introduce_at_training_step
+            )
         ]
         sum_w = sum(weights)
         assert sum_w > 0
@@ -647,9 +666,11 @@ class RoundRobinSchedulingStrategy(SchedulingStrategy):
     When reaching the end of the list of tasks, starts over from the beginning.
     """
 
-    def __init__(self, my_corpus_ids: List[str], opt_data: dict):
-        del opt_data    # unused argument
+    def __init__(self, my_corpus_ids: List[str]):
         self.infinite_corpus_ids = cycle(my_corpus_ids)
+
+    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
+        return cls(my_corpus_ids)
 
     def sample_corpus_ids(
         self,

@@ -334,12 +334,12 @@ class Trainer(object):
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
             for decoder_id, (_, group) in self.my_decoder_groups:
-                grads = [
-                    p.grad.data
-                    for name, p in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
-                    if 'embeddings' not in name and p.requires_grad and p.grad is not None
+                params = [
+                    (name, p)
+                    for (name, p) in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
+                    if 'embeddings' not in name
                 ]
-                onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
+                onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
             for src_emb_id, (_, group) in self.my_src_emb_groups:
                 src_lang, encoder_id = src_emb_id
                 embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']

@@ -7,40 +7,40 @@ def test_weights_all_zero():
     opt_data = {
         'a': {
             'weight': 0,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
         'b': {
             'weight': 0,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
         'notmine': {
             'weight': 10,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
     }
     with pytest.raises(ValueError) as exc_info:
         SamplingSchedulingStrategy(['a', 'b'], opt_data)
-    assert 'Can not set "weight" of all tasks on a device to zero' in str(exc_info.value)
+    assert 'Can not set "weight" of all corpora on a device to zero' in str(exc_info.value)
 
 
 def test_weights_all_postponed():
     opt_data = {
         'a': {
             'weight': 1,
-            'from_step': 1,
+            'introduce_at_training_step': 1,
         },
         'b': {
             'weight': 1,
-            'from_step': 10,
+            'introduce_at_training_step': 10,
         },
         'notmine': {
             'weight': 10,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
     }
     with pytest.raises(ValueError) as exc_info:
         SamplingSchedulingStrategy(['a', 'b'], opt_data)
-    assert 'Can not set "from_step" of all tasks on a device to nonzero' in str(exc_info.value)
+    assert 'Can not set "introduce_at_training_step" of all corpora on a device to nonzero' in str(exc_info.value)
 
 
 def test_invalid_curriculum():
@@ -48,16 +48,16 @@ def test_invalid_curriculum():
         # 'a' disabled by weight
         'a': {
             'weight': 0,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
         # 'b' postponed
         'b': {
             'weight': 1,
-            'from_step': 10,
+            'introduce_at_training_step': 10,
         },
         'notmine': {
             'weight': 10,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
     }
     with pytest.raises(ValueError) as exc_info:
@@ -70,22 +70,22 @@ def test_sampling_scheduling_strategy():
         # 'a' disabled by weight
         'a': {
             'weight': 0,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
         # 'b' postponed longer than n_batches
         'b': {
             'weight': 1,
-            'from_step': 9999,
+            'introduce_at_training_step': 9999,
         },
         # 'c' is the only valid corpus
         'c': {
             'weight': 1,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
         # 'notmine' is not on this device
         'notmine': {
             'weight': 10,
-            'from_step': 0,
+            'introduce_at_training_step': 0,
         },
     }
     strategy = SamplingSchedulingStrategy(['a', 'b', 'c'], opt_data)

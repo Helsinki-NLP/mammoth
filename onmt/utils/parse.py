@@ -77,16 +77,16 @@ class DataOptsCheckerMixin(object):
                 if cname != CorpusName.VALID:
                     logger.warning(f"Corpus {cname}'s weight should be given. We default it to 1 for you.")
                 corpus['weight'] = 1
-            # Check curriculum from_step
-            from_step = corpus.get('from_step', None)
-            if from_step is None:
+            # Check curriculum introduce_at_training_step
+            introduce_at_training_step = corpus.get('introduce_at_training_step', None)
+            if introduce_at_training_step is None:
                 if cname != CorpusName.VALID:
                     logger.warning(
-                        f"Corpus {cname}'s from_step is unset. "
+                        f"Corpus {cname}'s introduce_at_training_step is unset. "
                         " (curriculum introduces the corpus at this step)"
                         " We default it to 0 (start of training) for you."
                     )
-                corpus['from_step'] = 0
+                corpus['introduce_at_training_step'] = 0
 
             # Check features
             src_feats = corpus.get("src_feats", None)

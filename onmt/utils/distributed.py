@@ -587,7 +587,7 @@ class SamplingSchedulingStrategy(SchedulingStrategy):
     Schedules tasks by sampling with replacement from a categorical distribution.
     The probabilities are found by normalizing the weights of all valid tasks (corpora).
     Valid tasks are those that are present on this device, and have already reached
-    their curriculum starting point "from_step".
+    their curriculum starting point "introduce_at_training_step".
     """
 
     def __init__(self, my_corpus_ids: List[str], opt_data: dict):
@@ -596,13 +596,13 @@ class SamplingSchedulingStrategy(SchedulingStrategy):
 
         # Sanity check of weights and curriculum
         my_weights = [self.opt_data[corpus_id]['weight'] for corpus_id in self.my_corpus_ids]
-        my_starts = [self.opt_data[corpus_id]['from_step'] for corpus_id in self.my_corpus_ids]
+        my_starts = [self.opt_data[corpus_id]['introduce_at_training_step'] for corpus_id in self.my_corpus_ids]
         if sum(my_weights) <= 0:
-            raise ValueError('Can not set "weight" of all tasks on a device to zero')
+            raise ValueError('Can not set "weight" of all corpora on a device to zero')
         if all(x > 0 for x in my_starts):
-            raise ValueError('Can not set "from_step" of all tasks on a device to nonzero')
+            raise ValueError('Can not set "introduce_at_training_step" of all corpora on a device to nonzero')
         if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_starts)):
-            raise ValueError('Invalid curriculum: no task is ready to start in the first step')
+            raise ValueError('Invalid curriculum: no corpus is ready to start in the first step')
 
     def sample_corpus_ids(
         self,
@@ -610,7 +610,9 @@ class SamplingSchedulingStrategy(SchedulingStrategy):
         communication_batch_id: int,
     ):
         weights = [
-            self.opt_data[corpus_id]['weight'] if self.opt_data[corpus_id]['from_step'] <= communication_batch_id else 0
+            self.opt_data[corpus_id]['weight']
+            if self.opt_data[corpus_id]['introduce_at_training_step'] <= communication_batch_id
+            else 0
             for corpus_id in self.my_corpus_ids
         ]
         sum_w = sum(weights)
@@ -626,7 +628,7 @@ class SamplingSchedulingStrategy(SchedulingStrategy):
 
 class RoundRobinSchedulingStrategy(SchedulingStrategy):
     """
-    Schedules tasks in a round-robin fashion.
+    Schedules tasks (corpora) in a round-robin fashion.
     Yields a communication batch of n_samples at a time.
     When reaching the end of the list of tasks, starts over from the beginning.
     """

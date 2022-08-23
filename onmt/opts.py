@@ -1,11 +1,12 @@
 """ Implementation of all available options """
 import configargparse
 
-from onmt.models.sru import CheckSRU
-from onmt.transforms import AVAILABLE_TRANSFORMS
 from onmt.constants import ModelTask
+from onmt.models.sru import CheckSRU
 from onmt.modules.position_ffn import ACTIVATION_FUNCTIONS
 from onmt.modules.position_ffn import ActivationFunction
+from onmt.transforms import AVAILABLE_TRANSFORMS
+from onmt.utils.distributed import SCHEDULING_STRATEGIES
 
 
 def config_opts(parser):
@@ -834,7 +835,7 @@ def _add_train_general_opts(parser):
         default=[0],
         help="Steps at which accum_count values change",
     )
-    group.add('--scheduling_strategy', '-scheduling_strategy', choices=['sampling', 'roundrobin'], default='sampling')
+    group.add('--scheduling_strategy', '-scheduling_strategy', choices=SCHEDULING_STRATEGIES.keys(), default='sampling')
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
     group.add('--valid_batch_size', '-valid_batch_size', type=int, default=32, help='Maximum batch size for validation')
     group.add(

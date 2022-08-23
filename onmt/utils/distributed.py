@@ -13,10 +13,11 @@ from abc import ABC, abstractmethod
 from argparse import Namespace
 from collections import OrderedDict
 from itertools import compress, cycle, islice
+from typing import Any, Dict, Optional, List
+
 from onmt.inputters.corpus import get_corpus
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
-from typing import Any, Dict, Optional, List
 
 
 def is_master(global_rank):
@@ -335,20 +336,10 @@ class Scheduler:
         # A list of booleans, selecting only relevant parts of the configuration lists
         self._selector = self._get_selector(self.node_rank, self.local_rank)
 
-        strategies = {
-            'sampling': SamplingSchedulingStrategy,
-            'roundrobin': RoundRobinSchedulingStrategy,
-        }
-        try:
-            self.strategy = strategies[opt.scheduling_strategy](
-                my_corpus_ids=list(compress(self.opt.data.keys(), self._selector)),
-                opt_data=self.opt.data,
-            )
-        except KeyError:
-            raise ValueError(
-                f'Invalid valus for scheduling_strategy "{opt.scheduling_strategy}".'
-                f'Expecting one of {strategies.keys()}'
-            )
+        self.strategy = SCHEDULING_STRATEGIES[opt.scheduling_strategy](
+            my_corpus_ids=list(compress(self.opt.data.keys(), self._selector)),
+            opt_data=self.opt.data,
+        )
 
     def __repr__(self):
         return f'{self.__class__.__name__}(' f'..., node_rank={self.node_rank}, local_rank={self.local_rank})'
@@ -666,3 +657,9 @@ class RoundRobinSchedulingStrategy(SchedulingStrategy):
         communication_batch_id: int,
     ):
         return list(islice(self.infinite_corpus_ids, n_samples))
+
+
+SCHEDULING_STRATEGIES = {
+    'sampling': SamplingSchedulingStrategy,
+    'roundrobin': RoundRobinSchedulingStrategy,
+}

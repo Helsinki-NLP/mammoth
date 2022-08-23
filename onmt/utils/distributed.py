@@ -585,14 +585,24 @@ class SchedulingStrategy(ABC):
 class SamplingSchedulingStrategy(SchedulingStrategy):
     """
     Schedules tasks by sampling with replacement from a categorical distribution.
-    The probabilities are found by normalizing the weights of all valid corpora.
-    Valid corpora are those that are present on this device, and have already reached
+    The probabilities are found by normalizing the weights of all valid tasks (corpora).
+    Valid tasks are those that are present on this device, and have already reached
     their curriculum starting point "from_step".
     """
 
     def __init__(self, my_corpus_ids: List[str], opt_data: dict):
         self.my_corpus_ids = my_corpus_ids
         self.opt_data = opt_data
+
+        # Sanity check of weights and curriculum
+        my_weights = [self.opt_data[corpus_id]['weight'] for corpus_id in self.my_corpus_ids]
+        my_starts = [self.opt_data[corpus_id]['from_step'] for corpus_id in self.my_corpus_ids]
+        if sum(my_weights) <= 0:
+            raise ValueError('Can not set "weight" of all tasks on a device to zero')
+        if all(x > 0 for x in my_starts):
+            raise ValueError('Can not set "from_step" of all tasks on a device to nonzero')
+        if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_starts)):
+            raise ValueError('Invalid curriculum: no task is ready to start in the first step')
 
     def sample_corpus_ids(
         self,
@@ -604,10 +614,9 @@ class SamplingSchedulingStrategy(SchedulingStrategy):
             for corpus_id in self.my_corpus_ids
         ]
         sum_w = sum(weights)
-        if sum_w == 0:
-            raise Exception('Can not set "from_step" of all corpora to nonzero')
+        assert sum_w > 0
         p = [weight / sum_w for weight in weights]
-        # for id, pp in zip(my_corpus_ids, p):
+        # for id, pp in zip(my_corpus_ids, p):  # FIXME: debug
         #     logger.info(f'{id} {pp}')
         # sampling with replacement from weighted corpora (language pairs)
         sampled_corpus_ids = np.random.choice(self.my_corpus_ids, size=n_samples, p=p)
@@ -623,6 +632,7 @@ class RoundRobinSchedulingStrategy(SchedulingStrategy):
     """
 
     def __init__(self, my_corpus_ids: List[str], opt_data: dict):
+        del opt_data    # unused argument
         self.infinite_corpus_ids = cycle(my_corpus_ids)
 
     def sample_corpus_ids(

@@ -48,6 +48,33 @@ def broadcast_tensors(tensors, src=0, group=None):
 
 
 def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
+    """
+    Gradient synch tolerant to missing grads.
+
+    Missing grads occur when some parameters are not trained between two
+    gradient synchs, e.g. the embeddings of a low-resource language with low
+    sampling weight.
+
+    The algorithm first uses the 'has_grad' attribute set by the forward hook
+    'has_grad_hook'. This hook ensures that all parameters of the modules
+    selected for use during the current training computation have 'has_grad'
+    set to True. This gives the list of parameters that have been trained on
+    this device ("ready").
+
+    A bit mask covering the parameters that are ready on this device is
+    communicated to the other devices in the group. The bit masks are reduced
+    using summation. The sum gives the number of real gradients for that
+    parameter, and can be used for normalization.
+
+    If a parameter is ready on any device, all devices communicate a value.
+    Devices on which the parameter is ready communicate the actual gradient,
+    while devices on which it is not ready communicate a dummy zero tensor
+        instead. The sum computed previously is used for normalization.
+
+    Args:
+        named_parameters: tuples of (str, Parameter) defining the parameters to consider
+        group: torch.distributed communication group
+    """
     # Set missing gradients to zero, keeping track of true gradients
     require_grad = [(name, p) for (name, p) in named_parameters if p.requires_grad]
     device = require_grad[0][1].device
@@ -86,7 +113,7 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
     for grad, denom in zip(grads, rescale_denoms):
         if denom > 0:
             grad.div_(denom)
-        # else: TODO reuse p.has_grad to prevent this parameter from being stepped?
+    # Note: p.has_grad is reused in the optimizer to prevent the untrained components from being stepped
 
 
 def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None, buffer_size=10485760):

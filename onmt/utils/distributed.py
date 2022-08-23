@@ -102,7 +102,6 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
     rescale_denoms = [denom for denom in rescale_denoms if denom > 0]
     assert len(grads) == len(rescale_denoms)
     if len(grads) == 0:
-        logger.info('No remaining grads in this group.')
         return
 
     # All devices communicate either a real gradient or a dummy zeros of the same size
@@ -645,11 +644,8 @@ class SamplingSchedulingStrategy(SchedulingStrategy):
         sum_w = sum(weights)
         assert sum_w > 0
         p = [weight / sum_w for weight in weights]
-        # for id, pp in zip(my_corpus_ids, p):  # FIXME: debug
-        #     logger.info(f'{id} {pp}')
         # sampling with replacement from weighted corpora (language pairs)
         sampled_corpus_ids = np.random.choice(self.my_corpus_ids, size=n_samples, p=p)
-        # logger.info(f'sampled {sampled_corpus_ids}')
         return sampled_corpus_ids
 
 

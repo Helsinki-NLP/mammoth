@@ -336,9 +336,9 @@ class Scheduler:
         # A list of booleans, selecting only relevant parts of the configuration lists
         self._selector = self._get_selector(self.node_rank, self.local_rank)
 
-        self.strategy = SCHEDULING_STRATEGIES[opt.scheduling_strategy](
+        self.strategy = SCHEDULING_STRATEGIES[opt.scheduling_strategy].from_opt(
             my_corpus_ids=list(compress(self.opt.data.keys(), self._selector)),
-            opt_data=self.opt.data,
+            opt=self.opt,
         )
 
     def __repr__(self):

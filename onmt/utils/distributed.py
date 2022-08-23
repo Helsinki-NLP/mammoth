@@ -599,7 +599,7 @@ class SchedulingStrategy(ABC):
         pass
 
 
-class SamplingSchedulingStrategy(SchedulingStrategy):
+class WeightedSamplingSchedulingStrategy(SchedulingStrategy):
     """
     Schedules tasks by sampling with replacement from a categorical distribution.
     The probabilities are found by normalizing the weights of all valid tasks (corpora).
@@ -660,6 +660,6 @@ class RoundRobinSchedulingStrategy(SchedulingStrategy):
 
 
 SCHEDULING_STRATEGIES = {
-    'sampling': SamplingSchedulingStrategy,
+    'weighted_sampling': WeightedSamplingSchedulingStrategy,
     'roundrobin': RoundRobinSchedulingStrategy,
 }

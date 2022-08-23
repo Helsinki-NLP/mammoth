@@ -1,6 +1,6 @@
 import pytest
 
-from onmt.utils.distributed import SamplingSchedulingStrategy, RoundRobinSchedulingStrategy
+from onmt.utils.distributed import WeightedSamplingSchedulingStrategy, RoundRobinSchedulingStrategy
 
 
 def test_weights_all_zero():
@@ -19,7 +19,7 @@ def test_weights_all_zero():
         },
     }
     with pytest.raises(ValueError) as exc_info:
-        SamplingSchedulingStrategy(['a', 'b'], opt_data)
+        WeightedSamplingSchedulingStrategy(['a', 'b'], opt_data)
     assert 'Can not set "weight" of all corpora on a device to zero' in str(exc_info.value)
 
 
@@ -39,7 +39,7 @@ def test_weights_all_postponed():
         },
     }
     with pytest.raises(ValueError) as exc_info:
-        SamplingSchedulingStrategy(['a', 'b'], opt_data)
+        WeightedSamplingSchedulingStrategy(['a', 'b'], opt_data)
     assert 'Can not set "introduce_at_training_step" of all corpora on a device to nonzero' in str(exc_info.value)
 
 
@@ -61,7 +61,7 @@ def test_invalid_curriculum():
         },
     }
     with pytest.raises(ValueError) as exc_info:
-        SamplingSchedulingStrategy(['a', 'b'], opt_data)
+        WeightedSamplingSchedulingStrategy(['a', 'b'], opt_data)
     assert 'Invalid curriculum' in str(exc_info.value)
 
 
@@ -88,7 +88,7 @@ def test_sampling_scheduling_strategy():
             'introduce_at_training_step': 0,
         },
     }
-    strategy = SamplingSchedulingStrategy(['a', 'b', 'c'], opt_data)
+    strategy = WeightedSamplingSchedulingStrategy(['a', 'b', 'c'], opt_data)
     all_samples = []
     n_samples = 10
     n_batches = 1000

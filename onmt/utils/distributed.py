@@ -416,14 +416,15 @@ class Scheduler:
             'tgt_emb': my_tgt_emb_groups,
         }
 
-    def get_corpora(self, is_train=False) -> Dict[str, Any]:
+    def get_corpora(self, is_train=False, vocabs_dict=None) -> Dict[str, Any]:
         corpus_ids = self.opt.data.keys()
         my_corpus_ids = compress(corpus_ids, self._selector)
-        my_lang_pairs = compress(self.lang_pairs, self._selector)
+        my_src_vocabs = self.get_vocabs(side='src', vocabs_dict=vocabs_dict)
+        my_tgt_vocabs = self.get_vocabs(side='tgt', vocabs_dict=vocabs_dict)
         device = torch.device(self.local_rank)
         return {
-            corpus_id: get_corpus(self.opt, corpus_id, src_lang, tgt_lang, is_train=is_train).to(device)
-            for (corpus_id, (src_lang, tgt_lang)) in zip(my_corpus_ids, my_lang_pairs)
+            corpus_id: get_corpus(self.opt, corpus_id, src_vocab[-1], tgt_vocab[-1], is_train=is_train).to(device)
+            for (corpus_id, src_vocab, tgt_vocab) in zip(my_corpus_ids, my_src_vocabs, my_tgt_vocabs)
         }
 
     # FIXME: merge with below
@@ -460,13 +461,13 @@ class Scheduler:
             seen.add((side, lang, component_id))
         return result
 
-    def get_dataset_specs(self):
+    def get_dataset_specs(self, vocabs_dict):
         my_lang_pairs = compress(self.lang_pairs, self._selector)
         my_encoder_ids = compress(self.encoder_ids, self._selector)
         my_decoder_ids = compress(self.decoder_ids, self._selector)
         corpus_ids = self.opt.data.keys()
         my_corpus_ids = compress(corpus_ids, self._selector)
-        corpus_dict = self.get_corpora(is_train=True)
+        corpus_dict = self.get_corpora(is_train=True, vocabs_dict=vocabs_dict)
 
         selected = [my_lang_pairs, my_encoder_ids, my_decoder_ids, my_corpus_ids]
 

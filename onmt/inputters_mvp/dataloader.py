@@ -108,7 +108,7 @@ class DynamicDatasetIter(object):
 
     def _init_datasets(self):
         self.dataset_iterators = []
-        for tpl in self.scheduler.get_dataset_specs():
+        for tpl in self.scheduler.get_dataset_specs(self.vocabs_dict):
             (src_lang, tgt_lang, encoder_id, decoder_id, corpus_id, corpus) = tpl
             # , src_fields, tgt_fields) = tpl
             # merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}

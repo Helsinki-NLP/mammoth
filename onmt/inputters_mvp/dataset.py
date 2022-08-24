@@ -8,8 +8,8 @@ from torch.utils.data import IterableDataset
 
 from onmt.constants import DefaultTokens
 from onmt.transforms import TransformPipe, get_transforms_cls, make_transforms
-from onmt.inputters_mvp.vocab import get_vocab, Vocab, DEFAULT_SPECIALS
 from onmt.utils.logging import logger
+from onmt.inputters_mvp.vocab import Vocab
 
 
 # for compliance with previous code
@@ -126,31 +126,13 @@ class ParallelCorpus(IterableDataset):
         return batch
 
 
-def get_corpus(opts, corpus_id: str, src_lang: str, tgt_lang: str, is_train: bool = False):
+def get_corpus(opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
     """build an iterable Dataset object"""
-
-    # 1. get transform classes to infer special tokens
+    # get transform classes to infer special tokens
     transforms_cls = get_transforms_cls(opts.data[corpus_id].get('transforms', opts.transforms))
 
-    # 2. build src/tgt vocabs
-    if transforms_cls:
-        logger.info(f'Transforms: {transforms_cls}')
-        src_specials, tgt_specials = zip(*(cls.get_specials(opts) for cls in transforms_cls.values()))
-        src_specials = tuple(sorted(itertools.chain.from_iterable(src_specials + (DEFAULT_SPECIALS,))))
-        tgt_specials = tuple(sorted(itertools.chain.from_iterable(tgt_specials + (DEFAULT_SPECIALS,))))
-    else:
-        logger.info('No transforms found')
-        src_specials = tgt_specials = DEFAULT_SPECIALS  # get_vocab produces distinct lists
-    src_vocab_size = opts.src_vocab_size or None
-    tgt_vocab_size = opts.tgt_vocab_size or None
-    src_vocab = get_vocab(opts.src_vocab[src_lang], src_lang, src_vocab_size, specials=src_specials)
-    tgt_vocab = get_vocab(opts.tgt_vocab[tgt_lang], tgt_lang, tgt_vocab_size, specials=tgt_specials)
-    if opts.share_vocab:
-        assert src_vocab_size == tgt_vocab_size
-        src_vocab = tgt_vocab = Vocab.merge(src_vocab, tgt_vocab, size=src_vocab_size)
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
-
-    # 3. build Dataset proper
+    # build Dataset proper
     dataset = ParallelCorpus(
         opts.data[corpus_id]["path_src"],
         opts.data[corpus_id]["path_tgt"],

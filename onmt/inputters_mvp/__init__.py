@@ -8,7 +8,7 @@
 
 from onmt.inputters_mvp.dataloader import build_dataloader, DynamicDatasetIter
 from onmt.inputters_mvp.dataset import get_corpus, build_vocab_counts, ParallelCorpus
-from onmt.inputters_mvp.vocab import get_vocab
+from onmt.inputters_mvp.vocab import get_vocab, DEFAULT_SPECIALS
 
 
 __all__ = [
@@ -16,6 +16,7 @@ __all__ = [
     'DynamicDatasetIter',
     'get_corpus',
     'get_vocab',
+    'DEFAULT_SPECIALS',
     'build_vocab_counts',
     'ParallelCorpus'
 ]

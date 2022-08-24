@@ -15,7 +15,7 @@ from onmt.inputters_mvp import DynamicDatasetIter
 
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
-from onmt.inputters_mvp import get_vocab
+from onmt.inputters_mvp import get_vocab, DEFAULT_SPECIALS
 from onmt.transforms import get_transforms_cls
 from collections import OrderedDict
 from onmt.constants import ModelTask
@@ -143,7 +143,16 @@ def train(opt):
     logger.info("Training on {} node(s)".format(num_nodes))
 
     opt.data_task = ModelTask.SEQ2SEQ
+
     transforms_cls = get_transforms_cls(opt._all_transform)
+    if transforms_cls:
+        logger.info(f'All transforms: {transforms_cls}')
+        src_specials, tgt_specials = zip(*(cls.get_specials(opt) for cls in transforms_cls.values()))
+        all_specials = set(src_specials + tgt_specials + DEFAULT_SPECIALS)
+        all_specials = tuple(sorted(all_specials))  # get_vocab produces distinct lists
+    else:
+        logger.info('No transforms found')
+        all_specials = tuple(sorted(DEFAULT_SPECIALS))  # get_vocab produces distinct lists
 
     vocabs_dict = OrderedDict()
     # For creating fields, we use a scheduler that doesn't filter by node and gpu
@@ -152,9 +161,8 @@ def train(opt):
     vocab_size = {'src': opt.src_vocab_size or None, 'tgt': opt.tgt_vocab_size or None}
     for side in ('src', 'tgt'):
         for lang, vocab_path in global_scheduler.get_vocabularies(opt, side=side):
-            # FIXME: this should actually be fed with the transforms special keywords as well
-            # otherwise we may get different objects throughout the processes
-            vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side])
+            # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
+            vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 

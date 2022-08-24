@@ -1,17 +1,129 @@
+import bisect
 import collections
 import itertools
+import random
+
+from onmt.utils.logging import logger
 
 
 def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
 
-def build_dataloader(dataset, batch_size, batch_type):
+def build_dataloader(dataset, batch_size, batch_type, pool_size):
     """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
-    return infinite_iterator(dataset)
+    examples_stream = infinite_iterator(dataset)
+    if batch_type == 'sents':
+        def counting_fn(_): return 1
+    elif batch_type == 'tokens':
+        def counting_fn(example_dict): return len(example_dict['src']) + len(example_dict['tgt'])
+    collate_fn = dataset.collate_fn
+    return iter(LookAheadBucketing(examples_stream, pool_size, batch_size, counting_fn, counting_fn, collate_fn))
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
+
+
+class LookAheadBucketing():
+    def __init__(self, examples_stream, look_ahead_size, batch_size, bucket_fn, numel_fn, collate_fn):
+        self.examples_stream = examples_stream
+        self._prefetched = collections.defaultdict(list)
+        self._buckets = []
+        self.look_ahead_size = look_ahead_size
+        self.batch_size = batch_size
+        self.bucket_fn = bucket_fn
+        self.numel_fn = numel_fn
+        self.collate_fn = collate_fn
+        self._init()
+
+    def _init(self):
+        logger.info('LookAheadBucketing: initialization start')
+        for example in itertools.islice(self.examples_stream, self.look_ahead_size):
+            bucket = self.bucket_fn(example)
+            if bucket not in self._prefetched:
+                self._prefetched[bucket] = []
+            self._prefetched[bucket].append(example)
+        self._buckets = sorted(self._prefetched.keys())
+        logger.info('LookAheadBucketing: initialization done')
+
+    def maybe_replenish(self) -> bool:
+        try:
+            example = next(self.examples_stream)
+            bucket = self.bucket_fn(example)
+            creates_new_bucket = bucket not in self._prefetched
+            self._prefetched[bucket].append(example)
+            if creates_new_bucket:
+                bisect.insort(self._buckets, bucket)
+            return bucket if creates_new_bucket else None
+        except StopIteration:
+            return None
+
+    def bucket_is_empty(self, bucket_idx) -> bool:
+        bucket = self._buckets[bucket_idx]
+        if bucket not in self._prefetched:
+            return True
+        elif len(self._prefetched[bucket]) == 0:
+            del self._prefetched[bucket]
+            return True
+        else:
+            return False
+
+    def _choose_bucket(self, bucket_idx=None):
+        """pick a bucket (at random unless specified) and prepare examples for iteration"""
+        if bucket_idx is None:
+            bucket_idx = random.choice(range(len(self._buckets)))
+        # if bucket_idx >= len(self._buckets):
+        #     import pdb; pdb.set_trace()
+        # if len(self._prefetched[self._buckets[bucket_idx]]) == 0:
+        #     import pdb; pdb.set_trace()
+        random.shuffle(self._prefetched[self._buckets[bucket_idx]])
+        return self._buckets[bucket_idx], bucket_idx
+
+    def is_empty(self):
+        return (len(self._prefetched) == 0) or (sum(map(len, self._prefetched.values())) == 0)
+
+    def __iter__(self):
+        while True:
+            # 1. maybe we've exhausted the stream and the buckets
+            if self.is_empty():
+                break
+            accum, cur_batch_size = [], 0
+            # 2. pick a length at random
+            bucket, bucket_idx = self._choose_bucket()
+            # 3. build batch
+            batch_is_complete = False
+            while not batch_is_complete:
+                # maybe switch buckets
+                if self.bucket_is_empty(bucket_idx):
+                    if self.is_empty():
+                        logger.info('Reached end of stream')  # should not happen
+                        if accum:
+                            yield self.collate_fn(accum)
+                        break
+                    if self._buckets[bucket_idx] == self._buckets[-1]:
+                        # this was the largest bucket, so we'll need to pick the next smallest instead
+                        del self._buckets[bucket_idx]
+                        bucket_idx -= 1
+                    else:
+                        # there was a larger bucket, by dropping the current bucket we're shifting the index by one
+                        del self._buckets[bucket_idx]
+                    new_bucket, new_bucket_idx = self._choose_bucket(bucket_idx=bucket_idx)
+                    bucket, bucket_idx = new_bucket, new_bucket_idx
+                example = self._prefetched[bucket].pop()
+                accum.append(example)
+                numel = self.numel_fn(example)
+                cur_batch_size += numel
+                batch_is_complete = cur_batch_size >= self.batch_size
+
+                # 4. try to replenish reservoir if possible
+                new_bucket = self.maybe_replenish()
+                if (new_bucket is not None) and (new_bucket <= bucket):
+                    assert self._buckets[bucket_idx] != bucket
+                    bucket_idx += 1
+
+            yield self.collate_fn(accum)
+            if self.bucket_is_empty(bucket_idx):
+                del self._buckets[bucket_idx]
 
 
 class DynamicDatasetIter(object):
@@ -125,7 +237,12 @@ class DynamicDatasetIter(object):
             #     print('No transforms defined')
             #     transforms = []
 
-            ordered_iter = build_dataloader(corpus, self.batch_size, self.batch_type)
+            ordered_iter = build_dataloader(
+                corpus,
+                self.batch_size,
+                self.batch_type,
+                self.pool_factor * self.batch_size,
+            )
 
             self.dataset_iterators.append((ordered_iter, metadata))
 

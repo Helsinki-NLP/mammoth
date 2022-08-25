@@ -418,13 +418,14 @@ class Scheduler:
 
     def get_corpora(self, is_train=False, vocabs_dict=None) -> Dict[str, Any]:
         corpus_ids = self.opt.data.keys()
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
         my_corpus_ids = compress(corpus_ids, self._selector)
-        my_src_vocabs = self.get_vocabs(side='src', vocabs_dict=vocabs_dict)
-        my_tgt_vocabs = self.get_vocabs(side='tgt', vocabs_dict=vocabs_dict)
+        src_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='src', vocabs_dict=vocabs_dict)}
+        tgt_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='tgt', vocabs_dict=vocabs_dict)}
         device = torch.device(self.local_rank)
         return {
-            corpus_id: get_corpus(self.opt, corpus_id, src_vocab[-1], tgt_vocab[-1], is_train=is_train).to(device)
-            for (corpus_id, src_vocab, tgt_vocab) in zip(my_corpus_ids, my_src_vocabs, my_tgt_vocabs)
+            corpus_id: get_corpus(self.opt, corpus_id, src_vocabs[src], tgt_vocabs[tgt], is_train=is_train).to(device)
+            for (corpus_id, (src, tgt)) in zip(my_corpus_ids, my_lang_pairs)
         }
 
     # FIXME: merge with below

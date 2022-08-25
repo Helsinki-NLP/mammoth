@@ -806,7 +806,7 @@ def _add_train_general_opts(parser):
         '--pool_factor',
         '-pool_factor',
         type=int,
-        default=8192,
+        default=16,
         help="""Factor used in data loading and batch creations.
               It will load the equivalent of `pool_factor` batches,
               sort them by the according `sort_key` to produce

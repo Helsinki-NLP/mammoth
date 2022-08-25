@@ -139,7 +139,6 @@ class DynamicDatasetIter(object):
         batch_size_multiple (int): make batch size multiply of this;
         data_type (str): input data type, currently only text;
         bucket_size (int): accum this number of examples in a dynamic dataset;
-        pool_factor (int): accum this number of batch before sorting;
         skip_empty_level (str): security level when encouter empty line;
         stride (int): iterate data files with this stride;
         offset (int): iterate data files with this offset.
@@ -164,7 +163,6 @@ class DynamicDatasetIter(object):
         batch_size_multiple,
         data_type="text",
         bucket_size=2048,
-        pool_factor=8192,
         skip_empty_level='warning',
         stride=1,
         offset=0,
@@ -183,7 +181,6 @@ class DynamicDatasetIter(object):
         self.device = 'cpu'
         # self.sort_key = str2sortkey[data_type]
         self.bucket_size = bucket_size
-        self.pool_factor = pool_factor
         if stride <= 0:
             raise ValueError(f"Invalid argument for stride={stride}.")
         self.stride = stride
@@ -212,7 +209,6 @@ class DynamicDatasetIter(object):
             batch_size_multiple,
             data_type=opts.data_type,
             bucket_size=opts.bucket_size,
-            pool_factor=opts.pool_factor,
             skip_empty_level=opts.skip_empty_level,
             stride=stride,
             offset=offset,
@@ -241,7 +237,7 @@ class DynamicDatasetIter(object):
                 corpus,
                 self.batch_size,
                 self.batch_type,
-                self.pool_factor * self.batch_size,
+                self.bucket_size,
             )
 
             self.dataset_iterators.append((ordered_iter, metadata))
@@ -257,7 +253,6 @@ class DynamicDatasetIter(object):
     #         train_iter = OrderedIterator(
     #             bucket_dataset,.to(torch.device(local_rank)
     #             self.batch_size,
-    #             pool_factor=self.pool_factor,
     #             batch_size_fn=self.batch_size_fn,
     #             batch_size_multiple=self.batch_size_multiple,
     #             device=self.device,

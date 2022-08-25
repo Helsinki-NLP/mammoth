@@ -30,6 +30,7 @@ setup(
         "waitress",
         "pyonmttok>=1.32,<2",
         "pyyaml",
+        "timeout_decorator",
     ],
     entry_points={
         "console_scripts": [

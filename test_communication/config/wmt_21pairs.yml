@@ -1,90 +1,90 @@
 src_vocab:
-  cs: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  de: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  en: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  et: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  fi: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  ru: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  tr: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  zh: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
+  cs: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  de: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  en: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  et: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  fi: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  ru: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  tr: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  zh: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
 tgt_vocab:
-  cs: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  de: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  en: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  et: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  fi: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  ru: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  tr: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
-  zh: /home/micheleb/data/scaleUpMNMT/wmt/many2many.wmt.vocab.src
+  cs: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  de: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  en: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  et: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  fi: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  ru: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  tr: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
+  zh: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
 overwrite: False
 
 data:
   # en-X
   train_en-cs:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/en-cs/wmt.en-cs.train.BPE.en
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/en-cs/wmt.en-cs.train.BPE.cs
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/en-cs/wmt.en-cs.train.BPE.en
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-cs/wmt.en-cs.train.BPE.cs
   train_en-de:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/en-de/wmt.en-de.train.BPE.en
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/en-de/wmt.en-de.train.BPE.de
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/en-de/wmt.en-de.train.BPE.en
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-de/wmt.en-de.train.BPE.de
   train_en-et:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/en-et/wmt.en-et.train.BPE.en
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/en-et/wmt.en-et.train.BPE.et
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/en-et/wmt.en-et.train.BPE.en
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-et/wmt.en-et.train.BPE.et
   train_en-fi:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/en-fi/wmt.en-fi.train.BPE.en
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/en-fi/wmt.en-fi.train.BPE.fi
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/en-fi/wmt.en-fi.train.BPE.en
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-fi/wmt.en-fi.train.BPE.fi
   train_en-ru:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/en-ru/wmt.en-ru.train.BPE.en
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/en-ru/wmt.en-ru.train.BPE.ru
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/en-ru/wmt.en-ru.train.BPE.en
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-ru/wmt.en-ru.train.BPE.ru
   train_en-tr:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/en-tr/wmt.en-tr.train.BPE.en
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/en-tr/wmt.en-tr.train.BPE.tr
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/en-tr/wmt.en-tr.train.BPE.en
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-tr/wmt.en-tr.train.BPE.tr
   train_en-zh:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/en-zh/wmt.en-zh.train.BPE.en
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/en-zh/wmt.en-zh.train.BPE.zh
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/en-zh/wmt.en-zh.train.BPE.en
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-zh/wmt.en-zh.train.BPE.zh
   # X-en
   train_cs-en:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/cs-en/wmt.cs-en.train.BPE.en
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.en
   train_de-en:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/de-en/wmt.de-en.train.BPE.de
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/de-en/wmt.de-en.train.BPE.en
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.de
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.en
   train_et-en:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/et-en/wmt.et-en.train.BPE.et
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/et-en/wmt.et-en.train.BPE.en
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/et-en/wmt.et-en.train.BPE.et
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/et-en/wmt.et-en.train.BPE.en
   train_fi-en:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/fi-en/wmt.fi-en.train.BPE.fi
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/fi-en/wmt.fi-en.train.BPE.en
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/fi-en/wmt.fi-en.train.BPE.fi
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/fi-en/wmt.fi-en.train.BPE.en
   train_ru-en:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/ru-en/wmt.ru-en.train.BPE.ru
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/ru-en/wmt.ru-en.train.BPE.en
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/ru-en/wmt.ru-en.train.BPE.ru
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/ru-en/wmt.ru-en.train.BPE.en
   train_tr-en:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/tr-en/wmt.tr-en.train.BPE.tr
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/tr-en/wmt.tr-en.train.BPE.en
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/tr-en/wmt.tr-en.train.BPE.tr
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/tr-en/wmt.tr-en.train.BPE.en
   train_zh-en:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/zh-en/wmt.zh-en.train.BPE.zh
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/zh-en/wmt.zh-en.train.BPE.en
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/zh-en/wmt.zh-en.train.BPE.zh
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/zh-en/wmt.zh-en.train.BPE.en
   # X-X
   train_cs-cs:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
   train_de-de:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/de-en/wmt.de-en.train.BPE.de
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/de-en/wmt.de-en.train.BPE.de
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.de
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.de
   train_et-et:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/et-en/wmt.et-en.train.BPE.et
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/et-en/wmt.et-en.train.BPE.et
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/et-en/wmt.et-en.train.BPE.et
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/et-en/wmt.et-en.train.BPE.et
   train_fi-fi:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/fi-en/wmt.fi-en.train.BPE.fi
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/fi-en/wmt.fi-en.train.BPE.fi
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/fi-en/wmt.fi-en.train.BPE.fi
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/fi-en/wmt.fi-en.train.BPE.fi
   train_ru-ru:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/ru-en/wmt.ru-en.train.BPE.ru
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/ru-en/wmt.ru-en.train.BPE.ru
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/ru-en/wmt.ru-en.train.BPE.ru
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/ru-en/wmt.ru-en.train.BPE.ru
   train_tr-tr:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/tr-en/wmt.tr-en.train.BPE.tr
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/tr-en/wmt.tr-en.train.BPE.tr
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/tr-en/wmt.tr-en.train.BPE.tr
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/tr-en/wmt.tr-en.train.BPE.tr
   train_zh-zh:
-    path_src: /home/micheleb/data/scaleUpMNMT/wmt/train/zh-en/wmt.zh-en.train.BPE.zh
-    path_tgt: /home/micheleb/data/scaleUpMNMT/wmt/train/zh-en/wmt.zh-en.train.BPE.zh
+    path_src: /home/local/scaleUpMNMT-data/wmt/train/zh-en/wmt.zh-en.train.BPE.zh
+    path_tgt: /home/local/scaleUpMNMT-data/wmt/train/zh-en/wmt.zh-en.train.BPE.zh
 
 src_tgt:
 - en-cs

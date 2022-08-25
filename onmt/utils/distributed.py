@@ -78,6 +78,9 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
     """
     # Set missing gradients to zero, keeping track of true gradients
     require_grad = [(name, p) for (name, p) in named_parameters if p.requires_grad]
+    if not require_grad:
+        # Exit early if the component has no parameters that require a gradient
+        return
     device = require_grad[0][1].device
     ready_list = []
     for name, p in require_grad:

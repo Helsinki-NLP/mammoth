@@ -9,7 +9,6 @@ import timeout_decorator
 
 import onmt
 from onmt.bin.train import train
-from onmt.bin.translate import translate
 from onmt.utils.parse import ArgumentParser
 
 logger = logging.getLogger(__name__)

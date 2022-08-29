@@ -40,8 +40,6 @@ class LookAheadBucketing():
         logger.info('LookAheadBucketing: initialization start')
         for example in itertools.islice(self.examples_stream, self.look_ahead_size):
             bucket = self.bucket_fn(example)
-            if bucket not in self._prefetched:
-                self._prefetched[bucket] = []
             self._prefetched[bucket].append(example)
         self._buckets = sorted(self._prefetched.keys())
         logger.info('LookAheadBucketing: initialization done')
@@ -68,7 +66,7 @@ class LookAheadBucketing():
         else:
             return False
 
-    def _choose_bucket(self, bucket_idx=None):
+    def _choose_and_prepare_bucket(self, bucket_idx=None):
         """pick a bucket (at random unless specified) and prepare examples for iteration"""
         if bucket_idx is None:
             bucket_idx = random.choice(range(len(self._buckets)))
@@ -89,7 +87,7 @@ class LookAheadBucketing():
                 break
             accum, cur_batch_size = [], 0
             # 2. pick a length at random
-            bucket, bucket_idx = self._choose_bucket()
+            bucket, bucket_idx = self._choose_and_prepare_bucket()
             # 3. build batch
             batch_is_complete = False
             while not batch_is_complete:
@@ -107,7 +105,7 @@ class LookAheadBucketing():
                     else:
                         # there was a larger bucket, by dropping the current bucket we're shifting the index by one
                         del self._buckets[bucket_idx]
-                    new_bucket, new_bucket_idx = self._choose_bucket(bucket_idx=bucket_idx)
+                    new_bucket, new_bucket_idx = self._choose_and_prepare_bucket(bucket_idx=bucket_idx)
                     bucket, bucket_idx = new_bucket, new_bucket_idx
                 example = self._prefetched[bucket].pop()
                 accum.append(example)

@@ -1,4 +1,5 @@
 import collections
+from dataclasses import dataclass
 import itertools
 
 import torch
@@ -11,12 +12,11 @@ from onmt.utils.logging import logger
 from onmt.inputters_mvp.vocab import Vocab
 
 
-# for compliance with previous code
-class Batch(object):
-    def __init__(self, src, tgt, batch_size):
-        self.src = src
-        self.tgt = tgt
-        self.batch_size = batch_size
+@dataclass
+class Batch():
+    src: tuple  # of torch Tensors
+    tgt: torch.Tensor
+    batch_size: int
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
@@ -65,7 +65,7 @@ class ParallelCorpus(IterableDataset):
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
-        """Convert string into list of indices"""
+        """Split string, surround with specials"""
         vocab = self.vocabs[side]
         tokens = [
             DefaultTokens.BOS,
@@ -78,6 +78,7 @@ class ParallelCorpus(IterableDataset):
         return tokens
 
     def _numericalize(self, tokens, side='src'):
+        """Convert list of strings into list of indices"""
         vocab = self.vocabs[side]
         indices = torch.tensor(list(map(vocab.stoi.__getitem__, tokens)), device=self.device)
         return indices
@@ -104,19 +105,6 @@ class ParallelCorpus(IterableDataset):
         )
         examples = map(_cast, examples)
         yield from examples
-        # accum, cur_batch_size = [], 0
-        # for example in examples:
-        #     length = 1 if self.batch_type == 'sents' else (len(example['src']) + len(example['tgt']))
-        #     if length > self.batch_size:
-        #         warnings.warn(f'Example {example} larger than requested batch size, dropping it.')
-        #     else:
-        #         if cur_batch_size + length > self.batch_size:
-        #             yield self.collate_fn(accum)
-        #             accum, cur_batch_size = [], 0
-        #         cur_batch_size += length
-        #         accum.append(example)
-        # if accum:
-        #     yield self.collate_fn(accum)
 
     # FIXME: some RNN archs require sorting src's by length
     def collate_fn(self, examples):

@@ -24,7 +24,7 @@ def build_trainer(
     model,
     fields_dict,
     optim,
-    scheduler,
+    task_queue_manager,
     model_saver=None,
     generators_md=None,
 ):
@@ -46,7 +46,7 @@ def build_trainer(
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
-    for (side, lang, component_id, fields) in scheduler.get_fields('tgt', fields_dict):
+    for (side, lang, component_id, fields) in task_queue_manager.get_fields('tgt', fields_dict):
         generator = generators_md[f"generator{lang}"]
         # This retrieves the primary field of this crappy datastructure
         tgt_field = fields['tgt'].fields[0][1]
@@ -82,7 +82,7 @@ def build_trainer(
         else None
     )
 
-    report_manager = onmt.utils.build_report_manager(opt, scheduler.node_rank, scheduler.local_rank)
+    report_manager = onmt.utils.build_report_manager(opt, task_queue_manager.node_rank, task_queue_manager.local_rank)
     trainer = onmt.Trainer(
         model,
         train_loss_md,
@@ -105,7 +105,7 @@ def build_trainer(
         earlystopper=earlystopper,
         dropout=dropout,
         dropout_steps=dropout_steps,
-        scheduler=scheduler,
+        task_queue_manager=task_queue_manager,
         report_stats_from_parameters=opt.report_stats_from_parameters,
         lca_loginterval=opt.lca_loginterval,
     )
@@ -161,7 +161,7 @@ class Trainer(object):
         earlystopper=None,
         dropout=[0.3],
         dropout_steps=[0],
-        scheduler=None,
+        task_queue_manager=None,
         report_stats_from_parameters=False,
         lca_loginterval=-1,
     ):
@@ -191,9 +191,8 @@ class Trainer(object):
         self.dropout = dropout
         self.dropout_steps = dropout_steps
 
-        self.scheduler = scheduler
-
-        my_component_groups = self.scheduler.get_distributed_groups()
+        self.task_queue_manager = task_queue_manager
+        my_component_groups = self.task_queue_manager.get_distributed_groups()
         self.my_encoder_groups = my_component_groups['encoder']
         self.my_decoder_groups = my_component_groups['decoder']
         self.my_src_emb_groups = my_component_groups['src_emb']
@@ -335,26 +334,27 @@ class Trainer(object):
                 report_stats,
             )
 
-            for encoder_id, (_, group) in self.my_encoder_groups:
+            # Note that all group ids are tuples, some with length 1
+            for (encoder_id,), (_, group) in self.my_encoder_groups.items():
                 grads = [
                     p.grad.data
                     for name, p in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
                     if 'embeddings' not in name and p.requires_grad and p.grad is not None
                 ]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
-            for decoder_id, (_, group) in self.my_decoder_groups:
+            for (decoder_id,), (_, group) in self.my_decoder_groups.items():
                 grads = [
                     p.grad.data
                     for name, p in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
                     if 'embeddings' not in name and p.requires_grad and p.grad is not None
                 ]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
-            for src_emb_id, (_, group) in self.my_src_emb_groups:
+            for src_emb_id, (_, group) in self.my_src_emb_groups.items():
                 src_lang, encoder_id = src_emb_id
                 embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
                 grads = [p.grad.data for p in embs.parameters() if p.requires_grad and p.grad is not None]
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0, group=group)
-            for tgt_emb_id, (_, group) in self.my_tgt_emb_groups:
+            for tgt_emb_id, (_, group) in self.my_tgt_emb_groups.items():
                 tgt_lang, decoder_id = tgt_emb_id
                 embs = self.model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
                 grads = [p.grad.data for p in embs.parameters() if p.requires_grad and p.grad is not None]
@@ -369,7 +369,11 @@ class Trainer(object):
             grads = [
                 p.grad.data for p in self.model.attention_bridge.parameters() if p.requires_grad and p.grad is not None
             ]
-            if grads and self.scheduler.node_rank is not None and self.scheduler.local_rank is not None:
+            if (
+                grads
+                and self.task_queue_manager.node_rank is not None
+                and self.task_queue_manager.local_rank is not None
+            ):
                 # a group is not specified: reduce across all devices
                 onmt.utils.distributed.all_reduce_and_rescale_tensors(grads, rescale_denom=1.0)
 
@@ -398,7 +402,8 @@ class Trainer(object):
                 logger.info(f'After gradient sync {step}')
                 for name, p in self.model.named_parameters():
                     logger.info(
-                        f'{self.scheduler.node_rank}:{self.scheduler.local_rank}' f' {name}: {p.flatten()[:10]}'
+                        f'{self.task_queue_manager.node_rank}:{self.task_queue_manager.local_rank}'
+                        f' {name}: {p.flatten()[:10]}'
                     )
 
             if self.average_decay > 0 and i % self.average_every == 0:

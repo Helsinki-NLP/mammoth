@@ -11,7 +11,7 @@ from onmt.models import build_model_saver
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
-from onmt.utils.distributed import broadcast_tensors, Scheduler, is_master
+from onmt.utils.distributed import broadcast_tensors, is_master
 from onmt.inputters.dynamic_iterator import DynamicDatasetIter
 from onmt.transforms import get_transforms_cls
 
@@ -48,27 +48,27 @@ def _build_valid_iter(opt, fields, transforms_cls):
     return valid_iter
 
 
-def init_distributed(model, scheduler):
-    my_component_groups = scheduler.get_distributed_groups()
-    for encoder_id, (min_rank, group) in my_component_groups['encoder']:
+def init_distributed(model, task_queue_manager):
+    my_component_groups = task_queue_manager.get_distributed_groups()
+    for (encoder_id,), (min_rank, group) in my_component_groups['encoder'].items():
         weights = [
             p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters() if 'embeddings' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-    for decoder_id, (min_rank, group) in my_component_groups['decoder']:
+    for (decoder_id,), (min_rank, group) in my_component_groups['decoder'].items():
         weights = [
             p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters() if 'embeddings' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-    for src_emb_id, (min_rank, group) in my_component_groups['src_emb']:
+    for src_emb_id, (min_rank, group) in my_component_groups['src_emb'].items():
         src_lang, encoder_id = src_emb_id
         embs = model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
         weights = [p.data for p in embs.parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-    for tgt_emb_id, (min_rank, group) in my_component_groups['tgt_emb']:
+    for tgt_emb_id, (min_rank, group) in my_component_groups['tgt_emb'].items():
         tgt_lang, decoder_id = tgt_emb_id
         embs = model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
         weights = [p.data for p in embs.parameters()]
@@ -82,7 +82,7 @@ def init_distributed(model, scheduler):
 
     logger.debug('After init_distributed')
     for name, p in model.named_parameters():
-        logger.debug(f'{scheduler.node_rank}:{scheduler.local_rank} {name}: {p.flatten()[:10]}')
+        logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: {p.flatten()[:10]}')
 
 
 def main(
@@ -94,11 +94,12 @@ def main(
     semaphore=None,
     node_rank=None,
     local_rank=None,
+    global_task_queue_manager=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opt`` has been validated and updated
     # at this point.
-    scheduler = Scheduler(opt, node_rank=node_rank, local_rank=local_rank)
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=node_rank, local_rank=local_rank)
 
     init_logger(opt.log_file)
     if node_rank is not None and local_rank is not None:
@@ -111,11 +112,11 @@ def main(
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.
-    model, generators_md = build_model(model_opt, opt, fields_dict, scheduler, checkpoint)
+    model, generators_md = build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint)
 
     logger.info("GPU {} - Init model".format(global_rank))
     if node_rank is not None and local_rank is not None:
-        init_distributed(model, scheduler)
+        init_distributed(model, task_queue_manager)
     enc, dec = model.count_parameters(log=logger.debug)
     logger.info("GPU {} - total encoder parameters: {}".format(global_rank, enc))
     logger.info("GPU {} - total decoder parameters: {}".format(global_rank, dec))
@@ -125,7 +126,7 @@ def main(
     optim = Optimizer.from_opt(
         model,
         opt,
-        scheduler=scheduler,
+        task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
     )
 
@@ -139,7 +140,7 @@ def main(
         model,
         fields_dict,
         optim,
-        scheduler=scheduler,
+        task_queue_manager=task_queue_manager,
         model_saver=model_saver,
         generators_md=generators_md,
     )
@@ -147,7 +148,7 @@ def main(
 
     if batch_queue is None:
         _train_iter = DynamicDatasetIter.from_opts(
-            scheduler=scheduler,
+            task_queue_manager=task_queue_manager,
             transforms_cls=transforms_cls,
             fields_dict=fields_dict,
             opts=opt,

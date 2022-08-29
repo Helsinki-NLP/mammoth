@@ -51,7 +51,7 @@ def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transfor
 
 class ParallelCorpus(IterableDataset):
     """Torch-style dataset"""
-    def __init__(self, src_file, tgt_file, src_vocab, tgt_vocab, transforms, batch_size, batch_type, device='cpu'):
+    def __init__(self, src_file, tgt_file, src_vocab, tgt_vocab, transforms, device='cpu'):
         self.src_file = src_file
         self.tgt_file = tgt_file
         self.transforms = transforms
@@ -60,8 +60,6 @@ class ParallelCorpus(IterableDataset):
             'src': src_vocab,
             'tgt': tgt_vocab,
         }
-        self.batch_size = batch_size
-        self.batch_type = batch_type
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -118,21 +116,21 @@ class ParallelCorpus(IterableDataset):
         return batch
 
 
-def get_corpus(opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
+def get_corpus(corpus_opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
-    transforms_cls = get_transforms_cls(opts.data[corpus_id].get('transforms', opts.transforms))
+    # FIXME ensure TQM properly initializes transform with global if necessary
+    transforms_cls = get_transforms_cls(corpus_opts.get('transforms', []))
 
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
     # build Dataset proper
     dataset = ParallelCorpus(
-        opts.data[corpus_id]["path_src"],
-        opts.data[corpus_id]["path_tgt"],
+        corpus_opts["path_src"],
+        corpus_opts["path_tgt"],
         src_vocab,
         tgt_vocab,
-        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs).values()),
-        opts.batch_size,
-        opts.batch_type,
+        # FIXME pipe used to get access to full opts.
+        TransformPipe(corpus_opts, make_transforms(corpus_opts, transforms_cls, vocabs).values()),
     )
     return dataset
 

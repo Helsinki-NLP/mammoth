@@ -13,7 +13,7 @@ from argparse import Namespace
 from collections import OrderedDict, namedtuple
 from dataclasses import dataclass
 from itertools import compress, cycle, islice
-from onmt.inputters_mvp import get_corpus
+# from onmt.inputters_mvp import get_corpus
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
 from pprint import pformat
@@ -485,17 +485,17 @@ class TaskQueueManager:
         """Returns a list of tuples: (side, lang, component_id, fields)."""
         raise RuntimeError
 
-    def get_corpora(self, is_train=False, vocabs_dict=None) -> Dict[str, Any]:
-        corpus_ids = self.opt.data.keys()
-        my_lang_pairs = compress(self.lang_pairs, self._selector)
-        my_corpus_ids = compress(corpus_ids, self._selector)
-        src_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='src', vocabs_dict=vocabs_dict)}
-        tgt_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='tgt', vocabs_dict=vocabs_dict)}
-        device = torch.device(self.local_rank)
-        return {
-            corpus_id: get_corpus(self.opt, corpus_id, src_vocabs[src], tgt_vocabs[tgt], is_train=is_train).to(device)
-            for (corpus_id, (src, tgt)) in zip(my_corpus_ids, my_lang_pairs)
-        }
+    # def get_corpora(self, is_train=False, vocabs_dict=None) -> Dict[str, Any]:
+    #     corpus_ids = self.opt.data.keys()
+    #     my_lang_pairs = compress(self.lang_pairs, self._selector)
+    #     my_corpus_ids = compress(corpus_ids, self._selector)
+    #     src_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='src', vocabs_dict=vocabs_dict)}
+    #     tgt_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='tgt', vocabs_dict=vocabs_dict)}
+    #     device = torch.device(self.local_rank)
+    #     return {
+    #         corpus_id: get_corpus(self.opt, corpus_id, src_vocabs[src], tgt_vocabs[tgt], is_train=is_train).to(device)
+    #         for (corpus_id, (src, tgt)) in zip(my_corpus_ids, my_lang_pairs)
+    #     }
 
     # FIXME: merge with below
     def get_vocabularies(self, opt: Namespace, side: str):
@@ -532,32 +532,32 @@ class TaskQueueManager:
             seen.add((side, lang, component_id))
         return result
 
-    def get_dataset_specs(self, vocabs_dict):
-        my_lang_pairs = compress(self.lang_pairs, self._selector)
-        my_encoder_ids = compress(self.encoder_ids, self._selector)
-        my_decoder_ids = compress(self.decoder_ids, self._selector)
-        corpus_ids = self.opt.data.keys()
-        my_corpus_ids = compress(corpus_ids, self._selector)
-        corpus_dict = self.get_corpora(is_train=True, vocabs_dict=vocabs_dict)
-
-        selected = [my_lang_pairs, my_encoder_ids, my_decoder_ids, my_corpus_ids]
-
-        result = []
-        for lang_pair, encoder_id, decoder_id, corpus_id in zip(*selected):
-            src_lang, tgt_lang = lang_pair
-            result.append(
-                (
-                    src_lang,
-                    tgt_lang,
-                    encoder_id,
-                    decoder_id,
-                    corpus_id,
-                    corpus_dict[corpus_id],
-                    # vocabs_dict[('src', src_lang)]
-                    # vocabs_dict[('tgt', tgt_lang)]
-                )
-            )
-        return result
+    # def get_dataset_specs(self, vocabs_dict):
+    #     my_lang_pairs = compress(self.lang_pairs, self._selector)
+    #     my_encoder_ids = compress(self.encoder_ids, self._selector)
+    #     my_decoder_ids = compress(self.decoder_ids, self._selector)
+    #     corpus_ids = self.opt.data.keys()
+    #     my_corpus_ids = compress(corpus_ids, self._selector)
+    #     corpus_dict = self.get_corpora(is_train=True, vocabs_dict=vocabs_dict)
+    #
+    #     selected = [my_lang_pairs, my_encoder_ids, my_decoder_ids, my_corpus_ids]
+    #
+    #     result = []
+    #     for lang_pair, encoder_id, decoder_id, corpus_id in zip(*selected):
+    #         src_lang, tgt_lang = lang_pair
+    #         result.append(
+    #             (
+    #                 src_lang,
+    #                 tgt_lang,
+    #                 encoder_id,
+    #                 decoder_id,
+    #                 corpus_id,
+    #                 corpus_dict[corpus_id],
+    #                 # vocabs_dict[('src', src_lang)]
+    #                 # vocabs_dict[('tgt', tgt_lang)]
+    #             )
+    #         )
+    #     return result
 
     def get_encoders(self):
         my_encoder_ids = [task.encoder_id for task in self.get_tasks()]

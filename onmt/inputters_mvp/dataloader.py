@@ -5,7 +5,7 @@ import random
 
 import torch
 
-from onmt.inputters_mvp import get_corpus
+from onmt.inputters_mvp.dataset import get_corpus
 from onmt.utils.logging import logger
 
 
@@ -141,7 +141,6 @@ class DynamicDatasetIter(object):
         batch_size_multiple (int): make batch size multiply of this;
         data_type (str): input data type, currently only text;
         bucket_size (int): accum this number of examples in a dynamic dataset;
-        pool_factor (int): accum this number of batch before sorting;
         skip_empty_level (str): security level when encouter empty line;
         stride (int): iterate data files with this stride;
         offset (int): iterate data files with this offset.
@@ -164,7 +163,6 @@ class DynamicDatasetIter(object):
         batch_size_multiple,
         data_type="text",
         bucket_size=2048,
-        pool_factor=8192,
         skip_empty_level='warning',
         stride=1,
         offset=0,
@@ -176,11 +174,11 @@ class DynamicDatasetIter(object):
         self.corpora_info = corpora_info
         self.is_train = is_train
         self.init_iterators = False
+        self.batch_type = batch_type
         self.batch_size = batch_size
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
         self.bucket_size = bucket_size
-        self.pool_factor = pool_factor
         if stride <= 0:
             raise ValueError(f"Invalid argument for stride={stride}.")
         self.stride = stride
@@ -209,7 +207,6 @@ class DynamicDatasetIter(object):
             batch_size_multiple,
             data_type=opts.data_type,
             bucket_size=opts.bucket_size,
-            pool_factor=opts.pool_factor,
             skip_empty_level=opts.skip_empty_level,
             stride=stride,
             offset=offset,
@@ -224,7 +221,7 @@ class DynamicDatasetIter(object):
             metadata = task.get_serializable_metadata()
 
             device = torch.device(self.task_queue_manager.local_rank)
-            corpus = get_corpus(self.opt, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train).to(device)
+            corpus = get_corpus(task.corpus_opt, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train).to(device)
 
             # iterator over minibatches
             ordered_iter = build_dataloader(

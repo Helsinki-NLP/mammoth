@@ -5,7 +5,7 @@ from onmt.utils.logging import init_logger
 from onmt.utils.misc import set_random_seed, check_path
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import dynamic_prepare_opts
-from onmt.inputters.corpus import build_vocab
+from onmt.inputters_mvp import build_vocab_counts
 from onmt.transforms import make_transforms, get_transforms_cls
 
 
@@ -27,9 +27,8 @@ def build_vocab_main(opts):
     logger = init_logger()
     set_random_seed(opts.seed, False)
     transforms_cls = get_transforms_cls(opts._all_transform)
-    fields = None
 
-    transforms = make_transforms(opts, transforms_cls, fields)
+    transforms = make_transforms(opts, transforms_cls, None)
 
     src_counters_by_lang = defaultdict(Counter)
     tgt_counters_by_lang = defaultdict(Counter)
@@ -38,7 +37,7 @@ def build_vocab_main(opts):
     for lang_pair, corpus_id in zip(opts.src_tgt, opts.data):
         src_lang, tgt_lang = lang_pair.split('-')
         logger.info(f"Counter vocab from {corpus_id} {opts.n_sample} samples.")
-        src_counter, tgt_counter, src_feats_counter = build_vocab(
+        src_counter, tgt_counter = build_vocab_counts(
             opts, corpus_id=corpus_id, transforms=transforms, n_sample=opts.n_sample
         )
         src_counters_by_lang[src_lang].update(src_counter)
@@ -62,8 +61,8 @@ def build_vocab_main(opts):
         logger.info(f"=== Source lang: {src_lang}")
 
         logger.info(f"Counters src:{len(src_counter)}")
-        for feat_name, feat_counter in src_feats_counter.items():
-            logger.info(f"Counters {feat_name}:{len(feat_counter)}")
+        # for feat_name, feat_counter in src_feats_counter.items():
+        #     logger.info(f"Counters {feat_name}:{len(feat_counter)}")
 
         logger.info(f"Saving to {opts.src_vocab[src_lang]}")
         save_counter(src_counter, opts.src_vocab[src_lang])

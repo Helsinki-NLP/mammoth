@@ -4,6 +4,7 @@ Decodes using multiple models simultaneously,
 combining their prediction distributions by averaging.
 All models in the ensemble must share a target vocabulary.
 """
+import warnings
 
 import torch
 import torch.nn as nn
@@ -121,32 +122,21 @@ class EnsembleModel(NMTModel):
 
 def load_test_model(opt):
     """Read in multiple models for ensemble."""
-    shared_fields = None
+    shared_vocabs = None
     shared_model_opt = None
     models = []
     for model_path in opt.models:
-        fields, model, model_opt = onmt.model_builder.load_test_multitask_model(opt, model_path=model_path)
-        if shared_fields is None:
-            shared_fields = fields
+        vocabs, model, model_opt = onmt.model_builder.load_test_multitask_model(opt, model_path=model_path)
+        if shared_vocabs is None:
+            shared_vocabs = vocabs
         else:
-            for key, field in fields.items():
-                try:
-                    f_iter = iter(field)
-                except TypeError:
-                    f_iter = [(key, field)]
-                for sn, sf in f_iter:
-                    if sf is not None and 'vocab' in sf.__dict__:
-                        sh_field = shared_fields[key]
-                        try:
-                            sh_f_iter = iter(sh_field)
-                        except TypeError:
-                            sh_f_iter = [(key, sh_field)]
-                        sh_f_dict = dict(sh_f_iter)
-                        assert sf.vocab.stoi == sh_f_dict[sn].vocab.stoi, (
-                            "Ensemble models must use the same preprocessed data"
-                        )
+            warnings.warn('Ensemble models must use the same preprocessed data, verification was skipped.')
+            # FIXME: this check was killed in the Great Torchtext War
+            # for key, vocab in vocabs.items():
+            #     sh_vocab = shared_vocabs[key]
+            #     assert vocab.stoi == sh_vocab.stoi, "Ensemble models must use the same preprocessed data"
         models.append(model)
         if shared_model_opt is None:
             shared_model_opt = model_opt
     ensemble_model = EnsembleModel(models, opt.avg_raw_probs)
-    return shared_fields, ensemble_model, shared_model_opt
+    return shared_vocabs, ensemble_model, shared_model_opt

@@ -9,11 +9,12 @@ import signal
 import torch.distributed
 
 from argparse import Namespace
-from dataclasses import dataclass
 from collections import OrderedDict, namedtuple
+from dataclasses import dataclass
 from itertools import cycle, islice
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
+from pprint import pformat
 from typing import Any, Optional, List
 
 
@@ -360,11 +361,11 @@ class TaskQueueManager:
         )
 
     def __repr__(self):
-        kwargs = ', '.join(
-            f'{key}={self.__getattribute__(key)}'
+        kwargs = ',\n '.join(
+            f'{key}={pformat(self.__getattribute__(key))}'
             for key in ['tasks', 'gpus_per_node', 'n_nodes', 'node_rank', 'local_rank']
         )
-        return f'{self.__class__.__name__}({kwargs})'
+        return f'{self.__class__.__name__}(\n{kwargs}\n)'
 
     def _tasks_on_device(self, node_rank, local_rank):
         return [task for task in self.tasks if (task.node_rank, task.local_rank) == (node_rank, local_rank)]

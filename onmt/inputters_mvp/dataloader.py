@@ -221,7 +221,9 @@ class DynamicDatasetIter(object):
             metadata = task.get_serializable_metadata()
 
             device = torch.device(self.task_queue_manager.local_rank)
-            corpus = get_corpus(task.corpus_opt, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train).to(device)
+            corpus = get_corpus(
+                task.corpus_opt, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train
+            ).to(device)
 
             # iterator over minibatches
             ordered_iter = build_dataloader(

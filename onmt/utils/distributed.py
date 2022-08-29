@@ -17,7 +17,7 @@ from itertools import compress, cycle, islice
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
 from pprint import pformat
-from typing import Any, Optional, List, Dict
+from typing import Any, Optional, List
 
 
 def is_master(global_rank):

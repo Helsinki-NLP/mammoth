@@ -3,6 +3,9 @@ import collections
 import itertools
 import random
 
+import torch
+
+from onmt.inputters_mvp import get_corpus
 from onmt.utils.logging import logger
 
 
@@ -144,8 +147,6 @@ class DynamicDatasetIter(object):
         offset (int): iterate data files with this offset.
 
     Attributes:
-        batch_size_fn (function): functions to calculate batch_size;
-        sort_key (function): functions define how to sort examples;
         dataset_adapter (DatasetAdapter): organize raw corpus to tensor adapt;
         mixer (MixingStrategy): the strategy to iterate corpora.
     """
@@ -176,10 +177,8 @@ class DynamicDatasetIter(object):
         self.is_train = is_train
         self.init_iterators = False
         self.batch_size = batch_size
-        self.batch_size_fn = max_tok_len if batch_type == "tokens" else None
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
-        self.sort_key = str2sortkey[data_type]
         self.bucket_size = bucket_size
         self.pool_factor = pool_factor
         if stride <= 0:
@@ -224,7 +223,8 @@ class DynamicDatasetIter(object):
 
             metadata = task.get_serializable_metadata()
 
-            corpus = get_corpus(self.opt, corpus_id, src_vocabs[src], tgt_vocabs[tgt], is_train=is_train).to(device)
+            device = torch.device(self.task_queue_manager.local_rank)
+            corpus = get_corpus(self.opt, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train).to(device)
 
             # iterator over minibatches
             ordered_iter = build_dataloader(
@@ -237,26 +237,6 @@ class DynamicDatasetIter(object):
             self.dataset_iterators.append((ordered_iter, metadata))
 
         self.init_iterators = True
-
-    # def _bucketing(self, iterable):
-    #     buckets = torchtext_batch(iterable, batch_size=self.bucket_size, batch_size_fn=None)
-    #     yield from buckets
-    #
-    # def _wrap_in_ordered_iterator(self, transformed_iter):
-    #     for bucket_dataset in transformed_iter:
-    #         train_iter = OrderedIterator(
-    #             bucket_dataset,.to(torch.device(local_rank)
-    #             self.batch_size,
-    #             batch_size_fn=self.batch_size_fn,
-    #             batch_size_multiple=self.batch_size_multiple,
-    #             device=self.device,
-    #             train=self.is_train,
-    #             sort=False,
-    #             sort_within_batch=True,
-    #             sort_key=self.sort_key,
-    #             repeat=False,
-    #         )
-    #         yield from train_iter
 
     def __iter__(self):
         if self.init_iterators is False:

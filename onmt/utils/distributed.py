@@ -17,7 +17,7 @@ from onmt.inputters_mvp import get_corpus
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
 from pprint import pformat
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Dict
 
 
 def is_master(global_rank):
@@ -527,7 +527,6 @@ class TaskQueueManager:
             else:
                 lang = task.tgt_lang
                 component_id = task.decoder_id
-            fields = fields_dict[(side, lang)]
             if not (side, lang, component_id) in seen:
                 result.append((side, lang, component_id, vocabs_dict[(side, lang)]))
             seen.add((side, lang, component_id))

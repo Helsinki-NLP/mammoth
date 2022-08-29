@@ -244,7 +244,6 @@ def build_task_specific_model(
     decoders_md = nn.ModuleDict()
     generators_md = nn.ModuleDict()
 
-
     # FIXME: it's getting late and I just want this to compile
     for side, lang, encoder_id, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
         src_emb = build_src_emb(model_opt, vocab)

@@ -11,6 +11,8 @@ import onmt
 from onmt.bin.train import train
 from onmt.utils.parse import ArgumentParser
 
+import torch.multiprocessing as mp
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,6 +31,8 @@ class TestTraining(TestCase):
         for folder in ["models", "tensorboard"]:
             if os.path.exists(folder):
                 shutil.rmtree(folder)
+        for child_process in mp.active_children():
+            child_process.kill()
 
     @staticmethod
     def _get_model_components(opt) -> List[str]:

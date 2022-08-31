@@ -148,7 +148,10 @@ def train(opt):
     if transforms_cls:
         logger.info(f'All transforms: {transforms_cls}')
         src_specials, tgt_specials = zip(*(cls.get_specials(opt) for cls in transforms_cls.values()))
-        all_specials = set(src_specials + tgt_specials + DEFAULT_SPECIALS)
+        all_specials = set(DEFAULT_SPECIALS)
+        for special_group in src_specials + tgt_specials:
+            all_specials = all_specials | special_group
+        # all_specials = set(src_specials + tgt_specials + DEFAULT_SPECIALS)
         all_specials = tuple(sorted(all_specials))  # get_vocab produces distinct lists
     else:
         logger.info('No transforms found')

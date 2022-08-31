@@ -116,11 +116,12 @@ class ParallelCorpus(IterableDataset):
         return batch
 
 
-def get_corpus(corpus_opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
+def get_corpus(opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
-    transforms_cls = get_transforms_cls(corpus_opts.get('transforms', []))
+    corpus_opts = opts.data[corpus_id]
+    transforms_cls = get_transforms_cls(corpus_opts.get('transforms', opts.transforms))
 
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
     # build Dataset proper
@@ -129,8 +130,7 @@ def get_corpus(corpus_opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, 
         corpus_opts["path_tgt"],
         src_vocab,
         tgt_vocab,
-        # FIXME pipe used to get access to full opts.
-        TransformPipe(corpus_opts, make_transforms(corpus_opts, transforms_cls, vocabs).values()),
+        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs).values()),
     )
     return dataset
 

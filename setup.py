@@ -21,17 +21,18 @@ setup(
     },
     python_requires=">=3.5",
     install_requires=[
+        "torch>=1.10.2",
+        "torchtext==0.11.2",
         "configargparse",
-        "flake8==4.0.1",
+        "tensorboard>=2.9",
         "flask==2.0.3",
+        "flake8==4.0.1",
+        "waitress",
         "pyonmttok>=1.32,<2",
         "pytest-flake8==1.1.1",
         "pytest==7.0.1",
         "pyyaml",
-        "tensorboard>=2.9",
-        "torch>=1.10.2",
-        "torchtext==0.11.2",
-        "waitress",
+        "timeout_decorator",
     ],
     entry_points={
         "console_scripts": [

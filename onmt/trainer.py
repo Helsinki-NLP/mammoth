@@ -24,7 +24,7 @@ def build_trainer(
     model,
     fields_dict,
     optim,
-    scheduler,
+    task_queue_manager,
     model_saver=None,
     generators_md=None,
 ):
@@ -46,7 +46,7 @@ def build_trainer(
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
-    for (side, lang, component_id, fields) in scheduler.get_fields('tgt', fields_dict):
+    for (side, lang, component_id, fields) in task_queue_manager.get_fields('tgt', fields_dict):
         generator = generators_md[f"generator{lang}"]
         # This retrieves the primary field of this crappy datastructure
         tgt_field = fields['tgt'].fields[0][1]
@@ -82,7 +82,7 @@ def build_trainer(
         else None
     )
 
-    report_manager = onmt.utils.build_report_manager(opt, gpu_rank)
+    report_manager = onmt.utils.build_report_manager(opt, task_queue_manager.node_rank, task_queue_manager.local_rank)
     trainer = onmt.Trainer(
         model,
         train_loss_md,
@@ -105,7 +105,8 @@ def build_trainer(
         earlystopper=earlystopper,
         dropout=dropout,
         dropout_steps=dropout_steps,
-        scheduler=scheduler,
+        task_queue_manager=task_queue_manager,
+        report_stats_from_parameters=opt.report_stats_from_parameters,
         lca_loginterval=opt.lca_loginterval,
     )
     return trainer
@@ -160,7 +161,8 @@ class Trainer(object):
         earlystopper=None,
         dropout=[0.3],
         dropout_steps=[0],
-        scheduler=None,
+        task_queue_manager=None,
+        report_stats_from_parameters=False,
         lca_loginterval=-1,
     ):
         # Basic attributes.
@@ -178,6 +180,7 @@ class Trainer(object):
         self.gpu_rank = gpu_rank
         self.gpu_verbose_level = gpu_verbose_level
         self.report_manager = report_manager
+        self.report_stats_from_parameters = report_stats_from_parameters
         self.with_align = with_align
         self.model_saver = model_saver
         self.average_decay = average_decay
@@ -188,8 +191,8 @@ class Trainer(object):
         self.dropout = dropout
         self.dropout_steps = dropout_steps
 
-        self.scheduler = scheduler
-        my_component_groups = self.scheduler.get_distributed_groups()
+        self.task_queue_manager = task_queue_manager
+        my_component_groups = self.task_queue_manager.get_distributed_groups()
         self.my_encoder_groups = my_component_groups['encoder']
         self.my_decoder_groups = my_component_groups['decoder']
         self.my_src_emb_groups = my_component_groups['src_emb']
@@ -326,25 +329,29 @@ class Trainer(object):
                 report_stats,
             )
 
-            for encoder_id, (_, group) in self.my_encoder_groups:
+            # Note that all group ids are tuples, some with length 1
+            for (encoder_id,), (_, group) in self.my_encoder_groups.items():
                 params = [
                     (name, p)
                     for (name, p) in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
                     if 'embeddings' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
-            for decoder_id, (_, group) in self.my_decoder_groups:
+
+            for (decoder_id,), (_, group) in self.my_decoder_groups.items():
                 params = [
                     (name, p)
                     for (name, p) in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
                     if 'embeddings' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
-            for src_emb_id, (_, group) in self.my_src_emb_groups:
+
+            for src_emb_id, (_, group) in self.my_src_emb_groups.items():
                 src_lang, encoder_id = src_emb_id
                 embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
-            for tgt_emb_id, (_, group) in self.my_tgt_emb_groups:
+
+            for tgt_emb_id, (_, group) in self.my_tgt_emb_groups.items():
                 tgt_lang, decoder_id = tgt_emb_id
                 embs = self.model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
@@ -358,6 +365,8 @@ class Trainer(object):
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(
                     self.model.attention_bridge.named_parameters()
                 )
+
+            self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
             # LCA
             if (self.lca_loginterval > 0) and (step % self.lca_loginterval == 0) and (global_rank == 0):
@@ -385,7 +394,8 @@ class Trainer(object):
                 logger.info(f'After gradient sync {step}')
                 for name, p in self.model.named_parameters():
                     logger.info(
-                        f'{self.scheduler.node_rank}:{self.scheduler.local_rank} {name}: {p.flatten()[:10]}'
+                        f'{self.task_queue_manager.node_rank}:{self.task_queue_manager.local_rank}'
+                        f' {name}: {p.flatten()[:10]}'
                     )
                 if hasattr(self.optim._optimizer, 'report_steps'):
                     for line in self.optim._optimizer.report_steps():
@@ -563,6 +573,10 @@ class Trainer(object):
         if stat is not None and self.n_gpu > 1:
             return onmt.utils.Statistics.all_gather_stats(stat)
         return stat
+
+    def _maybe_update_stats_from_parameters(self, report_stats, named_parameters):
+        if self.report_manager is not None and self.report_stats_from_parameters:
+            report_stats.update_from_parameters(named_parameters)
 
     def _maybe_report_training(self, step, num_steps, learning_rate, report_stats):
         """

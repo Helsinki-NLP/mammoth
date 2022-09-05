@@ -178,6 +178,7 @@ def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
         corpus_id: read_examples_from_files(
                 opts.data[corpus_id]["path_src"],
                 opts.data[corpus_id]["path_tgt"],
+                # FIXME this is likely not working
                 transforms_fn=TransformPipe(transforms).apply if transforms else lambda x: x,
             )
         }

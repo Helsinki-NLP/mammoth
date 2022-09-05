@@ -148,6 +148,36 @@ def test_cpu_distributed_groups():
         assert len(my_groups[component]) == 0
 
 
+def test_distributed_groups_no_encoder_group():
+    opt_dict = {
+        'world_size': 4,
+        'gpu_ranks': [0, 1],
+        # every language pair on its own gpu: no overlap
+        'src_tgt': ['a-b', 'c-d', 'b-a', 'd-c'],
+        'node_gpu': ['0:0', '0:1', '1:0', '1:1'],
+        'enc_sharing_group': None,
+        'dec_sharing_group': None,
+        'data': {
+            'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+            'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+            'train_b-a': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+            'train_d-c': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+        }
+    }
+    opt = Namespace(**opt_dict)
+    global_task_queue_manager = TaskQueueManager.from_opt(opt)
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0)
+    new_group_func = MagicMock().new_group_func
+    my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)
+    # No groups should be created:
+    # AB is fully shared (doesn't need a group),
+    # and all other components are not shared at all
+    new_group_func.assert_not_called()
+    # The component keys should still exist, but be empty
+    for component in ['encoder', 'decoder', 'src_emb', 'tgt_emb']:
+        assert len(my_groups[component]) == 0
+
+
 def test_get_fields():
     mock_fields = {
         (side, lang): f'{side} {lang}' for (side, lang) in

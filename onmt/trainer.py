@@ -230,7 +230,7 @@ class Trainer(object):
         # accum_count now refers to number of tasks in one communication batch
         # i.e. minibatches to process before synching gradients
         self.accum_count = self._accum_count(self.optim.training_step)
-        self.scheduler.tasks_per_communication_batch = self.accum_count
+        self.task_queue_manager.tasks_per_communication_batch = self.accum_count
         for batch, metadata, communication_batch_id in iterator:
             if current_comm_batch_id is None:
                 current_comm_batch_id = communication_batch_id
@@ -239,7 +239,7 @@ class Trainer(object):
                 current_comm_batch_id = communication_batch_id
                 yield batches, normalization
                 self.accum_count = self._accum_count(self.optim.training_step)
-                self.scheduler.tasks_per_communication_batch = self.accum_count
+                self.task_queue_manager.tasks_per_communication_batch = self.accum_count
                 batches = []
                 normalization = 0
             batches.append((batch, metadata))
@@ -399,7 +399,7 @@ class Trainer(object):
                     )
                 if hasattr(self.optim._optimizer, 'report_steps'):
                     for line in self.optim._optimizer.report_steps():
-                        logger.info(f'{self.scheduler.node_rank}:{self.scheduler.local_rank} {line}')
+                        logger.info(f'{self.task_queue_manager.node_rank}:{self.task_queue_manager.local_rank} {line}')
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)

@@ -251,7 +251,7 @@ class DynamicDatasetIter(object):
         # before synching gradients between devices
         communication_batch_id = 0
         while True:
-            for corpus_id in self.scheduler.sample_corpus_ids(communication_batch_id):
+            for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
                 ordered_iter, metadata = self.dataset_iterators[corpus_id]
                 yield next(ordered_iter), metadata, communication_batch_id
             communication_batch_id += 1

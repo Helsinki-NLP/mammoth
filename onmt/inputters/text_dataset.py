@@ -97,6 +97,8 @@ class InferenceDataReader(object):
 
 
 class InferenceDataIterator(object):
+    """This class was manually backported from upstream OpenNMT-py,
+    where it lacks a docstring"""
 
     def __init__(self, src, tgt, src_feats, transform):
         self.src = src

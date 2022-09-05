@@ -61,6 +61,10 @@ class Transform(object):
         raise NotImplementedError
 
     def apply_reverse(self, translated):
+        """Reverse the application of this transform, on the translated string.
+        If a subclass does not override this, the default is a NO-OP returning
+        the translation unchanged.
+        """
         return translated
 
     def __getstate__(self):
@@ -191,6 +195,11 @@ class TransformPipe(Transform):
         return example
 
     def apply_reverse(self, translated):
+        """Reverse the transforms in the pipeline"""
+        # FIXME: this should probably iterate self.transforms in reverse order
+        # however, upstream OpenNMT-py does not reverse the pipeline
+        # TODO: it appears that the reversal of transforms has not been implemented
+        # for the transforms included in the code base. Currently this does nothing.
         for transform in self.transforms:
             translated = transform.apply_reverse(translated)
         return translated

@@ -176,7 +176,11 @@ def train(opt):
 
         for local_rank in range(n_gpu):
             # This task_queue_manager will only yield the items that are active on this gpu
-            task_queue_manager = global_task_queue_manager.global_to_local(node_rank=node_rank, local_rank=local_rank)
+            task_queue_manager = global_task_queue_manager.global_to_local(
+                node_rank=node_rank,
+                local_rank=local_rank,
+                opt=opt
+            )
 
             # each process's rank
             global_rank = n_gpu * node_rank + local_rank

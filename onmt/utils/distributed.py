@@ -609,7 +609,9 @@ class TaskQueueManager:
                         self.components_to_gpus.setdefault(key, set()).add(global_rank)
 
         # Structured, each component in a separate OrderedDict
-        self.components_to_groups = {}
+        self.components_to_groups = {
+            component_type:  OrderedDict() for component_type in ('encoder', 'decoder', 'src_emb', 'tgt_emb')
+        }
         for key, global_ranks in self.components_to_gpus.items():
             if len(global_ranks) < 2:
                 # only create a process group if the component is on 2 or more gpus
@@ -651,7 +653,7 @@ class TaskQueueManager:
 
         if self.global_rank is None:
             # Training on CPU, or called on global TaskQueueManager
-            for component_type, components in self.components_to_groups:
+            for component_type, components in self.components_to_groups.items():
                 my_distributed_groups[component_type] = components
 
         global_rank = self.global_rank

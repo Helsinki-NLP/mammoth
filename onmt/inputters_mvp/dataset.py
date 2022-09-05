@@ -30,8 +30,8 @@ def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transfor
         """Helper function to convert lines to dicts"""
         src_str, tgt_str = packed
         return {
-            'src': tokenize_fn(src_str),
-            'tgt': tokenize_fn(tgt_str) if tgt_str is not None else None,
+            'src': tokenize_fn(src_str, side='src'),
+            'tgt': tokenize_fn(tgt_str, side='tgt') if tgt_str is not None else None,
             # 'align': None,
         }
 

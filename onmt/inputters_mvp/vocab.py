@@ -11,7 +11,9 @@ DEFAULT_SPECIALS = (DefaultTokens.BOS, DefaultTokens.EOS, DefaultTokens.UNK, Def
 
 
 def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS):
-    return Vocab(path, items=None, tag=lang, size=size, specials=list(specials))
+    new_vocab = Vocab(path, items=None, tag=lang, size=size, specials=list(specials))
+    logger.debug(new_vocab)
+    return new_vocab
 
 
 class Vocab():
@@ -23,6 +25,7 @@ class Vocab():
                 items, _ = zip(*items)
                 items = list(items)
 
+        self.path = path
         size = None if size is None else size + len(specials)
         self.stoi = collections.defaultdict(itertools.count().__next__)
         self.itos = {
@@ -76,7 +79,7 @@ class Vocab():
         return cls(None, items=items, tag='', size=size, specials=specials)
 
     def __repr__(self):
-        return f"{self.__class__.__name__} ({len(self)} items)"
+        return f"{self.__class__.__name__} @ {self.path} ({len(self)} items, specials=[{sorted(self.specials.keys())}])"
 
 
 def _read_vocab_file(vocab_path, tag):

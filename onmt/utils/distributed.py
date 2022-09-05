@@ -287,7 +287,7 @@ def consumer(process_fn, opt, global_rank, error_queue, batch_queue, semaphore, 
         error_queue.put((opt.gpu_ranks[node_rank], traceback.format_exc()))
 
 
-class SchedulingStrategy(ABC):
+class TaskDistributionStrategy(ABC):
     @abstractmethod
     def __init__(self, my_corpus_ids: List[str], **kwargs):
         pass
@@ -302,7 +302,7 @@ class SchedulingStrategy(ABC):
         pass
 
 
-class WeightedSamplingSchedulingStrategy(SchedulingStrategy):
+class WeightedSamplingTaskDistributionStrategy(TaskDistributionStrategy):
     """
     Schedules tasks by sampling with replacement from a categorical distribution.
     The probabilities are found by normalizing the weights of all valid tasks (corpora).
@@ -357,7 +357,7 @@ class WeightedSamplingSchedulingStrategy(SchedulingStrategy):
         return sampled_corpus_ids
 
 
-class RoundRobinSchedulingStrategy(SchedulingStrategy):
+class RoundRobinTaskDistributionStrategy(TaskDistributionStrategy):
     """
     Schedules tasks (corpora) in a round-robin fashion.
     Yields a communication batch of n_samples at a time.
@@ -379,9 +379,9 @@ class RoundRobinSchedulingStrategy(SchedulingStrategy):
         return list(islice(self.infinite_corpus_ids, n_samples))
 
 
-SCHEDULING_STRATEGIES = {
-    'weighted_sampling': WeightedSamplingSchedulingStrategy,
-    'roundrobin': RoundRobinSchedulingStrategy,
+TASK_DISTRIBUTION_STRATEGIES = {
+    'weighted_sampling': WeightedSamplingTaskDistributionStrategy,
+    'roundrobin': RoundRobinTaskDistributionStrategy,
 }
 
 DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
@@ -427,7 +427,7 @@ class TaskQueueManager:
         components_to_groups=None,
         node_rank: Optional[int] = None,
         local_rank: Optional[int] = None,
-        scheduling_strategy: Optional[SchedulingStrategy] = None,
+        task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
     ):
         """
         Schedules tasks (language pairs) to devices.
@@ -444,7 +444,7 @@ class TaskQueueManager:
         self.node_rank = node_rank
         self.local_rank = local_rank
         self.tasks_per_communication_batch = tasks_per_communication_batch
-        self.scheduling_strategy = scheduling_strategy
+        self.task_distribution_strategy = task_distribution_strategy
 
         self.gpus_per_node = gpus_per_node
         self.n_nodes = n_nodes
@@ -530,7 +530,7 @@ class TaskQueueManager:
         )
 
     def global_to_local(self, node_rank, local_rank, opt):
-        scheduling_strategy = self._get_strategy(node_rank, local_rank, opt)
+        task_distribution_strategy = self._get_strategy(node_rank, local_rank, opt)
         return self.__class__(
             self.tasks,
             gpus_per_node=self.gpus_per_node,
@@ -540,13 +540,16 @@ class TaskQueueManager:
             components_to_groups=self.components_to_groups,
             node_rank=node_rank,
             local_rank=local_rank,
-            scheduling_strategy=scheduling_strategy,
+            task_distribution_strategy=task_distribution_strategy,
         )
 
     def _get_strategy(self, node_rank, local_rank, opt):
         # Global TQM does not have a task distribution strategy, but the local ones do
         my_corpus_ids = [task.corpus_id for task in self._tasks_on_device(node_rank, local_rank)]
-        strategy = SCHEDULING_STRATEGIES[opt.scheduling_strategy].from_opt(my_corpus_ids=my_corpus_ids, opt=opt)
+        strategy = TASK_DISTRIBUTION_STRATEGIES[opt.task_distribution_strategy].from_opt(
+            my_corpus_ids=my_corpus_ids,
+            opt=opt,
+        )
         return strategy
 
     def __repr__(self):
@@ -695,7 +698,7 @@ class TaskQueueManager:
         return result
 
     def sample_corpus_ids(self, communication_batch_id: int):
-        return self.scheduling_strategy.sample_corpus_ids(
+        return self.task_distribution_strategy.sample_corpus_ids(
             self.tasks_per_communication_batch,
             communication_batch_id,
         )

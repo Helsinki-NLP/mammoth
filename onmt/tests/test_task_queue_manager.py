@@ -8,7 +8,7 @@ from onmt.utils.distributed import TaskQueueManager
 def test_init_minimal():
     opt_dict = {
         'accum_count': 1,
-        'scheduling_strategy': 'roundrobin',
+        'task_distribution_strategy': 'roundrobin',
         'world_size': 2,
         'gpu_ranks': [0, 1],
         'src_tgt': ['a-b', 'c-d'],
@@ -36,7 +36,7 @@ def test_init_minimal():
 def create_basic_task_queue_manager():
     opt_dict = {
         'accum_count': 8,
-        'scheduling_strategy': 'weighted_sampling',
+        'task_distribution_strategy': 'weighted_sampling',
         'world_size': 4,
         'gpu_ranks': [0, 1],
         'src_tgt': ['a-b', 'c-d', 'a-d', 'e-b'],
@@ -130,7 +130,7 @@ def test_get_distributed_groups():
 def test_cpu_distributed_groups():
     opt_dict = {
         'accum_count': 4,
-        'scheduling_strategy': 'roundrobin',
+        'task_distribution_strategy': 'roundrobin',
         'world_size': 1,
         'gpu_ranks': [],
         'src_tgt': ['a-b', 'c-d'],

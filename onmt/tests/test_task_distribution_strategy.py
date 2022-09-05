@@ -1,7 +1,7 @@
 import pytest
 from argparse import Namespace
 
-from onmt.utils.distributed import WeightedSamplingSchedulingStrategy, RoundRobinSchedulingStrategy
+from onmt.utils.distributed import WeightedSamplingTaskDistributionStrategy, RoundRobinTaskDistributionStrategy
 
 
 def test_weights_all_zero():
@@ -20,7 +20,7 @@ def test_weights_all_zero():
         },
     })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingSchedulingStrategy.from_opt(['a', 'b'], opt)
+        WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b'], opt)
     assert 'Can not set "weight" of all corpora on a device to zero' in str(exc_info.value)
 
 
@@ -40,7 +40,7 @@ def test_weights_all_postponed():
         },
     })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingSchedulingStrategy.from_opt(['a', 'b'], opt)
+        WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b'], opt)
     assert 'Can not set "introduce_at_training_step" of all corpora on a device to nonzero' in str(exc_info.value)
 
 
@@ -62,11 +62,11 @@ def test_invalid_curriculum():
         },
     })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingSchedulingStrategy.from_opt(['a', 'b'], opt)
+        WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b'], opt)
     assert 'Invalid curriculum' in str(exc_info.value)
 
 
-def test_sampling_scheduling_strategy():
+def test_sampling_task_distribution_strategy():
     opt = Namespace(data={
         # 'a' disabled by weight
         'a': {
@@ -89,7 +89,7 @@ def test_sampling_scheduling_strategy():
             'introduce_at_training_step': 0,
         },
     })
-    strategy = WeightedSamplingSchedulingStrategy.from_opt(['a', 'b', 'c'], opt)
+    strategy = WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b', 'c'], opt)
     all_samples = []
     n_samples = 10
     n_batches = 1000
@@ -102,8 +102,8 @@ def test_sampling_scheduling_strategy():
     assert set(all_samples) == {'c'}
 
 
-def test_round_robin_scheduling_strategy():
-    strategy = RoundRobinSchedulingStrategy(['a', 'b'])
+def test_round_robin_task_distribution_strategy():
+    strategy = RoundRobinTaskDistributionStrategy(['a', 'b'])
     first_five = strategy.sample_corpus_ids(n_samples=5, communication_batch_id=0)
     assert first_five == ['a', 'b', 'a', 'b', 'a']
     next_two = strategy.sample_corpus_ids(n_samples=2, communication_batch_id=0)

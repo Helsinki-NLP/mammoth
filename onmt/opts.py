@@ -6,7 +6,7 @@ from onmt.models.sru import CheckSRU
 from onmt.modules.position_ffn import ACTIVATION_FUNCTIONS
 from onmt.modules.position_ffn import ActivationFunction
 from onmt.transforms import AVAILABLE_TRANSFORMS
-from onmt.utils.distributed import SCHEDULING_STRATEGIES
+from onmt.utils.distributed import TASK_DISTRIBUTION_STRATEGIES
 
 
 def config_opts(parser):
@@ -842,9 +842,9 @@ def _add_train_general_opts(parser):
         help="Steps at which accum_count values change",
     )
     group.add(
-        '--scheduling_strategy',
-        '-scheduling_strategy',
-        choices=SCHEDULING_STRATEGIES.keys(),
+        '--task_distribution_strategy',
+        '-task_distribution_strategy',
+        choices=TASK_DISTRIBUTION_STRATEGIES.keys(),
         default='weighted_sampling',
         help="Strategy for the order in which tasks (e.g. language pairs) are scheduled for training"
     )

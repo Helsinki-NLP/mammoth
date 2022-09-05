@@ -151,11 +151,11 @@ class DataOptsCheckerMixin(object):
             for key, vocab in opt.tgt_vocab.items():
                 cls._validate_file(vocab, info=f'tgt vocab ({key})')
 
-        if opt.dump_fields or opt.dump_transforms:
+        # if opt.dump_fields or opt.dump_transforms:
+        if opt.dump_transforms:
             assert (
                 opt.save_data
-            ), "-save_data should be set if set \
-                -dump_fields or -dump_transforms."
+            ), "-save_data should be set if set -dump_transforms."
         # Check embeddings stuff
         if opt.both_embeddings is not None:
             assert (
@@ -167,8 +167,7 @@ class DataOptsCheckerMixin(object):
             assert opt.embeddings_type is not None, "You need to specify an -embedding_type!"
             assert (
                 opt.save_data
-            ), "-save_data should be set if use \
-                pretrained embeddings."
+            ), "-save_data should be set if use pretrained embeddings."
 
     @classmethod
     def _validate_language_model_compatibilities_opts(cls, opt):

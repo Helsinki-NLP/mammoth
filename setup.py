@@ -22,7 +22,6 @@ setup(
     python_requires=">=3.5",
     install_requires=[
         "torch>=1.10.2",
-        "torchtext==0.11.2",
         "configargparse",
         "tensorboard>=2.9",
         "flask==2.0.3",

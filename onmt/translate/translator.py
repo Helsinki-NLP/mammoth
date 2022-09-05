@@ -12,6 +12,7 @@ from onmt.constants import DefaultTokens
 import onmt.model_builder
 import onmt.inputters as inputters
 import onmt.decoders.ensemble
+from onmt.inputters.text_dataset import InferenceDataIterator
 from onmt.translate.beam_search import BeamSearch, BeamSearchLM
 from onmt.translate.greedy_search import GreedySearch, GreedySearchLM
 from onmt.utils.misc import tile, set_random_seed, report_matrix
@@ -22,7 +23,8 @@ from onmt.constants import ModelTask
 
 def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
-        if not os.path.isdir(os.path.dirname(opt.output)):
+        outdir = os.path.dirname(opt.output)
+        if outdir and not os.path.isdir(outdir):
             logger.info('WARNING: output file directory does not exist... creating it.')
             os.makedirs(os.path.dirname(opt.output), exist_ok=True)
         out_file = codecs.open(opt.output, "w+", "utf-8")
@@ -155,12 +157,19 @@ class Inference(object):
         logger=None,
         seed=-1,
         langpair=None,
+        enc_id=None,
+        dec_id=None,
     ):
         self.langpair = langpair
-        self.langENC = str(langpair).split("-")[0]
-        self.langDEC = str(langpair).split("-")[1]
-        print(self.langENC)
-        print(self.langDEC)
+        self.src_lang = str(langpair).split("-")[0]
+        self.tgt_lang = str(langpair).split("-")[1]
+        self.enc_id = enc_id if enc_id else self.src_lang
+        self.dec_id = dec_id if dec_id else self.tgt_lang
+        if logger:
+            logger.info(
+                f'src_lang {self.src_lang} enc_id {self.enc_id} - '
+                f'dec_id {self.dec_id} tgt_lang {self.tgt_lang}'
+            )
 
         self.model = model
         self.fields = fields
@@ -298,6 +307,8 @@ class Inference(object):
             logger=logger,
             seed=opt.seed,
             langpair=langpair,
+            enc_id=opt.enc_id,
+            dec_id=opt.dec_id,
         )
 
     def _log(self, msg):
@@ -325,10 +336,49 @@ class Inference(object):
                 src_vocabs,
                 batch.src_map if use_src_map else None,
             )
-            self.model.decoder["decoder" + self.langDEC].init_state(src, memory_bank, enc_states)
+            self.model.decoder[f"decoder{self.dec_id}"].init_state(src, memory_bank, enc_states)
         else:
             gs = [0] * batch_size
         return gs
+
+    def translate_dynamic(
+        self,
+        src,
+        transform,
+        src_feats={},
+        tgt=None,
+        batch_size=None,
+        batch_type="sents",
+        attn_debug=False,
+        align_debug=False,
+        phrase_table=""
+    ):
+
+        if batch_size is None:
+            raise ValueError("batch_size must be set")
+
+        if self.tgt_prefix and tgt is None:
+            raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
+
+        data_iter = InferenceDataIterator(src, tgt, src_feats, transform)
+
+        data = inputters.DynamicDataset(
+            self.fields,
+            data=data_iter,
+            sort_key=inputters.str2sortkey[self.data_type],
+            filter_pred=self._filter_pred,
+        )
+
+        return self._translate(
+            data,
+            tgt=tgt,
+            batch_size=batch_size,
+            batch_type=batch_type,
+            attn_debug=attn_debug,
+            align_debug=align_debug,
+            phrase_table=phrase_table,
+            dynamic=True,
+            transform=transform)
 
     def translate(
         self,
@@ -365,9 +415,19 @@ class Inference(object):
         if self.tgt_prefix and tgt is None:
             raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
 
-        src_data = {"reader": self.src_reader, "data": src, "features": src_feats}
-        tgt_data = {"reader": self.tgt_reader, "data": tgt, "features": {}}
-        _readers, _data = inputters.Dataset.config([("src", src_data), ("tgt", tgt_data)])
+        src_data = {
+            "reader": self.src_reader,
+            "data": src,
+            "features": src_feats
+        }
+        tgt_data = {
+            "reader": self.tgt_reader,
+            "data": tgt,
+            "features": {}
+        }
+        _readers, _data = inputters.Dataset.config(
+            [("src", src_data), ("tgt", tgt_data)]
+        )
 
         data = inputters.Dataset(
             self.fields,
@@ -376,6 +436,28 @@ class Inference(object):
             sort_key=inputters.str2sortkey[self.data_type],
             filter_pred=self._filter_pred,
         )
+
+        return self._translate(
+            data,
+            tgt=tgt,
+            batch_size=batch_size,
+            batch_type=batch_type,
+            attn_debug=attn_debug,
+            align_debug=align_debug,
+            phrase_table=phrase_table)
+
+    def _translate(
+        self,
+        data,
+        tgt=None,
+        batch_size=None,
+        batch_type="sents",
+        attn_debug=False,
+        align_debug=False,
+        phrase_table="",
+        dynamic=False,
+        transform=None
+    ):
 
         data_iter = inputters.OrderedIterator(
             dataset=data,
@@ -427,6 +509,10 @@ class Inference(object):
                         pred + DefaultTokens.ALIGNMENT_SEPARATOR + align
                         for pred, align in zip(n_best_preds, n_best_preds_align)
                     ]
+
+                if dynamic:
+                    n_best_preds = [transform.apply_reverse(x)
+                                    for x in n_best_preds]
                 all_predictions += [n_best_preds]
                 self.out_file.write("\n".join(n_best_preds) + "\n")
                 self.out_file.flush()
@@ -549,10 +635,10 @@ class Inference(object):
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
-        #        dec_out, dec_attn = self.model.decoder(
-        #            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
-        #        )
-        dec_out, dec_attn = self.model.decoder["decoder" + str(self.langDEC)](
+#        dec_out, dec_attn = self.model.decoder(
+#            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
+#        )
+        dec_out, dec_attn = self.model.decoder[f"decoder{self.dec_id}"](
             decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
         )
 
@@ -562,12 +648,12 @@ class Inference(object):
                 attn = dec_attn["std"]
             else:
                 attn = None
-            log_probs = self.model.generator["generator" + str(self.langDEC)](dec_out.squeeze(0))
+            log_probs = self.model.generator[f"generator{self.tgt_lang}"](dec_out.squeeze(0))
             # returns [(batch_size x beam_size) , vocab ] when 1 step
             # or [ tgt_len, batch_size, vocab ] when full sentence
         else:
             attn = dec_attn["copy"]
-            scores = self.model.generator["generator" + str(self.langDEC)](
+            scores = self.model.generator[f"generator{self.tgt_lang}"](
                 dec_out.view(-1, dec_out.size(2)),
                 attn.view(-1, attn.size(2)),
                 src_map,
@@ -724,7 +810,9 @@ class Translator(Inference):
     def _run_encoder(self, batch):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
 
-        enc_states, memory_bank, src_lengths, mask = self.model.encoder["encoder" + str(self.langENC)](src, src_lengths)
+        enc_states, memory_bank, src_lengths, mask = self.model.encoder[f"encoder{self.enc_id}"](
+            src, src_lengths
+        )
 
         memory_bank, alphas = self.model.attention_bridge(memory_bank, mask)
 
@@ -752,7 +840,7 @@ class Translator(Inference):
 
         # (1) Run the encoder on the src.
         src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
-        self.model.decoder["decoder" + str(self.langDEC)].init_state(src, memory_bank, enc_states)
+        self.model.decoder[f"decoder{self.dec_id}"].init_state(src, memory_bank, enc_states)
 
         gold_score = self._gold_score(
             batch,
@@ -775,7 +863,7 @@ class Translator(Inference):
             src_map,
         ) = decode_strategy.initialize(memory_bank, src_lengths, src_map, target_prefix=target_prefix)
         if fn_map_state is not None:
-            self.model.decoder["decoder" + str(self.langDEC)].map_state(fn_map_state)
+            self.model.decoder[f"decoder{self.dec_id}"].map_state(fn_map_state)
 
         # (3) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
@@ -814,7 +902,7 @@ class Translator(Inference):
                     src_map = src_map.index_select(1, select_indices)
 
             if parallel_paths > 1 or any_finished:
-                self.model.decoder["decoder" + str(self.langDEC)].map_state(
+                self.model.decoder[f"decoder{self.dec_id}"].map_state(
                     lambda state, dim: state.index_select(dim, select_indices)
                 )
 

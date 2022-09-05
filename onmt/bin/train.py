@@ -96,8 +96,10 @@ def _init_train(opt):
 def init_train_prepare_fields_transforms(opt, vocab_path, side):
     """Prepare or dump fields & transforms before training."""
 
-    fields = build_dynamic_fields_langspec(opt, vocab_path, side)
     transforms_cls = get_transforms_cls(opt._all_transform)
+    specials = get_specials(opt, transforms_cls)
+
+    fields = build_dynamic_fields_langspec(opt, vocab_path, side, specials=specials[side])
     # TODO: maybe prepare pretrained embeddings, if any, with `prepare_pretrained_embeddings(opt, fields)`
 
     if opt.dump_fields:

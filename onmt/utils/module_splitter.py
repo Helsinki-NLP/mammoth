@@ -46,7 +46,8 @@ def explode_model(full_ab_model):
 
 
 def create_bilingual_statedict(
-    src_lang: str,
+    enc_id: str,
+    dec_id: str,
     tgt_lang: str,
     enc_module: OrderedDict,
     dec_module: OrderedDict,
@@ -54,8 +55,8 @@ def create_bilingual_statedict(
     gen_module: OrderedDict,
 ):
 
-    enc = {f'encoder.encoder{src_lang}.{k}': v for k, v in enc_module["model"].items()}
-    dec = {f'decoder.decoder{tgt_lang}.{k}': v for k, v in dec_module["model"].items()}
+    enc = {f'encoder.encoder{enc_id}.{k}': v for k, v in enc_module["model"].items()}
+    dec = {f'decoder.decoder{dec_id}.{k}': v for k, v in dec_module["model"].items()}
     ab = {f'attention_bridge.{k}': v for k, v in ab_module["model"].items()}
     gen = {f'generator.generator{tgt_lang}.{k}': v for k, v in gen_module["model"].items()}
 

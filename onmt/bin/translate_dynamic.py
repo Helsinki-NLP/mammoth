@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from onmt.utils.logging import init_logger
+from onmt.utils.misc import split_corpus
 from onmt.translate.translator import build_translator
 # from onmt.inputters.text_dataset import InferenceDataReader
 from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe

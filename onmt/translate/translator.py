@@ -367,7 +367,7 @@ class Inference(object):
         # )
 
         return self._translate(
-            data,
+            src,
             tgt=tgt,
             batch_size=batch_size,
             batch_type=batch_type,
@@ -438,35 +438,35 @@ class Inference(object):
             dynamic=False,
         )
 
-        def _translate(
-            self,
-            ,
-            tgt=None,
-            batch_size=None,
-            batch_type="sents",
-            attn_debug=False,
-            align_debug=False,
-            phrase_table="",
-            transforms=None,
-            dynamic=False,
-        ):
-            """Translate content of ``src`` and get gold scores from ``tgt``.
+    def _translate(
+        self,
+        src,
+        tgt=None,
+        batch_size=None,
+        batch_type="sents",
+        attn_debug=False,
+        align_debug=False,
+        phrase_table="",
+        transforms=None,
+        dynamic=False,
+    ):
+        """Translate content of ``src`` and get gold scores from ``tgt``.
 
-            Args:
-                src: See :func:`self.src_reader.read()`.
-                tgt: See :func:`self.tgt_reader.read()`.
-                src_feats: See :func`self.src_reader.read()`.
-                batch_size (int): size of examples per mini-batch
-                attn_debug (bool): enables the attention logging
-                align_debug (bool): enables the word alignment logging
+        Args:
+            src: See :func:`self.src_reader.read()`.
+            tgt: See :func:`self.tgt_reader.read()`.
+            src_feats: See :func`self.src_reader.read()`.
+            batch_size (int): size of examples per mini-batch
+            attn_debug (bool): enables the attention logging
+            align_debug (bool): enables the word alignment logging
 
-            Returns:
-                (`list`, `list`)
+        Returns:
+            (`list`, `list`)
 
-                * all_scores is a list of `batch_size` lists of `n_best` scores
-                * all_predictions is a list of `batch_size` lists
-                    of `n_best` predictions
-            """
+            * all_scores is a list of `batch_size` lists of `n_best` scores
+            * all_predictions is a list of `batch_size` lists
+                of `n_best` predictions
+        """
 
         corpus = ParallelCorpus(
             self.src_file_path,
@@ -532,7 +532,7 @@ class Inference(object):
                     ]
 
                 if dynamic:
-                    n_best_preds = [transform.apply_reverse(x) for x in n_best_preds]
+                    n_best_preds = [transforms.apply_reverse(x) for x in n_best_preds]
                 all_predictions += [n_best_preds]
                 self.out_file.write("\n".join(n_best_preds) + "\n")
                 self.out_file.flush()

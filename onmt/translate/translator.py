@@ -8,23 +8,23 @@ from itertools import count, zip_longest
 
 import torch
 
-from onmt.constants import DefaultTokens
 import onmt.model_builder
-import onmt.inputters as inputters
 import onmt.decoders.ensemble
-from onmt.inputters.text_dataset import InferenceDataIterator
+# from onmt.inputters.text_dataset import InferenceDataIterator
 from onmt.translate.beam_search import BeamSearch, BeamSearchLM
 from onmt.translate.greedy_search import GreedySearch, GreedySearchLM
 from onmt.utils.misc import tile, set_random_seed, report_matrix
 from onmt.utils.alignment import extract_alignment, build_align_pharaoh
 from onmt.modules.copy_generator import collapse_copy_scores
-from onmt.constants import ModelTask
+from onmt.constants import ModelTask, DefaultTokens
+from onmt.inputters_mvp.dataset import ParallelCorpus
 
 
 def build_translator(opt, report_score=True, logger=None, out_file=None):
     if out_file is None:
         outdir = os.path.dirname(opt.output)
         if outdir and not os.path.isdir(outdir):
+            # FIXME use warnings instead
             logger.info('WARNING: output file directory does not exist... creating it.')
             os.makedirs(os.path.dirname(opt.output), exist_ok=True)
         out_file = codecs.open(opt.output, "w+", "utf-8")
@@ -32,14 +32,14 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     load_test_model = (
         onmt.decoders.ensemble.load_test_model if len(opt.models) > 3 else onmt.model_builder.load_test_multitask_model
     )
-    fields, model, model_opt = load_test_model(opt)
+    vocabs, model, model_opt = load_test_model(opt)
 
     scorer = onmt.translate.GNMTGlobalScorer.from_opt(opt)
 
     if model_opt.model_task == ModelTask.LANGUAGE_MODEL:
         translator = GeneratorLM.from_opt(
             model,
-            fields,
+            vocabs,
             opt,
             model_opt,
             global_scorer=scorer,
@@ -51,7 +51,7 @@ def build_translator(opt, report_score=True, logger=None, out_file=None):
     else:
         translator = Translator.from_opt(
             model,
-            fields,
+            vocabs,
             opt,
             model_opt,
             global_scorer=scorer,
@@ -88,10 +88,10 @@ class Inference(object):
 
     Args:
         model (onmt.modules.NMTModel): NMT model to use for translation
-        fields (dict[str, torchtext.data.Field]): A dict
-            mapping each side to its list of name-Field pairs.
-        src_reader (onmt.inputters.DataReaderBase): Source reader.
-        tgt_reader (onmt.inputters.TextDataReader): Target reader.
+        vocabs (dict[str, onmt.inputters_mvp.Vocab]): A dict
+            mapping each side to its Vocab.
+        src_file_path (str): Source file to read.
+        tgt_reader (src): Target file, if necessary.
         gpu (int): GPU device. Set to negative for no GPU.
         n_best (int): How many beams to wait for.
         min_length (int): See
@@ -126,9 +126,9 @@ class Inference(object):
     def __init__(
         self,
         model,
-        fields,
-        src_reader,
-        tgt_reader,
+        vocabs,
+        src_file_path,
+        tgt_file_path=None,
         gpu=-1,
         n_best=1,
         min_length=0,
@@ -172,13 +172,13 @@ class Inference(object):
             )
 
         self.model = model
-        self.fields = fields
-        tgt_field = dict(self.fields)["tgt"].base_field
-        self._tgt_vocab = tgt_field.vocab
-        self._tgt_eos_idx = self._tgt_vocab.stoi[tgt_field.eos_token]
-        self._tgt_pad_idx = self._tgt_vocab.stoi[tgt_field.pad_token]
-        self._tgt_bos_idx = self._tgt_vocab.stoi[tgt_field.init_token]
-        self._tgt_unk_idx = self._tgt_vocab.stoi[tgt_field.unk_token]
+        self.vocabs = vocabs
+        tgt_vocab = dict(self.vocabs)["tgt"]
+        self._tgt_vocab = tgt_vocab
+        self._tgt_eos_idx = self._tgt_vocab.stoi[DefaultTokens.EOS]
+        self._tgt_pad_idx = self._tgt_vocab.stoi[DefaultTokens.PAD]
+        self._tgt_bos_idx = self._tgt_vocab.stoi[DefaultTokens.BOS]
+        self._tgt_unk_idx = self._tgt_vocab.stoi[DefaultTokens.UNK]
         self._tgt_vocab_len = len(self._tgt_vocab)
 
         self._gpu = gpu
@@ -201,8 +201,8 @@ class Inference(object):
         self.block_ngram_repeat = block_ngram_repeat
         self.ignore_when_blocking = ignore_when_blocking
         self._exclusion_idxs = {self._tgt_vocab.stoi[t] for t in self.ignore_when_blocking}
-        self.src_reader = src_reader
-        self.tgt_reader = tgt_reader
+        # self.src_reader = src_reader
+        # self.tgt_reader = tgt_reader
         self.replace_unk = replace_unk
         if self.replace_unk and not self.model.decoder.attentional:
             raise ValueError("replace_unk requires an attentional decoder.")
@@ -242,7 +242,7 @@ class Inference(object):
     def from_opt(
         cls,
         model,
-        fields,
+        vocabs,
         opt,
         model_opt,
         global_scorer=None,
@@ -256,7 +256,7 @@ class Inference(object):
 
         Args:
             model (onmt.modules.NMTModel): See :func:`__init__()`.
-            fields (dict[str, torchtext.data.Field]): See
+            vocabs (dict[str, onmt.inputters_mvp.Vocab]): See
                 :func:`__init__()`.
             opt (argparse.Namespace): Command line options
             model_opt (argparse.Namespace): Command line options saved with
@@ -272,13 +272,11 @@ class Inference(object):
         # TODO: maybe add dynamic part
         cls.validate_task(model_opt.model_task)
 
-        src_reader = inputters.str2reader[opt.data_type].from_opt(opt)
-        tgt_reader = inputters.str2reader["text"].from_opt(opt)
         return cls(
             model,
-            fields,
-            src_reader,
-            tgt_reader,
+            vocabs,
+            opt.src,
+            tgt_file_path=opt.tgt,
             gpu=opt.gpu,
             n_best=opt.n_best,
             min_length=opt.min_length,
@@ -328,7 +326,7 @@ class Inference(object):
         batch_size,
         src,
     ):
-        if "tgt" in batch.__dict__:
+        if batch.tgt is not None:
             gs = self._score_target(
                 batch,
                 memory_bank,
@@ -345,7 +343,6 @@ class Inference(object):
         self,
         src,
         transform,
-        src_feats={},
         tgt=None,
         batch_size=None,
         batch_type="sents",
@@ -359,15 +356,15 @@ class Inference(object):
 
         if self.tgt_prefix and tgt is None:
             raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
-
-        data_iter = InferenceDataIterator(src, tgt, src_feats, transform)
-
-        data = inputters.DynamicDataset(
-            self.fields,
-            data=data_iter,
-            sort_key=inputters.str2sortkey[self.data_type],
-            filter_pred=self._filter_pred,
-        )
+        #
+        # data_iter = InferenceDataIterator(src, tgt, src_feats, transform)
+        #
+        # data = inputters.DynamicDataset(
+        #     self.fields,
+        #     data=data_iter,
+        #     sort_key=inputters.str2sortkey[self.data_type],
+        #     filter_pred=self._filter_pred,
+        # )
 
         return self._translate(
             data,
@@ -378,7 +375,8 @@ class Inference(object):
             align_debug=align_debug,
             phrase_table=phrase_table,
             dynamic=True,
-            transform=transform)
+            transforms=transform,
+        )
 
     def translate(
         self,
@@ -415,68 +413,91 @@ class Inference(object):
         if self.tgt_prefix and tgt is None:
             raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
 
-        src_data = {
-            "reader": self.src_reader,
-            "data": src,
-            "features": src_feats
-        }
-        tgt_data = {
-            "reader": self.tgt_reader,
-            "data": tgt,
-            "features": {}
-        }
-        _readers, _data = inputters.Dataset.config(
-            [("src", src_data), ("tgt", tgt_data)]
-        )
+        # FIXME
+        # src_data = {"reader": self.src_reader, "data": src, "features": src_feats}
+        # tgt_data = {"reader": self.tgt_reader, "data": tgt, "features": {}}
+        # _readers, _data = None, None  # inputters.Dataset.config([("src", src_data), ("tgt", tgt_data)])
 
-        data = inputters.Dataset(
-            self.fields,
-            readers=_readers,
-            data=_data,
-            sort_key=inputters.str2sortkey[self.data_type],
-            filter_pred=self._filter_pred,
-        )
+        # data = inputters.Dataset(
+        #     self.fields,
+        #     readers=_readers,
+        #     data=_data,
+        #     sort_key=inputters.str2sortkey[self.data_type],
+        #     filter_pred=self._filter_pred,
+        # )
 
         return self._translate(
-            data,
+            src,
             tgt=tgt,
             batch_size=batch_size,
             batch_type=batch_type,
-            attn_debug=attn_debug,
-            align_debug=align_debug,
-            phrase_table=phrase_table)
-
-    def _translate(
-        self,
-        data,
-        tgt=None,
-        batch_size=None,
-        batch_type="sents",
-        attn_debug=False,
-        align_debug=False,
-        phrase_table="",
-        dynamic=False,
-        transform=None
-    ):
-
-        data_iter = inputters.OrderedIterator(
-            dataset=data,
-            device=self._dev,
-            batch_size=batch_size,
-            batch_size_fn=max_tok_len if batch_type == "tokens" else None,
-            train=False,
-            sort=False,
-            sort_within_batch=True,
-            shuffle=False,
+            attn_debug=False,
+            align_debug=False,
+            phrase_table="",
+            transforms=None,
+            dynamic=False,
         )
 
+        def _translate(
+            self,
+            ,
+            tgt=None,
+            batch_size=None,
+            batch_type="sents",
+            attn_debug=False,
+            align_debug=False,
+            phrase_table="",
+            transforms=None,
+            dynamic=False,
+        ):
+            """Translate content of ``src`` and get gold scores from ``tgt``.
+
+            Args:
+                src: See :func:`self.src_reader.read()`.
+                tgt: See :func:`self.tgt_reader.read()`.
+                src_feats: See :func`self.src_reader.read()`.
+                batch_size (int): size of examples per mini-batch
+                attn_debug (bool): enables the attention logging
+                align_debug (bool): enables the word alignment logging
+
+            Returns:
+                (`list`, `list`)
+
+                * all_scores is a list of `batch_size` lists of `n_best` scores
+                * all_predictions is a list of `batch_size` lists
+                    of `n_best` predictions
+            """
+
+        corpus = ParallelCorpus(
+            self.src_file_path,
+            self.tgt_file_path,  # may be None
+            self.vocabs['src'],
+            self.vocabs['tgt'],
+            transforms=transforms,  # I suppose you might want *some* transforms
+            batch_size=batch_size,
+            batch_type=batch_type,
+        )
+        # read_examples_from_files(None, None)
+
+        # data_iter = inputters.OrderedIterator(
+        #     dataset=data,
+        #     device=self._dev,
+        #     batch_size=batch_size,
+        #     batch_size_fn=max_tok_len if batch_type == "tokens" else None,
+        #     train=False,
+        #     sort=False,
+        #     sort_within_batch=True,
+        #     shuffle=False,
+        # )
+        # data_iter = None
+
         xlation_builder = onmt.translate.TranslationBuilder(
-            data,
-            self.fields,
+            corpus,
+            self.vocabs,
             self.n_best,
             self.replace_unk,
-            tgt,
-            self.phrase_table,
+            has_tgt=tgt is not None,
+            phrase_table=self.phrase_table,
         )
 
         # Statistics
@@ -489,8 +510,8 @@ class Inference(object):
 
         start_time = time.time()
 
-        for batch in data_iter:
-            batch_data = self.translate_batch(batch, data.src_vocabs, attn_debug)
+        for batch in corpus:
+            batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
 
             for trans in translations:
@@ -511,8 +532,7 @@ class Inference(object):
                     ]
 
                 if dynamic:
-                    n_best_preds = [transform.apply_reverse(x)
-                                    for x in n_best_preds]
+                    n_best_preds = [transform.apply_reverse(x) for x in n_best_preds]
                 all_predictions += [n_best_preds]
                 self.out_file.write("\n".join(n_best_preds) + "\n")
                 self.out_file.flush()

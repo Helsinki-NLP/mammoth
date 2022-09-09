@@ -79,7 +79,7 @@ class LookAheadBucketing():
     def _choose_and_prepare_bucket(self, bucket_idx=None):
         """pick a bucket (at random unless specified) and prepare examples for iteration"""
         if bucket_idx is None:
-            bucket_idx = random.choices(self._buckets, weights=self._lens, k=1)[0]
+            bucket_idx = random.choices(range(len(self._buckets)), weights=self._lens, k=1)[0]
         # if bucket_idx >= len(self._buckets):
         #     import pdb; pdb.set_trace()
         # if len(self._prefetched[self._buckets[bucket_idx]]) == 0:

@@ -16,21 +16,26 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size, n_buckets=None)
     """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
     examples_stream = infinite_iterator(dataset)
     if batch_type == 'sents':
-        n_buckets = 0
+        n_buckets = 1
 
         def counting_fn(_):
             return 0
+        bucket_fn = numel_fn = counting_fn
 
     elif batch_type == 'tokens':
 
-        def counting_fn(example_dict):
+        def bucket_fn(example_dict):
             # subtract four for bos/eos on both sides
             true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
             # maybe dump it in the last bucket if it's just too long
             return min(n_buckets - 1, true_size)
 
+        def numel_fn(example_dict):
+            true_size = len(example_dict['src']) + len(example_dict['tgt'])
+            return true_size
+
     collate_fn = dataset.collate_fn
-    lab = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, counting_fn, counting_fn, collate_fn)
+    lab = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn)
     return iter(lab)
 
 
@@ -40,8 +45,8 @@ DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang e
 class LookAheadBucketing():
     def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn):
         self.examples_stream = examples_stream
-        self._buckets = [[] for _ in range(n_buckets + 1)]
-        self._lens = [0 for _ in range(n_buckets + 1)]
+        self._buckets = [[] for _ in range(n_buckets)]
+        self._lens = [0 for _ in range(n_buckets)]
         self.look_ahead_size = look_ahead_size
         self.batch_size = batch_size
         self.bucket_fn = bucket_fn
@@ -52,10 +57,12 @@ class LookAheadBucketing():
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
         for example in itertools.islice(self.examples_stream, self.look_ahead_size):
-            self._buckets[self.bucket_fn(example)].append(example)
+            bucket_idx = self.bucket_fn(example)
+            self._buckets[bucket_idx].append(example)
+            self._lens[bucket_idx] += 1
         logger.info('LookAheadBucketing: initialization done')
 
-    def maybe_replenish(self) -> bool:
+    def maybe_replenish(self):
         try:
             example = next(self.examples_stream)
             bucket = self.bucket_fn(example)
@@ -81,7 +88,7 @@ class LookAheadBucketing():
         return bucket_idx
 
     def is_empty(self):
-        return not any(self._lens)
+        return all(size == 0 for size in self._lens)
 
     def __iter__(self):
         while True:

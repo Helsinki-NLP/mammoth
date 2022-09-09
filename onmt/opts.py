@@ -1007,7 +1007,14 @@ def _add_train_dynamic_data(parser):
         "--bucket_size",
         type=int,
         default=2048,
-        help="Examples per dynamically generated torchtext Dataset.",
+        help="Number of examples to dynamically pool before batching.",
+    )
+    group.add(
+        "-n_buckets",
+        "--n_buckets",
+        type=int,
+        default=1024,
+        help="Maximum number of bins for batching.",
     )
 
 

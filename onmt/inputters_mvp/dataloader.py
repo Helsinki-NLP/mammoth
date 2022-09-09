@@ -1,4 +1,3 @@
-import bisect
 import collections
 import itertools
 import random
@@ -13,25 +12,36 @@ def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size):
+def build_dataloader(dataset, batch_size, batch_type, pool_size, n_buckets=None):
     """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
     examples_stream = infinite_iterator(dataset)
     if batch_type == 'sents':
-        def counting_fn(_): return 1
+        n_buckets = 0
+
+        def counting_fn(_):
+            return 0
+
     elif batch_type == 'tokens':
-        def counting_fn(example_dict): return len(example_dict['src']) + len(example_dict['tgt'])
+
+        def counting_fn(example_dict):
+            # subtract four for bos/eos on both sides
+            true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
+            # maybe dump it in the last bucket if it's just too long
+            return min(n_buckets - 1, true_size)
+
     collate_fn = dataset.collate_fn
-    return iter(LookAheadBucketing(examples_stream, pool_size, batch_size, counting_fn, counting_fn, collate_fn))
+    lab = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, counting_fn, counting_fn, collate_fn)
+    return iter(lab)
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
 
 
 class LookAheadBucketing():
-    def __init__(self, examples_stream, look_ahead_size, batch_size, bucket_fn, numel_fn, collate_fn):
+    def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn):
         self.examples_stream = examples_stream
-        self._prefetched = collections.defaultdict(list)
-        self._buckets = []
+        self._buckets = [[] for _ in range(n_buckets + 1)]
+        self._lens = [0 for _ in range(n_buckets + 1)]
         self.look_ahead_size = look_ahead_size
         self.batch_size = batch_size
         self.bucket_fn = bucket_fn
@@ -42,46 +52,36 @@ class LookAheadBucketing():
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
         for example in itertools.islice(self.examples_stream, self.look_ahead_size):
-            bucket = self.bucket_fn(example)
-            self._prefetched[bucket].append(example)
-        self._buckets = sorted(self._prefetched.keys())
+            self._buckets[self.bucket_fn(example)].append(example)
         logger.info('LookAheadBucketing: initialization done')
 
     def maybe_replenish(self) -> bool:
         try:
             example = next(self.examples_stream)
             bucket = self.bucket_fn(example)
-            creates_new_bucket = bucket not in self._prefetched
-            self._prefetched[bucket].append(example)
-            if creates_new_bucket:
-                bisect.insort(self._buckets, bucket)
+            creates_new_bucket = self._lens[bucket] == 0
+            self._buckets[bucket].append(example)
+            self._lens[bucket] += 1
             return bucket if creates_new_bucket else None
         except StopIteration:
             return None
 
     def bucket_is_empty(self, bucket_idx) -> bool:
-        bucket = self._buckets[bucket_idx]
-        if bucket not in self._prefetched:
-            return True
-        elif len(self._prefetched[bucket]) == 0:
-            del self._prefetched[bucket]
-            return True
-        else:
-            return False
+        return self._lens[bucket_idx] == 0
 
     def _choose_and_prepare_bucket(self, bucket_idx=None):
         """pick a bucket (at random unless specified) and prepare examples for iteration"""
         if bucket_idx is None:
-            bucket_idx = random.choice(range(len(self._buckets)))
+            bucket_idx = random.choices(self._buckets, weights=self._lens, k=1)[0]
         # if bucket_idx >= len(self._buckets):
         #     import pdb; pdb.set_trace()
         # if len(self._prefetched[self._buckets[bucket_idx]]) == 0:
         #     import pdb; pdb.set_trace()
-        random.shuffle(self._prefetched[self._buckets[bucket_idx]])
-        return self._buckets[bucket_idx], bucket_idx
+        random.shuffle(self._buckets[bucket_idx])
+        return bucket_idx
 
     def is_empty(self):
-        return (len(self._prefetched) == 0) or (sum(map(len, self._prefetched.values())) == 0)
+        return not any(self._lens)
 
     def __iter__(self):
         while True:
@@ -90,41 +90,47 @@ class LookAheadBucketing():
                 break
             accum, cur_batch_size = [], 0
             # 2. pick a length at random
-            bucket, bucket_idx = self._choose_and_prepare_bucket()
+            smallest_bucket_idx = self._choose_and_prepare_bucket()
+            current_bucket_idx = smallest_bucket_idx
             # 3. build batch
             batch_is_complete = False
             while not batch_is_complete:
                 # maybe switch buckets
-                if self.bucket_is_empty(bucket_idx):
+                if self.bucket_is_empty(current_bucket_idx):
                     if self.is_empty():
                         logger.info('Reached end of stream')  # should not happen
                         if accum:
                             yield self.collate_fn(accum)
                         break
-                    if self._buckets[bucket_idx] == self._buckets[-1]:
+                    if not any(self._lens[current_bucket_idx:]):
                         # this was the largest bucket, so we'll need to pick the next smallest instead
-                        del self._buckets[bucket_idx]
-                        bucket_idx -= 1
+                        smallest_bucket_idx -= 1
+                        current_bucket_idx = smallest_bucket_idx
                     else:
-                        # there was a larger bucket, by dropping the current bucket we're shifting the index by one
-                        del self._buckets[bucket_idx]
-                    new_bucket, new_bucket_idx = self._choose_and_prepare_bucket(bucket_idx=bucket_idx)
-                    bucket, bucket_idx = new_bucket, new_bucket_idx
-                example = self._prefetched[bucket].pop()
+                        # there was a larger bucket, shift the index by one
+                        current_bucket_idx = next(
+                            bucket_idx
+                            for bucket_idx in range(current_bucket_idx, len(self._buckets) + 1)
+                            if self._lens[bucket_idx] != 0
+                        )
+                    _ = self._choose_and_prepare_bucket(bucket_idx=current_bucket_idx)
+                # retrieve and process the example
+                example = self._buckets[current_bucket_idx].pop()
+                self._lens[current_bucket_idx] -= 1
                 accum.append(example)
                 numel = self.numel_fn(example)
                 cur_batch_size += numel
                 batch_is_complete = cur_batch_size >= self.batch_size
 
                 # 4. try to replenish reservoir if possible
-                new_bucket = self.maybe_replenish()
-                if (new_bucket is not None) and (new_bucket <= bucket):
-                    assert self._buckets[bucket_idx] != bucket
-                    bucket_idx += 1
+                self.maybe_replenish()
+                # if (new_bucket is not None) and (new_bucket <= bucket):
+                #     assert self._buckets[bucket_idx] != bucket
+                #     bucket_idx += 1
 
             yield self.collate_fn(accum)
-            if self.bucket_is_empty(bucket_idx):
-                del self._buckets[bucket_idx]
+            # if self.bucket_is_empty(bucket_idx):
+            #     del self._buckets[bucket_idx]
 
 
 class DynamicDatasetIter(object):
@@ -163,6 +169,7 @@ class DynamicDatasetIter(object):
         batch_size_multiple,
         data_type="text",
         bucket_size=2048,
+        n_buckets=1024,
         skip_empty_level='warning',
         stride=1,
         offset=0,
@@ -179,6 +186,7 @@ class DynamicDatasetIter(object):
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
         self.bucket_size = bucket_size
+        self.n_buckets = n_buckets
         if stride <= 0:
             raise ValueError(f"Invalid argument for stride={stride}.")
         self.stride = stride
@@ -207,6 +215,7 @@ class DynamicDatasetIter(object):
             batch_size_multiple,
             data_type=opts.data_type,
             bucket_size=opts.bucket_size,
+            n_buckets=opts.n_buckets,
             skip_empty_level=opts.skip_empty_level,
             stride=stride,
             offset=offset,
@@ -231,6 +240,7 @@ class DynamicDatasetIter(object):
                 self.batch_size,
                 self.batch_type,
                 self.bucket_size,
+                n_buckets=self.n_buckets,
             )
 
             self.dataset_iterators.append((ordered_iter, metadata))

@@ -62,14 +62,15 @@ class LookAheadBucketing():
             self._lens[bucket_idx] += 1
         logger.info('LookAheadBucketing: initialization done')
 
-    def maybe_replenish(self):
+    def maybe_replenish(self) -> bool:
+        """look up one more example to add to this reservoir."""
         try:
             example = next(self.examples_stream)
-            bucket = self.bucket_fn(example)
-            creates_new_bucket = self._lens[bucket] == 0
-            self._buckets[bucket].append(example)
-            self._lens[bucket] += 1
-            return bucket if creates_new_bucket else None
+            bucket_idx = self.bucket_fn(example)
+            creates_new_bucket = self._lens[bucket_idx] == 0
+            self._buckets[bucket_idx].append(example)
+            self._lens[bucket_idx] += 1
+            return creates_new_bucket
         except StopIteration:
             return None
 
@@ -111,7 +112,11 @@ class LookAheadBucketing():
                         break
                     if not any(self._lens[current_bucket_idx:]):
                         # this was the largest bucket, so we'll need to pick the next smallest instead
-                        smallest_bucket_idx -= 1
+                        smallest_bucket_idx = next(
+                            bucket_idx
+                            for bucket_idx in range(smallest_bucket_idx, -1, -1)
+                            if self._lens[bucket_idx] != 0
+                        )
                         current_bucket_idx = smallest_bucket_idx
                     else:
                         # there was a larger bucket, shift the index by one

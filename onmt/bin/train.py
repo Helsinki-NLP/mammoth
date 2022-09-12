@@ -239,7 +239,12 @@ def train(opt):
             node_rank=None,
             local_rank=None,
         )
-        train_process(opt, device_context)
+        task_queue_manager = global_task_queue_manager.global_to_local(
+            node_rank=None,
+            local_rank=None,
+            opt=opt
+        )
+        train_process(opt, device_context=device_context, task_queue_manager=task_queue_manager)
 
 
 def _get_parser():

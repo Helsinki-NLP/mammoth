@@ -168,7 +168,7 @@ def main(
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()
-    logger.info("GPU {} - Valid iter".format(device_context.id))
+    logger.info("{} - Valid iter".format(device_context.id))
     valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
     if valid_iter is not None:
         valid_iter = IterOnDevice(valid_iter, device_context.local_rank)
@@ -183,7 +183,7 @@ def main(
         if device_context.is_master():
             logger.warning("Option single_pass is enabled, ignoring train_steps.")
         train_steps = 0
-    logger.info("GPU {} - Starting training".format(device_context.id))
+    logger.info("{} - Starting training".format(device_context.id))
     trainer.train(
         train_iter,
         train_steps,

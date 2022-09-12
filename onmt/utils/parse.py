@@ -305,7 +305,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             logger.warn("You have a CUDA device, should run with -gpu_ranks")
         if opt.world_size < len(opt.gpu_ranks):
             raise AssertionError("parameter counts of -gpu_ranks must be less or equal than -world_size.")
-        if opt.world_size == len(opt.gpu_ranks) and min(opt.gpu_ranks) > 0:
+        if len(opt.gpu_ranks) > 0 and opt.world_size == len(opt.gpu_ranks) and min(opt.gpu_ranks) > 0:
             raise AssertionError(
                 "-gpu_ranks should have master(=0) rank unless -world_size is greater than len(gpu_ranks)."
             )

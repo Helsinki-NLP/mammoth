@@ -68,7 +68,7 @@ class WorldContext:
     @classmethod
     def from_opt(cls, opt, current_env):
         gpus_per_node = len(opt.gpu_ranks)
-        world_size = int(opt.world_size)
+        world_size = int(opt.world_size) if gpus_per_node > 0 else 0
         if world_size <= 0:
             # setting a non-positive world size means use CPU
             device_context_enum = DeviceContextEnum.CPU

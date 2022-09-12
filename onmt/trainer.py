@@ -20,7 +20,7 @@ import torch.distributed
 
 def build_trainer(
     opt,
-    device_id,
+    device_context,
     model,
     fields_dict,
     optim,
@@ -64,16 +64,10 @@ def build_trainer(
     norm_method = opt.normalization
     accum_count = opt.accum_count
     accum_steps = opt.accum_steps
-    n_gpu = opt.world_size
     average_decay = opt.average_decay
     average_every = opt.average_every
     dropout = opt.dropout
     dropout_steps = opt.dropout_steps
-    if device_id is not None and device_id >= 0:
-        gpu_rank = opt.gpu_ranks[device_id]
-    else:
-        gpu_rank = -1
-        n_gpu = 0
     gpu_verbose_level = opt.gpu_verbose_level
 
     earlystopper = (
@@ -82,7 +76,7 @@ def build_trainer(
         else None
     )
 
-    report_manager = onmt.utils.build_report_manager(opt, task_queue_manager.node_rank, task_queue_manager.local_rank)
+    report_manager = onmt.utils.build_report_manager(opt, device_context.node_rank, device_context.local_rank)
     trainer = onmt.Trainer(
         model,
         train_loss_md,
@@ -93,10 +87,9 @@ def build_trainer(
         norm_method,
         accum_count,
         accum_steps,
-        n_gpu,
-        gpu_rank,
-        gpu_verbose_level,
-        report_manager,
+        device_context=device_context,
+        gpu_verbose_level=gpu_verbose_level,
+        report_manager=report_manager,
         with_align=True if opt.lambda_align > 0 else False,
         model_saver=model_saver,
         average_decay=average_decay,
@@ -149,8 +142,7 @@ class Trainer(object):
         norm_method="sents",
         accum_count=[1],
         accum_steps=[0],
-        n_gpu=1,
-        gpu_rank=1,
+        device_context=None,
         gpu_verbose_level=0,
         report_manager=None,
         with_align=False,
@@ -176,8 +168,7 @@ class Trainer(object):
         self.accum_count_l = accum_count
         self.accum_count = accum_count[0]
         self.accum_steps = accum_steps
-        self.n_gpu = n_gpu
-        self.gpu_rank = gpu_rank
+        self.device_context = device_context
         self.gpu_verbose_level = gpu_verbose_level
         self.report_manager = report_manager
         self.report_stats_from_parameters = report_stats_from_parameters
@@ -263,7 +254,13 @@ class Trainer(object):
                 self.moving_average[i] = (1 - average_decay) * avg + cpt.detach().float() * average_decay
 
     def train(
-        self, train_iter, train_steps, save_checkpoint_steps=5000, valid_iter=None, valid_steps=10000, global_rank=None
+        self,
+        train_iter,
+        train_steps,
+        save_checkpoint_steps=5000,
+        valid_iter=None,
+        valid_steps=10000,
+        device_context=None,
     ):
         """
         The main training loop by iterating over `train_iter` and possibly
@@ -320,7 +317,6 @@ class Trainer(object):
             # /LCA
 
             i, (batches_with_meta, normalization) = next(trainEnum)
-            # logger.info(f'{j} {i} global_rank {global_rank}')
 
             self._gradient_accumulation_overLangPair(
                 batches_with_meta,
@@ -361,7 +357,7 @@ class Trainer(object):
                 )
 
             # a group is not specified: reduce across all devices
-            if global_rank:
+            if device_context.is_distributed():
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(
                     self.model.attention_bridge.named_parameters()
                 )
@@ -369,7 +365,7 @@ class Trainer(object):
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
             # LCA
-            if (self.lca_loginterval > 0) and (step % self.lca_loginterval == 0) and (global_rank == 0):
+            if (self.lca_loginterval > 0) and (step % self.lca_loginterval == 0) and (device_context.is_master()):
                 for k, v in self.model.named_parameters():
                     if not v.requires_grad or isinstance(v.grad, type(None)) or k.find('attention_bridge') < 0:
                         continue
@@ -394,12 +390,12 @@ class Trainer(object):
                 logger.info(f'After gradient sync {step}')
                 for name, p in self.model.named_parameters():
                     logger.info(
-                        f'{self.task_queue_manager.node_rank}:{self.task_queue_manager.local_rank}'
+                        f'{device_context.node_rank}:{device_context.local_rank}'
                         f' {name}: {p.flatten()[:10]}'
                     )
                 if hasattr(self.optim._optimizer, 'report_steps'):
                     for line in self.optim._optimizer.report_steps():
-                        logger.info(f'{self.task_queue_manager.node_rank}:{self.task_queue_manager.local_rank} {line}')
+                        logger.info(f'{device_context.node_rank}:{device_context.local_rank} {line}')
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)
@@ -570,7 +566,7 @@ class Trainer(object):
         Returns:
             stat: the updated (or unchanged) stat object
         """
-        if stat is not None and self.n_gpu > 1:
+        if stat is not None and self.device_context.is_distributed() > 1:
             return onmt.utils.Statistics.all_gather_stats(stat)
         return stat
 
@@ -590,7 +586,7 @@ class Trainer(object):
                 learning_rate,
                 None if self.earlystopper is None else self.earlystopper.current_tolerance,
                 report_stats,
-                multigpu=self.n_gpu > 1,
+                multigpu=self.device_context.is_distributed(),
             )
 
     def _report_step(self, learning_rate, step, train_stats=None, valid_stats=None):

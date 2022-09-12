@@ -2,7 +2,7 @@ from argparse import Namespace
 from collections import OrderedDict
 from unittest.mock import MagicMock
 
-from onmt.utils.distributed import TaskQueueManager
+from onmt.utils.distributed import TaskQueueManager, WorldContext
 
 
 def test_init_minimal():
@@ -20,8 +20,10 @@ def test_init_minimal():
             'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
         }
     }
+    current_env = dict()
     opt = Namespace(**opt_dict)
-    task_queue_manager = TaskQueueManager.from_opt(opt)
+    world_context = WorldContext.from_opt(opt, current_env)
+    task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     assert len(task_queue_manager.tasks) == 2
     assert task_queue_manager.gpus_per_node == 2
     assert task_queue_manager.n_nodes == 1
@@ -54,8 +56,12 @@ def create_basic_task_queue_manager():
             'train_e-b': {'path_src': 'dummy', 'path_tgt': 'dummy', 'weight': 1, 'introduce_at_training_step': 0},
         }
     }
+    current_env = {
+        'SLURM_NNODES': 2,
+    }
     opt = Namespace(**opt_dict)
-    task_queue_manager = TaskQueueManager.from_opt(opt)
+    world_context = WorldContext.from_opt(opt, current_env)
+    task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     return task_queue_manager, opt
 
 
@@ -131,7 +137,7 @@ def test_cpu_distributed_groups():
     opt_dict = {
         'accum_count': 4,
         'task_distribution_strategy': 'roundrobin',
-        'world_size': 1,
+        'world_size': 0,
         'gpu_ranks': [],
         'src_tgt': ['a-b', 'c-d'],
         'node_gpu': None,
@@ -142,8 +148,10 @@ def test_cpu_distributed_groups():
             'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
         }
     }
+    current_env = dict()
     opt = Namespace(**opt_dict)
-    global_task_queue_manager = TaskQueueManager.from_opt(opt)
+    world_context = WorldContext.from_opt(opt, current_env)
+    global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=None, local_rank=None, opt=opt)
     new_group_func = MagicMock().new_group_func
     my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)
@@ -172,8 +180,12 @@ def test_distributed_groups_no_encoder_group():
             'train_d-c': {'path_src': 'dummy', 'path_tgt': 'dummy'},
         }
     }
+    current_env = {
+        'SLURM_NNODES': 2,
+    }
     opt = Namespace(**opt_dict)
-    global_task_queue_manager = TaskQueueManager.from_opt(opt)
+    world_context = WorldContext.from_opt(opt, current_env)
+    global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
     new_group_func = MagicMock().new_group_func
     my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)

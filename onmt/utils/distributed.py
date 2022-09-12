@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from argparse import Namespace
 from collections import OrderedDict, namedtuple
 from dataclasses import dataclass
+from enum import Enum
 from itertools import cycle, islice
 from pprint import pformat
 from typing import Any, Optional, List
@@ -21,8 +22,97 @@ from onmt.utils.logging import init_logger, logger
 from onmt.utils.misc import set_random_seed
 
 
-def is_master(global_rank):
-    return global_rank == 0
+class DeviceContextEnum(Enum):
+    CPU = 1
+    SINGLE_GPU = 2
+    MULTI_GPU = 3
+
+
+@dataclass
+class WorldContext:
+    context: DeviceContextEnum
+    # Size of the world: total number of nodes, gpus on each node
+    n_nodes: int
+    gpus_per_node: int
+
+    @property
+    def world_size(self):
+        """Total number of training GPUs"""
+        return self.n_nodes * self.gpus_per_node
+
+    def is_distributed(self):
+        """When training is distributed over several devices,
+        multiprocessing is used to communicate gradients"""
+        return self.context == DeviceContextEnum.MULTI_GPU
+
+    def is_gpu(self):
+        """Data tensors must be moved to the GPU for compute"""
+        return self.context != DeviceContextEnum.CPU
+
+    def is_master(self):
+        """For code that should only run in one process:
+        - saving fully shared modules from one device only
+        - avoiding log spam when all devices would log the same result
+        """
+        return not self.is_distributed() or self.global_rank == 0
+
+    def global_to_local(self, node_rank, local_rank):
+        return DeviceContext(
+            context=self.context,
+            n_nodes=self.n_nodes,
+            gpus_per_node=self.gpus_per_node,
+            node_rank=node_rank,
+            local_rank=local_rank,
+        )
+
+    @classmethod
+    def from_opt(cls, opt, current_env):
+        gpus_per_node = len(opt.gpu_ranks)
+        world_size = int(opt.world_size)
+        if world_size <= 0:
+            # setting a non-positive world size means use CPU
+            device_context_enum = DeviceContextEnum.CPU
+            n_nodes = 1
+        elif gpus_per_node != world_size:
+            # if `gpus_per_node` differs from `opt.world_size` we assume the training runs on multiple nodes
+            device_context_enum = DeviceContextEnum.MULTI_GPU
+            # FIXME: retrieving this from ENV here doesn't seem right at all. However, we
+            # 1) need the value here
+            # 2) maybe don't want to retreive it unless the context is MULTI_GPU
+            # 3) determine MULTI_GPU here
+            n_nodes = int(current_env.get("SLURM_NNODES", 1))
+        else:
+            device_context_enum = DeviceContextEnum.SINGLE_GPU
+            n_nodes = 1
+        world_context = WorldContext(context=device_context_enum, n_nodes=n_nodes, gpus_per_node=gpus_per_node)
+        return world_context
+
+
+@dataclass
+class DeviceContext(WorldContext):
+    # Our place in the world
+    node_rank: Optional[int]
+    local_rank: Optional[int]
+
+    @property
+    def global_rank(self) -> int:
+        return self.gpus_per_node * self.node_rank + self.local_rank
+
+    @property
+    def id(self) -> str:
+        if self.is_gpu():
+            return f'GPU {self.node_rank}:{self.local_rank}'
+        else:
+            return 'CPU'
+
+    def validate(self, world_context):
+        # check that this DeviceContext is consistent with given WorldContext
+        assert self.context == world_context.context
+        assert self.n_nodes == world_context.n_nodes
+        assert self.gpus_per_node == world_context.gpus_per_node
+        # check that ranks are within the specified size of the world
+        assert self.node_rank is None or 0 <= self.node_rank < self.n_nodes
+        assert self.local_rank is None or 0 <= self.local_rank < self.gpus_per_node
 
 
 def multi_init(opt, global_rank):
@@ -420,13 +510,11 @@ class TaskQueueManager:
     def __init__(
         self,
         tasks: List[TaskSpecs],
-        gpus_per_node: int,
-        n_nodes: int,
         tasks_per_communication_batch: int,
+        world_context: WorldContext,
+        device_context: Optional[DeviceContext] = None,
         components_to_gpus=None,
         components_to_groups=None,
-        node_rank: Optional[int] = None,
-        local_rank: Optional[int] = None,
         task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
     ):
         """
@@ -441,36 +529,46 @@ class TaskQueueManager:
         When set to None, all items are returned.
         """
         self.tasks = tasks
-        self.node_rank = node_rank
-        self.local_rank = local_rank
         self.tasks_per_communication_batch = tasks_per_communication_batch
         self.task_distribution_strategy = task_distribution_strategy
+        self.world_context = world_context
+        self.device_context = device_context
 
-        self.gpus_per_node = gpus_per_node
-        self.n_nodes = n_nodes
-
-        logger.info(f'in task_queue_manager: node_rank {node_rank} local_rank {local_rank}')
-        assert node_rank is None or 0 <= node_rank < self.n_nodes
-        assert local_rank is None or 0 <= local_rank < self.gpus_per_node
+        logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
+        if self.world_context and self.device_context:
+            self.device_context.validate(self.world_context)
 
         self.components_to_gpus = components_to_gpus
         self.components_to_groups = components_to_groups
 
-    @classmethod
-    def from_opt(cls, opt: Namespace):
-        n_tasks = len(opt.src_tgt)
-        gpus_per_node = len(opt.gpu_ranks)
-        if gpus_per_node > 0:
-            n_nodes = opt.world_size // gpus_per_node
-        else:
-            n_nodes = 1
-            gpus_per_node = 1
+    @property
+    def gpus_per_node(self):
+        return self.world_context.gpus_per_node
 
-        # When --node_gpu is not set, assume an assigment that fills gpus in rank order
-        node_gpu = (
-            [tuple(int(y) for y in x.split(':', 1)) for x in opt.node_gpu] if opt.node_gpu
-            else cls._default_node_gpu(n_tasks, n_nodes, gpus_per_node)
-        )
+    @property
+    def n_nodes(self):
+        return self.world_context.n_nodes
+
+    @property
+    def node_rank(self):
+        return self.device_context.node_rank if self.device_context else None
+
+    @property
+    def local_rank(self):
+        return self.device_context.local_rank if self.device_context else None
+
+    @classmethod
+    def from_opt(cls, opt: Namespace, world_context: WorldContext):
+        n_tasks = len(opt.src_tgt)
+
+        if world_context.is_gpu():
+            # When --node_gpu is not set, assume an assigment that fills gpus in rank order
+            node_gpu = (
+                [tuple(int(y) for y in x.split(':', 1)) for x in opt.node_gpu] if opt.node_gpu
+                else cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
+            )
+        else:
+            node_gpu = [(None, None)] * n_tasks
         lang_pairs = [lang_pair.split('-') for lang_pair in opt.src_tgt]
 
         if opt.enc_sharing_group:
@@ -524,22 +622,20 @@ class TaskQueueManager:
             tasks.append(task)
         return cls(
             tasks,
-            gpus_per_node=gpus_per_node,
-            n_nodes=n_nodes,
+            world_context=world_context,
             tasks_per_communication_batch=opt.accum_count,
         )
 
     def global_to_local(self, node_rank, local_rank, opt):
         task_distribution_strategy = self._get_strategy(node_rank, local_rank, opt)
+        device_context = self.world_context.global_to_local(node_rank, local_rank)
         return self.__class__(
             self.tasks,
-            gpus_per_node=self.gpus_per_node,
-            n_nodes=self.n_nodes,
             tasks_per_communication_batch=self.tasks_per_communication_batch,
+            world_context=self.world_context,
+            device_context=device_context,
             components_to_gpus=self.components_to_gpus,
             components_to_groups=self.components_to_groups,
-            node_rank=node_rank,
-            local_rank=local_rank,
             task_distribution_strategy=task_distribution_strategy,
         )
 

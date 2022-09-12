@@ -5,7 +5,15 @@ import torch
 from functools import partial
 import os
 
-from onmt.utils.distributed import ErrorHandler, consumer, batch_producer, TaskQueueManager
+from onmt.utils.distributed import (
+    DeviceContext,
+    DeviceContextEnum,
+    ErrorHandler,
+    TaskQueueManager,
+    WorldContext,
+    batch_producer,
+    consumer,
+)
 from onmt.utils.misc import set_random_seed
 from onmt.modules.embeddings import prepare_pretrained_embeddings
 from onmt.utils.logging import init_logger, logger
@@ -128,27 +136,19 @@ def train(opt):
     ArgumentParser.validate_prepare_opts(opt)
     set_random_seed(opt.seed, False)
 
-    n_gpu = len(opt.gpu_ranks)
     # set PyTorch distributed related environment variables
     current_env = os.environ
     current_env["WORLD_SIZE"] = str(opt.world_size)
-    # if `n_gpu` differs from `opt.world_size` we assume the training runs on multiple nodes
-    if n_gpu != int(opt.world_size):
-        current_env["MASTER_ADDR"] = opt.master_ip
-        current_env["MASTER_PORT"] = str(opt.master_port)
-        num_nodes = current_env.get("SLURM_NNODES", 1)
-        node_rank = int(current_env.get("SLURM_NODEID", 0))
-    else:
-        num_nodes = 1
-        node_rank = 0
-    logger.info("Training on {} node(s)".format(num_nodes))
+
+    world_context = WorldContext.from_opt(opt, current_env)
+    logger.info(f'Training on {world_context}')
 
     opt.data_task = ModelTask.SEQ2SEQ
     transforms_cls = get_transforms_cls(opt._all_transform)
 
     fields_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
-    global_task_queue_manager = TaskQueueManager.from_opt(opt)
+    global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
 
     for side in ('src', 'tgt'):
         for lang in global_task_queue_manager.get_langs(side):
@@ -157,11 +157,14 @@ def train(opt):
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
-    train_process = partial(single_main, fields_dict=fields_dict, global_task_queue_manager=global_task_queue_manager)
+    train_process = partial(single_main, fields_dict=fields_dict)
 
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 
-    if opt.world_size > 1:
+    if world_context.context == DeviceContextEnum.MULTI_GPU:
+        current_env["MASTER_ADDR"] = opt.master_ip
+        current_env["MASTER_PORT"] = str(opt.master_port)
+        node_rank = int(current_env.get("SLURM_NODEID", 0))
 
         queues = []
         mp = torch.multiprocessing.get_context('spawn')
@@ -174,7 +177,11 @@ def train(opt):
         procs = []
         producers = []
 
-        for local_rank in range(n_gpu):
+        for local_rank in range(world_context.gpus_per_node):
+            device_context: DeviceContext = world_context.global_to_local(
+                node_rank=node_rank,
+                local_rank=local_rank,
+            )
             # This task_queue_manager will only yield the items that are active on this gpu
             task_queue_manager = global_task_queue_manager.global_to_local(
                 node_rank=node_rank,
@@ -182,17 +189,16 @@ def train(opt):
                 opt=opt
             )
 
-            # each process's rank
-            global_rank = n_gpu * node_rank + local_rank
-            current_env["RANK"] = str(global_rank)
-            current_env["LOCAL_RANK"] = str(local_rank)
+            # store rank in env (FIXME: is this obsolete?)
+            current_env["RANK"] = str(device_context.global_rank)
+            current_env["LOCAL_RANK"] = str(device_context.local_rank)
 
             q = mp.Queue(opt.queue_size)
             queues += [q]
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opt, global_rank, error_queue, q, semaphore, node_rank, local_rank),
+                    args=(train_process, opt, device_context, error_queue, q, semaphore, task_queue_manager),
                     daemon=True,
                 )
             )
@@ -227,10 +233,13 @@ def train(opt):
         for p in producers:
             p.terminate()
 
-    elif n_gpu == 1:  # case 1 GPU only
-        train_process(opt, global_rank=0, local_rank=0)
-    else:  # case only CPU
-        train_process(opt, global_rank=None, local_rank=None)
+    else:
+        # SINGLE_GPU or CPU
+        device_context: DeviceContext = world_context.global_to_local(
+            node_rank=None,
+            local_rank=None,
+        )
+        train_process(opt, device_context)
 
 
 def _get_parser():

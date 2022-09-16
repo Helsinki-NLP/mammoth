@@ -18,20 +18,28 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size, n_buckets=None)
     if batch_type == 'sents':
         n_buckets = 1
 
-        def counting_fn(_):
+        def bucket_fn(_):
             return 0
-        bucket_fn = numel_fn = counting_fn
+
+        def numel_fn(_):
+            return 1
 
     elif batch_type == 'tokens':
 
         def bucket_fn(example_dict):
-            # subtract four for bos/eos on both sides
-            true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
+            if 'tgt' in example_dict:
+                # subtract four for bos/eos on both sides
+                true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
+            else:
+                true_size = len(example_dict['src']) + 2
             # maybe dump it in the last bucket if it's just too long
             return min(n_buckets - 1, true_size)
 
         def numel_fn(example_dict):
-            true_size = len(example_dict['src']) + len(example_dict['tgt'])
+            if 'tgt' in example_dict:
+                true_size = len(example_dict['src']) + len(example_dict['tgt'])
+            else:
+                true_size = len(example_dict['src'])
             return true_size
 
     collate_fn = dataset.collate_fn

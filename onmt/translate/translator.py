@@ -18,6 +18,7 @@ from onmt.utils.alignment import extract_alignment, build_align_pharaoh
 from onmt.modules.copy_generator import collapse_copy_scores
 from onmt.constants import ModelTask, DefaultTokens
 from onmt.inputters_mvp.dataset import ParallelCorpus
+from onmt.inputters_mvp.dataloader import build_dataloader
 
 
 def build_translator(opt, report_score=True, logger=None, out_file=None):
@@ -236,6 +237,8 @@ class Inference(object):
                 "log_probs": [],
             }
 
+        self.src_file_path = src_file_path
+        self.tgt_file_path = tgt_file_path
         set_random_seed(seed, self._use_cuda)
 
     @classmethod
@@ -474,9 +477,18 @@ class Inference(object):
             self.vocabs['src'],
             self.vocabs['tgt'],
             transforms=transforms,  # I suppose you might want *some* transforms
+            # batch_size=batch_size,
+            # batch_type=batch_type,
+        ).to(self._dev)
+
+        batches = build_dataloader(
+            corpus,
             batch_size=batch_size,
             batch_type=batch_type,
+            pool_size=512,
+            n_buckets=512,
         )
+
         # read_examples_from_files(None, None)
 
         # data_iter = inputters.OrderedIterator(
@@ -510,7 +522,7 @@ class Inference(object):
 
         start_time = time.time()
 
-        for batch in corpus:
+        for batch in batches:
             batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
 

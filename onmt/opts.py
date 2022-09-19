@@ -703,6 +703,8 @@ def _add_train_general_opts(parser):
     # GPU
     group.add('--gpuid', '-gpuid', default=[], nargs='*', type=int, help="Deprecated see world_size and gpu_ranks.")
     group.add('--gpu_ranks', '-gpu_ranks', default=[], nargs='*', type=int, help="list of ranks of each process.")
+    group.add('--n_nodes', '-n_nodes', default=1, type=int, help="total number of training nodes.")
+    group.add('--node_id', '-node_id', default=0, type=int, help="index of current node (0-based).")
     group.add('--world_size', '-world_size', default=1, type=int, help="total number of distributed processes.")
     group.add('--gpu_backend', '-gpu_backend', default="nccl", type=str, help="Type of torch distributed backend")
     group.add(

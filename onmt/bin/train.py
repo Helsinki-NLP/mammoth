@@ -139,8 +139,7 @@ def train(opt):
     # set PyTorch distributed related environment variables
     current_env = os.environ
     current_env["WORLD_SIZE"] = str(opt.world_size)
-
-    world_context = WorldContext.from_opt(opt, current_env)
+    world_context = WorldContext.from_opt(opt)
     logger.info(f'Training on {world_context}')
 
     opt.data_task = ModelTask.SEQ2SEQ
@@ -164,7 +163,7 @@ def train(opt):
     if world_context.context == DeviceContextEnum.MULTI_GPU:
         current_env["MASTER_ADDR"] = opt.master_ip
         current_env["MASTER_PORT"] = str(opt.master_port)
-        node_rank = int(current_env.get("SLURM_NODEID", 0))
+        node_rank = opt.node_id
 
         queues = []
         mp = torch.multiprocessing.get_context('spawn')

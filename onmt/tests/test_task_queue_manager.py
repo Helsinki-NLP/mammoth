@@ -10,6 +10,7 @@ def test_init_minimal():
         'accum_count': 1,
         'task_distribution_strategy': 'roundrobin',
         'world_size': 2,
+        'n_nodes': 1,
         'gpu_ranks': [0, 1],
         'src_tgt': ['a-b', 'c-d'],
         'node_gpu': None,
@@ -20,9 +21,8 @@ def test_init_minimal():
             'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
         }
     }
-    current_env = dict()
     opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt, current_env)
+    world_context = WorldContext.from_opt(opt)
     task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     assert len(task_queue_manager.tasks) == 2
     assert task_queue_manager.gpus_per_node == 2
@@ -40,6 +40,7 @@ def create_basic_task_queue_manager():
         'accum_count': 8,
         'task_distribution_strategy': 'weighted_sampling',
         'world_size': 4,
+        'n_nodes': 2,
         'gpu_ranks': [0, 1],
         'src_tgt': ['a-b', 'c-d', 'a-d', 'e-b'],
         # unconventional assignment: two on 0:1, none on 1:1
@@ -56,11 +57,8 @@ def create_basic_task_queue_manager():
             'train_e-b': {'path_src': 'dummy', 'path_tgt': 'dummy', 'weight': 1, 'introduce_at_training_step': 0},
         }
     }
-    current_env = {
-        'SLURM_NNODES': 2,
-    }
     opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt, current_env)
+    world_context = WorldContext.from_opt(opt)
     task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     return task_queue_manager, opt
 
@@ -139,6 +137,7 @@ def test_cpu_distributed_groups():
         'task_distribution_strategy': 'roundrobin',
         'world_size': 0,
         'gpu_ranks': [],
+        'n_nodes': 1,
         'src_tgt': ['a-b', 'c-d'],
         'node_gpu': None,
         'enc_sharing_group': None,
@@ -148,9 +147,8 @@ def test_cpu_distributed_groups():
             'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
         }
     }
-    current_env = dict()
     opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt, current_env)
+    world_context = WorldContext.from_opt(opt)
     global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=None, local_rank=None, opt=opt)
     new_group_func = MagicMock().new_group_func
@@ -167,6 +165,7 @@ def test_distributed_groups_no_encoder_group():
         'accum_count': 1,
         'task_distribution_strategy': 'roundrobin',
         'world_size': 4,
+        'n_nodes': 2,
         'gpu_ranks': [0, 1],
         # every language pair on its own gpu: no overlap
         'src_tgt': ['a-b', 'c-d', 'b-a', 'd-c'],
@@ -180,11 +179,8 @@ def test_distributed_groups_no_encoder_group():
             'train_d-c': {'path_src': 'dummy', 'path_tgt': 'dummy'},
         }
     }
-    current_env = {
-        'SLURM_NNODES': 2,
-    }
     opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt, current_env)
+    world_context = WorldContext.from_opt(opt)
     global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
     new_group_func = MagicMock().new_group_func

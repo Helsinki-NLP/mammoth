@@ -66,25 +66,25 @@ class WorldContext:
         )
 
     @classmethod
-    def from_opt(cls, opt, current_env):
+    def from_opt(cls, opt):
         gpus_per_node = len(opt.gpu_ranks)
         world_size = int(opt.world_size) if gpus_per_node > 0 else 0
         if world_size <= 0:
             # setting a non-positive world size means use CPU
             device_context_enum = DeviceContextEnum.CPU
-            n_nodes = 1
+            if opt.n_nodes != 1:
+                raise ValueError('CPU training is only possible on a single node')
         elif gpus_per_node != world_size:
             # if `gpus_per_node` differs from `opt.world_size` we assume the training runs on multiple nodes
             device_context_enum = DeviceContextEnum.MULTI_GPU
-            # FIXME: retrieving this from ENV here doesn't seem right at all. However, we
-            # 1) need the value here
-            # 2) maybe don't want to retreive it unless the context is MULTI_GPU
-            # 3) determine MULTI_GPU here
-            n_nodes = int(current_env.get("SLURM_NNODES", 1))
         else:
             device_context_enum = DeviceContextEnum.SINGLE_GPU
-            n_nodes = 1
-        world_context = WorldContext(context=device_context_enum, n_nodes=n_nodes, gpus_per_node=gpus_per_node)
+            if opt.n_nodes != 1:
+                raise ValueError(
+                    f'Invalid node configuration: '
+                    f'n_nodes {opt.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
+                )
+        world_context = WorldContext(context=device_context_enum, n_nodes=opt.n_nodes, gpus_per_node=gpus_per_node)
         return world_context
 
 

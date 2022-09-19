@@ -353,19 +353,23 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
         queue.put((batch, metadata, communication_batch_id))
 
 
-def consumer(process_fn, opt, global_rank, error_queue, batch_queue, semaphore, node_rank, local_rank):  # noqa: E501
+def consumer(process_fn, opt, device_context, error_queue, batch_queue, semaphore, task_queue_manager):
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
-        logger.info(f'global_rank {global_rank} node_rank {node_rank} local_rank {local_rank}')
+        logger.info(
+            f'global_rank {device_context.global_rank} '
+            f'node_rank {device_context.node_rank} '
+            f'local_rank {device_context.local_rank}'
+        )
         logger.info(f'opt.gpu_ranks {opt.gpu_ranks}')
-        multi_init(opt, global_rank)
+        multi_init(opt, device_context.global_rank)
+        # error_queue not passed (is this intentional?)
         process_fn(
             opt,
-            global_rank=global_rank,
+            device_context=device_context,
             batch_queue=batch_queue,
             semaphore=semaphore,
-            node_rank=node_rank,
-            local_rank=local_rank,
+            task_queue_manager=task_queue_manager,
         )
 
     except KeyboardInterrupt:
@@ -374,7 +378,7 @@ def consumer(process_fn, opt, global_rank, error_queue, batch_queue, semaphore, 
         # propagate exception to parent process, keeping original traceback
         import traceback
 
-        error_queue.put((opt.gpu_ranks[node_rank], traceback.format_exc()))
+        error_queue.put((opt.gpu_ranks[device_context.node_rank], traceback.format_exc()))
 
 
 class TaskDistributionStrategy(ABC):

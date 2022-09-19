@@ -128,6 +128,28 @@ def init_train_prepare_fields_transforms(opt, vocab_path, side):
     return fields
 
 
+def validate_slurm_node_opts(current_env, world_context, opt):
+    """If you are using slurm, confirm that opts match slurm environment variables"""
+    slurm_n_nodes = int(current_env['SLURM_NNODES'])
+    if slurm_n_nodes != world_context.n_nodes:
+        raise ValueError(
+            f'Looks like you are running on {slurm_n_nodes} slurm nodes, '
+            f'but set n_nodes to {world_context.n_nodes} in the conf'
+        )
+    slurm_node_id = int(current_env['SLURM_NODEID'])
+    if slurm_node_id != opt.node_rank:
+        if opt.node_rank:
+            raise ValueError(
+                f'Looks like you are running on slurm node {slurm_node_id}, '
+                f'but set node_rank to {opt.node_rank} on the command line'
+            )
+        else:
+            raise ValueError(
+                f'Looks like you are running on slurm node {slurm_node_id}, '
+                f'but did not set node_rank on the command line'
+            )
+
+
 def train(opt):
     init_logger(opt.log_file)
     ArgumentParser.validate_train_opts(opt)
@@ -140,6 +162,8 @@ def train(opt):
     current_env = os.environ
     current_env["WORLD_SIZE"] = str(opt.world_size)
     world_context = WorldContext.from_opt(opt)
+    if 'SLURM_NNODES' in current_env:
+        validate_slurm_node_opts(current_env, world_context, opt)
     logger.info(f'Training on {world_context}')
 
     opt.data_task = ModelTask.SEQ2SEQ
@@ -163,7 +187,7 @@ def train(opt):
     if world_context.context == DeviceContextEnum.MULTI_GPU:
         current_env["MASTER_ADDR"] = opt.master_ip
         current_env["MASTER_PORT"] = str(opt.master_port)
-        node_rank = opt.node_id
+        node_rank = opt.node_rank
 
         queues = []
         mp = torch.multiprocessing.get_context('spawn')

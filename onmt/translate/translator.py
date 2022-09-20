@@ -487,6 +487,7 @@ class Inference(object):
             batch_type=batch_type,
             pool_size=512,
             n_buckets=512,
+            cycle=False,
         )
 
         # read_examples_from_files(None, None)

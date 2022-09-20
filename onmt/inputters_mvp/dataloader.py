@@ -12,8 +12,11 @@ def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size, n_buckets=None):
+def build_dataloader(dataset, batch_size, batch_type, pool_size, n_buckets=None, cycle=True):
     """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
+    if not cycle:
+        return iter(InferenceBatcher(dataset, batch_size))
+
     examples_stream = infinite_iterator(dataset)
     if batch_type == 'sents':
         n_buckets = 1
@@ -48,6 +51,24 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size, n_buckets=None)
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
+
+
+class InferenceBatcher():
+    """Iterator for inference"""
+    def __init__(self, dataset, batch_size):
+        self.examples_stream = iter(dataset)
+        self.collate_fn = dataset.collate_fn
+        self.batch_size = batch_size
+
+    def __iter__(self):
+        accum = []
+        for example in self.examples_stream:
+            accum.append(example)
+            if len(accum) >= self.batch_size:
+                yield self.collate_fn(accum)
+                accum = []
+        if accum:
+            yield self.collate_fn(accum)
 
 
 class LookAheadBucketing():

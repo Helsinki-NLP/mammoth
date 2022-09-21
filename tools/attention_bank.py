@@ -1,16 +1,19 @@
 import argparse
 import collections
+import functools
 import itertools
 import pathlib
 
 import numpy as np
 import torch
+from torchtext.legacy.data import batch as torchtext_batch
+from torchtext.legacy.data import Batch
 
-from onmt.inputter import DynamicDataset, str2sortkey
+from onmt.inputters import DynamicDataset, str2sortkey
 from onmt.inputters.text_dataset import InferenceDataIterator
 from onmt.model_builder import load_test_multitask_model
-from onmt.opts import build_bilingual_model, translate_opts
-from inmt.transforms import get_transforms_cls, make_transforms, TransformPipe
+from onmt.opts import build_bilingual_model, translate_opts, _add_dynamic_transform_opts
+from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe
 from onmt.utils.parse import ArgumentParser
 
 
@@ -18,8 +21,12 @@ def get_opts():
     """parse command line options"""
 
     parser = argparse.ArgumentParser()
-    translate_opts(parser, dynamic=True)
+    # translate_opts(parser, dynamic=True)
+    parser.add_argument('--model', type=str, required=True)
+    parser.add_argument('--lang_pair', type=str, required=False)
     build_bilingual_model(parser)
+    parser.add_argument('--transforms', type=str, nargs='*', default=[])
+    _add_dynamic_transform_opts(parser)
 
     subparsers = parser.add_subparsers(dest='command')
 
@@ -44,17 +51,22 @@ def get_opts():
     return opts
 
 
-def _extract(sentences_file, model, fields, transforms, enc_id):
+def _extract(sentences_file, model, fields, transforms, enc_id, batch_size=10):
     """sub-routine to embed file"""
-    example_stream = InferenceDataIterator(sentences_file, None, None, transforms)
-    example_stream = DynamicDataset(fields, data=example_stream, sort_key=str2sortkey['text'])
-    for batch in example_stream:
-        src, src_lengths = batch.src
-        enc_states, memory_bank, src_lengths, mask = model.encoder[f"encoder{enc_id}"](
-            src, src_lengths
-        )
-        memory_bank, alphas = model.attention_bridge(memory_bank, mask)
-        yield (memory_bank, src_lengths)
+    with open(sentences_file, 'rb') as sentences_file_fh:
+        example_stream = InferenceDataIterator(sentences_file_fh, itertools.repeat(None), None, transforms)
+        example_stream = DynamicDataset(fields, data=example_stream, sort_key=str2sortkey['text'])
+        example_stream = torchtext_batch(example_stream, batch_size=batch_size)
+        fake_dataset = collections.namedtuple('FakeDataset', 'fields')(fields)
+        batching_fn = functools.partial(Batch, dataset=fake_dataset, device='cpu')
+        example_stream = map(batching_fn, example_stream)
+        for batch in example_stream:
+            src, src_lengths = batch.src
+            enc_states, memory_bank, src_lengths, mask = model.encoder[f"encoder{enc_id}"](
+                src, src_lengths
+            )
+            memory_bank, alphas = model.attention_bridge(memory_bank, mask)
+            yield (memory_bank, src_lengths)
 
 
 def extract(opts, fields, model, model_opt, transforms):
@@ -142,9 +154,10 @@ def main():
     opts = get_opts()
     ArgumentParser._get_all_transform_translate(opts)
     ArgumentParser._validate_transforms_opts(opts)
-    ArgumentParser.validate_translate_opts_dynamic(opts)
+    # ArgumentParser.validate_translate_opts_dynamic(opts)
+    opts.enc_id = opts.enc_id or opts.src_lang
 
-    fields, model, model_opt = load_test_multitask_model(opts, opts.model_path)
+    fields, model, model_opt = load_test_multitask_model(opts, opts.model)
     command_fn = {
         fn.__name__: fn for fn in
         [extract, estimate, classify]

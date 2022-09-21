@@ -12,7 +12,7 @@ from torchtext.legacy.data import Batch
 from onmt.inputters import DynamicDataset, str2sortkey
 from onmt.inputters.text_dataset import InferenceDataIterator
 from onmt.model_builder import load_test_multitask_model
-from onmt.opts import build_bilingual_model, translate_opts, _add_dynamic_transform_opts
+from onmt.opts import build_bilingual_model, _add_dynamic_transform_opts
 from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe
 from onmt.utils.parse import ArgumentParser
 

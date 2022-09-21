@@ -417,6 +417,8 @@ class WeightedSamplingTaskDistributionStrategy(TaskDistributionStrategy):
         # Sanity check of weights and curriculum
         assert len(self.my_corpus_ids) == len(self.my_weights)
         assert len(self.my_corpus_ids) == len(self.my_introduce_at_training_step)
+        if len(self.my_corpus_ids) == 0:
+            raise ValueError('No corpora on device')
         if sum(my_weights) <= 0:
             raise ValueError('Can not set "weight" of all corpora on a device to zero')
         if all(x > 0 for x in my_introduce_at_training_step):
@@ -631,7 +633,9 @@ class TaskQueueManager:
         )
 
     def global_to_local(self, node_rank, local_rank, opt):
-        task_distribution_strategy = self._get_strategy(node_rank, local_rank, opt)
+        node_rank = node_rank if node_rank else 0
+        local_rank = local_rank if local_rank else 0
+        task_distribution_strategy = self._get_strategy(node_rank=node_rank, local_rank=local_rank, opt=opt)
         device_context = self.world_context.global_to_local(node_rank, local_rank)
         return self.__class__(
             self.tasks,
@@ -646,11 +650,16 @@ class TaskQueueManager:
     def _get_strategy(self, node_rank, local_rank, opt):
         # Global TQM does not have a task distribution strategy, but the local ones do
         my_corpus_ids = [task.corpus_id for task in self._tasks_on_device(node_rank, local_rank)]
-        strategy = TASK_DISTRIBUTION_STRATEGIES[opt.task_distribution_strategy].from_opt(
-            my_corpus_ids=my_corpus_ids,
-            opt=opt,
-        )
-        return strategy
+        try:
+            strategy = TASK_DISTRIBUTION_STRATEGIES[opt.task_distribution_strategy].from_opt(
+                my_corpus_ids=my_corpus_ids,
+                opt=opt,
+            )
+            return strategy
+        except Exception as e:
+            raise Exception(
+                f'Exception when creating task distribution strategy on {node_rank}:{local_rank} {e}'
+            )
 
     def __repr__(self):
         kwargs = ',\n '.join(
@@ -683,6 +692,8 @@ class TaskQueueManager:
         self,
         new_group_func=torch.distributed.new_group,
     ):
+        if not self.world_context.is_distributed:
+            return dict()
         # Single OrderedDict contains all components.
         # Keys are tuples of strings.
         # The length of the key varies depending on the component:

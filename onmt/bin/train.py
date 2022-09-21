@@ -258,13 +258,14 @@ def train(opt):
 
     else:
         # SINGLE_GPU or CPU
+        local_rank = 0 if world_context.context == DeviceContextEnum.SINGLE_GPU else None
         device_context: DeviceContext = world_context.global_to_local(
-            node_rank=None,
-            local_rank=None,
+            node_rank=0,
+            local_rank=local_rank,
         )
         task_queue_manager = global_task_queue_manager.global_to_local(
-            node_rank=None,
-            local_rank=None,
+            node_rank=0,
+            local_rank=local_rank,
             opt=opt
         )
         train_process(opt, device_context=device_context, task_queue_manager=task_queue_manager)

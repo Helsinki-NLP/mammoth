@@ -77,7 +77,7 @@ class ModelSaverBase(object):
                 model_params_data.append(param.data)
                 param.data = avg.data
 
-        chkpt_names = self._save(step, save_model, self.device_id)
+        chkpt_names = self._save(step, save_model, self.device_context)
         self.last_saved_step = step
 
         if moving_average:

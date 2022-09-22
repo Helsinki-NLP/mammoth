@@ -106,3 +106,4 @@ learning_rate: 3.0
 max_grad_norm: 0.0
 seed: 3435
 model_type: text
+node_rank: 0

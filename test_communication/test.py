@@ -849,7 +849,7 @@ class TestTraining(TestCase):
                 os.remove(out_file)
         self.assertIn(out_model_prefix, os.listdir("tensorboard"))
         self.assertEqual(1, len(os.listdir("tensorboard/{}".format(out_model_prefix))))
-        self.assertEqual("-rankNone:0", os.listdir("tensorboard/{}".format(out_model_prefix))[0][-11:])
+        self.assertEqual("-rank0:0", os.listdir("tensorboard/{}".format(out_model_prefix))[0][-8:])
         if os.path.exists("tensorboard/{}".format(out_model_prefix)):
             logger.info("Removing folder {}".format("tensorboard/{}".format(out_model_prefix)))
             shutil.rmtree("tensorboard/{}".format(out_model_prefix))

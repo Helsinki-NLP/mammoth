@@ -137,20 +137,25 @@ def classify(opts, fields, model, model_opt, transforms):
     X_trains = []
     for train_file in tqdm.tqdm(opts.train_sentences, desc='train files'):
         embedded = []
-        for src, src_lengths in tqdm.tqdm(
-            _extract(
-                train_file,
-                model,
-                fields,
-                transforms,
-                opts.enc_id,
-                batch_size=opts.batch_size,
-                device=opts.device,
-            ),
-            leave=False,
-        ):
-            mask = torch.arange(src.size(0), device=opts.device).unsqueeze(1) >= src_lengths.unsqueeze(0)
-            embedded.append(src.masked_fill(mask.unsqueeze(-1), 0.).sum(0).cpu())
+        if train_file.suffix == '.pt':
+            print(f"Assuming {train_file} corresponds to pre-extracted embeddings; change suffix if it's not.")
+            for sentence_rep in torch.load(train_file):
+                embedded.append(sentence_rep.sum(0, keepdim=True))
+        else:
+            for src, src_lengths in tqdm.tqdm(
+                _extract(
+                    train_file,
+                    model,
+                    fields,
+                    transforms,
+                    opts.enc_id,
+                    batch_size=opts.batch_size,
+                    device=opts.device,
+                ),
+                leave=False,
+            ):
+                mask = torch.arange(src.size(0), device=opts.device).unsqueeze(1) >= src_lengths.unsqueeze(0)
+                embedded.append(src.masked_fill(mask.unsqueeze(-1), 0.).sum(0).cpu())
         X_trains.append(torch.cat(embedded, dim=0))
     X_train = torch.cat(X_trains, dim=-1).numpy()
 
@@ -164,20 +169,25 @@ def classify(opts, fields, model, model_opt, transforms):
     X_test = []
     for test_file in tqdm.tqdm(opts.test_sentences, desc='test files'):
         embedded = []
-        for src, src_lengths in tqdm.tqdm(
-            _extract(
-                test_file,
-                model,
-                fields,
-                transforms,
-                opts.enc_id,
-                batch_size=opts.batch_size,
-                device=opts.device,
-            ),
-            leave=False,
-        ):
-            mask = torch.arange(src.size(0), device=opts.device).unsqueeze(1) >= src_lengths.unsqueeze(0)
-            embedded.append(src.masked_fill(mask.unsqueeze(-1), 0.).sum(0).cpu())
+        if test_file.suffix == '.pt':
+            print(f"Assuming {test_file} corresponds to pre-extracted embeddings; change suffix if it's not.")
+            for sentence_rep in torch.load(test_file):
+                embedded.append(sentence_rep.sum(0, keepdim=True))
+        else:
+            for src, src_lengths in tqdm.tqdm(
+                _extract(
+                    test_file,
+                    model,
+                    fields,
+                    transforms,
+                    opts.enc_id,
+                    batch_size=opts.batch_size,
+                    device=opts.device,
+                ),
+                leave=False,
+            ):
+                mask = torch.arange(src.size(0), device=opts.device).unsqueeze(1) >= src_lengths.unsqueeze(0)
+                embedded.append(src.masked_fill(mask.unsqueeze(-1), 0.).sum(0).cpu())
         X_test.append(torch.cat(embedded, dim=0))
     X_test = torch.cat(X_test, dim=-1).numpy()
 

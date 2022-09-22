@@ -1,8 +1,9 @@
+import pytest
 from argparse import Namespace
 from collections import OrderedDict
 from unittest.mock import MagicMock
 
-from onmt.utils.distributed import TaskQueueManager
+from onmt.utils.distributed import TaskQueueManager, WorldContext
 
 
 def test_init_minimal():
@@ -10,6 +11,7 @@ def test_init_minimal():
         'accum_count': 1,
         'task_distribution_strategy': 'roundrobin',
         'world_size': 2,
+        'n_nodes': 1,
         'gpu_ranks': [0, 1],
         'src_tgt': ['a-b', 'c-d'],
         'node_gpu': None,
@@ -21,12 +23,18 @@ def test_init_minimal():
         }
     }
     opt = Namespace(**opt_dict)
-    task_queue_manager = TaskQueueManager.from_opt(opt)
+    world_context = WorldContext.from_opt(opt)
+    task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
+    assert world_context.is_gpu()
+    assert world_context.is_distributed()
     assert len(task_queue_manager.tasks) == 2
     assert task_queue_manager.gpus_per_node == 2
     assert task_queue_manager.n_nodes == 1
-    assert task_queue_manager.node_rank is None
-    assert task_queue_manager.local_rank is None
+    with pytest.raises(Exception):
+        # global TQM does not allow accessing node_rank or local_rank
+        task_queue_manager.node_rank
+    with pytest.raises(Exception):
+        task_queue_manager.local_rank
     assert [task.node_rank for task in task_queue_manager.tasks] == [0, 0]
     assert [task.local_rank for task in task_queue_manager.tasks] == [0, 1]
     assert task_queue_manager.get_encoders() == ['a', 'c']
@@ -38,6 +46,7 @@ def create_basic_task_queue_manager():
         'accum_count': 8,
         'task_distribution_strategy': 'weighted_sampling',
         'world_size': 4,
+        'n_nodes': 2,
         'gpu_ranks': [0, 1],
         'src_tgt': ['a-b', 'c-d', 'a-d', 'e-b'],
         # unconventional assignment: two on 0:1, none on 1:1
@@ -55,13 +64,17 @@ def create_basic_task_queue_manager():
         }
     }
     opt = Namespace(**opt_dict)
-    task_queue_manager = TaskQueueManager.from_opt(opt)
+    world_context = WorldContext.from_opt(opt)
+    task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     return task_queue_manager, opt
 
 
 def test_init_basic():
     global_task_queue_manager, opt = create_basic_task_queue_manager()
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opt=opt)
+    world_context = task_queue_manager.world_context
+    assert world_context.is_gpu()
+    assert world_context.is_distributed()
     assert len(task_queue_manager.tasks) == 4
     assert task_queue_manager.gpus_per_node == 2
     assert task_queue_manager.n_nodes == 2
@@ -131,8 +144,9 @@ def test_cpu_distributed_groups():
     opt_dict = {
         'accum_count': 4,
         'task_distribution_strategy': 'roundrobin',
-        'world_size': 1,
+        'world_size': 0,
         'gpu_ranks': [],
+        'n_nodes': 1,
         'src_tgt': ['a-b', 'c-d'],
         'node_gpu': None,
         'enc_sharing_group': None,
@@ -143,8 +157,9 @@ def test_cpu_distributed_groups():
         }
     }
     opt = Namespace(**opt_dict)
-    global_task_queue_manager = TaskQueueManager.from_opt(opt)
-    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=None, local_rank=None, opt=opt)
+    world_context = WorldContext.from_opt(opt)
+    global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
     new_group_func = MagicMock().new_group_func
     my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)
     # No groups should be created when running on CPU
@@ -152,6 +167,8 @@ def test_cpu_distributed_groups():
     # The component keys should still exist, but be empty
     for component in ['encoder', 'decoder', 'src_emb', 'tgt_emb']:
         assert len(my_groups[component]) == 0
+    assert not world_context.is_gpu()
+    assert not world_context.is_distributed()
 
 
 def test_distributed_groups_no_encoder_group():
@@ -159,6 +176,7 @@ def test_distributed_groups_no_encoder_group():
         'accum_count': 1,
         'task_distribution_strategy': 'roundrobin',
         'world_size': 4,
+        'n_nodes': 2,
         'gpu_ranks': [0, 1],
         # every language pair on its own gpu: no overlap
         'src_tgt': ['a-b', 'c-d', 'b-a', 'd-c'],
@@ -173,7 +191,8 @@ def test_distributed_groups_no_encoder_group():
         }
     }
     opt = Namespace(**opt_dict)
-    global_task_queue_manager = TaskQueueManager.from_opt(opt)
+    world_context = WorldContext.from_opt(opt)
+    global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
     new_group_func = MagicMock().new_group_func
     my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)

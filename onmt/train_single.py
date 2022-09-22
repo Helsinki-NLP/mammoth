@@ -11,7 +11,7 @@ from onmt.models import build_model_saver
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
-from onmt.utils.distributed import broadcast_tensors, is_master
+from onmt.utils.distributed import broadcast_tensors
 from onmt.inputters.dynamic_iterator import DynamicDatasetIter
 from onmt.transforms import get_transforms_cls
 
@@ -88,26 +88,20 @@ def init_distributed(model, task_queue_manager):
 def main(
     opt,
     fields_dict,
-    global_rank,
+    device_context,
     error_queue=None,
     batch_queue=None,
     semaphore=None,
-    node_rank=None,
-    local_rank=None,
-    global_task_queue_manager=None,
+    task_queue_manager=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opt`` has been validated and updated
     # at this point.
-    task_queue_manager = global_task_queue_manager.global_to_local(
-        node_rank=node_rank,
-        local_rank=local_rank,
-        opt=opt,
-    )
+    # N.B: task_queue_manager is already local
 
     init_logger(opt.log_file)
-    if node_rank is not None and local_rank is not None:
-        configure_process(opt, local_rank)
+    if device_context.is_distributed():
+        configure_process(opt, device_context.local_rank)
         gpu_rank_t = torch.distributed.get_rank()
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
@@ -118,15 +112,15 @@ def main(
     # Build model.
     model, generators_md = build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint)
 
-    logger.info("GPU {} - Init model".format(global_rank))
-    if node_rank is not None and local_rank is not None:
+    logger.info("{} - Init model".format(device_context.id))
+    if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
     enc, dec = model.count_parameters(log=logger.debug)
-    logger.info("GPU {} - total encoder parameters: {}".format(global_rank, enc))
-    logger.info("GPU {} - total decoder parameters: {}".format(global_rank, dec))
+    logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
+    logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))
 
     # Build optimizer.
-    logger.info("GPU {} - Build optimizer".format(global_rank))
+    logger.info("{} - Build optimizer".format(device_context.id))
     optim = Optimizer.from_opt(
         model,
         opt,
@@ -135,12 +129,12 @@ def main(
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, global_rank)
+    model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, device_context)
 
-    logger.info("GPU {} - Build trainer".format(global_rank))
+    logger.info("{} - Build trainer".format(device_context.id))
     trainer = build_trainer(
         opt,
-        local_rank,
+        device_context,
         model,
         fields_dict,
         optim,
@@ -148,7 +142,7 @@ def main(
         model_saver=model_saver,
         generators_md=generators_md,
     )
-    logger.info("GPU {} - Trainer built".format(global_rank))
+    logger.info("{} - Trainer built".format(device_context.id))
 
     if batch_queue is None:
         _train_iter = DynamicDatasetIter.from_opts(
@@ -160,7 +154,11 @@ def main(
             stride=1,
             offset=0,
         )
-        train_iter = IterOnDevice(_train_iter, local_rank)
+        # TODO: pass in whole device_context into refactored IterOnDevice
+        if device_context.is_gpu():
+            train_iter = IterOnDevice(_train_iter, device_context.local_rank)
+        else:
+            train_iter = IterOnDevice(_train_iter, -1)
     else:
         assert semaphore is not None, "Using batch_queue requires semaphore as well"
 
@@ -169,33 +167,39 @@ def main(
                 batch, metadata, communication_batch_id = batch_queue.get()
                 semaphore.release()
                 # Move batch to specified device
-                IterOnDevice.batch_to_device(batch, local_rank)
+                if device_context.is_gpu():
+                    IterOnDevice.batch_to_device(batch, device_context.local_rank)
+                else:
+                    IterOnDevice.batch_to_device(batch, -1)
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()
-    logger.info("GPU {} - Valid iter".format(global_rank))
+    logger.info("{} - Valid iter".format(device_context.id))
     valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
     if valid_iter is not None:
-        valid_iter = IterOnDevice(valid_iter, local_rank)
+        if device_context.is_gpu():
+            valid_iter = IterOnDevice(valid_iter, device_context.local_rank)
+        else:
+            valid_iter = IterOnDevice(valid_iter, -1)
 
     if len(opt.gpu_ranks):
-        if is_master(global_rank):
+        if device_context.is_master():
             logger.info('Starting training on GPU: %s' % opt.gpu_ranks)
     else:
         logger.info('Starting training on CPU, could be very slow')
     train_steps = opt.train_steps
     if opt.single_pass and train_steps > 0:
-        if is_master(global_rank):
+        if device_context.is_master():
             logger.warning("Option single_pass is enabled, ignoring train_steps.")
         train_steps = 0
-    logger.info("GPU {} - Starting training".format(global_rank))
+    logger.info("{} - Starting training".format(device_context.id))
     trainer.train(
         train_iter,
         train_steps,
         save_checkpoint_steps=opt.save_checkpoint_steps,
         valid_iter=valid_iter,
         valid_steps=opt.valid_steps,
-        global_rank=global_rank,
+        device_context=device_context,
     )
 
     if trainer.report_manager.tensorboard_writer is not None:

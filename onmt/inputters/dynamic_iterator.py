@@ -184,7 +184,7 @@ class DynamicDatasetIter(object):
 
             logger.debug(f'self.transforms_cls {self.transforms_cls}')
             if self.transforms_cls:
-                transforms = make_transforms(self.opts, self.transforms_cls, merged_fields)
+                transforms = make_transforms(self.opts, self.transforms_cls, merged_fields, task=task)
             else:
                 print('No transforms defined')
                 transforms = []

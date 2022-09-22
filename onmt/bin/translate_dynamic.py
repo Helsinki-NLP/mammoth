@@ -6,6 +6,7 @@ from onmt.inputters.text_dataset import InferenceDataReader
 from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe
 
 import onmt.opts as opts
+from onmt.utils.distributed import TaskSpecs
 from onmt.utils.parse import ArgumentParser
 
 
@@ -16,13 +17,29 @@ def translate(opt):
     ArgumentParser.validate_translate_opts_dynamic(opt)
     logger = init_logger(opt.log_file)
 
+    # only src_lang and tgt_lang are used at the moment
+    # TODO: pass task into build_translator and use instead of opts?
+    task = TaskSpecs(
+        node_rank=None,
+        local_rank=None,
+        src_lang=opt.src_lang,
+        tgt_lang=opt.tgt_lang,
+        encoder_id=opt.enc_id if opt.enc_id else opt.src_lang,
+        decoder_id=opt.dec_id if opt.dec_id else opt.tgt_lang,
+        corpus_id='trans',
+        weight=1,
+        corpus_opt=dict(),
+        src_vocab=None,
+        tgt_vocab=None,
+    )
+
     translator = build_translator(opt, logger=logger, report_score=True)
 
     data_reader = InferenceDataReader(opt.src, opt.tgt, opt.src_feats)
 
     # Build transforms
     transforms_cls = get_transforms_cls(opt._all_transform)
-    transforms = make_transforms(opt, transforms_cls, translator.fields)
+    transforms = make_transforms(opt, transforms_cls, translator.fields, task=task)
     data_transform = [
         transforms[name] for name in opt.transforms if name in transforms
     ]

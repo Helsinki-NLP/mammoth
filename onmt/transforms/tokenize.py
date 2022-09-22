@@ -165,13 +165,21 @@ class SentencePieceTransform(TokenizerTransform):
 
         spm.set_random_generator_seed(seed)
 
-    def warm_up(self, vocabs=None):
+    def warm_up(self, vocabs=None, task=None):
         """Load subword models."""
         super().warm_up(None)
         import sentencepiece as spm
 
         load_src_model = spm.SentencePieceProcessor()
-        load_src_model.Load(self.src_subword_model)
+        if task:
+            concrete_model = self.src_subword_model.format(
+                src_lang=task.src_lang,
+                tgt_lang=task.tgt_lang,
+            )
+        else:
+            concrete_model = self.src_subword_model
+        logger.info(f'Concrete SentencePiece model, src: {concrete_model}')
+        load_src_model.Load(concrete_model)
         _diff_vocab = (
             self.src_subword_vocab != self.tgt_subword_vocab or self.src_vocab_threshold != self.tgt_vocab_threshold
         )
@@ -181,7 +189,15 @@ class SentencePieceTransform(TokenizerTransform):
             self.load_models = {'src': load_src_model, 'tgt': load_src_model}
         else:
             load_tgt_model = spm.SentencePieceProcessor()
-            load_tgt_model.Load(self.tgt_subword_model)
+            if task:
+                concrete_model = self.tgt_subword_model.format(
+                    src_lang=task.src_lang,
+                    tgt_lang=task.tgt_lang,
+                )
+            else:
+                concrete_model = self.tgt_subword_model
+            logger.info(f'Concrete SentencePiece model, tgt: {concrete_model}')
+            load_tgt_model.Load(concrete_model)
             if self.tgt_subword_vocab != "" and self.tgt_vocab_threshold > 0:
                 load_tgt_model.LoadVocabulary(self.tgt_subword_vocab, self.tgt_vocab_threshold)
             self.load_models = {'src': load_src_model, 'tgt': load_tgt_model}

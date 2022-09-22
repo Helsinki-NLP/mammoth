@@ -224,7 +224,7 @@ class TransformPipe(Transform):
         return ', '.join(info_args)
 
 
-def make_transforms(opts, transforms_cls, fields):
+def make_transforms(opts, transforms_cls, fields, task):
     """Build transforms in `transforms_cls` with vocab of `fields`."""
     vocabs = get_vocabs(fields) if fields is not None else None
     transforms = {}
@@ -233,7 +233,11 @@ def make_transforms(opts, transforms_cls, fields):
             logger.warning(f"{transform_cls.__name__} require vocab to apply, skip it.")
             continue
         transform_obj = transform_cls(opts)
-        transform_obj.warm_up(vocabs)
+        try:
+            transform_obj.warm_up(vocabs, task=task)
+        except TypeError:
+            # old-style transform that does not take the task
+            transform_obj.warm_up(vocabs)
         transforms[name] = transform_obj
     return transforms
 

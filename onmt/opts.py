@@ -1176,7 +1176,7 @@ def _add_decoding_opts(parser):
     )
 
 
-def translate_opts(parser):
+def translate_opts(parser, dynamic=False):
     """Translation / inference options"""
     group = parser.add_argument_group('Model')
     group.add(
@@ -1267,6 +1267,19 @@ def translate_opts(parser):
     )
     group.add('--gpu', '-gpu', type=int, default=-1, help="Device to run on")
 
+    if dynamic:
+        group.add(
+            "-transforms",
+            "--transforms",
+            default=[],
+            nargs="+",
+            choices=AVAILABLE_TRANSFORMS.keys(),
+            help="Default transform pipeline to apply to data.",
+        )
+
+        # Adding options related to Transforms
+        _add_dynamic_transform_opts(parser)
+
 
 def build_bilingual_model(parser):
     """options for modular translation"""
@@ -1283,6 +1296,8 @@ def build_bilingual_model(parser):
         required=True,
         help="The 2-character target language code",
     )
+    group.add("--enc_id", "-enc_id", default=None, help="The encoder id. If unset, defaults to the src_lang")
+    group.add("--dec_id", "-dec_id", default=None, help="The decoder id. If unset, defaults to the tgt_lang")
     group = parser.add_argument_group("Model Modules")
     group.add(
         "--encoder",

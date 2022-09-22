@@ -94,9 +94,11 @@ def load_test_multitask_model(opt, model_path=None):
     if model_path.endswith('.pt'):
         return load_test_model(opt, model_path)
     else:
+        enc_id = opt.enc_id if opt.enc_id else opt.src_lang
+        dec_id = opt.dec_id if opt.dec_id else opt.tgt_lang
         model_path = model_path if model_path.endswith('_') else f'{model_path}_'
-        enc_path = model_path + opt.src_lang + '_enc.pt'
-        dec_path = model_path + opt.tgt_lang + '_dec.pt'
+        enc_path = model_path + enc_id + '_enc.pt'
+        dec_path = model_path + dec_id + '_dec.pt'
         opt.generator = model_path + opt.tgt_lang + '_gen.pt' if opt.generator is None else opt.generator
         opt.bridge = model_path + 'bridge.pt' if opt.bridge is None else opt.bridge
         opt.model_frame = model_path + 'frame.pt' if opt.model_frame is None else opt.model_frame
@@ -108,7 +110,8 @@ def load_test_multitask_model(opt, model_path=None):
         frame = torch.load(opt.model_frame, map_location=lambda storage, loc: storage)
 
         ckpt_state_dict = create_bilingual_statedict(
-            src_lang=opt.src_lang,
+            enc_id=enc_id,
+            dec_id=dec_id,
             tgt_lang=opt.tgt_lang,
             enc_module=encoder,
             dec_module=decoder,
@@ -125,7 +128,20 @@ def load_test_multitask_model(opt, model_path=None):
         model_opt = ArgumentParser.ckpt_model_opts(frame['opt'])
         # Avoid functionality on inference
         model_opt.update_vocab = False
-        model = create_bilingual_model(src_lang=opt.src_lang, tgt_lang=opt.tgt_lang, model_opt=model_opt, fields=fields)
+        model = create_bilingual_model(
+            src_lang=opt.src_lang,
+            tgt_lang=opt.tgt_lang,
+            enc_id=enc_id,
+            dec_id=dec_id,
+            model_opt=model_opt,
+            fields=fields
+            )
+        model_params = {name for name, p in model.named_parameters()}
+        model_params.update(name for name, p in model.named_buffers())
+        for key in set(ckpt_state_dict.keys()):
+            if key not in model_params:
+                logger.debug(f'deleting unnecessary key: {key}')
+                del ckpt_state_dict[key]
         model.load_state_dict(ckpt_state_dict)
         device = torch.device("cuda" if use_gpu(opt) else "cpu")
         model.to(device)
@@ -184,7 +200,7 @@ def load_test_model(opt, model_path=None):
     return fields, model, model_opt
 
 
-def create_bilingual_model(src_lang, tgt_lang, model_opt, fields):
+def create_bilingual_model(src_lang, tgt_lang, enc_id, dec_id, model_opt, fields):
     """For translation - state dict to be loaded to this model."""
 
     encoder = nn.ModuleDict()
@@ -198,13 +214,17 @@ def create_bilingual_model(src_lang, tgt_lang, model_opt, fields):
 
     pluggable_src_emb.activate(src_lang)
     pluggable_tgt_emb.activate(tgt_lang)
-    encoder.add_module(f'encoder{src_lang}', build_only_enc(model_opt, pluggable_src_emb))
-    decoder.add_module(f'decoder{tgt_lang}', build_only_dec(model_opt, pluggable_tgt_emb))
+    encoder.add_module(f'encoder{enc_id}', build_only_enc(model_opt, pluggable_src_emb))
+    decoder.add_module(f'decoder{dec_id}', build_only_dec(model_opt, pluggable_tgt_emb))
     generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, fields, tgt_emb))
 
     attention_bridge = AttentionBridge.from_opt(model_opt)
 
-    nmt_model = onmt.models.NMTModel(encoder=encoder, decoder=decoder, attention_bridge=attention_bridge)
+    nmt_model = onmt.models.NMTModel(
+        encoder=encoder,
+        decoder=decoder,
+        attention_bridge=attention_bridge
+    )
 
     nmt_model.generator = generator
     return nmt_model

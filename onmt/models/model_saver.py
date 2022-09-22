@@ -125,10 +125,16 @@ class ModelSaver(ModelSaverBase):
 
         model_state_dict = real_model.state_dict()
         encoder_ids = {
-            index: lang[0].replace('encoder', '') for index, lang in enumerate(model.encoder.named_children())
+            index: lang[0].replace('encoder', '')
+            for index, lang in enumerate(model.encoder.named_children())
         }
         decoder_ids = {
-            index: lang[0].replace('decoder', '') for index, lang in enumerate(model.decoder.named_children())
+            index: lang[0].replace('decoder', '')
+            for index, lang in enumerate(model.decoder.named_children())
+        }
+        generator_ids = {
+            index: lang[0].replace('generator', '')
+            for index, lang in enumerate(model.generator.named_children())
         }
 
         checkpoint = {
@@ -151,7 +157,7 @@ class ModelSaver(ModelSaverBase):
 
         encoders, decoders, attention_bridge, generators, model_frame = explode_model(checkpoint)
 
-        # TODO: refactor (in a dedicated saver class?)
+        # TODO: save embeddings for each language separately from the encoders/decoders
         # encoder modules
         for i, encoder in enumerate(encoders):
             checkpoint_path = "{}_step_{}_{}_enc.pt".format(self.base_path, step, encoder_ids[i])
@@ -172,7 +178,9 @@ class ModelSaver(ModelSaverBase):
                 tmp_checkpoint_paths.append(checkpoint_path)
         # generator modules
         for i, generator in enumerate(generators):
-            checkpoint_path = "{}_step_{}_{}_gen.pt".format(self.base_path, step, decoder_ids[i])
+            checkpoint_path = "{}_step_{}_{}_gen.pt".format(
+                self.base_path, step, generator_ids[i]
+            )
             if os.path.isfile(checkpoint_path):
                 logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
             else:

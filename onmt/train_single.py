@@ -155,7 +155,10 @@ def main(
             offset=0,
         )
         # TODO: pass in whole device_context into refactored IterOnDevice
-        train_iter = IterOnDevice(_train_iter, device_context.local_rank)
+        if device_context.is_gpu():
+            train_iter = IterOnDevice(_train_iter, device_context.local_rank)
+        else:
+            train_iter = IterOnDevice(_train_iter, -1)
     else:
         assert semaphore is not None, "Using batch_queue requires semaphore as well"
 
@@ -164,14 +167,20 @@ def main(
                 batch, metadata, communication_batch_id = batch_queue.get()
                 semaphore.release()
                 # Move batch to specified device
-                IterOnDevice.batch_to_device(batch, device_context.local_rank)
+                if device_context.is_gpu():
+                    IterOnDevice.batch_to_device(batch, device_context.local_rank)
+                else:
+                    IterOnDevice.batch_to_device(batch, -1)
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()
     logger.info("{} - Valid iter".format(device_context.id))
     valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
     if valid_iter is not None:
-        valid_iter = IterOnDevice(valid_iter, device_context.local_rank)
+        if device_context.is_gpu():
+            valid_iter = IterOnDevice(valid_iter, device_context.local_rank)
+        else:
+            valid_iter = IterOnDevice(valid_iter, -1)
 
     if len(opt.gpu_ranks):
         if device_context.is_master():

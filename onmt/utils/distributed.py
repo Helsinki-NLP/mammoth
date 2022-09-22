@@ -57,6 +57,8 @@ class WorldContext:
         return not self.is_distributed() or self.global_rank == 0
 
     def global_to_local(self, node_rank, local_rank):
+        assert node_rank is not None
+        assert local_rank is not None
         return DeviceContext(
             context=self.context,
             n_nodes=self.n_nodes,
@@ -69,21 +71,28 @@ class WorldContext:
     def from_opt(cls, opt):
         gpus_per_node = len(opt.gpu_ranks)
         world_size = int(opt.world_size) if gpus_per_node > 0 else 0
+        multinode = gpus_per_node != world_size
         if world_size <= 0:
             # setting a non-positive world size means use CPU
             device_context_enum = DeviceContextEnum.CPU
             if opt.n_nodes != 1:
                 raise ValueError('CPU training is only possible on a single node')
-        elif gpus_per_node != world_size:
-            # if `gpus_per_node` differs from `opt.world_size` we assume the training runs on multiple nodes
-            device_context_enum = DeviceContextEnum.MULTI_GPU
-        else:
+        elif world_size == 1:
+            # world size 1 uses GPU, but is not distributed
             device_context_enum = DeviceContextEnum.SINGLE_GPU
             if opt.n_nodes != 1:
                 raise ValueError(
-                    f'Invalid node configuration: '
+                    f'Invalid single-gpu node configuration: '
                     f'n_nodes {opt.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
                 )
+        else:
+            # world size > 1
+            if multinode and opt.n_nodes == 1:
+                raise ValueError(
+                    f'Invalid multi-node configuration: '
+                    f'n_nodes {opt.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
+                )
+            device_context_enum = DeviceContextEnum.MULTI_GPU
         world_context = WorldContext(context=device_context_enum, n_nodes=opt.n_nodes, gpus_per_node=gpus_per_node)
         return world_context
 
@@ -91,8 +100,8 @@ class WorldContext:
 @dataclass
 class DeviceContext(WorldContext):
     # Our place in the world
-    node_rank: Optional[int]
-    local_rank: Optional[int]
+    node_rank: int
+    local_rank: int
 
     @property
     def global_rank(self) -> int:
@@ -111,8 +120,9 @@ class DeviceContext(WorldContext):
         assert self.n_nodes == world_context.n_nodes
         assert self.gpus_per_node == world_context.gpus_per_node
         # check that ranks are within the specified size of the world
-        assert self.node_rank is None or 0 <= self.node_rank < self.n_nodes
-        assert self.local_rank is None or 0 <= self.local_rank < self.gpus_per_node
+        assert 0 <= self.node_rank < self.n_nodes
+        if self.is_gpu():
+            assert 0 <= self.local_rank < self.gpus_per_node
 
 
 def multi_init(opt, global_rank):
@@ -540,8 +550,8 @@ class TaskQueueManager:
         self.world_context = world_context
         self.device_context = device_context
 
-        logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
         if self.world_context and self.device_context:
+            logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
             self.device_context.validate(self.world_context)
 
         self.components_to_gpus = components_to_gpus
@@ -557,24 +567,28 @@ class TaskQueueManager:
 
     @property
     def node_rank(self):
-        return self.device_context.node_rank if self.device_context else None
+        if not self.device_context:
+            raise Exception('Trying to get node_rank of global TQM')
+        return self.device_context.node_rank
 
     @property
     def local_rank(self):
-        return self.device_context.local_rank if self.device_context else None
+        if not self.device_context:
+            raise Exception('Trying to get local_rank of global TQM')
+        return self.device_context.local_rank
 
     @classmethod
     def from_opt(cls, opt: Namespace, world_context: WorldContext):
         n_tasks = len(opt.src_tgt)
 
-        if world_context.is_gpu():
+        if world_context.is_distributed():
             # When --node_gpu is not set, assume an assigment that fills gpus in rank order
             node_gpu = (
                 [tuple(int(y) for y in x.split(':', 1)) for x in opt.node_gpu] if opt.node_gpu
                 else cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
             )
         else:
-            node_gpu = [(None, None)] * n_tasks
+            node_gpu = [(0, 0)] * n_tasks
         lang_pairs = [lang_pair.split('-') for lang_pair in opt.src_tgt]
 
         if opt.enc_sharing_group:
@@ -633,8 +647,8 @@ class TaskQueueManager:
         )
 
     def global_to_local(self, node_rank, local_rank, opt):
-        node_rank = node_rank if node_rank else 0
-        local_rank = local_rank if local_rank else 0
+        assert node_rank is not None
+        assert local_rank is not None
         task_distribution_strategy = self._get_strategy(node_rank=node_rank, local_rank=local_rank, opt=opt)
         device_context = self.world_context.global_to_local(node_rank, local_rank)
         return self.__class__(
@@ -648,6 +662,8 @@ class TaskQueueManager:
         )
 
     def _get_strategy(self, node_rank, local_rank, opt):
+        assert node_rank is not None
+        assert local_rank is not None
         # Global TQM does not have a task distribution strategy, but the local ones do
         my_corpus_ids = [task.corpus_id for task in self._tasks_on_device(node_rank, local_rank)]
         try:
@@ -672,7 +688,7 @@ class TaskQueueManager:
         return [task for task in self.tasks if (task.node_rank, task.local_rank) == (node_rank, local_rank)]
 
     def get_tasks(self):
-        if self.node_rank is None or self.local_rank is None:
+        if not self.device_context:
             # global mode: return all
             return self.tasks
         else:
@@ -692,8 +708,11 @@ class TaskQueueManager:
         self,
         new_group_func=torch.distributed.new_group,
     ):
-        if not self.world_context.is_distributed:
-            return dict()
+        if not self.world_context.is_distributed():
+            self.components_to_gpus = dict()
+            self.components_to_groups = dict()
+            return self.components_to_groups
+
         # Single OrderedDict contains all components.
         # Keys are tuples of strings.
         # The length of the key varies depending on the component:
@@ -738,8 +757,8 @@ class TaskQueueManager:
 
     @property
     def global_rank(self):
-        if self.node_rank is None or self.local_rank is None:
-            return None
+        assert self.node_rank is not None
+        assert self.local_rank is not None
         return self.node_rank * self.gpus_per_node + self.local_rank
 
     def get_distributed_groups(

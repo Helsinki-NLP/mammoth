@@ -138,16 +138,10 @@ def validate_slurm_node_opts(current_env, world_context, opt):
         )
     slurm_node_id = int(current_env['SLURM_NODEID'])
     if slurm_node_id != opt.node_rank:
-        if opt.node_rank:
-            raise ValueError(
-                f'Looks like you are running on slurm node {slurm_node_id}, '
-                f'but set node_rank to {opt.node_rank} on the command line'
-            )
-        else:
-            raise ValueError(
-                f'Looks like you are running on slurm node {slurm_node_id}, '
-                f'but did not set node_rank on the command line'
-            )
+        raise ValueError(
+            f'Looks like you are running on slurm node {slurm_node_id}, '
+            f'but set node_rank to {opt.node_rank} on the command line'
+        )
 
 
 def train(opt):
@@ -258,14 +252,13 @@ def train(opt):
 
     else:
         # SINGLE_GPU or CPU
-        local_rank = 0 if world_context.context == DeviceContextEnum.SINGLE_GPU else None
         device_context: DeviceContext = world_context.global_to_local(
             node_rank=0,
-            local_rank=local_rank,
+            local_rank=0,
         )
         task_queue_manager = global_task_queue_manager.global_to_local(
             node_rank=0,
-            local_rank=local_rank,
+            local_rank=0,
             opt=opt
         )
         train_process(opt, device_context=device_context, task_queue_manager=task_queue_manager)

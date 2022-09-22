@@ -14,7 +14,7 @@ onmt.opts.model_opts(parser)
 onmt.opts._add_train_general_opts(parser)
 
 # -data option is required, but not used in this test, so dummy.
-opt = parser.parse_known_args(['-data', 'dummy'])[0]
+opt = parser.parse_known_args(['-data', 'dummy', '-node_rank', '0'])[0]
 
 
 class TestModel(unittest.TestCase):

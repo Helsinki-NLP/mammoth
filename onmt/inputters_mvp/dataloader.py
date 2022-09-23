@@ -263,14 +263,20 @@ class DynamicDatasetIter(object):
         )
 
     def _init_datasets(self):
-        self.dataset_iterators = []
+        self.dataset_iterators = dict()
         for task in self.task_queue_manager.get_tasks():
             src_vocab = self.vocabs_dict[('src', task.src_lang)]
             tgt_vocab = self.vocabs_dict[('tgt', task.tgt_lang)]
+            # merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}
+            # logger.debug(f'merged_fields {merged_fields}')
 
             metadata = task.get_serializable_metadata()
 
-            device = torch.device(self.task_queue_manager.local_rank)
+            device = torch.device(
+                self.task_queue_manager.device_context.local_rank
+                if self.task_queue_manager.device_context.is_gpu()
+                else 'cpu'
+            )
             corpus = get_corpus(
                 self.opts, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train
             ).to(device)
@@ -284,7 +290,7 @@ class DynamicDatasetIter(object):
                 n_buckets=self.n_buckets,
             )
 
-            self.dataset_iterators.append((ordered_iter, metadata))
+            self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
 
         self.init_iterators = True
 
@@ -296,7 +302,7 @@ class DynamicDatasetIter(object):
         # before synching gradients between devices
         communication_batch_id = 0
         while True:
-            # interleaves one minibatch from each language pair, in a round-robin fashion
-            for ordered_iter, metadata in self.dataset_iterators:
+            for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
+                ordered_iter, metadata = self.dataset_iterators[corpus_id]
                 yield next(ordered_iter), metadata, communication_batch_id
             communication_batch_id += 1

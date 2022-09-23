@@ -18,8 +18,6 @@ from enum import Enum
 from itertools import compress, cycle, islice
 
 # from onmt.inputters_mvp import get_corpus
-from onmt.utils.logging import init_logger, logger
-from onmt.utils.misc import set_random_seed
 from pprint import pformat
 from typing import Any, Optional, List
 

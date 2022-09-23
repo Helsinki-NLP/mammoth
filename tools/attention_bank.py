@@ -102,6 +102,7 @@ def estimate(opts, vocabs_dict, model, model_opt, transforms):
         raise RuntimeError('please install scikit-learn')
 
     assert model.attention_bridge.is_fixed_length, "Can't estimate matrix-variate distribution with varying shapes"
+    print('Extracting sentences...')
     sentence_reps, _ = zip(
         * _extract(
             opts.src_sentences,
@@ -115,11 +116,13 @@ def estimate(opts, vocabs_dict, model, model_opt, transforms):
     )
     sentence_reps = torch.cat(sentence_reps, dim=1).transpose(0, 1)
     b, fixed_len, feats = sentence_reps.size()
-    sentence_reps = sentence_reps.view(b, fixed_len * feats).cpu().numpy()
+    sentence_reps = sentence_reps.contiguous().view(b, fixed_len * feats).cpu().numpy()
+    print('Estimating covariance...')
     cov_obj = sklearn.covariance.EmpiricalCovariance()
     cov_obj.fit(sentence_reps)
     loc = torch.from_numpy(cov_obj.location_)
     cov_mat = torch.from_numpy(cov_obj.covariance_)
+    print('Saving params...')
     torch.save([loc, cov_mat, fixed_len, feats], opts.param_save_file)
     # TODO: need to implement some way of using this in translate.py
     # how to use:

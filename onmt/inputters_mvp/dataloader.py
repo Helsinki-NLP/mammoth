@@ -12,7 +12,7 @@ def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size, n_buckets=None, cycle=True):
+def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True):
     """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         return iter(InferenceBatcher(dataset, batch_size))

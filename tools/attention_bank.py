@@ -1,17 +1,14 @@
 import argparse
 import collections
-import functools
 import itertools
 import pathlib
 
 import numpy as np
 import torch
-from torchtext.legacy.data import batch as torchtext_batch
-from torchtext.legacy.data import Batch
 import tqdm
 
-from onmt.inputters import DynamicDataset, str2sortkey
-from onmt.inputters.text_dataset import InferenceDataIterator
+from onmt.inputters_mvp.dataset import ParallelCorpus
+from onmt.inputters_mvp.dataloader import build_dataloader
 from onmt.model_builder import load_test_multitask_model
 from onmt.opts import build_bilingual_model, _add_dynamic_transform_opts
 from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe
@@ -54,31 +51,39 @@ def get_opts():
     return opts
 
 
-def _extract(sentences_file, model, fields, transforms, enc_id, batch_size=100, device='cpu'):
+def _extract(sentences_file, model, vocabs_dict, transforms, enc_id, batch_size=100, device='cpu'):
     """sub-routine to embed file"""
-    with open(sentences_file, 'rb') as sentences_file_fh:
-        example_stream = InferenceDataIterator(sentences_file_fh, itertools.repeat(None), None, transforms)
-        example_stream = DynamicDataset(fields, data=example_stream, sort_key=str2sortkey['text'])
-        example_stream = torchtext_batch(example_stream, batch_size=batch_size)
-        fake_dataset = collections.namedtuple('FakeDataset', 'fields')(fields)
-        batching_fn = functools.partial(Batch, dataset=fake_dataset, device=device)
-        example_stream = map(batching_fn, example_stream)
-        for batch in example_stream:
-            src, src_lengths = batch.src
-            enc_states, memory_bank, src_lengths, mask = model.encoder[f"encoder{enc_id}"](
-                src.to(device), src_lengths.to(device)
-            )
-            memory_bank, alphas = model.attention_bridge(memory_bank, mask)
-            yield (memory_bank, src_lengths)
+    corpus = ParallelCorpus(
+        sentences_file,
+        None,  # no target
+        vocabs_dict['src'],
+        vocabs_dict['tgt'],
+        transforms=transforms,
+    ).to(device)
+
+    batches = build_dataloader(
+        corpus,
+        batch_size=batch_size,
+        batch_type='sents',
+        cycle=False,
+    )
+
+    for batch in batches:
+        src, src_lengths = batch.src
+        enc_states, memory_bank, src_lengths, mask = model.encoder[f"encoder{enc_id}"](
+            src.to(device), src_lengths.to(device)
+        )
+        memory_bank, alphas = model.attention_bridge(memory_bank, mask)
+        yield (memory_bank, src_lengths)
 
 
-def extract(opts, fields, model, model_opt, transforms):
+def extract(opts, vocabs_dict, model, model_opt, transforms):
     """Compute representations drawn from the encoder and save them to file."""
     sentence_reps = []
     for src, src_length in _extract(
         opts.src_sentences,
         model,
-        fields,
+        vocabs_dict,
         transforms,
         opts.enc_id,
         batch_size=opts.batch_size,
@@ -89,7 +94,7 @@ def extract(opts, fields, model, model_opt, transforms):
     torch.save(sentence_reps, opts.dump_file)
 
 
-def estimate(opts, fields, model, model_opt, transforms):
+def estimate(opts, vocabs_dict, model, model_opt, transforms):
     """Estimate the matrix-variate distribution of representations drawn from the encoder."""
     try:
         import sklearn.covariance
@@ -101,7 +106,7 @@ def estimate(opts, fields, model, model_opt, transforms):
         * _extract(
             opts.src_sentences,
             model,
-            fields,
+            vocabs_dict,
             transforms,
             opts.enc_id,
             batch_size=opts.batch_size,
@@ -125,7 +130,7 @@ def estimate(opts, fields, model, model_opt, transforms):
     # return sampling_fn
 
 
-def classify(opts, fields, model, model_opt, transforms):
+def classify(opts, vocabs_dict, model, model_opt, transforms):
     """Learn a simple SGD classifier using representations drawn from the encoder."""
     try:
         import sklearn.linear_model
@@ -146,7 +151,7 @@ def classify(opts, fields, model, model_opt, transforms):
                 _extract(
                     train_file,
                     model,
-                    fields,
+                    vocabs_dict,
                     transforms,
                     opts.enc_id,
                     batch_size=opts.batch_size,
@@ -178,7 +183,7 @@ def classify(opts, fields, model, model_opt, transforms):
                 _extract(
                     test_file,
                     model,
-                    fields,
+                    vocabs_dict,
                     transforms,
                     opts.enc_id,
                     batch_size=opts.batch_size,
@@ -212,7 +217,7 @@ def main():
     # ArgumentParser.validate_translate_opts_dynamic(opts)
     opts.enc_id = opts.enc_id or opts.src_lang
 
-    fields, model, model_opt = load_test_multitask_model(opts, opts.model)
+    vocabs_dict, model, model_opt = load_test_multitask_model(opts, opts.model)
     command_fn = {
         fn.__name__: fn for fn in
         [extract, estimate, classify]
@@ -220,13 +225,13 @@ def main():
 
     # Build transforms
     transforms_cls = get_transforms_cls(opts._all_transform)
-    transforms = make_transforms(opts, transforms_cls, fields)
+    transforms = make_transforms(opts, transforms_cls, vocabs_dict)
     data_transform = [
         transforms[name] for name in opts.transforms if name in transforms
     ]
     transform = TransformPipe.build_from(data_transform)
 
-    command_fn(opts, fields, model.to(opts.device), model_opt, transform)
+    command_fn(opts, vocabs_dict, model.to(opts.device), model_opt, transform)
 
 
 if __name__ == '__main__':

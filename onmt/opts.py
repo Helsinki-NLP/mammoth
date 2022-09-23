@@ -147,12 +147,12 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
     )
 
     if not build_vocab_only:
-        group.add(
-            '-dump_fields',
-            '--dump_fields',
-            action='store_true',
-            help="Dump fields `*.vocab.pt` to disk. -save_data should be set as saving prefix.",
-        )
+        # group.add(
+        #     '-dump_fields',
+        #     '--dump_fields',
+        #     action='store_true',
+        #     help="Dump fields `*.vocab.pt` to disk. -save_data should be set as saving prefix.",
+        # )
         group.add(
             '-dump_transforms',
             '--dump_transforms',
@@ -178,11 +178,11 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         )
 
 
-def _add_dynamic_fields_opts(parser, build_vocab_only=False):
-    """Options related to vocabulary and fields.
+def _add_dynamic_vocabs_opts(parser, build_vocab_only=False):
+    """Options related to vocabulary.
 
-    Add all options relate to vocabulary or fields to parser.
-    If `build_vocab_only` set to True, do not contain fields
+    Add all options relate to vocabulary to parser.
+    If `build_vocab_only` set to True, do not contain vocab
     related options which won't be used in `bin/build_vocab.py`.
     """
     group = parser.add_argument_group("Vocab")
@@ -298,7 +298,7 @@ def dynamic_prepare_opts(parser, build_vocab_only=False):
     """
     config_opts(parser)
     _add_dynamic_corpus_opts(parser, build_vocab_only=build_vocab_only)
-    _add_dynamic_fields_opts(parser, build_vocab_only=build_vocab_only)
+    _add_dynamic_vocabs_opts(parser, build_vocab_only=build_vocab_only)
     _add_dynamic_transform_opts(parser)
 
     if build_vocab_only:
@@ -813,18 +813,6 @@ def _add_train_general_opts(parser):
         help="Batch grouping for batch_size. Standard is sents. Tokens will do dynamic batching",
     )
     group.add(
-        '--pool_factor',
-        '-pool_factor',
-        type=int,
-        default=8192,
-        help="""Factor used in data loading and batch creations.
-              It will load the equivalent of `pool_factor` batches,
-              sort them by the according `sort_key` to produce
-              homogeneous batches and reduce padding, and yield
-              the produced batches in a shuffled way.
-              Inspired by torchtext's pool mechanism.""",
-    )
-    group.add(
         '--normalization',
         '-normalization',
         default='sents',
@@ -1036,7 +1024,14 @@ def _add_train_dynamic_data(parser):
         "--bucket_size",
         type=int,
         default=2048,
-        help="Examples per dynamically generated torchtext Dataset.",
+        help="Number of examples to dynamically pool before batching.",
+    )
+    group.add(
+        "-n_buckets",
+        "--n_buckets",
+        type=int,
+        default=1024,
+        help="Maximum number of bins for batching.",
     )
 
 

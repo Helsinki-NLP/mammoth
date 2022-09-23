@@ -2,7 +2,6 @@
 import torch
 from onmt.utils.logging import logger
 from onmt.utils.misc import check_path
-from onmt.inputters.fields import get_vocabs
 
 
 class Transform(object):
@@ -54,7 +53,7 @@ class Transform(object):
         """Apply transform to `example`.
 
         Args:
-            example (dict): a dict of field value, ex. src, tgt;
+            example (dict): a dict of src, tgt, etc.;
             is_train (bool): Indicate if src/tgt is training data;
             stats (TransformStatistics): a statistic object.
         """
@@ -185,7 +184,7 @@ class TransformPipe(Transform):
         """Apply transform pipe to `example`.
 
         Args:
-            example (dict): a dict of field value, ex. src, tgt.
+            example (dict): a dict of src, tgt, etc.
 
         """
         for transform in self.transforms:
@@ -224,9 +223,8 @@ class TransformPipe(Transform):
         return ', '.join(info_args)
 
 
-def make_transforms(opts, transforms_cls, fields):
-    """Build transforms in `transforms_cls` with vocab of `fields`."""
-    vocabs = get_vocabs(fields) if fields is not None else None
+def make_transforms(opts, transforms_cls, vocabs):
+    """Build transforms in `transforms_cls` with `vocabs`."""
     transforms = {}
     for name, transform_cls in transforms_cls.items():
         if transform_cls.require_vocab() and vocabs is None:

@@ -187,7 +187,7 @@ def train(opt):
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
-    train_process = partial(single_main, vocabs_dict=vocabs_dict, global_task_queue_manager=global_task_queue_manager)
+    train_process = partial(single_main, vocabs_dict=vocabs_dict)
 
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 

@@ -3,23 +3,126 @@
     https://github.com/pytorch/fairseq
 """
 import math
+import numpy as np
 import os
 import pickle
 import signal
 import torch.distributed
 
+from abc import ABC, abstractmethod
 from argparse import Namespace
 from collections import OrderedDict, namedtuple
 from dataclasses import dataclass
+from enum import Enum
 from itertools import cycle, islice
-from onmt.utils.logging import init_logger, logger
-from onmt.utils.misc import set_random_seed
 from pprint import pformat
 from typing import Any, Optional, List
 
+from onmt.utils.logging import init_logger, logger
+from onmt.utils.misc import set_random_seed
 
-def is_master(global_rank):
-    return global_rank == 0
+
+class DeviceContextEnum(Enum):
+    CPU = 1
+    SINGLE_GPU = 2
+    MULTI_GPU = 3
+
+
+@dataclass
+class WorldContext:
+    context: DeviceContextEnum
+    # Size of the world: total number of nodes, gpus on each node
+    n_nodes: int
+    gpus_per_node: int
+
+    @property
+    def world_size(self):
+        """Total number of training GPUs"""
+        return self.n_nodes * self.gpus_per_node
+
+    def is_distributed(self):
+        """When training is distributed over several devices,
+        multiprocessing is used to communicate gradients"""
+        return self.context == DeviceContextEnum.MULTI_GPU
+
+    def is_gpu(self):
+        """Data tensors must be moved to the GPU for compute"""
+        return self.context != DeviceContextEnum.CPU
+
+    def is_master(self):
+        """For code that should only run in one process:
+        - saving fully shared modules from one device only
+        - avoiding log spam when all devices would log the same result
+        """
+        return not self.is_distributed() or self.global_rank == 0
+
+    def global_to_local(self, node_rank, local_rank):
+        assert node_rank is not None
+        assert local_rank is not None
+        return DeviceContext(
+            context=self.context,
+            n_nodes=self.n_nodes,
+            gpus_per_node=self.gpus_per_node,
+            node_rank=node_rank,
+            local_rank=local_rank,
+        )
+
+    @classmethod
+    def from_opt(cls, opt):
+        gpus_per_node = len(opt.gpu_ranks)
+        world_size = int(opt.world_size) if gpus_per_node > 0 else 0
+        multinode = gpus_per_node != world_size
+        if world_size <= 0:
+            # setting a non-positive world size means use CPU
+            device_context_enum = DeviceContextEnum.CPU
+            if opt.n_nodes != 1:
+                raise ValueError('CPU training is only possible on a single node')
+        elif world_size == 1:
+            # world size 1 uses GPU, but is not distributed
+            device_context_enum = DeviceContextEnum.SINGLE_GPU
+            if opt.n_nodes != 1:
+                raise ValueError(
+                    f'Invalid single-gpu node configuration: '
+                    f'n_nodes {opt.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
+                )
+        else:
+            # world size > 1
+            if multinode and opt.n_nodes == 1:
+                raise ValueError(
+                    f'Invalid multi-node configuration: '
+                    f'n_nodes {opt.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
+                )
+            device_context_enum = DeviceContextEnum.MULTI_GPU
+        world_context = WorldContext(context=device_context_enum, n_nodes=opt.n_nodes, gpus_per_node=gpus_per_node)
+        return world_context
+
+
+@dataclass
+class DeviceContext(WorldContext):
+    # Our place in the world
+    node_rank: int
+    local_rank: int
+
+    @property
+    def global_rank(self) -> int:
+        return self.gpus_per_node * self.node_rank + self.local_rank
+
+    @property
+    def id(self) -> str:
+        if self.is_gpu():
+            return f'GPU {self.node_rank}:{self.local_rank}'
+        else:
+            return 'CPU'
+
+    def validate(self, world_context):
+        # check that this DeviceContext is consistent with given WorldContext
+        assert self.context == world_context.context
+        assert self.n_nodes == world_context.n_nodes
+        assert self.gpus_per_node == world_context.gpus_per_node
+        # check that ranks are within the specified size of the world
+        assert 0 <= self.node_rank < self.n_nodes
+        if self.is_gpu():
+            assert 0 <= self.local_rank < self.gpus_per_node
 
 
 def multi_init(opt, global_rank):
@@ -44,6 +147,77 @@ def broadcast_tensors(tensors, src=0, group=None):
             torch.distributed.broadcast(t, src)
         else:
             torch.distributed.broadcast(t, src, group=group)
+
+
+def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
+    """
+    Gradient synch tolerant to missing grads.
+
+    Missing grads occur when some parameters are not trained between two
+    gradient synchs, e.g. the embeddings of a low-resource language with low
+    sampling weight.
+
+    The algorithm first uses the 'has_grad' attribute set by the forward hook
+    'has_grad_hook'. This hook ensures that all parameters of the modules
+    selected for use during the current training computation have 'has_grad'
+    set to True. This gives the list of parameters that have been trained on
+    this device ("ready").
+
+    A bit mask covering the parameters that are ready on this device is
+    communicated to the other devices in the group. The bit masks are reduced
+    using summation. The sum gives the number of real gradients for that
+    parameter, and can be used for normalization.
+
+    If a parameter is ready on any device, all devices communicate a value.
+    Devices on which the parameter is ready communicate the actual gradient,
+    while devices on which it is not ready communicate a dummy zero tensor
+        instead. The sum computed previously is used for normalization.
+
+    Args:
+        named_parameters: tuples of (str, Parameter) defining the parameters to consider
+        group: torch.distributed communication group
+    """
+    # Set missing gradients to zero, keeping track of true gradients
+    require_grad = [(name, p) for (name, p) in named_parameters if p.requires_grad]
+    if not require_grad:
+        # Exit early if the component has no parameters that require a gradient
+        return
+    device = require_grad[0][1].device
+    ready_list = []
+    for name, p in require_grad:
+        if hasattr(p, 'has_grad') and p.has_grad:
+            ready_list.append(1.0)
+        else:
+            ready_list.append(0.0)
+            if p.grad is None:
+                p.grad = torch.zeros_like(p)
+
+    # Communicate the ready bits, and reduce them using summation.
+    # This gives the number of non-dummy gradients participating, for normalization
+    ready_t = torch.tensor(ready_list).to(device)
+    if group is None:
+        torch.distributed.all_reduce(ready_t)
+    else:
+        torch.distributed.all_reduce(ready_t, group=group)
+    rescale_denoms = ready_t  # after reduction
+
+    # Omit if all nodes sent a zero ready bit
+    grads = [p.grad.data for name, p in require_grad]
+    grads = [grad for (grad, denom) in zip(grads, rescale_denoms) if denom > 0]
+    rescale_denoms = [denom for denom in rescale_denoms if denom > 0]
+    assert len(grads) == len(rescale_denoms)
+    if len(grads) == 0:
+        return
+
+    # All devices communicate either a real gradient or a dummy zeros of the same size
+    # Can not use rescale_denom, as each grad may have its own denominator
+    all_reduce_and_rescale_tensors(grads, rescale_denom=1, group=group)
+
+    # Normalize using the previously computed values
+    for grad, denom in zip(grads, rescale_denoms):
+        if denom > 0:
+            grad.div_(denom)
+    # Note: p.has_grad is reused in the optimizer to prevent the untrained components from being stepped
 
 
 def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None, buffer_size=10485760):
@@ -189,19 +363,23 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
         queue.put((batch, metadata, communication_batch_id))
 
 
-def consumer(process_fn, opt, global_rank, error_queue, batch_queue, semaphore, node_rank, local_rank):  # noqa: E501
+def consumer(process_fn, opt, device_context, error_queue, batch_queue, semaphore, task_queue_manager):
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
-        logger.info(f'global_rank {global_rank} node_rank {node_rank} local_rank {local_rank}')
+        logger.info(
+            f'global_rank {device_context.global_rank} '
+            f'node_rank {device_context.node_rank} '
+            f'local_rank {device_context.local_rank}'
+        )
         logger.info(f'opt.gpu_ranks {opt.gpu_ranks}')
-        multi_init(opt, global_rank)
+        multi_init(opt, device_context.global_rank)
+        # error_queue not passed (is this intentional?)
         process_fn(
             opt,
-            global_rank=global_rank,
+            device_context=device_context,
             batch_queue=batch_queue,
             semaphore=semaphore,
-            node_rank=node_rank,
-            local_rank=local_rank,
+            task_queue_manager=task_queue_manager,
         )
 
     except KeyboardInterrupt:
@@ -210,8 +388,107 @@ def consumer(process_fn, opt, global_rank, error_queue, batch_queue, semaphore, 
         # propagate exception to parent process, keeping original traceback
         import traceback
 
-        error_queue.put((opt.gpu_ranks[node_rank], traceback.format_exc()))
+        error_queue.put((opt.gpu_ranks[device_context.node_rank], traceback.format_exc()))
 
+
+class TaskDistributionStrategy(ABC):
+    @abstractmethod
+    def __init__(self, my_corpus_ids: List[str], **kwargs):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
+        pass
+
+    @abstractmethod
+    def sample_corpus_ids(self, n_samples: int, communication_batch_id: int) -> List[str]:
+        pass
+
+
+class WeightedSamplingTaskDistributionStrategy(TaskDistributionStrategy):
+    """
+    Schedules tasks by sampling with replacement from a categorical distribution.
+    The probabilities are found by normalizing the weights of all valid tasks (corpora).
+    Valid tasks are those that are present on this device, and have already reached
+    their curriculum starting point "introduce_at_training_step".
+    """
+
+    def __init__(
+        self,
+        my_corpus_ids: List[str],
+        my_weights: List[float],
+        my_introduce_at_training_step: List[int]
+    ):
+        self.my_corpus_ids = my_corpus_ids
+        self.my_weights = my_weights
+        self.my_introduce_at_training_step = my_introduce_at_training_step
+
+        # Sanity check of weights and curriculum
+        assert len(self.my_corpus_ids) == len(self.my_weights)
+        assert len(self.my_corpus_ids) == len(self.my_introduce_at_training_step)
+        if len(self.my_corpus_ids) == 0:
+            raise ValueError('No corpora on device')
+        if sum(my_weights) <= 0:
+            raise ValueError('Can not set "weight" of all corpora on a device to zero')
+        if all(x > 0 for x in my_introduce_at_training_step):
+            raise ValueError('Can not set "introduce_at_training_step" of all corpora on a device to nonzero')
+        if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_introduce_at_training_step)):
+            raise ValueError('Invalid curriculum: no corpus is ready to start in the first step')
+
+    @classmethod
+    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
+        my_weights = [opt.data[corpus_id]['weight'] for corpus_id in my_corpus_ids]
+        my_introduce_at_training_step = [
+            opt.data[corpus_id]['introduce_at_training_step'] for corpus_id in my_corpus_ids
+        ]
+        return cls(my_corpus_ids, my_weights, my_introduce_at_training_step)
+
+    def sample_corpus_ids(
+        self,
+        n_samples: int,
+        communication_batch_id: int,
+    ):
+        weights = [
+            weight if introduce_at_training_step <= communication_batch_id else 0
+            for (corpus_id, weight, introduce_at_training_step) in zip(
+                self.my_corpus_ids, self.my_weights, self.my_introduce_at_training_step
+            )
+        ]
+        sum_w = sum(weights)
+        assert sum_w > 0
+        p = [weight / sum_w for weight in weights]
+        # sampling with replacement from weighted corpora (language pairs)
+        sampled_corpus_ids = np.random.choice(self.my_corpus_ids, size=n_samples, p=p)
+        return sampled_corpus_ids
+
+
+class RoundRobinTaskDistributionStrategy(TaskDistributionStrategy):
+    """
+    Schedules tasks (corpora) in a round-robin fashion.
+    Yields a communication batch of n_samples at a time.
+    When reaching the end of the list of tasks, starts over from the beginning.
+    """
+
+    def __init__(self, my_corpus_ids: List[str]):
+        self.infinite_corpus_ids = cycle(my_corpus_ids)
+
+    @classmethod
+    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
+        return cls(my_corpus_ids)
+
+    def sample_corpus_ids(
+        self,
+        n_samples: int,
+        communication_batch_id: int,
+    ):
+        return list(islice(self.infinite_corpus_ids, n_samples))
+
+
+TASK_DISTRIBUTION_STRATEGIES = {
+    'weighted_sampling': WeightedSamplingTaskDistributionStrategy,
+    'roundrobin': RoundRobinTaskDistributionStrategy,
+}
 
 DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
 
@@ -249,12 +526,12 @@ class TaskQueueManager:
     def __init__(
         self,
         tasks: List[TaskSpecs],
-        gpus_per_node: int,
-        n_nodes: int,
+        tasks_per_communication_batch: int,
+        world_context: WorldContext,
+        device_context: Optional[DeviceContext] = None,
         components_to_gpus=None,
         components_to_groups=None,
-        node_rank: Optional[int] = None,
-        local_rank: Optional[int] = None
+        task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
     ):
         """
         Schedules tasks (language pairs) to devices.
@@ -268,34 +545,50 @@ class TaskQueueManager:
         When set to None, all items are returned.
         """
         self.tasks = tasks
-        self.node_rank = node_rank
-        self.local_rank = local_rank
+        self.tasks_per_communication_batch = tasks_per_communication_batch
+        self.task_distribution_strategy = task_distribution_strategy
+        self.world_context = world_context
+        self.device_context = device_context
 
-        self.gpus_per_node = gpus_per_node
-        self.n_nodes = n_nodes
-
-        logger.info(f'in task_queue_manager: node_rank {node_rank} local_rank {local_rank}')
-        assert node_rank is None or 0 <= node_rank < self.n_nodes
-        assert local_rank is None or 0 <= local_rank < self.gpus_per_node
+        if self.world_context and self.device_context:
+            logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
+            self.device_context.validate(self.world_context)
 
         self.components_to_gpus = components_to_gpus
         self.components_to_groups = components_to_groups
 
-    @classmethod
-    def from_opt(cls, opt: Namespace):
-        n_tasks = len(opt.src_tgt)
-        gpus_per_node = len(opt.gpu_ranks)
-        if gpus_per_node > 0:
-            n_nodes = opt.world_size // gpus_per_node
-        else:
-            n_nodes = 1
-            gpus_per_node = 1
+    @property
+    def gpus_per_node(self):
+        return self.world_context.gpus_per_node
 
-        # When --node_gpu is not set, assume an assigment that fills gpus in rank order
-        node_gpu = (
-            [tuple(int(y) for y in x.split(':', 1)) for x in opt.node_gpu] if opt.node_gpu
-            else cls._default_node_gpu(n_tasks, n_nodes, gpus_per_node)
-        )
+    @property
+    def n_nodes(self):
+        return self.world_context.n_nodes
+
+    @property
+    def node_rank(self):
+        if not self.device_context:
+            raise Exception('Trying to get node_rank of global TQM')
+        return self.device_context.node_rank
+
+    @property
+    def local_rank(self):
+        if not self.device_context:
+            raise Exception('Trying to get local_rank of global TQM')
+        return self.device_context.local_rank
+
+    @classmethod
+    def from_opt(cls, opt: Namespace, world_context: WorldContext):
+        n_tasks = len(opt.src_tgt)
+
+        if world_context.is_distributed():
+            # When --node_gpu is not set, assume an assigment that fills gpus in rank order
+            node_gpu = (
+                [tuple(int(y) for y in x.split(':', 1)) for x in opt.node_gpu] if opt.node_gpu
+                else cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
+            )
+        else:
+            node_gpu = [(0, 0)] * n_tasks
         lang_pairs = [lang_pair.split('-') for lang_pair in opt.src_tgt]
 
         if opt.enc_sharing_group:
@@ -347,18 +640,42 @@ class TaskQueueManager:
                 tgt_vocab=None,
             )
             tasks.append(task)
-        return cls(tasks, gpus_per_node=gpus_per_node, n_nodes=n_nodes)
+        return cls(
+            tasks,
+            world_context=world_context,
+            tasks_per_communication_batch=opt.accum_count,
+        )
 
-    def global_to_local(self, node_rank, local_rank):
+    def global_to_local(self, node_rank, local_rank, opt):
+        assert node_rank is not None
+        assert local_rank is not None
+        task_distribution_strategy = self._get_strategy(node_rank=node_rank, local_rank=local_rank, opt=opt)
+        device_context = self.world_context.global_to_local(node_rank, local_rank)
         return self.__class__(
             self.tasks,
-            gpus_per_node=self.gpus_per_node,
-            n_nodes=self.n_nodes,
+            tasks_per_communication_batch=self.tasks_per_communication_batch,
+            world_context=self.world_context,
+            device_context=device_context,
             components_to_gpus=self.components_to_gpus,
             components_to_groups=self.components_to_groups,
-            node_rank=node_rank,
-            local_rank=local_rank,
+            task_distribution_strategy=task_distribution_strategy,
         )
+
+    def _get_strategy(self, node_rank, local_rank, opt):
+        assert node_rank is not None
+        assert local_rank is not None
+        # Global TQM does not have a task distribution strategy, but the local ones do
+        my_corpus_ids = [task.corpus_id for task in self._tasks_on_device(node_rank, local_rank)]
+        try:
+            strategy = TASK_DISTRIBUTION_STRATEGIES[opt.task_distribution_strategy].from_opt(
+                my_corpus_ids=my_corpus_ids,
+                opt=opt,
+            )
+            return strategy
+        except Exception as e:
+            raise Exception(
+                f'Exception when creating task distribution strategy on {node_rank}:{local_rank} {e}'
+            )
 
     def __repr__(self):
         kwargs = ',\n '.join(
@@ -371,7 +688,7 @@ class TaskQueueManager:
         return [task for task in self.tasks if (task.node_rank, task.local_rank) == (node_rank, local_rank)]
 
     def get_tasks(self):
-        if self.node_rank is None or self.local_rank is None:
+        if not self.device_context:
             # global mode: return all
             return self.tasks
         else:
@@ -391,6 +708,11 @@ class TaskQueueManager:
         self,
         new_group_func=torch.distributed.new_group,
     ):
+        if not self.world_context.is_distributed():
+            self.components_to_gpus = dict()
+            self.components_to_groups = dict()
+            return self.components_to_groups
+
         # Single OrderedDict contains all components.
         # Keys are tuples of strings.
         # The length of the key varies depending on the component:
@@ -435,8 +757,8 @@ class TaskQueueManager:
 
     @property
     def global_rank(self):
-        if self.node_rank is None or self.local_rank is None:
-            return None
+        assert self.node_rank is not None
+        assert self.local_rank is not None
         return self.node_rank * self.gpus_per_node + self.local_rank
 
     def get_distributed_groups(
@@ -506,6 +828,12 @@ class TaskQueueManager:
                 result.append((side, lang, component_id, fields))
             seen.add((side, lang, component_id))
         return result
+
+    def sample_corpus_ids(self, communication_batch_id: int):
+        return self.task_distribution_strategy.sample_corpus_ids(
+            self.tasks_per_communication_batch,
+            communication_batch_id,
+        )
 
     def get_encoders(self):
         my_encoder_ids = [task.encoder_id for task in self.get_tasks()]

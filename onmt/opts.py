@@ -1,11 +1,12 @@
 """ Implementation of all available options """
 import configargparse
 
-from onmt.models.sru import CheckSRU
-from onmt.transforms import AVAILABLE_TRANSFORMS
 from onmt.constants import ModelTask
+from onmt.models.sru import CheckSRU
 from onmt.modules.position_ffn import ACTIVATION_FUNCTIONS
 from onmt.modules.position_ffn import ActivationFunction
+from onmt.transforms import AVAILABLE_TRANSFORMS
+from onmt.utils.distributed import TASK_DISTRIBUTION_STRATEGIES
 
 
 def config_opts(parser):
@@ -702,6 +703,15 @@ def _add_train_general_opts(parser):
     # GPU
     group.add('--gpuid', '-gpuid', default=[], nargs='*', type=int, help="Deprecated see world_size and gpu_ranks.")
     group.add('--gpu_ranks', '-gpu_ranks', default=[], nargs='*', type=int, help="list of ranks of each process.")
+    group.add('--n_nodes', '-n_nodes', default=1, type=int, help="total number of training nodes.")
+    group.add(
+        '--node_rank',
+        '-node_rank',
+        required=True,
+        type=int,
+        help="index of current node (0-based). "
+             "When using non-distributed training (CPU, single-GPU), set to 0"
+    )
     group.add('--world_size', '-world_size', default=1, type=int, help="total number of distributed processes.")
     group.add('--gpu_backend', '-gpu_backend', default="nccl", type=str, help="Type of torch distributed backend")
     group.add(
@@ -839,6 +849,13 @@ def _add_train_general_opts(parser):
         nargs='+',
         default=[0],
         help="Steps at which accum_count values change",
+    )
+    group.add(
+        '--task_distribution_strategy',
+        '-task_distribution_strategy',
+        choices=TASK_DISTRIBUTION_STRATEGIES.keys(),
+        default='weighted_sampling',
+        help="Strategy for the order in which tasks (e.g. language pairs) are scheduled for training"
     )
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
     group.add('--valid_batch_size', '-valid_batch_size', type=int, default=32, help='Maximum batch size for validation')

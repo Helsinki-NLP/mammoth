@@ -5,17 +5,16 @@ from onmt.utils.logging import logger
 import torch
 import torch.nn as nn
 
-from onmt.utils.distributed import is_master
 from onmt.utils.module_splitter import explode_model
 
 
-def build_model_saver(model_opt, opt, model, fields_dict, optim, device_id):
+def build_model_saver(model_opt, opt, model, fields_dict, optim, device_context):
     # _check_save_model_path
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opt.save_model, model, model_opt, fields_dict, optim, opt.keep_checkpoint, device_id, opt.save_all_gpus
+        opt.save_model, model, model_opt, fields_dict, optim, opt.keep_checkpoint, device_context, opt.save_all_gpus
     )
     return model_saver
 
@@ -45,7 +44,7 @@ class ModelSaverBase(object):
         fields_dict,
         optim,
         keep_checkpoint=-1,
-        device_id="0",
+        device_context=None,
         all_gpus=False,
     ):
         self.base_path = base_path
@@ -57,7 +56,8 @@ class ModelSaverBase(object):
         self.keep_checkpoint = keep_checkpoint
         if keep_checkpoint > 0:
             self.checkpoint_queue = deque([], maxlen=keep_checkpoint)
-        self.device_id = device_id
+        assert device_context is not None
+        self.device_context = device_context
         self.all_gpus = all_gpus
 
     def save(self, step, moving_average=None):
@@ -77,7 +77,7 @@ class ModelSaverBase(object):
                 model_params_data.append(param.data)
                 param.data = avg.data
 
-        chkpt_names = self._save(step, save_model, self.device_id)
+        chkpt_names = self._save(step, save_model, self.device_context)
         self.last_saved_step = step
 
         if moving_average:
@@ -120,7 +120,7 @@ class ModelSaverBase(object):
 class ModelSaver(ModelSaverBase):
     """Simple model saver to filesystem"""
 
-    def _save(self, step, model, device_id):
+    def _save(self, step, model, device_context):
         real_model = model.module if isinstance(model, nn.DataParallel) else model
 
         model_state_dict = real_model.state_dict()
@@ -150,7 +150,7 @@ class ModelSaver(ModelSaverBase):
 
         if self.all_gpus:
             # save models trained in each gpu
-            checkpoint_path = "{}_step_{}_gpu_{}.pt".format(self.base_path, step, device_id)
+            checkpoint_path = "{}_step_{}_gpu_{}.pt".format(self.base_path, step, device_context.global_rank)
             logger.info("Saving full checkpoint {}".format(checkpoint_path))
             torch.save(checkpoint, checkpoint_path)
             tmp_checkpoint_paths.append(checkpoint_path)
@@ -162,7 +162,7 @@ class ModelSaver(ModelSaverBase):
         for i, encoder in enumerate(encoders):
             checkpoint_path = "{}_step_{}_{}_enc.pt".format(self.base_path, step, encoder_ids[i])
             if os.path.isfile(checkpoint_path):
-                logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
+                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
             else:
                 logger.info("Saving encoder checkpoint {}".format(checkpoint_path))
                 torch.save(encoder, checkpoint_path)
@@ -171,7 +171,7 @@ class ModelSaver(ModelSaverBase):
         for i, decoder in enumerate(decoders):
             checkpoint_path = "{}_step_{}_{}_dec.pt".format(self.base_path, step, decoder_ids[i])
             if os.path.isfile(checkpoint_path):
-                logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
+                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
             else:
                 logger.info("Saving decoder checkpoint {}".format(checkpoint_path))
                 torch.save(decoder, checkpoint_path)
@@ -182,13 +182,13 @@ class ModelSaver(ModelSaverBase):
                 self.base_path, step, generator_ids[i]
             )
             if os.path.isfile(checkpoint_path):
-                logger.debug("GPU {} - not saving {} as it is already present".format(device_id, checkpoint_path))
+                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
             else:
                 logger.info("Saving generator checkpoint {}".format(checkpoint_path))
                 torch.save(generator, checkpoint_path)
                 tmp_checkpoint_paths.append(checkpoint_path)
 
-        if device_id is None or is_master(device_id):
+        if device_context.is_master():
             # TODO: not sure how to deal with model_state_dict, fields, model_opt and optim.state_dict() in a multi-gpu
             #  setting. Is it OK to save only from master?
             # attention bridge module

@@ -303,6 +303,21 @@ def build_task_specific_model(
         attention_bridge.half()
 
     nmt_model = onmt.models.NMTModel(encoder=encoders_md, decoder=decoders_md, attention_bridge=attention_bridge)
+
+    # register a forward hook to keep track of which parameters have valid gradients.
+    # p.grad is None can not be used: grad is None only before first update.
+    # zero_grad typically sets the grad to zero, not to None.
+    # While zero_grad takes a flag set_to_none, it is not reliably forwarded by various optimizers.
+    def has_grad_hook(module, input, output) -> None:
+        for param in module.parameters(recurse=False):
+            if param.requires_grad:
+                param.has_grad = True
+
+    for module in nmt_model.modules():
+        module.register_forward_hook(has_grad_hook)
+    for module in generators_md.modules():
+        module.register_forward_hook(has_grad_hook)
+
     return nmt_model, generators_md
 
 

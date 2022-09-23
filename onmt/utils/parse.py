@@ -73,12 +73,20 @@ class DataOptsCheckerMixin(object):
                     raise ValueError(f'Corpus {cname} prefix are required.')
             # Check weight
             weight = corpus.get('weight', None)
-            if weight is not None:
+            if weight is None:
+                if cname != CorpusName.VALID:
+                    logger.warning(f"Corpus {cname}'s weight should be given. We default it to 1 for you.")
+                corpus['weight'] = 1
+            # Check curriculum introduce_at_training_step
+            introduce_at_training_step = corpus.get('introduce_at_training_step', None)
+            if introduce_at_training_step is None:
                 if cname != CorpusName.VALID:
                     logger.warning(
-                        f"Corpus {cname}'s weight is set, but weights are not supported. We reset it to 1 for you."
+                        f"Corpus {cname}'s introduce_at_training_step is unset. "
+                        " (curriculum introduces the corpus at this step)"
+                        " We default it to 0 (start of training) for you."
                     )
-            corpus['weight'] = 1
+                corpus['introduce_at_training_step'] = 0
 
             # Check features
             src_feats = corpus.get("src_feats", None)
@@ -301,7 +309,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             logger.warn("You have a CUDA device, should run with -gpu_ranks")
         if opt.world_size < len(opt.gpu_ranks):
             raise AssertionError("parameter counts of -gpu_ranks must be less or equal than -world_size.")
-        if opt.world_size == len(opt.gpu_ranks) and min(opt.gpu_ranks) > 0:
+        if len(opt.gpu_ranks) > 0 and opt.world_size == len(opt.gpu_ranks) and min(opt.gpu_ranks) > 0:
             raise AssertionError(
                 "-gpu_ranks should have master(=0) rank unless -world_size is greater than len(gpu_ranks)."
             )

@@ -173,7 +173,7 @@ class DynamicDatasetIter(object):
         )
 
     def _init_datasets(self):
-        self.dataset_iterators = []
+        self.dataset_iterators = dict()
         for task in self.task_queue_manager.get_tasks():
             src_fields = self.fields_dict[('src', task.src_lang)]
             tgt_fields = self.fields_dict[('tgt', task.tgt_lang)]
@@ -218,7 +218,7 @@ class DynamicDatasetIter(object):
             # iterator over minibatches
             ordered_iter = self._wrap_in_ordered_iterator(transformed_iter)
 
-            self.dataset_iterators.append((ordered_iter, metadata))
+            self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
 
         self.init_iterators = True
 
@@ -251,7 +251,7 @@ class DynamicDatasetIter(object):
         # before synching gradients between devices
         communication_batch_id = 0
         while True:
-            # interleaves one minibatch from each language pair, in a round-robin fashion
-            for ordered_iter, metadata in self.dataset_iterators:
+            for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
+                ordered_iter, metadata = self.dataset_iterators[corpus_id]
                 yield next(ordered_iter), metadata, communication_batch_id
             communication_batch_id += 1

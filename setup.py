@@ -29,6 +29,8 @@ setup(
         "flake8==4.0.1",
         "waitress",
         "pyonmttok>=1.32,<2",
+        "pytest-flake8==1.1.1",
+        "pytest==7.0.1",
         "pyyaml",
         "timeout_decorator",
     ],

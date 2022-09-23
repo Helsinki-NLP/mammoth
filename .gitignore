@@ -113,3 +113,7 @@ runs/
 
 #SFTP
 sftp.config*.json
+
+#vim
+*.swp
+*.swo

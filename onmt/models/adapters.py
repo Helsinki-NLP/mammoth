@@ -22,7 +22,7 @@ class AdapterLayer(ABC, nn.Module):
     See also fairseq implementation:
     https://github.com/ahmetustun/fairseq/blob/master/fairseq/modules/adapter_layer.py
     """
-    def __init__(self, input_dim, hidden_dim, pfeiffer=False, init='small'):
+    def __init__(self, input_dim, hidden_dim, pfeiffer=False, init='small', layernorm='layernorm'):
         super().__init__()
         # Omit LayerCache
         self._does_not_need_cache = True
@@ -31,7 +31,10 @@ class AdapterLayer(ABC, nn.Module):
         self.up_proj = nn.Linear(hidden_dim, input_dim)
         self.pfeiffer = pfeiffer
         if not self.pfeiffer:
-            self.layer_norm = RMSNorm(input_dim, eps=1e-6)
+            if layernorm == 'rmsnorm':
+                self.layer_norm = RMSNorm(input_dim, eps=1e-6)
+            else:
+                self.layer_norm = nn.LayerNorm(input_dim, eps=1e-6)
 
         if init == 'small' or 'init' == 'bert':
             if init == 'small':
@@ -74,7 +77,6 @@ class EncoderAdapterLayer(AdapterLayer):
     # same call signature as TransformerEncoderLayer
     def forward(self, inputs, mask):
         out = super().forward(inputs)
-        print(f'{self.__class__.__name__} returning {out}')
         return out
 
 
@@ -94,7 +96,6 @@ class DecoderAdapterLayer(AdapterLayer):
         output = super().forward(output)
         attn = None
         attn_align = None
-        print(f'{self.__class__.__name__} returning {output}')
         return output, attn, attn_align
 
 
@@ -165,13 +166,13 @@ class TransformerAdapterMixin:
         containing the layers of all currently active adapters
         """
         active_adapters = [
-            adapter for adapter, name in self.adapters.items()
+            adapter for name, adapter in self.adapters.items()
             if name in self.active
         ]
         merged = defaultdict(list)
         for adapter in active_adapters:
-            for layer_idx, layer in adapter.get_layers():
-                merged[layer_idx].append(layer)
+            for layer_idx, layers in adapter.get_layers():
+                merged[layer_idx].extend(layers)
         return merged
 
     def _inject_adapters(self, base_layers):

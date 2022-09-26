@@ -467,7 +467,7 @@ class TransformerDecoder(TransformerDecoderBase):
 
         output = self.layer_norm(output)
         dec_outs = output.transpose(0, 1).contiguous()
-        attn = attn.transpose(0, 1).contiguous()
+        attn = attn.transpose(0, 1).contiguous() if attn else None
 
         attns = {"std": attn}
         if self._copy:

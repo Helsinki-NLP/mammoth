@@ -1303,6 +1303,20 @@ def build_bilingual_model(parser):
     )
     group.add("--enc_id", "-enc_id", default=None, help="The encoder id. If unset, defaults to the src_lang")
     group.add("--dec_id", "-dec_id", default=None, help="The decoder id. If unset, defaults to the tgt_lang")
+    group.add(
+        "--enc_adapters",
+        "-enc_adapters",
+        default=[],
+        nargs="+",
+        help="The encoder adapters. List of tuples (adapter_group, sub_id)"
+    )
+    group.add(
+        "--dec_adapters",
+        "-dec_adapters",
+        default=[],
+        nargs="+",
+        help="The decoder adapters. List of tuples (adapter_group, sub_id)"
+    )
     group = parser.add_argument_group("Model Modules")
     group.add(
         "--encoder",

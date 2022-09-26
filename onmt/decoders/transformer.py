@@ -484,8 +484,14 @@ class TransformerDecoder(TransformerDecoderBase):
         batch_size = memory_bank.size(1)
         depth = memory_bank.size(-1)
 
-        # TODO: only allocate cache to layers that actually need it
         for i, layer in enumerate(self._get_layers()):
+            try:
+                if layer._does_not_need_cache:
+                    self.state["cache"]["layer_{}".format(i)] = None
+                    continue
+            except AttributeError:
+                # needs the cache
+                pass
             layer_cache = {"memory_keys": None, "memory_values": None}
             if isinstance(layer.self_attn, AverageAttention):
                 layer_cache["prev_g"] = torch.zeros((batch_size, 1, depth), device=memory_bank.device)

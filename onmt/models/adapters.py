@@ -24,6 +24,8 @@ class AdapterLayer(ABC, nn.Module):
     """
     def __init__(self, input_dim, hidden_dim, pfeiffer=False, init='small'):
         super().__init__()
+        # Omit LayerCache
+        self._does_not_need_cache = True
 
         self.down_proj = nn.Linear(input_dim, hidden_dim)
         self.up_proj = nn.Linear(hidden_dim, input_dim)

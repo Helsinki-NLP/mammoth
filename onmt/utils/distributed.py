@@ -511,6 +511,7 @@ class TaskSpecs():
     tgt_vocab: Any
     encoder_adapter_ids: List[str]
     decoder_adapter_ids: List[str]
+    # TODO: encoder bridge and decoder bridge need their own adapters
 
     def get_serializable_metadata(self):
         """

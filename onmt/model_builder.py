@@ -144,6 +144,8 @@ def load_test_multitask_model(opt, model_path=None):
             tgt_lang=opt.tgt_lang,
             enc_id=enc_id,
             dec_id=dec_id,
+            enc_adapters=opt.enc_adapters,
+            dec_adapters=opt.dec_adapters,
             model_opt=model_opt,
             fields=fields
             )
@@ -211,8 +213,9 @@ def load_test_model(opt, model_path=None):
     return fields, model, model_opt
 
 
-# FIXME: create only the requested adapters
-def create_bilingual_model(src_lang, tgt_lang, enc_id, dec_id, model_opt, fields):
+def create_bilingual_model(
+    src_lang, tgt_lang, enc_id, dec_id, enc_adapters, dec_adapters, model_opt, fields
+):
     """For translation - state dict to be loaded to this model."""
 
     encoder = nn.ModuleDict()
@@ -237,6 +240,12 @@ def create_bilingual_model(src_lang, tgt_lang, enc_id, dec_id, model_opt, fields
         decoder=decoder,
         attention_bridge=attention_bridge
     )
+
+    if uses_adapters(model_opt):
+        logger.info('Creating adapters...')
+        create_bilingual_adapters(nmt_model, model_opt, src_lang, tgt_lang, enc_id, dec_id, enc_adapters, dec_adapters)
+    print('built model:')
+    print(nmt_model)
 
     nmt_model.generator = generator
     return nmt_model
@@ -321,7 +330,7 @@ def build_task_specific_model(
     )
     if uses_adapters(model_opt):
         logger.info('Creating adapters...')
-        create_adapters(nmt_model, model_opt, task_queue_manager, fields_dict)
+        create_all_adapters(nmt_model, model_opt, task_queue_manager)
     print('built model:')
     print(nmt_model)
 
@@ -482,21 +491,54 @@ def build_base_model_langspec(
 
 
 def uses_adapters(opt):
-    return 'adapters' in opt and len(opt['adapters']) > 0
+    return 'adapters' in opt and len(opt.adapters) > 0
 
 
-def create_adapters(model, opt, task_queue_manager, fields_dict):
+def create_all_adapters(model, opt, task_queue_manager):
     my_enc_adapter_ids = set()
     my_dec_adapter_ids = set()
     adapter_to_encoder_ids = defaultdict(set)
     adapter_to_decoder_ids = defaultdict(set)
     for task in task_queue_manager.get_tasks():
         for adapter_id in task.encoder_adapter_ids:
+            adapter_id = tuple(adapter_id)
             my_enc_adapter_ids.add(adapter_id)
             adapter_to_encoder_ids[adapter_id].add(task.encoder_id)
         for adapter_id in task.decoder_adapter_ids:
+            adapter_id = tuple(adapter_id)
             my_dec_adapter_ids.add(adapter_id)
             adapter_to_decoder_ids[adapter_id].add(task.decoder_id)
+    _create_adapters(
+        model,
+        opt,
+        my_enc_adapter_ids,
+        adapter_to_encoder_ids,
+        my_dec_adapter_ids,
+        adapter_to_decoder_ids,
+    )
+
+
+def create_bilingual_adapters(model, opt, src_lang, tgt_lang, enc_id, dec_id, my_enc_adapter_ids, my_dec_adapter_ids):
+    adapter_to_encoder_ids = {tuple(adapter_id): enc_id for adapter_id in my_enc_adapter_ids}
+    adapter_to_decoder_ids = {tuple(adapter_id): dec_id for adapter_id in my_dec_adapter_ids}
+    _create_adapters(
+        model,
+        opt,
+        my_enc_adapter_ids,
+        adapter_to_encoder_ids,
+        my_dec_adapter_ids,
+        adapter_to_decoder_ids,
+    )
+
+
+def _create_adapters(
+    model,
+    opt,
+    my_enc_adapter_ids,
+    adapter_to_encoder_ids,
+    my_dec_adapter_ids,
+    adapter_to_decoder_ids,
+):
     for adapter_group, adapter_opts in opt.adapters['encoder'].items():
         for sub_id in adapter_opts['ids']:
             adapter_id = (adapter_group, sub_id)

@@ -1,6 +1,7 @@
 import configargparse as cfargparse
 import os
 import torch
+import yaml
 
 import onmt.opts as opts
 from onmt.utils.logging import logger
@@ -22,7 +23,6 @@ class DataOptsCheckerMixin(object):
         """Parse corpora specified in data field of YAML file."""
         if not opt.adapters:
             return
-        import yaml
         adapter_opts = yaml.safe_load(opt.adapters)
         # TODO: validate adapter opts
         opt.adapters = adapter_opts
@@ -30,8 +30,6 @@ class DataOptsCheckerMixin(object):
     @classmethod
     def _validate_data(cls, opt):
         """Parse corpora specified in data field of YAML file."""
-        import yaml
-
         default_transforms = opt.transforms
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
@@ -155,8 +153,6 @@ class DataOptsCheckerMixin(object):
             if cname != CorpusName.VALID and corpus["src_feats"] is not None:
                 assert opt.src_feats_vocab, "-src_feats_vocab is required if using source features."
                 if isinstance(opt.src_feats_vocab, str):
-                    import yaml
-
                     opt.src_feats_vocab = yaml.safe_load(opt.src_feats_vocab)
 
                 for feature in corpus["src_feats"].keys():
@@ -348,3 +344,8 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         # It comes from training
         # TODO: needs to be added as inference opt
         opt.share_vocab = False
+
+        if opt.enc_adapters:
+            opt.enc_adapters = [yaml.safe_load(item) for item in opt.enc_adapters]
+        if opt.dec_adapters:
+            opt.dec_adapters = [yaml.safe_load(item) for item in opt.dec_adapters]

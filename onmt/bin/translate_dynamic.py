@@ -18,7 +18,6 @@ def translate(opt):
     logger = init_logger(opt.log_file)
 
     # only src_lang and tgt_lang are used at the moment
-    # TODO: pass task into build_translator and use instead of opts?
     task = TaskSpecs(
         node_rank=None,
         local_rank=None,
@@ -31,9 +30,11 @@ def translate(opt):
         corpus_opt=dict(),
         src_vocab=None,
         tgt_vocab=None,
+        encoder_adapter_ids=opt.enc_adapters,
+        decoder_adapter_ids=opt.dec_adapters,
     )
 
-    translator = build_translator(opt, logger=logger, report_score=True)
+    translator = build_translator(opt, task, logger=logger, report_score=True)
 
     data_reader = InferenceDataReader(opt.src, opt.tgt, opt.src_feats)
 

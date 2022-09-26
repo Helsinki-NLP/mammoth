@@ -244,6 +244,8 @@ def create_bilingual_model(
     if uses_adapters(model_opt):
         logger.info('Creating adapters...')
         create_bilingual_adapters(nmt_model, model_opt, src_lang, tgt_lang, enc_id, dec_id, enc_adapters, dec_adapters)
+    else:
+        logger.info('Does not use adapters...')
     print('built model:')
     print(nmt_model)
 
@@ -519,8 +521,8 @@ def create_all_adapters(model, opt, task_queue_manager):
 
 
 def create_bilingual_adapters(model, opt, src_lang, tgt_lang, enc_id, dec_id, my_enc_adapter_ids, my_dec_adapter_ids):
-    adapter_to_encoder_ids = {tuple(adapter_id): enc_id for adapter_id in my_enc_adapter_ids}
-    adapter_to_decoder_ids = {tuple(adapter_id): dec_id for adapter_id in my_dec_adapter_ids}
+    adapter_to_encoder_ids = {tuple(adapter_id): [enc_id] for adapter_id in my_enc_adapter_ids}
+    adapter_to_decoder_ids = {tuple(adapter_id): [dec_id] for adapter_id in my_dec_adapter_ids}
     _create_adapters(
         model,
         opt,
@@ -539,6 +541,8 @@ def _create_adapters(
     my_dec_adapter_ids,
     adapter_to_decoder_ids,
 ):
+    my_enc_adapter_ids = [tuple(item) for item in my_enc_adapter_ids]
+    my_dec_adapter_ids = [tuple(item) for item in my_dec_adapter_ids]
     for adapter_group, adapter_opts in opt.adapters['encoder'].items():
         for sub_id in adapter_opts['ids']:
             adapter_id = (adapter_group, sub_id)

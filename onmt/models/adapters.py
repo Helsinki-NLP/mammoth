@@ -152,7 +152,10 @@ class TransformerAdapterMixin:
     def activate_adapter(self, name: str):
         name = f'adapter_{name}'
         if name not in self.adapters:
-            raise ValueError(f'Nonexistent Adapter "{name}"')
+            raise ValueError(
+                f'Nonexistent Adapter "{name}". '
+                f'Should be one of: {" ".join(self.adapters.keys())}'
+            )
         self.active.add(name)
         print(f'activated {name}')
 

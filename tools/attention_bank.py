@@ -208,7 +208,7 @@ def classify(opts, vocabs_dict, model, model_opt, transforms):
     print('Training classifiers...')
     scores = []
     for _ in range(opts.n_runs):
-        model = sklearn.linear_model.SGDClassifier(max_iter=100_000, n_jobs=-1, early_stopping=True, loss='log_loss')
+        model = sklearn.linear_model.SGDClassifier(max_iter=100_000, n_jobs=-1, early_stopping=True)
         model.fit(X_train, y_train)
         scores.append(f'{model.score(X_test, y_test) * 100:.4f}%')
 

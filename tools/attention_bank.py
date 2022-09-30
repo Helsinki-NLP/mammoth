@@ -45,6 +45,7 @@ def get_opts():
     subparser.add_argument('--train_labels', type=pathlib.Path)
     subparser.add_argument('--test_sentences', type=pathlib.Path, nargs='+')
     subparser.add_argument('--test_labels', type=pathlib.Path)
+    subparser.add_argument('--n_runs', type=int, default=10)
 
     opts = parser.parse_args()
 
@@ -204,11 +205,14 @@ def classify(opts, vocabs_dict, model, model_opt, transforms):
         istr = map(label2idx.__getitem__, istr)
         y_test = np.array(list(istr))
 
-    print('Training classifier...')
-    model = sklearn.linear_model.SGDClassifier(max_iter=10_000, n_jobs=-1, early_stopping=True)
-    model.fit(X_train, y_train)
+    print('Training classifiers...')
+    scores = []
+    for _ in range(opts.n_runs):
+        model = sklearn.linear_model.SGDClassifier(max_iter=100_000, n_jobs=-1, early_stopping=True, loss='log_loss')
+        model.fit(X_train, y_train)
+        scores.append(f'{model.score(X_test, y_test) * 100:.4f}%')
 
-    print(f'Score: {model.score(X_test, y_test) * 100:.4f}%')
+    print(f'Scores: {" ".join(scores)}')
 
 
 @torch.no_grad()

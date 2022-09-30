@@ -7,6 +7,7 @@ import numpy as np
 import os
 import pickle
 import signal
+import torch
 import torch.distributed
 
 from abc import ABC, abstractmethod
@@ -14,7 +15,9 @@ from argparse import Namespace
 from collections import OrderedDict, namedtuple
 from dataclasses import dataclass
 from enum import Enum
-from itertools import cycle, islice
+from itertools import compress, cycle, islice
+
+# from onmt.inputters_mvp import get_corpus
 from pprint import pformat
 from typing import Any, Optional, List
 
@@ -356,10 +359,9 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
 
     for batch, metadata, communication_batch_id in generator_to_serve:
         semaphore.acquire()
-        batch.dataset = None
         # Move batch to correspond device_id when consumer iterate
         # hack to dodge unpicklable `dict_keys`
-        batch.fields = list(batch.fields)
+        # batch.fields = list(batch.fields)
         queue.put((batch, metadata, communication_batch_id))
 
 
@@ -805,14 +807,41 @@ class TaskQueueManager:
 
     # TODO: soon deprecated by #18 Data pipeline refactoring
     def get_fields(self, side: str, fields_dict):
-        """Returns a list of tuples: (side, lang, component_id, fields).
+        """Returns a list of tuples: (side, lang, component_id, fields)."""
+        raise RuntimeError
+
+    # def get_corpora(self, is_train=False, vocabs_dict=None) -> Dict[str, Any]:
+    #     corpus_ids = self.opt.data.keys()
+    #     my_lang_pairs = compress(self.lang_pairs, self._selector)
+    #     my_corpus_ids = compress(corpus_ids, self._selector)
+    #     src_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='src', vocabs_dict=vocabs_dict)}
+    #     tgt_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='tgt', vocabs_dict=vocabs_dict)}
+    #     device = torch.device(self.local_rank)
+    #     return {
+    #         corpus_id: get_corpus(self.opt, corpus_id, src_vocabs[src], tgt_vocabs[tgt], is_train=is_train).to(device)
+    #         for (corpus_id, (src, tgt)) in zip(my_corpus_ids, my_lang_pairs)
+    #     }
+
+    # FIXME: merge with below
+    def get_vocabularies(self, opt: Namespace, side: str):
+        my_lang_pairs = compress(self.lang_pairs, self._selector)
+        result = []
+        for lang_pair in my_lang_pairs:
+            src_lang, tgt_lang = lang_pair
+            lang = src_lang if side == 'src' else tgt_lang
+            vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
+            result.append((lang, vocab_path))
+        return result
+
+    def get_vocabs(self, side: str, vocabs_dict):
+        """Returns a list of tuples: (side, lang, component_id, vocabs).
         side:           Either 'src' or 'tgt'.
         lang:           The language code. Vocabularies are language specific.
         component_id:   The encoder or decoder id. Embeddings are stored in
                         the encoders/decoders, so that component needs to be identified
                         in order to access the correct embeddings,
                         even if the embeddings are language specific.
-        fields:         The actual Fields.
+        vocabs_dict:         The actual vocabs.
         """
         seen = set()
         result = []
@@ -823,9 +852,8 @@ class TaskQueueManager:
             else:
                 lang = task.tgt_lang
                 component_id = task.decoder_id
-            fields = fields_dict[(side, lang)]
             if not (side, lang, component_id) in seen:
-                result.append((side, lang, component_id, fields))
+                result.append((side, lang, component_id, vocabs_dict[(side, lang)]))
             seen.add((side, lang, component_id))
         return result
 

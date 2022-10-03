@@ -7,6 +7,7 @@ from onmt.utils.parse import ArgumentParser
 from onmt.opts import dynamic_prepare_opts
 from onmt.inputters.corpus import build_vocab
 from onmt.transforms import make_transforms, get_transforms_cls
+from onmt.utils.distributed import TaskSpecs
 
 
 def build_vocab_main(opts):
@@ -29,14 +30,30 @@ def build_vocab_main(opts):
     transforms_cls = get_transforms_cls(opts._all_transform)
     fields = None
 
-    transforms = make_transforms(opts, transforms_cls, fields)
-
     src_counters_by_lang = defaultdict(Counter)
     tgt_counters_by_lang = defaultdict(Counter)
 
     assert len(opts.src_tgt) == len(opts.data)
     for lang_pair, corpus_id in zip(opts.src_tgt, opts.data):
         src_lang, tgt_lang = lang_pair.split('-')
+        task = TaskSpecs(
+            node_rank=None,
+            local_rank=None,
+            src_lang=src_lang,
+            tgt_lang=tgt_lang,
+            encoder_id=src_lang,
+            decoder_id=tgt_lang,
+            corpus_id=f'{src_lang}-{tgt_lang}',
+            weight=1,
+            corpus_opt=dict(),
+            src_vocab=None,
+            tgt_vocab=None,
+            encoder_adapter_ids=None,
+            decoder_adapter_ids=None,
+        )
+
+        transforms = make_transforms(opts, transforms_cls, fields, task=task)
+
         logger.info(f"Counter vocab from {corpus_id} {opts.n_sample} samples.")
         src_counter, tgt_counter, src_feats_counter = build_vocab(
             opts, corpus_id=corpus_id, transforms=transforms, n_sample=opts.n_sample

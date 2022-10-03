@@ -73,7 +73,7 @@ class Transform(object):
 
     def __getstate__(self):
         """Pickling following for rebuild."""
-        state = {"opts": self.opts}
+        state = {"opts": self.opts, "task": self.task}
         if hasattr(self, 'vocabs'):
             state['vocabs'] = self.vocabs
         return state
@@ -91,6 +91,7 @@ class Transform(object):
     def __setstate__(self, state):
         """Reload when unpickling from save file."""
         self.opts = state["opts"]
+        self.task = state["task"]
         self._parse_opts()
         vocabs = state.get('vocabs', None)
         self.warm_up(vocabs=vocabs)

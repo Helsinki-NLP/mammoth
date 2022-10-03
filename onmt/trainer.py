@@ -188,6 +188,8 @@ class Trainer(object):
         self.my_decoder_groups = my_component_groups['decoder']
         self.my_src_emb_groups = my_component_groups['src_emb']
         self.my_tgt_emb_groups = my_component_groups['tgt_emb']
+        self.my_encoder_adapter_groups = my_component_groups['encoder_adapters']
+        self.my_decoder_adapter_groups = my_component_groups['decoder_adapters']
 
         self.lca_loginterval = lca_loginterval
 
@@ -330,7 +332,7 @@ class Trainer(object):
                 params = [
                     (name, p)
                     for (name, p) in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
-                    if 'embeddings' not in name
+                    if 'embeddings' not in name and 'adapter' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
@@ -338,7 +340,7 @@ class Trainer(object):
                 params = [
                     (name, p)
                     for (name, p) in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
-                    if 'embeddings' not in name
+                    if 'embeddings' not in name and 'adapter' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
@@ -355,6 +357,16 @@ class Trainer(object):
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(
                     self.model.generator[f'generator{tgt_lang}'].named_parameters(), group=group
                 )
+
+            for adapter_id, (_, group) in self.my_encoder_adapter_groups.items():
+                encoder_id, adapter_group, sub_id = adapter_id
+                adapter = self.model.encoder[f'encoder{encoder_id}'].adapters.get_adapter(adapter_group, sub_id)
+                onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
+
+            for adapter_id, (_, group) in self.my_decoder_adapter_groups.items():
+                decoder_id, adapter_group, sub_id = adapter_id
+                adapter = self.model.decoder[f'decoder{decoder_id}'].adapters.get_adapter(adapter_group, sub_id)
+                onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             # a group is not specified: reduce across all devices
             if device_context.is_distributed():

@@ -141,6 +141,10 @@ class TransformerAdapterMixin:
                 # freeze everything except the adapter parameters
                 p.requires_grad = requires_grad
 
+    def get_adapter(self, adapter_group: str, sub_id: str):
+        name = f'adapter_{adapter_group}_{sub_id}'
+        return self.adapters[name]
+
     def add_adapter(self, name: str, adapter: Adapter):
         name = f'adapter_{name}'
         if name in self.adapters:

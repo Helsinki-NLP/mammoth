@@ -162,7 +162,6 @@ class TransformerAdapterMixin:
                 f'Should be one of: {" ".join(self.adapters.keys())}'
             )
         self.active.add(name)
-        print(f'activated {name}')
 
     def _merge_active_adapters(self):
         """

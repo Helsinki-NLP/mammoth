@@ -360,12 +360,12 @@ class Trainer(object):
 
             for adapter_id, (_, group) in self.my_encoder_adapter_groups.items():
                 encoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.encoder[f'encoder{encoder_id}'].adapters.get_adapter(adapter_group, sub_id)
+                adapter = self.model.encoder[f'encoder{encoder_id}'].get_adapter(adapter_group, sub_id)
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             for adapter_id, (_, group) in self.my_decoder_adapter_groups.items():
                 decoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.decoder[f'decoder{decoder_id}'].adapters.get_adapter(adapter_group, sub_id)
+                adapter = self.model.decoder[f'decoder{decoder_id}'].get_adapter(adapter_group, sub_id)
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             # a group is not specified: reduce across all devices

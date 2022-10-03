@@ -52,13 +52,15 @@ def init_distributed(model, task_queue_manager):
     my_component_groups = task_queue_manager.get_distributed_groups()
     for (encoder_id,), (min_rank, group) in my_component_groups['encoder'].items():
         weights = [
-            p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters() if 'embeddings' not in name
+            p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters()
+            if 'embeddings' not in name and 'adapter' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
     for (decoder_id,), (min_rank, group) in my_component_groups['decoder'].items():
         weights = [
-            p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters() if 'embeddings' not in name
+            p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters()
+            if 'embeddings' not in name and 'adapter' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
@@ -75,6 +77,18 @@ def init_distributed(model, task_queue_manager):
         broadcast_tensors(weights, src=min_rank, group=group)
 
         weights = [p.data for p in model.generator[f'generator{tgt_lang}'].parameters()]
+        broadcast_tensors(weights, src=min_rank, group=group)
+
+    for adapter_id, (min_rank, group) in my_component_groups['encoder_adapters'].items():
+        encoder_id, adapter_group, sub_id = adapter_id
+        adapter = model.encoder[f'encoder{encoder_id}'].get_adapter(adapter_group, sub_id)
+        weights = [p.data for name, p in adapter.named_parameters()]
+        broadcast_tensors(weights, src=min_rank, group=group)
+
+    for adapter_id, (min_rank, group) in my_component_groups['decoder_adapters'].items():
+        decoder_id, adapter_group, sub_id = adapter_id
+        adapter = model.decoder[f'decoder{decoder_id}'].get_adapter(adapter_group, sub_id)
+        weights = [p.data for name, p in adapter.named_parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
     weights = [p.data for p in model.attention_bridge.parameters()]

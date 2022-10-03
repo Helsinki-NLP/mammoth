@@ -12,6 +12,7 @@ class Transform(object):
         """Initialize Transform by parsing `opts` and add them as attribute."""
         self.opts = opts
         self._parse_opts()
+        self.task = None
 
     def _set_seed(self, seed):
         """Reproducibility: Set seed for non-deterministic transform."""
@@ -21,6 +22,9 @@ class Transform(object):
     def require_vocab(cls):
         """Override this method to inform it need vocab to start."""
         return False
+
+    def set_task(self, task):
+        self.task = task
 
     def warm_up(self, vocabs=None):
         """Procedure needed after initialize and before apply.
@@ -233,11 +237,8 @@ def make_transforms(opts, transforms_cls, fields, task):
             logger.warning(f"{transform_cls.__name__} require vocab to apply, skip it.")
             continue
         transform_obj = transform_cls(opts)
-        try:
-            transform_obj.warm_up(vocabs, task=task)
-        except TypeError:
-            # old-style transform that does not take the task
-            transform_obj.warm_up(vocabs)
+        transform_obj.set_task(task)
+        transform_obj.warm_up(vocabs)
         transforms[name] = transform_obj
     return transforms
 

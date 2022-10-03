@@ -165,16 +165,16 @@ class SentencePieceTransform(TokenizerTransform):
 
         spm.set_random_generator_seed(seed)
 
-    def warm_up(self, vocabs=None, task=None):
+    def warm_up(self, vocabs=None):
         """Load subword models."""
         super().warm_up(None)
         import sentencepiece as spm
 
         load_src_model = spm.SentencePieceProcessor()
-        if task:
+        if self.task:
             concrete_model = self.src_subword_model.format(
-                src_lang=task.src_lang,
-                tgt_lang=task.tgt_lang,
+                src_lang=self.task.src_lang,
+                tgt_lang=self.task.tgt_lang,
             )
         else:
             concrete_model = self.src_subword_model
@@ -189,10 +189,10 @@ class SentencePieceTransform(TokenizerTransform):
             self.load_models = {'src': load_src_model, 'tgt': load_src_model}
         else:
             load_tgt_model = spm.SentencePieceProcessor()
-            if task:
+            if self.task:
                 concrete_model = self.tgt_subword_model.format(
-                    src_lang=task.src_lang,
-                    tgt_lang=task.tgt_lang,
+                    src_lang=self.task.src_lang,
+                    tgt_lang=self.task.tgt_lang,
                 )
             else:
                 concrete_model = self.tgt_subword_model

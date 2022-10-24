@@ -28,7 +28,7 @@ class ModularDecoder(DecoderBase):
                 opt.self_attn_type,
                 opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
                 opt.attention_dropout[0] if type(opt.attention_dropout) is list else opt.attention_dropout,
-                embeddings,
+                None,  # embeddings,
                 opt.max_relative_positions,
                 opt.aan_useffn,
                 opt.full_context_alignment,

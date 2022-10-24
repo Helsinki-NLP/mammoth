@@ -15,7 +15,6 @@ from onmt.encoders import str2enc
 from onmt.decoders.modular_decoder import ModularDecoder
 
 from onmt.models.adapters import (
-    AdaptedTransformerDecoder,
     AdaptedTransformerEncoder,
     Adapter,
     EncoderAdapterLayer,

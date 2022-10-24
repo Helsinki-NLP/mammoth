@@ -329,7 +329,8 @@ class TransformerDecoderBase(DecoderBase):
         raise NotImplementedError
 
     def update_dropout(self, dropout, attention_dropout):
-        self.embeddings.update_dropout(dropout)
+        if self.embeddings:
+            self.embeddings.update_dropout(dropout)
         for layer in self.transformer_layers:
             layer.update_dropout(dropout, attention_dropout)
 

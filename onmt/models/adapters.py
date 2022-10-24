@@ -104,11 +104,15 @@ class Adapter(nn.Module):
     A container for one or several AdapterLayers,
     together with layer indices for injecting into the base network.
     """
-    def __init__(self, name: str):
+    def __init__(self, adapter_group: str, sub_id: str):
         super().__init__()
-        self.name = name
+        self.name = self._name(adapter_group, sub_id)
         # mapping layer_idx -> ModuleList of AdapterLayer to inject after that layer
         self.adapter_layers = nn.ModuleDict()
+
+    @staticmethod
+    def _name(adapter_group: str, sub_id: str) -> str:
+        return f'adapter_{adapter_group}_{sub_id}'
 
     def add_layer(self, layer_idx, adapter_layer: AdapterLayer):
         layer_idx = f'layer{layer_idx}'
@@ -142,11 +146,11 @@ class TransformerAdapterMixin:
                 p.requires_grad = requires_grad
 
     def get_adapter(self, adapter_group: str, sub_id: str):
-        name = f'adapter_{adapter_group}_{sub_id}'
-        return self.adapters[name]
+        name = Adapter._name(adapter_group, sub_id)
+        return self.adapters.get(name, None)
 
-    def add_adapter(self, name: str, adapter: Adapter):
-        name = f'adapter_{name}'
+    def add_adapter(self, adapter_group: str, sub_id: str, adapter: Adapter):
+        name = Adapter._name(adapter_group, sub_id)
         if name in self.adapters:
             raise ValueError(f'Duplicate Adapter "{name}"')
         self.adapters[name] = adapter
@@ -154,8 +158,8 @@ class TransformerAdapterMixin:
     def deactivate_adapters(self):
         self.active = set()
 
-    def activate_adapter(self, name: str):
-        name = f'adapter_{name}'
+    def activate_adapter(self, adapter_group: str, sub_id: str):
+        name = Adapter._name(adapter_group, sub_id)
         if name not in self.adapters:
             raise ValueError(
                 f'Nonexistent Adapter "{name}". '

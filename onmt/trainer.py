@@ -509,6 +509,7 @@ class Trainer(object):
             target_size = batch.tgt.size(0)
             # Truncated BPTT: reminder not compatible with accum > 1
             if self.trunc_size:
+                raise Exception('Truncated BPTT not supported')
                 trunc_size = self.trunc_size
             else:
                 trunc_size = target_size
@@ -552,10 +553,6 @@ class Trainer(object):
                 except Exception:
                     traceback.print_exc()
                     logger.info("At step %d, we removed a batch - accum %d", self.training_step_all, k)
-
-                # If truncated, don't backprop fully.
-                if self.model.decoder[f'decoder{metadata.decoder_id}'].state is not None:
-                    self.model.decoder[f'decoder{metadata.decoder_id}'].detach_state()
 
     def _start_report_manager(self, start_time=None):
         """

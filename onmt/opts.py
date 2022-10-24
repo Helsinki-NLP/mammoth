@@ -428,7 +428,7 @@ def model_opts(parser):
 
     group.add('--layers', '-layers', type=int, default=-1, help='Number of layers in enc/dec.')
     group.add('--enc_layers', '-enc_layers', type=int, default=2, help='Number of layers in the encoder')
-    group.add('--dec_layers', '-dec_layers', type=int, default=2, help='Number of layers in the decoder')
+    group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder')
     group.add(
         '--rnn_size',
         '-rnn_size',

@@ -12,7 +12,7 @@ from torchtext.legacy.data import Field
 import onmt.modules
 from onmt.encoders import str2enc
 
-from onmt.decoders import str2dec
+from onmt.decoders.modular_decoder import ModularDecoder
 
 from onmt.models.adapters import (
     AdaptedTransformerDecoder,
@@ -88,10 +88,8 @@ def build_decoder(opt, embeddings):
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
-    dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed else opt.decoder_type
-    if dec_type == 'transformer' and uses_adapters(opt):
-        return AdaptedTransformerDecoder.from_opt(opt, embeddings)
-    return str2dec[dec_type].from_opt(opt, embeddings)
+    assert opt.decoder_type == 'transformer', 'Only Transformer is supported'
+    return ModularDecoder.from_opt(opt, embeddings)
 
 
 def load_test_multitask_model(opt, model_path=None):
@@ -548,8 +546,7 @@ def _create_adapters(
             adapter_id = (adapter_group, sub_id)
             if adapter_id not in my_enc_adapter_ids:
                 continue
-            adapter_name = '_'.join(adapter_id)
-            adapter = Adapter(name=adapter_name)
+            adapter = Adapter(adapter_group, sub_id)
             input_dim = opt.rnn_size
             hidden_dim = adapter_opts['hidden_size']
 
@@ -565,14 +562,14 @@ def _create_adapters(
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
             for adapted_module in adapted_modules:
-                adapted_module.add_adapter(adapter_name, adapter)
+                adapted_module.add_adapter(adapter_group, sub_id, adapter)
     for adapter_group, adapter_opts in opt.adapters['decoder'].items():
+        module_index = adapter_opts['module_index']
         for sub_id in adapter_opts['ids']:
             adapter_id = (adapter_group, sub_id)
             if adapter_id not in my_dec_adapter_ids:
                 continue
-            adapter_name = '_'.join(adapter_id)
-            adapter = Adapter(name=adapter_name)
+            adapter = Adapter(adapter_group, sub_id)
             input_dim = opt.rnn_size
             hidden_dim = adapter_opts['hidden_size']
 
@@ -588,7 +585,7 @@ def _create_adapters(
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
             for adapted_module in adapted_modules:
-                adapted_module.add_adapter(adapter_name, adapter)
+                adapted_module.add_adapter(adapter_group, sub_id, adapter, module_index)
 
 
 def build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint):

@@ -70,11 +70,11 @@ class NMTModel(BaseModel):
         if metadata.encoder_adapter_ids is not None:
             encoder.deactivate_adapters()
             for adapter_id in metadata.encoder_adapter_ids:
-                encoder.activate_adapter('_'.join(adapter_id))
+                encoder.activate_adapter(*adapter_id)
         if metadata.decoder_adapter_ids is not None:
             decoder.deactivate_adapters()
             for adapter_id in metadata.decoder_adapter_ids:
-                decoder.activate_adapter('_'.join(adapter_id))
+                decoder.activate_adapter(*adapter_id)
 
         enc_state, memory_bank, lengths, mask = encoder(src, lengths)
 

@@ -419,30 +419,44 @@ class TransformerDecoder(TransformerDecoderBase):
         """ Allow subclasses to modify layer stack on-the-fly """
         return self.transformer_layers
 
-    def forward(self, tgt, memory_bank=None, step=None, memory_lengths=None, **kwargs):
+    def forward(
+        self,
+        tgt,
+        memory_bank=None,
+        step=None,
+        memory_lengths=None,
+        tgt_pad_mask=None,
+        skip_embedding=False,
+        **kwargs
+    ):
         """Decode, possibly stepwise."""
         if memory_bank is None:
             memory_bank = self.embeddings(tgt)
+            src_memory_bank = memory_bank.transpose(0, 1).contiguous()
         if step == 0:
             self._init_cache(memory_bank)
 
-        tgt_words = tgt[:, :, 0].transpose(0, 1)
+        if skip_embedding:
+            # tgt and memory_bank are already in batch-first order
+            output = tgt
+            src_memory_bank = memory_bank
+        else:
+            tgt_words = tgt[:, :, 0].transpose(0, 1)
 
-        emb = self.embeddings(tgt, step=step)
-        assert emb.dim() == 3  # len x batch x embedding_dim
+            pad_idx = self.embeddings.word_padding_idx
+            tgt_pad_mask = tgt_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_tgt]
 
-        output = emb.transpose(0, 1).contiguous()
-        src_memory_bank = memory_bank.transpose(0, 1).contiguous()
+            emb = self.embeddings(tgt, step=step)
+            assert emb.dim() == 3  # len x batch x embedding_dim
 
-        pad_idx = self.embeddings.word_padding_idx
+            output = emb.transpose(0, 1).contiguous()
+
         src_pad_mask = None
         if memory_lengths is not None:
             # either if the attention bridge contains no fixed-length component
             # or lengths were provided for a DecodeStrategy in translation
-            src_max_len = memory_bank.size(0)
+            src_max_len = memory_bank.size(1)
             src_pad_mask = ~sequence_mask(memory_lengths, src_max_len).unsqueeze(1)
-
-        tgt_pad_mask = tgt_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_tgt]
 
         with_align = kwargs.pop("with_align", False)
         attn_aligns = []
@@ -466,8 +480,8 @@ class TransformerDecoder(TransformerDecoderBase):
                 attn_aligns.append(attn_align)
 
         output = self.layer_norm(output)
-        dec_outs = output.transpose(0, 1).contiguous()
-        attn = attn.transpose(0, 1).contiguous() if attn else None
+        # caller should call transpose and contiguous if they need it
+        dec_outs = output
 
         attns = {"std": attn}
         if self._copy:
@@ -481,7 +495,8 @@ class TransformerDecoder(TransformerDecoderBase):
 
     def _init_cache(self, memory_bank):
         self.state["cache"] = {}
-        batch_size = memory_bank.size(1)
+        # memory_bank is now batch-first
+        batch_size = memory_bank.size(0)
         depth = memory_bank.size(-1)
 
         for i, layer in enumerate(self._get_layers()):
@@ -498,183 +513,4 @@ class TransformerDecoder(TransformerDecoderBase):
             else:
                 layer_cache["self_keys"] = None
                 layer_cache["self_values"] = None
-            self.state["cache"]["layer_{}".format(i)] = layer_cache
-
-
-class TransformerLMDecoderLayer(TransformerDecoderLayerBase):
-    """Transformer Decoder only layer block in GPT style.
-
-    .. mermaid::
-
-        graph LR
-        %% "*SubLayer" can be self-attn, src-attn or feed forward block
-            A(input) --> B[Norm]
-            B --> C["*SubLayer"]
-            C --> D[Drop]
-            D --> E((+))
-            A --> E
-            E --> F(out)
-
-
-    Args:
-        See TransformerDecoderLayerBase
-    """
-
-    def _forward(self, inputs, tgt_pad_mask, layer_cache=None, step=None, future=False):
-        """A naive forward pass for transformer decoder.
-
-        # T: could be 1 in the case of stepwise decoding or tgt_len
-
-        Args:
-            inputs (FloatTensor): ``(batch_size, T, model_dim)``
-            tgt_pad_mask (bool): ``(batch_size, 1, T)``
-            layer_cache (dict or None): cached layer info when stepwise decode
-            step (int or None): stepwise decoding counter
-            future (bool): If set True, do not apply future_mask.
-
-        Returns:
-            (FloatTensor, FloatTensor):
-
-            * output ``(batch_size, T, model_dim)``
-            * attns ``(batch_size, head, T, T)``
-
-        """
-        dec_mask = None
-
-        if inputs.size(1) > 1:
-            # masking is necessary when sequence length is greater than one
-            dec_mask = self._compute_dec_mask(tgt_pad_mask, future)
-
-        inputs_norm = self.layer_norm_1(inputs)
-
-        query, attns = self._forward_self_attn(inputs_norm, dec_mask, layer_cache, step)
-
-        output = self.drop(query) + inputs
-
-        output_feedforward = self.feed_forward(output)
-
-        return output_feedforward, attns
-
-
-class TransformerLMDecoder(TransformerDecoderBase):
-    """The Transformer decoder from GPT-2
-
-    .. mermaid::
-
-       graph BT
-          A[input]
-          B[multi-head self-attn]
-          C[feed forward]
-          O[output]
-          A --> B
-          B --> C
-          C --> O
-
-
-    Args:
-        num_layers (int): number of decoder layers.
-        d_model (int): size of the model
-        heads (int): number of heads
-        d_ff (int): size of the inner FF layer
-        copy_attn (bool): if using a separate copy attention
-        self_attn_type (str): type of self-attention scaled-dot, average
-        dropout (float): dropout in residual, self-attn(dot) and feed-forward
-        attention_dropout (float): dropout in context_attn (and self-attn(avg))
-        embeddings (onmt.modules.Embeddings):
-            embeddings to use, should have positional encodings
-        max_relative_positions (int):
-            Max distance between inputs in relative positions representations
-        aan_useffn (bool): Turn on the FFN layer in the AAN decoder
-    """
-
-    def __init__(
-        self,
-        num_layers,
-        d_model,
-        heads,
-        d_ff,
-        copy_attn,
-        self_attn_type,
-        dropout,
-        attention_dropout,
-        embeddings,
-        max_relative_positions,
-        aan_useffn,
-        full_context_alignment=None,
-        alignment_layer=None,
-        alignment_heads=None,
-        pos_ffn_activation_fn=ActivationFunction.relu,
-    ):
-        super(TransformerLMDecoder, self).__init__(d_model, copy_attn, embeddings, None)
-        self.transformer_layers = nn.ModuleList(
-            [
-                TransformerLMDecoderLayer(
-                    d_model,
-                    heads,
-                    d_ff,
-                    dropout,
-                    attention_dropout,
-                    self_attn_type=self_attn_type,
-                    max_relative_positions=max_relative_positions,
-                    aan_useffn=aan_useffn,
-                    full_context_alignment=None,
-                    alignment_heads=None,
-                    pos_ffn_activation_fn=pos_ffn_activation_fn,
-                )
-                for i in range(num_layers)
-            ]
-        )
-
-    def init_state(self, src=None, memory_bank=None, enc_hidden=None):
-        super(TransformerLMDecoder, self).init_state(None, None, None)
-
-    def detach_state(self):
-        pass
-
-    def forward(self, tgt, memory_bank=None, step=None, **kwargs):
-        """Decode, possibly stepwise."""
-        if step == 0:
-            self._init_cache()
-
-        tgt_words = tgt[:, :, 0].transpose(0, 1)
-
-        emb = self.embeddings(tgt, step=step)
-        assert emb.dim() == 3  # len x batch x embedding_dim
-
-        output = emb.transpose(0, 1).contiguous()
-
-        pad_idx = self.embeddings.word_padding_idx
-        tgt_pad_mask = tgt_words.data.eq(pad_idx).unsqueeze(1)  # [B, 1, T_tgt]
-
-        with_align = kwargs.pop("with_align", False)
-        assert not with_align, "TransformerLMDecoder does not support align"
-
-        for i, layer in enumerate(self.transformer_layers):
-            layer_cache = self.state["cache"]["layer_{}".format(i)] if step is not None else None
-            output, attn, _ = layer(
-                output,
-                tgt_pad_mask,
-                layer_cache=layer_cache,
-                step=step,
-                with_align=with_align,
-            )
-
-        output = self.layer_norm(output)
-        dec_outs = output.transpose(0, 1).contiguous()
-        attn = attn.transpose(0, 1).contiguous()
-
-        attns = {"std": attn}
-        if self._copy:
-            attns["copy"] = attn
-
-        # TODO change the way attns is returned dict => list or tuple (onnx)
-        return dec_outs, attns
-
-    def _init_cache(self, memory_bank=None):
-        self.state["cache"] = {}
-
-        for i, layer in enumerate(self.transformer_layers):
-            layer_cache = {"self_keys": None, "self_values": None}
-            if isinstance(layer.self_attn, AverageAttention):
-                raise NotImplementedError
             self.state["cache"]["layer_{}".format(i)] = layer_cache

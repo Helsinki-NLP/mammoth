@@ -10,24 +10,22 @@ from collections import defaultdict
 from torchtext.legacy.data import Field
 
 import onmt.modules
-from onmt.encoders import str2enc
-
-from onmt.decoders.layer_stack_decoder import LayerStackDecoder
 
 from onmt.models.adapters import (
-    AdaptedTransformerEncoder,
     Adapter,
     EncoderAdapterLayer,
     DecoderAdapterLayer,
 )
+from onmt.constants import ModelTask
+from onmt.decoders.layer_stack_decoder import LayerStackDecoder
+from onmt.encoders.layer_stack_encoder import LayerStackEncoder
 from onmt.modules import Embeddings
 from onmt.modules.embeddings import PluggableEmbeddings
 from onmt.modules.util_class import Cast
-from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
-from onmt.utils.parse import ArgumentParser
+from onmt.utils.misc import use_gpu
 from onmt.utils.module_splitter import create_bilingual_statedict
-from onmt.constants import ModelTask
+from onmt.utils.parse import ArgumentParser
 
 from onmt.attention_bridge import AttentionBridge
 
@@ -74,10 +72,8 @@ def build_encoder(opt, embeddings):
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
-    enc_type = opt.encoder_type if opt.model_type == "text" else opt.model_type
-    if enc_type == 'transformer' and uses_adapters(opt):
-        return AdaptedTransformerEncoder.from_opt(opt, embeddings)
-    return str2enc[enc_type].from_opt(opt, embeddings)
+    assert opt.encoder_type == 'transformer', 'Only Transformer is supported'
+    return LayerStackEncoder.from_opt(opt, embeddings)
 
 
 def build_decoder(opt, embeddings):
@@ -541,6 +537,7 @@ def _create_adapters(
     my_enc_adapter_ids = [tuple(item) for item in my_enc_adapter_ids]
     my_dec_adapter_ids = [tuple(item) for item in my_dec_adapter_ids]
     for adapter_group, adapter_opts in opt.adapters['encoder'].items():
+        layer_stack_index = adapter_opts['layer_stack_index']
         for sub_id in adapter_opts['ids']:
             adapter_id = (adapter_group, sub_id)
             if adapter_id not in my_enc_adapter_ids:
@@ -561,7 +558,12 @@ def _create_adapters(
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
             for adapted_module in adapted_modules:
-                adapted_module.add_adapter(adapter_group, sub_id, adapter)
+                adapted_module.add_adapter(
+                    adapter_group=adapter_group,
+                    sub_id=sub_id,
+                    adapter=adapter,
+                    layer_stack_index=layer_stack_index,
+                )
     for adapter_group, adapter_opts in opt.adapters['decoder'].items():
         layer_stack_index = adapter_opts['layer_stack_index']
         for sub_id in adapter_opts['ids']:

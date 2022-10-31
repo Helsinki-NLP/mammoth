@@ -109,16 +109,18 @@ class Adapter(nn.Module):
         self.name = self._name(adapter_group, sub_id)
         # mapping layer_idx -> ModuleList of AdapterLayer to inject after that layer
         self.adapter_layers = nn.ModuleDict()
+        self._adapted_layer_indices = set()
 
     @staticmethod
     def _name(adapter_group: str, sub_id: str) -> str:
         return f'adapter_{adapter_group}_{sub_id}'
 
     def add_layer(self, layer_idx, adapter_layer: AdapterLayer):
-        layer_idx = f'layer{layer_idx}'
-        if layer_idx not in self.adapter_layers:
-            self.adapter_layers[layer_idx] = nn.ModuleList()
-        self.adapter_layers[layer_idx].append(adapter_layer)
+        self._adapted_layer_indices.add(layer_idx)
+        layer_idx_str = f'layer{layer_idx}'
+        if layer_idx_str not in self.adapter_layers:
+            self.adapter_layers[layer_idx_str] = nn.ModuleList()
+        self.adapter_layers[layer_idx_str].append(adapter_layer)
 
     def get_layers(self):
         return self.adapter_layers.items()
@@ -153,7 +155,14 @@ class TransformerAdapterMixin:
         name = Adapter._name(adapter_group, sub_id)
         if name in self.adapters:
             raise ValueError(f'Duplicate Adapter "{name}"')
+        max_layer_index = max(adapter._adapted_layer_indices)
+        if not self._check_n_layers(max_layer_index):
+            raise ValueError(f'Invalid number of layers {max_layer_index} in Adapter "{name}"')
         self.adapters[name] = adapter
+
+    def _check_n_layers(self, max_layer_index):
+        """Override this"""
+        return True
 
     def deactivate_adapters(self):
         self.active = set()
@@ -200,6 +209,9 @@ class AdaptedTransformerEncoder(TransformerAdapterMixin, TransformerEncoder):
             out = layer(out, mask)
         return out
 
+    def _check_n_layers(self, max_layer_index):
+        return max_layer_index <= len(self.transformer)
+
 
 class AdaptedTransformerDecoder(TransformerAdapterMixin, TransformerDecoder):
     def forward(self, *args, **kwargs):
@@ -208,3 +220,6 @@ class AdaptedTransformerDecoder(TransformerAdapterMixin, TransformerDecoder):
 
     def _get_layers(self):
         return self._injected
+
+    def _check_n_layers(self, max_layer_index):
+        return max_layer_index <= len(self.transformer_layers)

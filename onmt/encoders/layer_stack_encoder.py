@@ -1,5 +1,5 @@
 from torch import nn
-from typing import Dict, Tuple, List
+from typing import Dict, List
 
 from onmt.encoders.encoder import EncoderBase
 from onmt.models.adapters import Adapter, AdaptedTransformerEncoder
@@ -13,7 +13,7 @@ class LayerStackEncoder(EncoderBase):
 
         self.embeddings = embeddings
         self.encoders: nn.ModuleList[nn.ModuleDict] = encoders
-        self._adapter_to_stack: Dict[str, Tuple[int, str]] = dict()
+        self._adapter_to_stack: Dict[str, int] = dict()
         self._active: List[str] = []
 
     @classmethod
@@ -76,9 +76,9 @@ class LayerStackEncoder(EncoderBase):
             for stack in stacks:
                 stack.freeze_base_model(requires_grad=requires_grad)
 
-    def get_adapter(self, adapter_group: str, sub_id: str):
+    def get_adapter(self, module_id: str, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
-        layer_stack_index, module_id = self._adapter_to_stack[name]
+        layer_stack_index = self._adapter_to_stack[name]
         return self.encoders[layer_stack_index][module_id].get_adapter(adapter_group, sub_id)
 
     def add_adapter(
@@ -87,7 +87,7 @@ class LayerStackEncoder(EncoderBase):
         sub_id: str,
         adapter: Adapter,
         layer_stack_index: int,
-        module_id: str,
+        module_ids: List[str],
     ):
         """Adds the specified adapter with the name (adapter_group, sub_id)
         into the module_id sharing group of the layer_stack_index'th stack"""
@@ -99,26 +99,30 @@ class LayerStackEncoder(EncoderBase):
             raise ValueError(
                 f'No layer stack with index {layer_stack_index}. There are {len(len(self.encoders))} layer stacks'
             )
-        if module_id not in self.encoders[layer_stack_index]:
-            raise ValueError(
-                f'No sharing group / module_id "{module_id}" in the selected index {layer_stack_index}. '
-                f'Expected one of {self.encoders[layer_stack_index].keys()}'
-            )
-        self.encoders[layer_stack_index][module_id].add_adapter(adapter_group, sub_id, adapter)
+        for module_id in module_ids:
+            if module_id not in self.encoders[layer_stack_index]:
+                raise ValueError(
+                    f'No sharing group / module_id "{module_id}" in the selected index {layer_stack_index}. '
+                    f'Expected one of {self.encoders[layer_stack_index].keys()}'
+                )
+            self.encoders[layer_stack_index][module_id].add_adapter(adapter_group, sub_id, adapter)
 
     def deactivate_adapters(self):
         for stacks in self.encoders:
             for stack in stacks:
                 stack.deactivate_adapters()
 
-    def activate_adapter(self, adapter_group: str, sub_id: str):
+    def activate_adapter(self, module_id: str, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
-        layer_stack_index, module_id = self._adapter_to_stack[name]
+        layer_stack_index = self._adapter_to_stack[name]
         self.encoders[layer_stack_index][module_id].activate_adapter(adapter_group, sub_id)
 
     def activate(self, metadata: DatasetMetadata):
         self._active = metadata.encoder_id
         if metadata.encoder_adapter_ids is not None:
             self.deactivate_adapters()
-            for adapter_id in metadata.encoder_adapter_ids:
-                self.activate_adapter(*adapter_id)
+            for adapter_group, sub_id in metadata.encoder_adapter_ids:
+                name = Adapter._name(adapter_group, sub_id)
+                layer_stack_index = self._adapter_to_stack[name]
+                module_id = metadata.encoder_id[layer_stack_index]
+                self.activate_adapter(module_id, adapter_group, sub_id)

@@ -551,14 +551,13 @@ def _create_adapters(
                     layer_idx,
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
-            for module_id in adapted_stacks:
-                model.encoder.add_adapter(
-                    adapter_group=adapter_group,
-                    sub_id=sub_id,
-                    adapter=adapter,
-                    layer_stack_index=layer_stack_index,
-                    module_id=module_id,
-                )
+            model.encoder.add_adapter(
+                adapter_group=adapter_group,
+                sub_id=sub_id,
+                adapter=adapter,
+                layer_stack_index=layer_stack_index,
+                module_ids=adapted_stacks,
+            )
     for adapter_group, adapter_opts in opt.adapters['decoder'].items():
         layer_stack_index = adapter_opts['layer_stack_index']
         for sub_id in adapter_opts['ids']:
@@ -579,14 +578,13 @@ def _create_adapters(
                     layer_idx,
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
-            for module_id in adapted_stacks:
-                model.decoder.add_adapter(
-                    adapter_group=adapter_group,
-                    sub_id=sub_id,
-                    adapter=adapter,
-                    layer_stack_index=layer_stack_index,
-                    module_id=module_id,
-                )
+            model.decoder.add_adapter(
+                adapter_group=adapter_group,
+                sub_id=sub_id,
+                adapter=adapter,
+                layer_stack_index=layer_stack_index,
+                module_ids=adapted_stacks,
+            )
 
 
 def build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint):

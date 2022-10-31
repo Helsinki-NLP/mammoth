@@ -296,12 +296,16 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
         if model_opt.enc_sharing_group:
             model_opt.enc_sharing_group = [yaml.safe_load(item) for item in model_opt.enc_sharing_group]
-            assert isinstance(model_opt.enc_sharing_group, list)
-            assert all(isinstance(val, str) for val in model_opt.enc_sharing_group)
+            assert isinstance(model_opt.enc_sharing_group, list), model_opt.enc_sharing_group
+            for grouplist in model_opt.enc_sharing_group:
+                assert isinstance(grouplist, list), grouplist
+                assert all(isinstance(val, str) for val in grouplist), grouplist
         if model_opt.dec_sharing_group:
             model_opt.dec_sharing_group = [yaml.safe_load(item) for item in model_opt.dec_sharing_group]
-            assert isinstance(model_opt.dec_sharing_group, list)
-            assert all(isinstance(val, str) for val in model_opt.dec_sharing_group)
+            assert isinstance(model_opt.dec_sharing_group, list), model_opt.dec_sharing_group
+            for grouplist in model_opt.dec_sharing_group:
+                assert isinstance(grouplist, list), grouplist
+                assert all(isinstance(val, str) for val in grouplist), grouplist
 
     @classmethod
     def ckpt_model_opts(cls, ckpt_opt):

@@ -118,9 +118,18 @@ class LayerStackDecoder(DecoderBase):
         """Adds the specified adapter with the name (adapter_group, sub_id)
         into the module_id sharing group of the layer_stack_index'th stack"""
         name = Adapter._name(adapter_group, sub_id)
-        if name in self._adapter_to_decoder:
+        if name in self._adapter_to_stack:
             raise ValueError(f'Duplicate Adapter "{name}"')
         self._adapter_to_stack[name] = layer_stack_index
+        if layer_stack_index >= len(self.decoders):
+            raise ValueError(
+                f'No layer stack with index {layer_stack_index}. There are {len(len(self.decoders))} layer stacks'
+            )
+        if module_id not in self.decoders[layer_stack_index]:
+            raise ValueError(
+                f'No sharing group / module_id "{module_id}" in the selected index {layer_stack_index}. '
+                f'Expected one of {self.decoders[layer_stack_index].keys()}'
+            )
         self.decoders[layer_stack_index][module_id].add_adapter(adapter_group, sub_id, adapter)
 
     def deactivate_adapters(self):

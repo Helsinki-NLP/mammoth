@@ -22,7 +22,7 @@ class LayerStackEncoder(EncoderBase):
         encoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.enc_layers):
             stacks = nn.ModuleDict()
-            for module_id in task_queue_manager.get_decoders(layer_stack_index):
+            for module_id in task_queue_manager.get_encoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
                     continue
@@ -92,9 +92,18 @@ class LayerStackEncoder(EncoderBase):
         """Adds the specified adapter with the name (adapter_group, sub_id)
         into the module_id sharing group of the layer_stack_index'th stack"""
         name = Adapter._name(adapter_group, sub_id)
-        if name in self._adapter_to_encoder:
+        if name in self._adapter_to_stack:
             raise ValueError(f'Duplicate Adapter "{name}"')
         self._adapter_to_stack[name] = layer_stack_index
+        if layer_stack_index >= len(self.encoders):
+            raise ValueError(
+                f'No layer stack with index {layer_stack_index}. There are {len(len(self.encoders))} layer stacks'
+            )
+        if module_id not in self.encoders[layer_stack_index]:
+            raise ValueError(
+                f'No sharing group / module_id "{module_id}" in the selected index {layer_stack_index}. '
+                f'Expected one of {self.encoders[layer_stack_index].keys()}'
+            )
         self.encoders[layer_stack_index][module_id].add_adapter(adapter_group, sub_id, adapter)
 
     def deactivate_adapters(self):

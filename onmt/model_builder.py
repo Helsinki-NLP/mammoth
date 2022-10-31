@@ -492,11 +492,11 @@ def create_all_adapters(model, opt, task_queue_manager):
         for adapter_id in task.encoder_adapter_ids:
             adapter_id = tuple(adapter_id)
             my_enc_adapter_ids.add(adapter_id)
-            adapter_to_encoder_ids[adapter_id].add(task.encoder_id)
+            adapter_to_encoder_ids[adapter_id].add(tuple(task.encoder_id))
         for adapter_id in task.decoder_adapter_ids:
             adapter_id = tuple(adapter_id)
             my_dec_adapter_ids.add(adapter_id)
-            adapter_to_decoder_ids[adapter_id].add(task.decoder_id)
+            adapter_to_decoder_ids[adapter_id].add(tuple(task.decoder_id))
     _create_adapters(
         model,
         opt,
@@ -541,7 +541,9 @@ def _create_adapters(
             hidden_dim = adapter_opts['hidden_size']
 
             # all stacks to which this adapter should be added
-            adapted_stacks = adapter_to_encoder_ids[adapter_id][layer_stack_index]
+            adapted_stacks = set(
+                stacks[layer_stack_index] for stacks in adapter_to_encoder_ids[adapter_id]
+            )
             adapter_cls = EncoderAdapterLayer
 
             for layer_idx in adapter_opts['layers']:
@@ -567,7 +569,9 @@ def _create_adapters(
             input_dim = opt.rnn_size
             hidden_dim = adapter_opts['hidden_size']
 
-            adapted_stacks = adapter_to_encoder_ids[adapter_id][layer_stack_index]
+            adapted_stacks = set(
+                stacks[layer_stack_index] for stacks in adapter_to_decoder_ids[adapter_id]
+            )
             adapter_cls = DecoderAdapterLayer
 
             for layer_idx in adapter_opts['layers']:

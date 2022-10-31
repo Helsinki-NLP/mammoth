@@ -6,7 +6,7 @@ from onmt.decoders.decoder import DecoderBase
 from onmt.models.adapters import Adapter, AdaptedTransformerDecoder
 
 
-class ModularDecoder(DecoderBase):
+class LayerStackDecoder(DecoderBase):
     def __init__(self, embeddings, decoders):
         super().__init__()
 
@@ -86,15 +86,15 @@ class ModularDecoder(DecoderBase):
             decoder.freeze_base_model(requires_grad=requires_grad)
 
     def get_adapter(self, adapter_group: str, sub_id: str):
-        dec_idx = Adapter._name(adapter_group, sub_id)
-        return self.decoders[dec_idx].get_adapter(adapter_group, sub_id)
+        layer_stack_index = Adapter._name(adapter_group, sub_id)
+        return self.decoders[layer_stack_index].get_adapter(adapter_group, sub_id)
 
-    def add_adapter(self, adapter_group: str, sub_id: str, adapter: Adapter, dec_idx: int):
+    def add_adapter(self, adapter_group: str, sub_id: str, adapter: Adapter, layer_stack_index: int):
         name = Adapter._name(adapter_group, sub_id)
         if name in self._adapter_to_decoder:
             raise ValueError(f'Duplicate Adapter "{name}"')
-        self._adapter_to_decoder[name] = dec_idx
-        self.decoders[dec_idx].add_adapter(adapter_group, sub_id, adapter)
+        self._adapter_to_decoder[name] = layer_stack_index
+        self.decoders[layer_stack_index].add_adapter(adapter_group, sub_id, adapter)
 
     def deactivate_adapters(self):
         for decoder in self.decoders:
@@ -102,5 +102,5 @@ class ModularDecoder(DecoderBase):
 
     def activate_adapter(self, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
-        dec_idx = self._adapter_to_decoder[name]
-        self.decoders[dec_idx].activate_adapter(adapter_group, sub_id)
+        layer_stack_index = self._adapter_to_decoder[name]
+        self.decoders[layer_stack_index].activate_adapter(adapter_group, sub_id)

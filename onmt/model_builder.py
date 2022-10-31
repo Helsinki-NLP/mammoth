@@ -12,7 +12,7 @@ from torchtext.legacy.data import Field
 import onmt.modules
 from onmt.encoders import str2enc
 
-from onmt.decoders.modular_decoder import ModularDecoder
+from onmt.decoders.layer_stack_decoder import LayerStackDecoder
 
 from onmt.models.adapters import (
     AdaptedTransformerEncoder,
@@ -88,7 +88,7 @@ def build_decoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
     assert opt.decoder_type == 'transformer', 'Only Transformer is supported'
-    return ModularDecoder.from_opt(opt, embeddings)
+    return LayerStackDecoder.from_opt(opt, embeddings)
 
 
 def load_test_multitask_model(opt, model_path=None):
@@ -563,7 +563,7 @@ def _create_adapters(
             for adapted_module in adapted_modules:
                 adapted_module.add_adapter(adapter_group, sub_id, adapter)
     for adapter_group, adapter_opts in opt.adapters['decoder'].items():
-        module_index = adapter_opts['module_index']
+        layer_stack_index = adapter_opts['layer_stack_index']
         for sub_id in adapter_opts['ids']:
             adapter_id = (adapter_group, sub_id)
             if adapter_id not in my_dec_adapter_ids:
@@ -584,7 +584,12 @@ def _create_adapters(
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
             for adapted_module in adapted_modules:
-                adapted_module.add_adapter(adapter_group, sub_id, adapter, module_index)
+                adapted_module.add_adapter(
+                    adapter_group=adapter_group,
+                    sub_id=sub_id,
+                    adapter=adapter,
+                    layer_stack_index=layer_stack_index,
+                )
 
 
 def build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint):

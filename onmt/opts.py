@@ -395,13 +395,13 @@ def model_opts(parser):
         "--enc_sharing_group",
         "-enc_sharing_group",
         nargs='+',
-        help="List of encoder sharing group id for each dataset. ",
+        help="List of (list of encoder sharing group id for each stack layer) for each dataset. ",
     )
     group.add(
         "--dec_sharing_group",
         "-dec_sharing_group",
         nargs='+',
-        help="List of decoder sharing group id for each dataset. ",
+        help="List of (list of decoder sharing group id for each stack layer) for each dataset. ",
     )
     group.add("--node_gpu", "-node_gpu", nargs='+', help="List of node:gpu assignments")
 

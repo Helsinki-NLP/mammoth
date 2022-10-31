@@ -294,6 +294,15 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
                 )
             )
 
+        if model_opt.enc_sharing_group:
+            model_opt.enc_sharing_group = [yaml.safe_load(item) for item in model_opt.enc_sharing_group]
+            assert isinstance(model_opt.enc_sharing_group, list)
+            assert all(isinstance(val, str) for val in model_opt.enc_sharing_group)
+        if model_opt.dec_sharing_group:
+            model_opt.dec_sharing_group = [yaml.safe_load(item) for item in model_opt.dec_sharing_group]
+            assert isinstance(model_opt.dec_sharing_group, list)
+            assert all(isinstance(val, str) for val in model_opt.dec_sharing_group)
+
     @classmethod
     def ckpt_model_opts(cls, ckpt_opt):
         # Load default opt values, then overwrite with the opts in

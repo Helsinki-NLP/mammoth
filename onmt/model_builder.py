@@ -65,7 +65,7 @@ def build_embeddings(opt, text_field, for_encoder=True):
     return emb
 
 
-def build_encoder(opt, embeddings):
+def build_encoder(opt, embeddings, task_queue_manager):
     """
     Various encoder dispatcher function.
     Args:
@@ -73,10 +73,10 @@ def build_encoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
     assert opt.encoder_type == 'transformer', 'Only Transformer is supported'
-    return LayerStackEncoder.from_opt(opt, embeddings)
+    return LayerStackEncoder.from_opt(opt, embeddings, task_queue_manager)
 
 
-def build_decoder(opt, embeddings):
+def build_decoder(opt, embeddings, task_queue_manager):
     """
     Various decoder dispatcher function.
     Args:
@@ -84,7 +84,7 @@ def build_decoder(opt, embeddings):
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
     assert opt.decoder_type == 'transformer', 'Only Transformer is supported'
-    return LayerStackDecoder.from_opt(opt, embeddings)
+    return LayerStackDecoder.from_opt(opt, embeddings, task_queue_manager)
 
 
 def load_test_multitask_model(opt, model_path=None):
@@ -278,32 +278,26 @@ def build_task_specific_model(
     if not model_opt.model_task == ModelTask.SEQ2SEQ:
         raise ValueError(f"Only ModelTask.SEQ2SEQ works - {model_opt.model_task} task")
 
-    src_embs_by_encoder = defaultdict(dict)
-    tgt_embs_by_decoder = defaultdict(dict)
+    src_embs = dict()
+    tgt_embs = dict()
 
-    encoders_md = nn.ModuleDict()
-    decoders_md = nn.ModuleDict()
     generators_md = nn.ModuleDict()
 
-    for side, lang, encoder_id, fields in task_queue_manager.get_fields(side='src', fields_dict=fields_dict):
+    for side, lang, _, fields in task_queue_manager.get_fields(side='src', fields_dict=fields_dict):
         src_emb = build_src_emb(model_opt, fields)
-        src_embs_by_encoder[encoder_id][lang] = src_emb
+        src_embs[lang] = src_emb
 
-    for encoder_id in task_queue_manager.get_encoders():
-        pluggable_src_emb = PluggableEmbeddings(src_embs_by_encoder[encoder_id])
-        encoder = build_only_enc(model_opt, pluggable_src_emb)
-        encoders_md.add_module(f'encoder{encoder_id}', encoder)
+    pluggable_src_emb = PluggableEmbeddings(src_embs)
+    encoder = build_only_enc(model_opt, pluggable_src_emb, task_queue_manager)
 
-    for side, lang, decoder_id, fields in task_queue_manager.get_fields(side='tgt', fields_dict=fields_dict):
+    for side, lang, _, fields in task_queue_manager.get_fields(side='tgt', fields_dict=fields_dict):
         tgt_emb = build_tgt_emb(model_opt, fields)
-        tgt_embs_by_decoder[decoder_id][lang] = tgt_emb
+        tgt_embs[lang] = tgt_emb
         generator = build_generator(model_opt, fields, tgt_emb)
         generators_md.add_module(f'generator{lang}', generator)
 
-    for decoder_id in task_queue_manager.get_decoders():
-        pluggable_tgt_emb = PluggableEmbeddings(tgt_embs_by_decoder[decoder_id])
-        decoder = build_only_dec(model_opt, pluggable_tgt_emb)
-        decoders_md.add_module(f'decoder{decoder_id}', decoder)
+    pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
+    decoder = build_only_dec(model_opt, pluggable_tgt_emb, task_queue_manager)
 
     # TODO: implement hierarchical approach to layer sharing
     attention_bridge = AttentionBridge.from_opt(model_opt)
@@ -319,8 +313,8 @@ def build_task_specific_model(
         attention_bridge.half()
 
     nmt_model = onmt.models.NMTModel(
-        encoder=encoders_md,
-        decoder=decoders_md,
+        encoder=encoder,
+        decoder=decoder,
         attention_bridge=attention_bridge
     )
     if uses_adapters(model_opt):
@@ -346,9 +340,9 @@ def build_task_specific_model(
     return nmt_model, generators_md
 
 
-def build_only_enc(model_opt, src_emb):
+def build_only_enc(model_opt, src_emb, task_queue_manager):
     """Truly only builds encoder: no embeddings"""
-    encoder = build_encoder(model_opt, src_emb)
+    encoder = build_encoder(model_opt, src_emb, task_queue_manager)
     if model_opt.param_init != 0.0:
         for p in encoder.parameters():
             p.data.uniform_(-model_opt.param_init, model_opt.param_init)
@@ -362,8 +356,8 @@ def build_only_enc(model_opt, src_emb):
     return encoder
 
 
-def build_only_dec(model_opt, tgt_emb):
-    decoder = build_decoder(model_opt, tgt_emb)
+def build_only_dec(model_opt, tgt_emb, task_queue_manager):
+    decoder = build_decoder(model_opt, tgt_emb, task_queue_manager)
 
     if model_opt.param_init != 0.0:
         for p in decoder.parameters():
@@ -546,10 +540,8 @@ def _create_adapters(
             input_dim = opt.rnn_size
             hidden_dim = adapter_opts['hidden_size']
 
-            encoder_ids = adapter_to_encoder_ids[adapter_id]
-            adapted_modules = [
-                model.encoder[f'encoder{encoder_id}'] for encoder_id in encoder_ids
-            ]
+            # all stacks to which this adapter should be added
+            adapted_stacks = adapter_to_encoder_ids[adapter_id][layer_stack_index]
             adapter_cls = EncoderAdapterLayer
 
             for layer_idx in adapter_opts['layers']:
@@ -557,12 +549,13 @@ def _create_adapters(
                     layer_idx,
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
-            for adapted_module in adapted_modules:
-                adapted_module.add_adapter(
+            for module_id in adapted_stacks:
+                model.encoder.add_adapter(
                     adapter_group=adapter_group,
                     sub_id=sub_id,
                     adapter=adapter,
                     layer_stack_index=layer_stack_index,
+                    module_id=module_id,
                 )
     for adapter_group, adapter_opts in opt.adapters['decoder'].items():
         layer_stack_index = adapter_opts['layer_stack_index']
@@ -574,10 +567,7 @@ def _create_adapters(
             input_dim = opt.rnn_size
             hidden_dim = adapter_opts['hidden_size']
 
-            decoder_ids = adapter_to_decoder_ids[adapter_id]
-            adapted_modules = [
-                model.decoder[f'decoder{decoder_id}'] for decoder_id in decoder_ids
-            ]
+            adapted_stacks = adapter_to_encoder_ids[adapter_id][layer_stack_index]
             adapter_cls = DecoderAdapterLayer
 
             for layer_idx in adapter_opts['layers']:
@@ -585,12 +575,13 @@ def _create_adapters(
                     layer_idx,
                     adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
                 )
-            for adapted_module in adapted_modules:
-                adapted_module.add_adapter(
+            for module_id in adapted_stacks:
+                model.decoder.add_adapter(
                     adapter_group=adapter_group,
                     sub_id=sub_id,
                     adapter=adapter,
                     layer_stack_index=layer_stack_index,
+                    module_id=module_id,
                 )
 
 

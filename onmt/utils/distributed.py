@@ -502,8 +502,8 @@ class TaskSpecs():
     local_rank: int
     src_lang: str
     tgt_lang: str
-    encoder_id: str
-    decoder_id: str
+    encoder_id: List[str]
+    decoder_id: List[str]
     corpus_id: str
     weight: int
     corpus_opt: dict
@@ -603,14 +603,22 @@ class TaskQueueManager:
 
         if opt.enc_sharing_group:
             encoder_ids = opt.enc_sharing_group
+            assert all(len(enc_ids) == len(opt.enc_layers) for enc_ids in encoder_ids)
         else:
-            # if no encoder sharing groups are defined, encoders are language specific
-            encoder_ids = [src_lang for src_lang, tgt_lang in lang_pairs]
+            # if no encoder sharing groups are defined,
+            # it is assumed that there is only one encoder stack and it is language specific
+            if not len(opt.enc_layers) == 1:
+                raise Exception('With more than one encoder stack, you must explictly define enc_sharing_group')
+            encoder_ids = [[src_lang] for src_lang, tgt_lang in lang_pairs]
         if opt.dec_sharing_group:
             decoder_ids = opt.dec_sharing_group
+            assert all(len(dec_ids) == len(opt.dec_layers) for dec_ids in decoder_ids)
         else:
-            # if no decoder sharing groups are defined, decoders are language specific
-            decoder_ids = [tgt_lang for src_lang, tgt_lang in lang_pairs]
+            # if no decoder sharing groups are defined,
+            # it is assumed that there is only one decoder stack and it is language specific
+            if not len(opt.dec_layers) == 1:
+                raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
+            decoder_ids = [[tgt_lang] for src_lang, tgt_lang in lang_pairs]
 
         corpus_ids = opt.data.keys()
 
@@ -746,12 +754,12 @@ class TaskQueueManager:
         # Single OrderedDict contains all components.
         # Keys are tuples of strings.
         # The length of the key varies depending on the component:
-        # ('encoder', encoder_id)
-        # ('decoder', decoder_id)
-        # ('src_emb', lang, encoder_id)
-        # ('tgt_emb', lang, decoder_id)
-        # ('encoder_adapters', encoder_id, adapter_group, sub_id)
-        # ('decoder_adapters', decoder_id, adapter_group, sub_id)
+        # ('encoder', layer_stack_index, encoder_id)
+        # ('decoder', layer_stack_index, decoder_id)
+        # ('src_emb', lang)
+        # ('tgt_emb', lang)
+        # ('encoder_adapters', layer_stack_index, encoder_id, adapter_group, sub_id)
+        # ('decoder_adapters', layer_stack_index, decoder_id, adapter_group, sub_id)
         self.components_to_gpus = OrderedDict()
 
         for node_rank in range(self.n_nodes):
@@ -761,22 +769,26 @@ class TaskQueueManager:
 
                 for task in tasks:
                     keys = [
-                        ('encoder', task.encoder_id),
-                        ('decoder', task.decoder_id),
-                        ('src_emb', task.src_lang, task.encoder_id),
-                        ('tgt_emb', task.tgt_lang, task.decoder_id),
+                        ('src_emb', task.src_lang),
+                        ('tgt_emb', task.tgt_lang),
                     ]
+                    for layer_stack_index, encoder_id in enumerate(task.encoder_id):
+                        keys.append(('encoder', layer_stack_index, encoder_id))
+                    for layer_stack_index, decoder_id in enumerate(task.decoder_id):
+                        keys.append(('decoder', layer_stack_index, decoder_id))
                     for key in keys:
                         # Using setdefault to treat OrderedDict as defaultdict
                         self.components_to_gpus.setdefault(key, set()).add(global_rank)
 
                     if task.encoder_adapter_ids:
-                        for adapter_group, sub_id in task.encoder_adapter_ids:
-                            key = ('encoder_adapters', task.encoder_id, adapter_group, sub_id)
+                        for layer_stack_index, adapter_group, sub_id in task.encoder_adapter_ids:
+                            encoder_id = task.encoder_id[layer_stack_index]
+                            key = ('encoder_adapters', layer_stack_index, encoder_id, adapter_group, sub_id)
                             self.components_to_gpus.setdefault(key, set()).add(global_rank)
                     if task.decoder_adapter_ids:
-                        for adapter_group, sub_id in task.decoder_adapter_ids:
-                            key = ('decoder_adapters', task.decoder_id, adapter_group, sub_id)
+                        for layer_stack_index, adapter_group, sub_id in task.decoder_adapter_ids:
+                            decoder_id = task.decoder_id[layer_stack_index]
+                            key = ('decoder_adapters', layer_stack_index, decoder_id, adapter_group, sub_id)
                             self.components_to_gpus.setdefault(key, set()).add(global_rank)
 
         # Structured, each component in a separate OrderedDict
@@ -855,21 +867,17 @@ class TaskQueueManager:
         """Returns a list of tuples: (side, lang, component_id, fields).
         side:           Either 'src' or 'tgt'.
         lang:           The language code. Vocabularies are language specific.
-        component_id:   The encoder or decoder id. Embeddings are stored in
-                        the encoders/decoders, so that component needs to be identified
-                        in order to access the correct embeddings,
-                        even if the embeddings are language specific.
+        component_id:   None
         fields:         The actual Fields.
         """
         seen = set()
         result = []
+        component_id = None     # for hysterical raisins
         for task in self.get_tasks():
             if side == 'src':
                 lang = task.src_lang
-                component_id = task.encoder_id
             else:
                 lang = task.tgt_lang
-                component_id = task.decoder_id
             fields = fields_dict[(side, lang)]
             if not (side, lang, component_id) in seen:
                 result.append((side, lang, component_id, fields))
@@ -882,19 +890,19 @@ class TaskQueueManager:
             communication_batch_id,
         )
 
-    def get_encoders(self):
-        my_encoder_ids = [task.encoder_id for task in self.get_tasks()]
+    def get_encoders(self, layer_stack_index: int):
+        my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_tasks()]
         return my_encoder_ids
 
-    def get_decoders(self):
-        my_decoder_ids = [task.decoder_id for task in self.get_tasks()]
+    def get_decoders(self, layer_stack_index: int):
+        my_decoder_ids = [task.decoder_id[layer_stack_index] for task in self.get_tasks()]
         return my_decoder_ids
 
-    def get_src_embs(self):
-        return [(task.src_lang, task.encoder_id) for task in self.get_tasks()]
+    def get_src_langs(self):
+        return [task.src_lang for task in self.get_tasks()]
 
-    def get_tgt_embs(self):
-        return [(task.tgt_lang, task.decoder_id) for task in self.get_tasks()]
+    def get_tgt_langs(self):
+        return [task.tgt_lang for task in self.get_tasks()]
 
     def get_generators(self):
         return [task.tgt_lang for task in self.get_tasks()]

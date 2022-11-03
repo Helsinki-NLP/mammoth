@@ -175,6 +175,8 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         B, L, H = intermediate_output.size()  # [bsz, len, nhid]
         compressed_embeddings = intermediate_output.reshape(-1, H)  # [bsz*len, nhid*2]
         hbar = self.ws1(compressed_embeddings)  # [bsz*len, attention-unit]
+        
+        hbar = self.relu(hbar)
 
         alphas = self.ws2(hbar).view(B, L, -1)  # [bsz, len, hop]
         alphas = torch.transpose(alphas, 1, 2).contiguous()  # [bsz, hop, len]

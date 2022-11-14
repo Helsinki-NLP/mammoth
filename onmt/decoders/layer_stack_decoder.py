@@ -53,18 +53,18 @@ class LayerStackDecoder(DecoderBase):
     def init_state(self, src, memory_bank, enc_hidden):
         """Initialize decoder state."""
         for stacks in self.decoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.init_state(src, memory_bank, enc_hidden)
 
     def detach_state(self):
         for stacks in self.decoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.detach_state()
 
     def update_dropout(self, dropout, attention_dropout):
         self.embeddings.update_dropout(dropout)
         for stacks in self.decoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.update_dropout(dropout, attention_dropout)
 
     def forward(self, tgt, memory_bank=None, step=None, memory_lengths=None, **kwargs):
@@ -99,8 +99,15 @@ class LayerStackDecoder(DecoderBase):
 
     def freeze_base_model(self, requires_grad=False):
         for stacks in self.decoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.freeze_base_model(requires_grad=requires_grad)
+
+    @property
+    def n_layer_stacks(self):
+        return len(self.decoders)
+
+    def get_submodule(self, layer_stack_index: int, module_id: str):
+        return self.decoders[layer_stack_index][module_id]
 
     def get_adapter(self, module_id: str, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
@@ -135,7 +142,7 @@ class LayerStackDecoder(DecoderBase):
 
     def deactivate_adapters(self):
         for stacks in self.decoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.deactivate_adapters()
 
     def activate_adapter(self, module_id: str, adapter_group: str, sub_id: str):
@@ -145,6 +152,7 @@ class LayerStackDecoder(DecoderBase):
 
     def activate(self, metadata: DatasetMetadata):
         self._active = metadata.decoder_id
+        self.embeddings.activate(metadata.tgt_lang)
         if metadata.decoder_adapter_ids is not None:
             self.deactivate_adapters()
             for adapter_group, sub_id in metadata.decoder_adapter_ids:

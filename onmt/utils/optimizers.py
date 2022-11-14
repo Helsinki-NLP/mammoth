@@ -14,20 +14,28 @@ from torch.nn.utils import clip_grad_norm_
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     multiOptims = {}
     components = [
-        ('encoder', model.encoder, task_queue_manager.get_encoders()),
-        ('decoder', model.decoder, task_queue_manager.get_decoders()),
-        ('generator', model.generator, task_queue_manager.get_generators()),
+        ('encoder', model.encoder, task_queue_manager.get_encoders),
+        ('decoder', model.decoder, task_queue_manager.get_decoders),
     ]
-    for component_name, components, component_ids in components:
-        for component_id in component_ids:
-            params = []
-            comp = components[f'{component_name}{component_id}']
-            for name, param in comp.named_parameters():
-                if not param.requires_grad:
-                    continue
-                params.append(param)
-            ada = base_optimizer(params)
-            multiOptims[f'{component_name}_{component_id}'] = ada
+    for component_name, main_component, component_id_func in components:
+        for layer_stack_index in range(main_component.n_layer_stacks):
+            for component_id in component_id_func(layer_stack_index):
+                params = []
+                sub_component = main_component.get_submodule(layer_stack_index, component_id)
+                for name, param in sub_component.named_parameters():
+                    if not param.requires_grad:
+                        continue
+                    params.append(param)
+                optimizer = base_optimizer(params)
+                multiOptims[f'{component_name}_{layer_stack_index}_{component_id}'] = optimizer
+    for generator_id in task_queue_manager.get_generators():
+        generator = model.generator[f'generator_{generator_id}']
+        for name, param in generator.named_parameters():
+            if not param.requires_grad:
+                continue
+            params.append(param)
+        optimizer = base_optimizer(params)
+        multiOptims[f'generator_{generator_id}'] = optimizer
 
     attParam = []
     for name, param in model.attention_bridge.named_parameters():
@@ -37,8 +45,8 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
 
     # skip AB optimizer if AB is not in use
     if len(attParam):
-        ada = base_optimizer(attParam)
-        multiOptims["ATT"] = ada
+        optimizer = base_optimizer(attParam)
+        multiOptims["ATT"] = optimizer
 
     optimizer = MultipleOptimizer(multiOptims, None)
     return optimizer

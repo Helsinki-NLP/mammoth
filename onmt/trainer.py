@@ -47,7 +47,7 @@ def build_trainer(
     logger.info("BUILD TRAINER")
 
     for (side, lang, component_id, fields) in task_queue_manager.get_fields('tgt', fields_dict):
-        generator = generators_md[f"generator{lang}"]
+        generator = generators_md[f'generator_{lang}']
         # This retrieves the primary field of this crappy datastructure
         tgt_field = fields['tgt'].fields[0][1]
         train_loss_md.add_module(

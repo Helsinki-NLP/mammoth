@@ -294,7 +294,7 @@ def build_task_specific_model(
         tgt_emb = build_tgt_emb(model_opt, fields)
         tgt_embs[lang] = tgt_emb
         generator = build_generator(model_opt, fields, tgt_emb)
-        generators_md.add_module(f'generator{lang}', generator)
+        generators_md.add_module(f'generator_{lang}', generator)
 
     pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
     decoder = build_only_dec(model_opt, pluggable_tgt_emb, task_queue_manager)

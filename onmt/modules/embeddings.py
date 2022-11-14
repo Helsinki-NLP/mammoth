@@ -282,6 +282,8 @@ class PluggableEmbeddings(nn.ModuleDict):
 
     @property
     def _active_embeddings(self):
+        if self.active_key is None:
+            raise Exception('Must activate PluggableEmbeddings before forward')
         active_embeddings = self[f'embeddings{self.active_key}']
         # print(f'plugging in embeddings{self.active_key}')
         return active_embeddings

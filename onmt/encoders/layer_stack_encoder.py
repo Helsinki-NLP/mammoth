@@ -47,7 +47,7 @@ class LayerStackEncoder(EncoderBase):
     def update_dropout(self, dropout, attention_dropout):
         self.embeddings.update_dropout(dropout)
         for stacks in self.encoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.update_dropout(dropout, attention_dropout)
 
     def forward(self, src, lengths=None, **kwargs):
@@ -73,8 +73,15 @@ class LayerStackEncoder(EncoderBase):
 
     def freeze_base_model(self, requires_grad=False):
         for stacks in self.encoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.freeze_base_model(requires_grad=requires_grad)
+
+    @property
+    def n_layer_stacks(self):
+        return len(self.encoders)
+
+    def get_submodule(self, layer_stack_index: int, module_id: str):
+        return self.encoders[layer_stack_index][module_id]
 
     def get_adapter(self, module_id: str, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
@@ -109,7 +116,7 @@ class LayerStackEncoder(EncoderBase):
 
     def deactivate_adapters(self):
         for stacks in self.encoders:
-            for stack in stacks:
+            for stack in stacks.values():
                 stack.deactivate_adapters()
 
     def activate_adapter(self, module_id: str, adapter_group: str, sub_id: str):
@@ -119,6 +126,7 @@ class LayerStackEncoder(EncoderBase):
 
     def activate(self, metadata: DatasetMetadata):
         self._active = metadata.encoder_id
+        self.embeddings.activate(metadata.src_lang)
         if metadata.encoder_adapter_ids is not None:
             self.deactivate_adapters()
             for adapter_group, sub_id in metadata.encoder_adapter_ids:

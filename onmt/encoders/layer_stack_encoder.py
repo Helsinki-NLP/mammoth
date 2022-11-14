@@ -18,7 +18,7 @@ class LayerStackEncoder(EncoderBase):
 
     @classmethod
     def from_opt(cls, opt, embeddings, task_queue_manager):
-        """Alternate constructor."""
+        """Alternate constructor for use during training."""
         encoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.enc_layers):
             stacks = nn.ModuleDict()
@@ -41,6 +41,32 @@ class LayerStackEncoder(EncoderBase):
                     opt.max_relative_positions,
                     pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
                 )
+            encoders.append(stacks)
+        return cls(embeddings, encoders)
+
+    @classmethod
+    def from_trans_opt(cls, model_opt, embeddings, opt_stack):
+        """Alternate constructor for use during translation."""
+        encoders = nn.ModuleList()
+        for layer_stack_index, n_layers in enumerate(model_opt.enc_layers):
+            stacks = nn.ModuleDict()
+            module_opts = opt_stack['encoder'][layer_stack_index]
+            module_id = module_opts['id']
+            stacks[module_id] = AdaptedTransformerEncoder(
+                n_layers,
+                model_opt.enc_rnn_size,
+                model_opt.heads,
+                model_opt.transformer_ff,
+                model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
+                (
+                    model_opt.attention_dropout[0]
+                    if type(model_opt.attention_dropout) is list
+                    else model_opt.attention_dropout
+                ),
+                None,  # embeddings,
+                model_opt.max_relative_positions,
+                pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+            )
             encoders.append(stacks)
         return cls(embeddings, encoders)
 

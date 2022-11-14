@@ -18,7 +18,7 @@ class LayerStackDecoder(DecoderBase):
 
     @classmethod
     def from_opt(cls, opt, embeddings, task_queue_manager):
-        """Alternate constructor."""
+        """Alternate constructor for use during training."""
         decoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.dec_layers):
             stacks = nn.ModuleDict()
@@ -50,6 +50,38 @@ class LayerStackDecoder(DecoderBase):
             decoders.append(stacks)
         return cls(embeddings, decoders)
 
+    @classmethod
+    def from_trans_opt(cls, model_opt, embeddings, opt_stack):
+        """Alternate constructor for use during translation."""
+        decoders = nn.ModuleList()
+        for layer_stack_index, n_layers in enumerate(model_opt.dec_layers):
+            stacks = nn.ModuleDict()
+            module_opts = opt_stack['decoder'][layer_stack_index]
+            module_id = module_opts['id']
+            stacks[module_id] = AdaptedTransformerDecoder(
+                n_layers,
+                model_opt.dec_rnn_size,
+                model_opt.heads,
+                model_opt.transformer_ff,
+                model_opt.copy_attn,
+                model_opt.self_attn_type,
+                model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
+                (
+                    model_opt.attention_dropout[0]
+                    if type(model_opt.attention_dropout) is list
+                    else model_opt.attention_dropout
+                ),
+                None,  # embeddings,
+                model_opt.max_relative_positions,
+                model_opt.aan_useffn,
+                model_opt.full_context_alignment,
+                model_opt.alignment_layer,
+                alignment_heads=model_opt.alignment_heads,
+                pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+            )
+            decoders.append(stacks)
+        return cls(embeddings, decoders)
+
     def init_state(self, src, memory_bank, enc_hidden):
         """Initialize decoder state."""
         for stacks in self.decoders:
@@ -60,6 +92,11 @@ class LayerStackDecoder(DecoderBase):
         for stacks in self.decoders:
             for stack in stacks.values():
                 stack.detach_state()
+
+    def map_state(self, fn_map_state):
+        for stacks in self.decoders:
+            for stack in stacks.values():
+                stack.map_state(fn_map_state)
 
     def update_dropout(self, dropout, attention_dropout):
         self.embeddings.update_dropout(dropout)

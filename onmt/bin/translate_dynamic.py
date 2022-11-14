@@ -17,21 +17,32 @@ def translate(opt):
     ArgumentParser.validate_translate_opts_dynamic(opt)
     logger = init_logger(opt.log_file)
 
+    encoder_adapter_ids = set()
+    for stack in opt.stack['encoder']:
+        if 'adapters' in stack:
+            for key in stack['adapters']:
+                encoder_adapter_ids.add(tuple(key))
+    decoder_adapter_ids = set()
+    for stack in opt.stack['decoder']:
+        if 'adapters' in stack:
+            for key in stack['adapters']:
+                decoder_adapter_ids.add(tuple(key))
+
     # only src_lang and tgt_lang are used at the moment
     task = TaskSpecs(
         node_rank=None,
         local_rank=None,
         src_lang=opt.src_lang,
         tgt_lang=opt.tgt_lang,
-        encoder_id=opt.enc_id if opt.enc_id else opt.src_lang,
-        decoder_id=opt.dec_id if opt.dec_id else opt.tgt_lang,
+        encoder_id=[stack['id'] for stack in opt.stack['encoder']],
+        decoder_id=[stack['id'] for stack in opt.stack['decoder']],
         corpus_id='trans',
         weight=1,
         corpus_opt=dict(),
         src_vocab=None,
         tgt_vocab=None,
-        encoder_adapter_ids=opt.enc_adapters,
-        decoder_adapter_ids=opt.dec_adapters,
+        encoder_adapter_ids=encoder_adapter_ids,
+        decoder_adapter_ids=decoder_adapter_ids,
     )
 
     translator = build_translator(opt, task, logger=logger, report_score=True)

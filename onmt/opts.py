@@ -1301,52 +1301,10 @@ def build_bilingual_model(parser):
         required=True,
         help="The 2-character target language code",
     )
-    group.add("--enc_id", "-enc_id", default=None, help="The encoder id. If unset, defaults to the src_lang")
-    group.add("--dec_id", "-dec_id", default=None, help="The decoder id. If unset, defaults to the tgt_lang")
     group.add(
-        "--enc_adapters",
-        "-enc_adapters",
-        default=[],
-        nargs="+",
-        help="The encoder adapters. List of tuples (adapter_group, sub_id)"
-    )
-    group.add(
-        "--dec_adapters",
-        "-dec_adapters",
-        default=[],
-        nargs="+",
-        help="The decoder adapters. List of tuples (adapter_group, sub_id)"
-    )
-    group = parser.add_argument_group("Model Modules")
-    group.add(
-        "--encoder",
-        "-encoder",
-        required=False,
-        help="Path to the encoder module .pt file NOT NEEDED IF --model gives a path+model_preffix",
-    )
-    group.add(
-        "--decoder",
-        "-decoder",
-        required=False,
-        help="Path to the decoder module .pt file NOT NEEDED IF --model gives a path+model_preffix",
-    )
-    group.add(
-        "--bridge",
-        "-bridge",
-        required=False,
-        help="Path to the attention bridge module .pt file",
-    )
-    group.add(
-        "--generator",
-        "-generator",
-        required=False,
-        help="Path to the generator module .pt file",
-    )
-    group.add(
-        "--model_frame",
-        "-model_frame",
-        required=False,
-        help="Path to the model frame .pt file",
+        "--stack",
+        required=True,
+        help="The stack of modules to use. Use a yaml conf, for your own sanity"
     )
     group.add(
         "--output_model",

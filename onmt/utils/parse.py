@@ -358,7 +358,4 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         # TODO: needs to be added as inference opt
         opt.share_vocab = False
 
-        if opt.enc_adapters:
-            opt.enc_adapters = [yaml.safe_load(item) for item in opt.enc_adapters]
-        if opt.dec_adapters:
-            opt.dec_adapters = [yaml.safe_load(item) for item in opt.dec_adapters]
+        opt.stack = yaml.safe_load(opt.stack)

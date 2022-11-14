@@ -329,7 +329,7 @@ class Inference(object):
                 src_vocabs,
                 batch.src_map if use_src_map else None,
             )
-            self.model.decoder[f"decoder{self.dec_id}"].init_state(src, memory_bank, enc_states)
+            self.model.decoder.init_state(src, memory_bank, enc_states)
         else:
             gs = [0] * batch_size
         return gs
@@ -628,10 +628,7 @@ class Inference(object):
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
         # in case of Gold Scoring tgt_len = actual length, batch = 1 batch
-#        dec_out, dec_attn = self.model.decoder(
-#            decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
-#        )
-        dec_out, dec_attn = self.model.decoder[f"decoder{self.task.decoder_id}"](
+        dec_out, dec_attn = self.model.decoder(
             decoder_in, memory_bank, memory_lengths=memory_lengths, step=step
         )
 
@@ -641,12 +638,12 @@ class Inference(object):
                 attn = dec_attn["std"]
             else:
                 attn = None
-            log_probs = self.model.generator[f"generator{self.task.tgt_lang}"](dec_out.squeeze(0))
+            log_probs = self.model.generator[f"generator_{self.task.tgt_lang}"](dec_out.squeeze(0))
             # returns [(batch_size x beam_size) , vocab ] when 1 step
             # or [ tgt_len, batch_size, vocab ] when full sentence
         else:
             attn = dec_attn["copy"]
-            scores = self.model.generator[f"generator{self.task.tgt_lang}"](
+            scores = self.model.generator[f"generator_{self.task.tgt_lang}"](
                 dec_out.view(-1, dec_out.size(2)),
                 attn.view(-1, attn.size(2)),
                 src_map,
@@ -803,7 +800,7 @@ class Translator(Inference):
     def _run_encoder(self, batch):
         src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
 
-        enc_states, memory_bank, src_lengths, mask = self.model.encoder[f"encoder{self.task.encoder_id}"](
+        enc_states, memory_bank, src_lengths, mask = self.model.encoder(
             src, src_lengths
         )
 
@@ -832,22 +829,13 @@ class Translator(Inference):
         batch_size = batch.batch_size
 
         # (0.5) Activate adapters
-        encoder = self.model.encoder[f"encoder{self.task.encoder_id}"]
-        decoder = self.model.decoder[f"decoder{self.task.decoder_id}"]
-        if hasattr(encoder, 'adapters'):
-            if not self.task.encoder_adapter_ids:
-                self.logger.warning('Model uses adapters, but no encoder adapters are activated')
-            for adapter_id in self.task.encoder_adapter_ids:
-                encoder.activate_adapter('_'.join(adapter_id))
-        if hasattr(decoder, 'adapters'):
-            if not self.task.decoder_adapter_ids:
-                self.logger.warning('Model uses adapters, but no decoder adapters are activated')
-            for adapter_id in self.task.decoder_adapter_ids:
-                decoder.activate_adapter('_'.join(adapter_id))
+        metadata = self.task.get_serializable_metadata()
+        self.model.encoder.activate(metadata)
+        self.model.decoder.activate(metadata)
 
         # (1) Run the encoder on the src.
         src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
-        self.model.decoder[f"decoder{self.task.decoder_id}"].init_state(src, memory_bank, enc_states)
+        self.model.decoder.init_state(src, memory_bank, enc_states)
 
         gold_score = self._gold_score(
             batch,
@@ -870,7 +858,7 @@ class Translator(Inference):
             src_map,
         ) = decode_strategy.initialize(memory_bank, src_lengths, src_map, target_prefix=target_prefix)
         if fn_map_state is not None:
-            self.model.decoder[f"decoder{self.task.decoder_id}"].map_state(fn_map_state)
+            self.model.decoder.map_state(fn_map_state)
 
         # (3) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
@@ -909,7 +897,7 @@ class Translator(Inference):
                     src_map = src_map.index_select(1, select_indices)
 
             if parallel_paths > 1 or any_finished:
-                self.model.decoder[f"decoder{self.task.decoder_id}"].map_state(
+                self.model.decoder.map_state(
                     lambda state, dim: state.index_select(dim, select_indices)
                 )
 

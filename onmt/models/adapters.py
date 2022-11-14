@@ -113,6 +113,8 @@ class Adapter(nn.Module):
 
     @staticmethod
     def _name(adapter_group: str, sub_id: str) -> str:
+        assert isinstance(adapter_group, str), f'Expecting str, not {adapter_group}'
+        assert isinstance(sub_id, str), f'Expecting str, not {sub_id}'
         return f'adapter_{adapter_group}_{sub_id}'
 
     def add_layer(self, layer_idx, adapter_layer: AdapterLayer):
@@ -212,6 +214,20 @@ class AdaptedTransformerEncoder(TransformerAdapterMixin, TransformerEncoder):
     def _check_n_layers(self, max_layer_index):
         return max_layer_index <= len(self.transformer)
 
+    def state_dict(self, *args, include_adapters=False, **kwargs):
+        if not include_adapters:
+            # hide adapters
+            omitted_adapters = self.adapters
+            self.adapters = None
+
+        result = TransformerEncoder.state_dict(self, *args, **kwargs)
+
+        if not include_adapters:
+            # unhide adapters
+            self.adapters = omitted_adapters
+
+        return result
+
 
 class AdaptedTransformerDecoder(TransformerAdapterMixin, TransformerDecoder):
     def forward(self, *args, **kwargs):
@@ -223,3 +239,17 @@ class AdaptedTransformerDecoder(TransformerAdapterMixin, TransformerDecoder):
 
     def _check_n_layers(self, max_layer_index):
         return max_layer_index <= len(self.transformer_layers)
+
+    def state_dict(self, *args, include_adapters=False, **kwargs):
+        if not include_adapters:
+            # hide adapters
+            omitted_adapters = self.adapters
+            self.adapters = None
+
+        result = TransformerDecoder.state_dict(self, *args, **kwargs)
+
+        if not include_adapters:
+            # unhide adapters
+            self.adapters = omitted_adapters
+
+        return result

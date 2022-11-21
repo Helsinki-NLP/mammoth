@@ -328,30 +328,28 @@ class Trainer(object):
             )
 
             # Note that all group ids are tuples, some with length 1
-            for (encoder_id,), (_, group) in self.my_encoder_groups.items():
+            for (layer_stack_index, encoder_id), (_, group) in self.my_encoder_groups.items():
                 params = [
-                    (name, p)
-                    for (name, p) in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
+                    (name, p) for (name, p)
+                    in self.model.encoder.get_submodule(layer_stack_index, encoder_id).named_parameters()
                     if 'embeddings' not in name and 'adapter' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
-            for (decoder_id,), (_, group) in self.my_decoder_groups.items():
+            for (layer_stack_index, decoder_id), (_, group) in self.my_decoder_groups.items():
                 params = [
-                    (name, p)
-                    for (name, p) in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
+                    (name, p) for (name, p)
+                    in self.model.decoder.get_submodule(layer_stack_index, decoder_id).named_parameters()
                     if 'embeddings' not in name and 'adapter' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
-            for src_emb_id, (_, group) in self.my_src_emb_groups.items():
-                src_lang, encoder_id = src_emb_id
-                embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
+            for (src_lang,), (_, group) in self.my_src_emb_groups.items():
+                embs = self.model.encoder.embeddings[f'embeddings{src_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
-            for tgt_emb_id, (_, group) in self.my_tgt_emb_groups.items():
-                tgt_lang, decoder_id = tgt_emb_id
-                embs = self.model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
+            for (tgt_lang,), (_, group) in self.my_tgt_emb_groups.items():
+                embs = self.model.decoder.embeddings[f'embeddings{tgt_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(
@@ -359,13 +357,17 @@ class Trainer(object):
                 )
 
             for adapter_id, (_, group) in self.my_encoder_adapter_groups.items():
-                encoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.encoder[f'encoder{encoder_id}'].get_adapter(adapter_group, sub_id)
+                layer_stack_index, encoder_id, adapter_group, sub_id = adapter_id
+                adapter = self.model.encoder.get_submodule(layer_stack_index, encoder_id).get_adapter(
+                    adapter_group, sub_id
+                )
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             for adapter_id, (_, group) in self.my_decoder_adapter_groups.items():
-                decoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.decoder[f'decoder{decoder_id}'].get_adapter(adapter_group, sub_id)
+                layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
+                adapter = self.model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(
+                    adapter_group, sub_id
+                )
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             # a group is not specified: reduce across all devices

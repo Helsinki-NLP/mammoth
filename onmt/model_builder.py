@@ -506,7 +506,7 @@ def build_base_model_langspec(
 
 
 def uses_adapters(opt):
-    return 'adapters' in opt and len(opt.adapters) > 0
+    return 'adapters' in opt and opt.adapters
 
 
 def create_all_adapters(model, opt, task_queue_manager):

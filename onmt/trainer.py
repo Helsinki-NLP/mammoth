@@ -345,15 +345,15 @@ class Trainer(object):
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
             for (src_lang,), (_, group) in self.my_src_emb_groups.items():
-                embs = self.model.encoder.embeddings[f'embeddings{src_lang}']
+                embs = self.model.encoder.embeddings[f'embeddings_{src_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
             for (tgt_lang,), (_, group) in self.my_tgt_emb_groups.items():
-                embs = self.model.decoder.embeddings[f'embeddings{tgt_lang}']
+                embs = self.model.decoder.embeddings[f'embeddings_{tgt_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(
-                    self.model.generator[f'generator{tgt_lang}'].named_parameters(), group=group
+                    self.model.generator[f'generator_{tgt_lang}'].named_parameters(), group=group
                 )
 
             for adapter_id, (_, group) in self.my_encoder_adapter_groups.items():

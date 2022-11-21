@@ -67,16 +67,16 @@ def init_distributed(model, task_queue_manager):
         broadcast_tensors(weights, src=min_rank, group=group)
 
     for (src_lang,), (min_rank, group) in my_component_groups['src_emb'].items():
-        embs = model.encoder.embeddings[f'embeddings{src_lang}']
+        embs = model.encoder.embeddings[f'embeddings_{src_lang}']
         weights = [p.data for p in embs.parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
     for (tgt_lang,), (min_rank, group) in my_component_groups['tgt_emb'].items():
-        embs = model.decoder.embeddings[f'embeddings{tgt_lang}']
+        embs = model.decoder.embeddings[f'embeddings_{tgt_lang}']
         weights = [p.data for p in embs.parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-        weights = [p.data for p in model.generator[f'generator{tgt_lang}'].parameters()]
+        weights = [p.data for p in model.generator[f'generator_{tgt_lang}'].parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
     for adapter_id, (min_rank, group) in my_component_groups['encoder_adapters'].items():
@@ -87,7 +87,7 @@ def init_distributed(model, task_queue_manager):
 
     for adapter_id, (min_rank, group) in my_component_groups['decoder_adapters'].items():
         layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
-        adapter = model.decoder[f'decoder{decoder_id}'].get_adapter(adapter_group, sub_id)
+        adapter = model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(adapter_group, sub_id)
         weights = [p.data for name, p in adapter.named_parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 

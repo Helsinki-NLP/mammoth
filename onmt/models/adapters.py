@@ -151,7 +151,7 @@ class TransformerAdapterMixin:
 
     def get_adapter(self, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
-        return self.adapters.get(name, None)
+        return self.adapters[name]
 
     def add_adapter(self, adapter_group: str, sub_id: str, adapter: Adapter):
         name = Adapter._name(adapter_group, sub_id)

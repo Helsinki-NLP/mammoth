@@ -99,8 +99,8 @@ def load_test_multitask_model(opt, model_path=None):
         return load_test_model(opt, model_path)
     else:
         checkpoint_modules = [
-            (f'encoder.embeddings.embeddings{opt.src_lang}.', f'src_embeddings_{opt.src_lang}'),
-            (f'decoder.embeddings.embeddings{opt.tgt_lang}.', f'tgt_embeddings_{opt.tgt_lang}'),
+            (f'encoder.embeddings.embeddings_{opt.src_lang}.', f'src_embeddings_{opt.src_lang}'),
+            (f'decoder.embeddings.embeddings_{opt.tgt_lang}.', f'tgt_embeddings_{opt.tgt_lang}'),
             (f'generator.generator_{opt.tgt_lang}.', f'generator_{opt.tgt_lang}'),
             ('', 'attention_bridge'),
         ]

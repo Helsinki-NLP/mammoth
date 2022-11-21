@@ -18,11 +18,11 @@ def explode_model(full_ab_model):
 
     # embeddings
     for embedding_key, embeddings in encoder.embeddings.items():
-        lang = embedding_key.replace('embeddings', '')
+        lang = embedding_key.replace('embeddings_', '')
         key = f'src_embeddings_{lang}'
         modules[key] = embeddings.state_dict()
     for embedding_key, embeddings in decoder.embeddings.items():
-        lang = embedding_key.replace('embeddings', '')
+        lang = embedding_key.replace('embeddings_', '')
         key = f'tgt_embeddings_{lang}'
         modules[key] = embeddings.state_dict()
 

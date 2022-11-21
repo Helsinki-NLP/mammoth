@@ -530,6 +530,20 @@ class TaskSpecs():
         )
 
 
+def get_adapter_ids(opt, corpus_opt, side):
+    if 'adapters' not in opt or 'adapters' not in corpus_opt:
+        return []
+    global_adapters_opt = opt.adapters.get(side, None)
+    corpus_adapter_opt = corpus_opt['adapters'].get(side, None)
+    if not global_adapters_opt or not corpus_adapter_opt:
+        return []
+    result = []
+    for adapter_group, sub_id in corpus_adapter_opt:
+        layer_stack_index = global_adapters_opt[adapter_group]['layer_stack_index']
+        result.append((layer_stack_index, adapter_group, sub_id))
+    return result
+
+
 class TaskQueueManager:
     def __init__(
         self,
@@ -646,8 +660,8 @@ class TaskQueueManager:
             corpus_opt = opt.data[corpus_id]
             weight = corpus_opt.get('weight', 1.0)
             if 'adapters' in corpus_opt:
-                encoder_adapter_ids = corpus_opt['adapters'].get('encoder')
-                decoder_adapter_ids = corpus_opt['adapters'].get('decoder')
+                encoder_adapter_ids = get_adapter_ids(opt, corpus_opt, 'encoder')
+                decoder_adapter_ids = get_adapter_ids(opt, corpus_opt, 'decoder')
                 uses_adapters = True
             else:
                 encoder_adapter_ids = None

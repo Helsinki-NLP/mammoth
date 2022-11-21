@@ -132,6 +132,8 @@ class LayerStackEncoder(EncoderBase):
             raise ValueError(
                 f'No layer stack with index {layer_stack_index}. There are {len(len(self.encoders))} layer stacks'
             )
+        if len(module_ids) == 0:
+            raise Exception(f'Adapter {adapter_group} {sub_id} has no module_ids')
         for module_id in module_ids:
             if module_id not in self.encoders[layer_stack_index]:
                 raise ValueError(
@@ -147,7 +149,10 @@ class LayerStackEncoder(EncoderBase):
 
     def activate_adapter(self, module_id: str, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
-        layer_stack_index = self._adapter_to_stack[name]
+        try:
+            layer_stack_index = self._adapter_to_stack[name]
+        except KeyError:
+            raise KeyError(f'"{name}" not in {self._adapter_to_stack.keys()}')
         self.encoders[layer_stack_index][module_id].activate_adapter(adapter_group, sub_id)
 
     def activate(self, metadata: DatasetMetadata):
@@ -155,8 +160,6 @@ class LayerStackEncoder(EncoderBase):
         self.embeddings.activate(metadata.src_lang)
         if metadata.encoder_adapter_ids is not None:
             self.deactivate_adapters()
-            for adapter_group, sub_id in metadata.encoder_adapter_ids:
-                name = Adapter._name(adapter_group, sub_id)
-                layer_stack_index = self._adapter_to_stack[name]
+            for layer_stack_index, adapter_group, sub_id in metadata.encoder_adapter_ids:
                 module_id = metadata.encoder_id[layer_stack_index]
                 self.activate_adapter(module_id, adapter_group, sub_id)

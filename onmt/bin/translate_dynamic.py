@@ -18,15 +18,15 @@ def translate(opt):
     logger = init_logger(opt.log_file)
 
     encoder_adapter_ids = set()
-    for stack in opt.stack['encoder']:
+    for layer_stack_idx, stack in enumerate(opt.stack['encoder']):
         if 'adapters' in stack:
-            for key in stack['adapters']:
-                encoder_adapter_ids.add(tuple(key))
+            for group_id, sub_id in stack['adapters']:
+                encoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
     decoder_adapter_ids = set()
-    for stack in opt.stack['decoder']:
+    for layer_stack_idx, stack in enumerate(opt.stack['decoder']):
         if 'adapters' in stack:
-            for key in stack['adapters']:
-                decoder_adapter_ids.add(tuple(key))
+            for group_id, sub_id in stack['adapters']:
+                decoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
 
     # only src_lang and tgt_lang are used at the moment
     task = TaskSpecs(

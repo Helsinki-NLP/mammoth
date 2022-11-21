@@ -543,14 +543,14 @@ def create_bilingual_adapters(model, opt, src_lang, tgt_lang, opt_stack):
     dec_ids = [layer_stack_opts['id'] for layer_stack_opts in opt_stack['decoder']]
 
     for layer_stack_index, layer_stack_opts in enumerate(opt_stack['encoder']):
-        for adapter_id in layer_stack_opts.get('adapters', []):
-            adapter_id = tuple(adapter_id)
+        for group_id, sub_id in layer_stack_opts.get('adapters', []):
+            adapter_id = (layer_stack_index, group_id, sub_id)
             my_enc_adapter_ids.append(adapter_id)
             adapter_to_encoder_ids[adapter_id] = [enc_ids]
 
     for layer_stack_index, layer_stack_opts in enumerate(opt_stack['decoder']):
-        for adapter_id in layer_stack_opts.get('adapters', []):
-            adapter_id = tuple(adapter_id)
+        for group_id, sub_id in layer_stack_opts.get('adapters', []):
+            adapter_id = (layer_stack_index, group_id, sub_id)
             my_dec_adapter_ids.append(adapter_id)
             adapter_to_decoder_ids[adapter_id] = [dec_ids]
 
@@ -577,8 +577,8 @@ def _create_adapters(
     for adapter_group, adapter_opts in opt.adapters['encoder'].items():
         layer_stack_index = adapter_opts['layer_stack_index']
         for sub_id in adapter_opts['ids']:
-            adapter_id = (adapter_group, sub_id)
-            if adapter_id not in my_enc_adapter_ids:
+            adapter_id_long = (layer_stack_index, adapter_group, sub_id)
+            if adapter_id_long not in my_enc_adapter_ids:
                 continue
             adapter = Adapter(adapter_group, sub_id)
             input_dim = opt.rnn_size
@@ -586,7 +586,7 @@ def _create_adapters(
 
             # all stacks to which this adapter should be added
             adapted_stacks = set(
-                stacks[layer_stack_index] for stacks in adapter_to_encoder_ids[adapter_id]
+                stacks[layer_stack_index] for stacks in adapter_to_encoder_ids[adapter_id_long]
             )
             adapter_cls = EncoderAdapterLayer
 
@@ -605,15 +605,15 @@ def _create_adapters(
     for adapter_group, adapter_opts in opt.adapters['decoder'].items():
         layer_stack_index = adapter_opts['layer_stack_index']
         for sub_id in adapter_opts['ids']:
-            adapter_id = (adapter_group, sub_id)
-            if adapter_id not in my_dec_adapter_ids:
+            adapter_id_long = (layer_stack_index, adapter_group, sub_id)
+            if adapter_id_long not in my_dec_adapter_ids:
                 continue
             adapter = Adapter(adapter_group, sub_id)
             input_dim = opt.rnn_size
             hidden_dim = adapter_opts['hidden_size']
 
             adapted_stacks = set(
-                stacks[layer_stack_index] for stacks in adapter_to_decoder_ids[adapter_id]
+                stacks[layer_stack_index] for stacks in adapter_to_decoder_ids[adapter_id_long]
             )
             adapter_cls = DecoderAdapterLayer
 

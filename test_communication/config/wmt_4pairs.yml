@@ -40,8 +40,8 @@ rnn_size: 256
 word_vec_size: 256
 transformer_ff: 2048
 heads: 2
-enc_layers: 2
-dec_layers: 2
+enc_layers: [2]
+dec_layers: [2]
 dropout: 0.1
 label_smoothing: 0.1
 param_init: 0.0

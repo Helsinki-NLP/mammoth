@@ -385,12 +385,13 @@ class Trainer(object):
                     p.has_grad = False
 
             if step % 1000 == 0:
-                logger.info(f'After gradient sync {step}')
-                for name, p in self.model.named_parameters():
-                    logger.info(
-                        f'{device_context.node_rank}:{device_context.local_rank}'
-                        f' {name}: {p.flatten()[:10]}'
-                    )
+                # TODO: if you are going to uncomment that block, please make it optional
+                # logger.info(f'Aftesyncr gradient sync {step}')
+                # for name, p in self.model.named_parameters():
+                #     logger.info(
+                #         f'{device_context.node_rank}:{device_context.local_rank}'
+                #         f' {name}: {p.flatten()[:10]}'
+                #     )
                 if hasattr(self.optim._optimizer, 'report_steps'):
                     for line in self.optim._optimizer.report_steps():
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} {line}')

@@ -210,5 +210,5 @@ class ModelSaver(ModelSaverBase):
             if os.path.exists(name):
                 try:
                     os.remove(name)
-                except:
+                except BaseException:
                     logger.warning(f'Failed to delete {name}')

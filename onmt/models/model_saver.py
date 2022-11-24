@@ -208,4 +208,7 @@ class ModelSaver(ModelSaverBase):
     def _rm_checkpoint(self, names):
         for name in names:
             if os.path.exists(name):
-                os.remove(name)
+                try:
+                    os.remove(name)
+                except:
+                    logger.warning(f'Failed to delete {name}')

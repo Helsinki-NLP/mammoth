@@ -7,6 +7,9 @@ import torch
 from onmt.utils.logging import init_logger, logger
 
 
+# FIXME haven't touched that file yet...
+
+
 def get_vocabs(dict_path):
     fields = torch.load(dict_path)
 

@@ -1,11 +1,10 @@
 """ Translation main class """
 import os
-import torch
 from onmt.constants import DefaultTokens
-from onmt.inputters.text_dataset import TextMultiField
 from onmt.utils.alignment import build_align_pharaoh
 
 
+# FIXME
 class TranslationBuilder(object):
     """
     Build a word-based translation from the batch output
@@ -15,17 +14,17 @@ class TranslationBuilder(object):
     Problem in Neural Machine Translation" :cite:`Luong2015b`
 
     Args:
-       data (onmt.inputters.Dataset): Data.
-       fields (List[Tuple[str, torchtext.data.Field]]): data fields
+       data (onmt.inputters_mvp.ParallelCorpus): Data.
+       vocabs (dict[str, onmt.inputters_mvp.Vocab]): data vocabs
        n_best (int): number of translations produced
        replace_unk (bool): replace unknown words using attention
        has_tgt (bool): will the batch have gold targets
     """
 
-    def __init__(self, data, fields, n_best=1, replace_unk=False, has_tgt=False, phrase_table=""):
+    def __init__(self, data, vocabs, n_best=1, replace_unk=False, has_tgt=False, phrase_table=""):
         self.data = data
-        self.fields = fields
-        self._has_text_src = isinstance(dict(self.fields)["src"], TextMultiField)
+        self.vocabs = vocabs
+        self._has_text_src = True  # isinstance(dict(self.fields)["src"], None)
         self.n_best = n_best
         self.replace_unk = replace_unk
         self.phrase_table_dict = {}
@@ -37,21 +36,20 @@ class TranslationBuilder(object):
         self.has_tgt = has_tgt
 
     def _build_target_tokens(self, src, src_vocab, src_raw, pred, attn):
-        tgt_field = dict(self.fields)["tgt"].base_field
-        vocab = tgt_field.vocab
+        vocab = self.vocabs['tgt']
         tokens = []
 
         for tok in pred:
             if tok < len(vocab):
-                tokens.append(vocab.itos[tok])
+                tokens.append(vocab.itos[tok.item()])
             else:
-                tokens.append(src_vocab.itos[tok - len(vocab)])
-            if tokens[-1] == tgt_field.eos_token:
+                tokens.append(src_vocab.itos[tok.item() - len(vocab)])
+            if tokens[-1] == DefaultTokens.EOS:
                 tokens = tokens[:-1]
                 break
         if self.replace_unk and attn is not None and src is not None:
             for i in range(len(tokens)):
-                if tokens[i] == tgt_field.unk_token:
+                if tokens[i] == DefaultTokens.UNK:
                     _, max_index = attn[i][: len(src_raw)].max(0)
                     tokens[i] = src_raw[max_index.item()]
                     if self.phrase_table_dict:
@@ -65,7 +63,7 @@ class TranslationBuilder(object):
         assert len(translation_batch["gold_score"]) == len(translation_batch["predictions"])
         batch_size = batch.batch_size
 
-        preds, pred_score, attn, align, gold_score, indices = list(
+        preds, pred_score, attn, align, gold_score = list(
             zip(
                 *sorted(
                     zip(
@@ -74,7 +72,7 @@ class TranslationBuilder(object):
                         translation_batch["attention"],
                         translation_batch["alignment"],
                         translation_batch["gold_score"],
-                        batch.indices.data,
+                        # batch.indices.data,
                     ),
                     key=lambda x: x[-1],
                 )
@@ -85,21 +83,21 @@ class TranslationBuilder(object):
             align = [None] * batch_size
 
         # Sorting
-        inds, perm = torch.sort(batch.indices)
+        # inds, perm = torch.sort(batch.indices)
         if self._has_text_src:
-            src = batch.src[0][:, :, 0].index_select(1, perm)
+            src = batch.src[0][:, :, 0]  # .index_select(1, perm)
         else:
             src = None
-        tgt = batch.tgt[:, :, 0].index_select(1, perm) if self.has_tgt else None
+        tgt = batch.tgt[:, :, 0] if self.has_tgt else None
 
         translations = []
         for b in range(batch_size):
-            if self._has_text_src:
-                src_vocab = self.data.src_vocabs[inds[b]] if self.data.src_vocabs else None
-                src_raw = self.data.examples[inds[b]].src[0]
-            else:
-                src_vocab = None
-                src_raw = None
+            # if self._has_text_src:
+            #     src_vocab = self.data.vocabs['src']
+            #     src_raw = self.data.examples[inds[b]].src[0]
+            # else:
+            src_vocab = None
+            src_raw = None
             pred_sents = [
                 self._build_target_tokens(
                     src[:, b] if src is not None else None,

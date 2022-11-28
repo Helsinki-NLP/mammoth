@@ -2,7 +2,6 @@
 """Training on a single process."""
 import torch
 
-from onmt.inputters.inputter import IterOnDevice
 from onmt.model_builder import build_model
 from onmt.utils.optimizers import Optimizer
 from onmt.utils.misc import set_random_seed
@@ -12,7 +11,7 @@ from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
 from onmt.utils.distributed import broadcast_tensors
-from onmt.inputters.dynamic_iterator import DynamicDatasetIter
+from onmt.inputters_mvp import DynamicDatasetIter
 from onmt.transforms import get_transforms_cls
 
 
@@ -40,10 +39,10 @@ def _get_model_opts(opt, checkpoint=None):
     return model_opt
 
 
-def _build_valid_iter(opt, fields, transforms_cls):
+def _build_valid_iter(opt, vocabs, transforms_cls):
     """Build iterator used for validation."""
     # valid_iter = DynamicDatasetIter(
-    #     fields, transforms_cls, opt, is_train=False)
+    #     vocabs, transforms_cls, opt, is_train=False)
     valid_iter = iter([])  # FIXME: validation temporarily disabled
     return valid_iter
 
@@ -101,7 +100,7 @@ def init_distributed(model, task_queue_manager):
 
 def main(
     opt,
-    fields_dict,
+    vocabs_dict,
     device_context,
     error_queue=None,
     batch_queue=None,
@@ -124,7 +123,8 @@ def main(
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.
-    model, generators_md = build_model(model_opt, opt, fields_dict, task_queue_manager, checkpoint)
+
+    model, generators_md = build_model(model_opt, opt, vocabs_dict, task_queue_manager, checkpoint)
 
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
@@ -143,14 +143,14 @@ def main(
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opt, opt, model, fields_dict, optim, device_context)
+    model_saver = build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context)
 
     logger.info("{} - Build trainer".format(device_context.id))
     trainer = build_trainer(
         opt,
         device_context,
         model,
-        fields_dict,
+        vocabs_dict,
         optim,
         task_queue_manager=task_queue_manager,
         model_saver=model_saver,
@@ -159,20 +159,20 @@ def main(
     logger.info("{} - Trainer built".format(device_context.id))
 
     if batch_queue is None:
-        _train_iter = DynamicDatasetIter.from_opts(
+        train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,
             transforms_cls=transforms_cls,
-            fields_dict=fields_dict,
+            vocabs_dict=vocabs_dict,
             opts=opt,
             is_train=True,
             stride=1,
             offset=0,
         )
-        # TODO: pass in whole device_context into refactored IterOnDevice
-        if device_context.is_gpu():
-            train_iter = IterOnDevice(_train_iter, device_context.local_rank)
-        else:
-            train_iter = IterOnDevice(_train_iter, -1)
+        # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
+        # if device_context.is_gpu():
+        #     train_iter = IterOnDevice(_train_iter, device_context.local_rank)
+        # else:
+        #     train_iter = IterOnDevice(_train_iter, -1)
     else:
         assert semaphore is not None, "Using batch_queue requires semaphore as well"
 
@@ -180,21 +180,15 @@ def main(
             while True:
                 batch, metadata, communication_batch_id = batch_queue.get()
                 semaphore.release()
-                # Move batch to specified device
-                if device_context.is_gpu():
-                    IterOnDevice.batch_to_device(batch, device_context.local_rank)
-                else:
-                    IterOnDevice.batch_to_device(batch, -1)
+                # TODO: confirm that batch-providing corpus has already been to'd to the correct place
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()
-    logger.info("{} - Valid iter".format(device_context.id))
-    valid_iter = _build_valid_iter(opt, fields_dict, transforms_cls)
+    logger.info("Device {} - Valid iter".format(device_context.id))
+    valid_iter = _build_valid_iter(opt, vocabs_dict, transforms_cls)
     if valid_iter is not None:
-        if device_context.is_gpu():
-            valid_iter = IterOnDevice(valid_iter, device_context.local_rank)
-        else:
-            valid_iter = IterOnDevice(valid_iter, -1)
+        # valid_iter = IterOnDevice(valid_iter, local_rank)
+        pass
 
     if len(opt.gpu_ranks):
         if device_context.is_master():

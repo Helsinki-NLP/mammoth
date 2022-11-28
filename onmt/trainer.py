@@ -22,7 +22,7 @@ def build_trainer(
     opt,
     device_context,
     model,
-    fields_dict,
+    vocabs_dict,
     optim,
     task_queue_manager,
     model_saver=None,
@@ -34,7 +34,7 @@ def build_trainer(
     Args:
         opt (:obj:`Namespace`): user options (usually from argument parsing)
         model (:obj:`onmt.models.NMTModel`): the model to train
-        fields (dict): dict of fields
+        vocabs_dict (dict): dict of vocabs
         optim (:obj:`onmt.utils.Optimizer`): optimizer used during training
         data_type (str): string describing the type of data
             e.g. "text"
@@ -46,17 +46,15 @@ def build_trainer(
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
-    for (side, lang, component_id, fields) in task_queue_manager.get_fields('tgt', fields_dict):
+    for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_vocabs('tgt', vocabs_dict):
         generator = generators_md[f'generator_{lang}']
-        # This retrieves the primary field of this crappy datastructure
-        tgt_field = fields['tgt'].fields[0][1]
         train_loss_md.add_module(
             f'trainloss{lang}',
-            onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=True, generator=generator),
+            onmt.utils.loss.build_loss_compute(model, tgt_vocab, opt, train=True, generator=generator),
         )
         valid_loss_md.add_module(
             f'valloss{lang}',
-            onmt.utils.loss.build_loss_compute(model, tgt_field, opt, train=False, generator=generator),
+            onmt.utils.loss.build_loss_compute(model, tgt_vocab, opt, train=False, generator=generator),
         )
 
     trunc_size = opt.truncated_decoder  # Badly named...
@@ -401,12 +399,13 @@ class Trainer(object):
                     p.has_grad = False
 
             if step % 1000 == 0:
-                logger.info(f'After gradient sync {step}')
-                for name, p in self.model.named_parameters():
-                    logger.info(
-                        f'{device_context.node_rank}:{device_context.local_rank}'
-                        f' {name}: {p.flatten()[:10]}'
-                    )
+                # TODO: if you are going to uncomment that block, please make it optional
+                # logger.info(f'After gradient sync {step}')
+                # for name, p in self.model.named_parameters():
+                #     logger.info(
+                #         f'{device_context.node_rank}:{device_context.local_rank}'
+                #         f' {name}: {p.flatten()[:10]}'
+                #     )
                 if hasattr(self.optim._optimizer, 'report_steps'):
                     for line in self.optim._optimizer.report_steps():
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} {line}')

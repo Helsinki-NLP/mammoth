@@ -8,13 +8,13 @@ import torch.nn as nn
 from onmt.utils.module_splitter import explode_model
 
 
-def build_model_saver(model_opt, opt, model, fields_dict, optim, device_context):
+def build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context):
     # _check_save_model_path
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opt.save_model, model, model_opt, fields_dict, optim, opt.keep_checkpoint, device_context, opt.save_all_gpus
+        opt.save_model, model, model_opt, vocabs_dict, optim, opt.keep_checkpoint, device_context, opt.save_all_gpus
     )
     return model_saver
 
@@ -41,7 +41,7 @@ class ModelSaverBase(object):
         base_path,
         model,
         model_opt,
-        fields_dict,
+        vocabs_dict,
         optim,
         keep_checkpoint=-1,
         device_context=None,
@@ -50,7 +50,7 @@ class ModelSaverBase(object):
         self.base_path = base_path
         self.model = model
         self.model_opt = model_opt
-        self.fields_dict = fields_dict
+        self.vocabs_dict = vocabs_dict
         self.optim = optim
         self.last_saved_step = None
         self.keep_checkpoint = keep_checkpoint
@@ -128,7 +128,7 @@ class ModelSaver(ModelSaverBase):
         checkpoint = {
             "model": model_state_dict,
             # 'generator': generator_state_dict,
-            "vocab": self.fields_dict,
+            "vocab": self.vocabs_dict,
             "opt": self.model_opt,
             "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
             "whole_model": self.model,
@@ -173,4 +173,7 @@ class ModelSaver(ModelSaverBase):
     def _rm_checkpoint(self, names):
         for name in names:
             if os.path.exists(name):
-                os.remove(name)
+                try:
+                    os.remove(name)
+                except BaseException:
+                    logger.warning(f'Failed to delete {name}')

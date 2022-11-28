@@ -356,10 +356,9 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
 
     for batch, metadata, communication_batch_id in generator_to_serve:
         semaphore.acquire()
-        batch.dataset = None
         # Move batch to correspond device_id when consumer iterate
         # hack to dodge unpicklable `dict_keys`
-        batch.fields = list(batch.fields)
+        # batch.fields = list(batch.fields)
         queue.put((batch, metadata, communication_batch_id))
 
 
@@ -511,7 +510,6 @@ class TaskSpecs():
     tgt_vocab: Any
     encoder_adapter_ids: List[str]
     decoder_adapter_ids: List[str]
-    # TODO: encoder bridge and decoder bridge need their own adapters
 
     def get_serializable_metadata(self):
         """
@@ -866,11 +864,24 @@ class TaskQueueManager:
 
     # TODO: soon deprecated by #18 Data pipeline refactoring
     def get_fields(self, side: str, fields_dict):
-        """Returns a list of tuples: (side, lang, component_id, fields).
+        """Returns a list of tuples: (side, lang, component_id, fields)."""
+        raise RuntimeError
+
+    # FIXME: merge with below
+    def get_vocabularies(self, opt: Namespace, side: str):
+        result = []
+        for task in self.get_tasks():
+            lang = self.src_lang if side == 'src' else self.tgt_lang
+            vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
+            result.append((lang, vocab_path))
+        return result
+
+    def get_vocabs(self, side: str, vocabs_dict):
+        """Returns a list of tuples: (side, lang, component_id, vocabs).
         side:           Either 'src' or 'tgt'.
         lang:           The language code. Vocabularies are language specific.
         component_id:   None
-        fields:         The actual Fields.
+        vocabs_dict:    The actual vocabs.
         """
         seen = set()
         result = []
@@ -880,9 +891,8 @@ class TaskQueueManager:
                 lang = task.src_lang
             else:
                 lang = task.tgt_lang
-            fields = fields_dict[(side, lang)]
             if not (side, lang, component_id) in seen:
-                result.append((side, lang, component_id, fields))
+                result.append((side, lang, component_id, vocabs_dict[(side, lang)]))
             seen.add((side, lang, component_id))
         return result
 

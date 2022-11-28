@@ -6,6 +6,7 @@ import yaml
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 
+
 def load_yaml(fname):
     with open(fname, 'r') as istr:
         config = yaml.safe_load(istr)
@@ -15,7 +16,7 @@ def load_yaml(fname):
 def load_simmat_csv(fname):
     with open(fname, 'r') as istr:
         reader = csv.reader(istr)
-        header = next(reader):
+        header = next(reader)
         data = list(reader)
     assert header[0] == 'lang', 'first column header should be lang'
     row_headers = [d[0] for d in data]
@@ -82,15 +83,15 @@ def define_group(opts):
     sim_langs = set(opts.similarity_matrix['header'])
     corpus_langs = set()
     for cname, corpus in opts.in_config[0]['data'].items():
-        assert all(l in sim_langs for l in corpus['src_tgt'].split('-')), \
-            f'corpus {cname}: one language (either {" or ".join(corpus['src_tgt'].split('-'))} was '\
-            f'not found in the similarity matrix (supports {" ".join(sim_langs)})'
+        assert all([(lng in sim_langs) for lng in corpus['src_tgt'].split('-')]), \
+            f'corpus {cname}: one language (either {" or ".join(corpus["src_tgt"].split("-"))} ' \
+            f'was not found in the similarity matrix (supports {" ".join(sim_langs)})'
         corpus_langs = corpus_langs | set(corpus['src_tgt'].split('-'))
     if sim_langs != corpus_langs:
         warnings.warn(
             f"languages in the similarity matrix are unused ({', ' .join(sim_langs - corpus_langs)})"
         )
-        
+
     group_idx = AgglomerativeClustering(
         n_clusters=opts.n_groups,
         affinity='precomputed',

@@ -34,6 +34,10 @@ def save_yaml(opts):
         yaml.dump(opts.in_config[0], ostr, default_flow_style=False, allow_unicode=True)
 
 
+def add_complete_language_pairs(parser):
+    pass
+
+
 def add_configs_args(parser):
     parser.add_argument('--in_config', required=True, type=load_yaml)
     parser.add_argument('--out_config', type=str)
@@ -55,6 +59,10 @@ def add_allocate_device_args(parser):
     parser.add_argument('--n_nodes', type=int, required=True)
 
 
+def add_adapter_config_args(parser):
+    pass
+
+
 def get_opts():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
@@ -69,11 +77,17 @@ def get_opts():
     add_allocate_device_args(parser_allocate_devices)
     parser_adapter_config = subparsers.add_subparser('adapter_config')
     add_configs_args(parser_adapter_config)
+    add_adapter_config_args(parser_adapter_config)
+    parser_complete_language_pairs = subparsers.add_subparser('complete_language_pairs')
+    add_configs_args(parser_complete_language_pairs)
+    add_complete_language_pairs_args(parser_complete_language_pairs)
     parser_config_all = subparsers.add_subparser('config_all')
     add_configs_args(parser_config_all)
     add_corpora_schedule_args(parser_config_all)
     add_define_group_args(parser_config_all)
     add_allocate_device_args(parser_config_all)
+    add_complete_language_pairs_args(parser_config_all)
+    add_adapter_config_args(parser_config_all)
     return parser.parse_args()
 
 
@@ -131,7 +145,12 @@ def adapter_config(opts):
     pass
 
 
+def complete_language_pairs(opts):
+    pass
+
+
 def config_all(opts):
+    complete_language_pairs(opts)
     corpora_schedule(opts)
     define_group(opts)
     allocate_devices(opts)
@@ -144,7 +163,7 @@ if __name__ == '__main__':
         opts.out_config = opts.in_config[1]
     main = {
         func.__name__: func
-        for func in (corpora_schedule, define_group, allocate_devices, adapter_config, config_all)
+        for func in (complete_language_pairs, corpora_schedule, define_group, allocate_devices, adapter_config, config_all)
     }[opts.command]
     main(opts)
     save_yaml(opts)

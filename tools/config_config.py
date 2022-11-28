@@ -41,6 +41,7 @@ def add_configs_args(parser):
 
 def add_corpora_schedule_args(parser):
     parser.add_argument('--use_weights', action='store_true')
+    parser.add_argument('--temperature', type=float)
 
 
 def add_define_group_args(parser):
@@ -83,7 +84,7 @@ def corpora_schedule(opts):
             corpora_lens[cname] = sum(1 for _ in istr)
     max_lines = max(corpora_lens.values())
     corpora_weights = {
-        cname: (max_lines - clen) / max_lines
+        cname: (max_lines - clen) ** opts.temperature / max_lines
         for cname, clen in corpora_lens.items()
     }
     if opts.use_weight:

@@ -34,7 +34,7 @@ def save_yaml(opts):
         yaml.dump(opts.in_config[0], ostr, default_flow_style=False, allow_unicode=True)
 
 
-def add_complete_language_pairs(parser):
+def add_complete_language_pairs_args(parser):
     pass
 
 
@@ -163,7 +163,14 @@ if __name__ == '__main__':
         opts.out_config = opts.in_config[1]
     main = {
         func.__name__: func
-        for func in (complete_language_pairs, corpora_schedule, define_group, allocate_devices, adapter_config, config_all)
+        for func in (
+            complete_language_pairs,
+            corpora_schedule,
+            define_group,
+            allocate_devices,
+            adapter_config,
+            config_all,
+        )
     }[opts.command]
     main(opts)
     save_yaml(opts)

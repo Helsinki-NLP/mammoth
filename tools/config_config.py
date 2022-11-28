@@ -1,11 +1,31 @@
 import argparse
+import csv
+import warnings
 import yaml
 
+import numpy as np
+from sklearn.cluster import AgglomerativeClustering
 
 def load_yaml(fname):
     with open(fname, 'r') as istr:
         config = yaml.safe_load(istr)
     return config, fname
+
+
+def load_simmat_csv(fname):
+    with open(fname, 'r') as istr:
+        reader = csv.reader(istr)
+        header = next(reader):
+        data = list(reader)
+    assert header[0] == 'lang', 'first column header should be lang'
+    row_headers = [d[0] for d in data]
+    column_headers = header[1:]
+    assert row_headers == column_headers, 'provided matrix is not valid'
+    sim_data = np.array([list(map(float, d[1:])) for d in data])
+    return {
+        'header': row_headers,
+        'data': sim_data,
+    }
 
 
 def save_yaml(opts):
@@ -23,13 +43,14 @@ def get_opts():
     parser_define_group = subparsers.add_subparser('define_group')
     parser_define_group.add_argument('--in_config', required=True, type=load_yaml)
     parser_define_group.add_argument('--out_config', type=str)
-    parser_define_group.add_argument('-similarity_matrix', required=True)
-    parser_define_group.add_argument('-cutoff_threshold', required=True, type=float)
+    parser_define_group.add_argument('--similarity_matrix', required=True, type=load_simmat_csv)
+    parser_define_group.add_argument('--cutoff_threshold', type=float)
+    parser_define_group.add_argument('--n_groups', type=int)
     parser_allocate_devices = subparsers.add_subparser('allocate_devices')
     parser_allocate_devices.add_argument('--in_config', required=True, type=load_yaml)
     parser_allocate_devices.add_argument('--out_config', type=str)
-    parser_allocate_devices.add_argument('-n_devices', type=int, required=True)
-    parser_allocate_devices.add_argument('-n_nodes', type=int, required=True)
+    parser_allocate_devices.add_argument('--n_devices', type=int, required=True)
+    parser_allocate_devices.add_argument('--n_nodes', type=int, required=True)
     parser_adapter_config = subparsers.add_subparser('adapter_config')
     parser_adapter_config.add_argument('--in_config', required=True, type=load_yaml)
     parser_adapter_config.add_argument('--out_config', type=str)
@@ -58,7 +79,31 @@ def corpora_schedule(opts):
 
 
 def define_group(opts):
-    pass
+    sim_langs = set(opts.similarity_matrix['header'])
+    corpus_langs = set()
+    for cname, corpus in opts.in_config[0]['data'].items():
+        assert all(l in sim_langs for l in corpus['src_tgt'].split('-')), \
+            f'corpus {cname}: one language (either {" or ".join(corpus['src_tgt'].split('-'))} was '\
+            f'not found in the similarity matrix (supports {" ".join(sim_langs)})'
+        corpus_langs = corpus_langs | set(corpus['src_tgt'].split('-'))
+    if sim_langs != corpus_langs:
+        warnings.warn(
+            f"languages in the similarity matrix are unused ({', ' .join(sim_langs - corpus_langs)})"
+        )
+        
+    group_idx = AgglomerativeClustering(
+        n_clusters=opts.n_groups,
+        affinity='precomputed',
+        distance_threshold=opts.cutoff_threshold,
+    ).fit_predict(opts.similarity_matrix['data']).tolist()
+    groups = {lang: f'group{idx}' for lang, idx in zip(opts.similarity_matrix['header'], group_idx)}
+
+    for cname, corpus in opts.in_config[0]['data'].items():
+        src, tgt = corpus['src_tgt'].split('-')
+        corpus['enc_sharing_group'] = [groups[src], 'full']
+        corpus['dec_sharing_group'] = [groups[tgt], 'full', groups[tgt]]
+
+    save_yaml(opts)
 
 
 def allocate_devices(opts):

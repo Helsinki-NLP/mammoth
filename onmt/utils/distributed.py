@@ -603,61 +603,49 @@ class TaskQueueManager:
 
     @classmethod
     def from_opt(cls, opt: Namespace, world_context: WorldContext):
-        n_tasks = len(opt.src_tgt)
+        n_tasks = len(opt.data)
 
         if world_context.is_distributed():
-            # When --node_gpu is not set, assume an assigment that fills gpus in rank order
-            node_gpu = (
-                [tuple(int(y) for y in x.split(':', 1)) for x in opt.node_gpu] if opt.node_gpu
-                else cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
-            )
+            if any(task.get('node_gpu', None) is not None for task in opt.data.values()):
+                node_gpu = [tuple(int(y) for y in task['node_gpu'].split(':', 1)) for task in opt.data.values()]
+            else:
+                # When --node_gpu is not set, assume an assigment that fills gpus in rank order
+                node_gpu = cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
         else:
             node_gpu = [(0, 0)] * n_tasks
-        lang_pairs = [lang_pair.split('-') for lang_pair in opt.src_tgt]
 
-        if opt.enc_sharing_group:
-            encoder_ids = opt.enc_sharing_group
-            assert all(len(enc_ids) == len(opt.enc_layers) for enc_ids in encoder_ids)
+        enc_sharing_group = [task.get('enc_sharing_group', None) for task in opt.data.values()]
+        dec_sharing_group = [task.get('dec_sharing_group', None) for task in opt.data.values()]
+        if any(x is not None for x in enc_sharing_group):
+            assert all(len(enc_ids) == len(opt.enc_layers) for enc_ids in enc_sharing_group)
         else:
             # if no encoder sharing groups are defined,
             # it is assumed that there is only one encoder stack and it is language specific
             if not len(opt.enc_layers) == 1:
                 raise Exception('With more than one encoder stack, you must explictly define enc_sharing_group')
-            encoder_ids = [[src_lang] for src_lang, tgt_lang in lang_pairs]
-        if opt.dec_sharing_group:
-            decoder_ids = opt.dec_sharing_group
-            assert all(len(dec_ids) == len(opt.dec_layers) for dec_ids in decoder_ids)
+        if any(x is not None for x in dec_sharing_group):
+            assert all(len(dec_ids) == len(opt.dec_layers) for dec_ids in dec_sharing_group)
         else:
             # if no decoder sharing groups are defined,
             # it is assumed that there is only one decoder stack and it is language specific
             if not len(opt.dec_layers) == 1:
                 raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
-            decoder_ids = [[tgt_lang] for src_lang, tgt_lang in lang_pairs]
 
         corpus_ids = opt.data.keys()
-
-        assert len(node_gpu) == n_tasks, f'{len(node_gpu)} != {n_tasks}'
-        assert len(lang_pairs) == n_tasks, f'{len(lang_pairs)} != {n_tasks}'
-        assert len(encoder_ids) == n_tasks, f'{len(encoder_ids)} != {n_tasks}'
-        assert len(decoder_ids) == n_tasks, f'{len(decoder_ids)} != {n_tasks}'
-        assert len(corpus_ids) == n_tasks, f'{len(corpus_ids)} != {n_tasks}'
 
         tasks = []
         uses_adapters = False
         for (
             (node_rank, local_rank),
-            (src_lang, tgt_lang),
-            encoder_id,
-            decoder_id,
             corpus_id
         ) in zip(
             node_gpu,
-            lang_pairs,
-            encoder_ids,
-            decoder_ids,
             corpus_ids
         ):
             corpus_opt = opt.data[corpus_id]
+            src_lang, tgt_lang = corpus_opt['src_tgt'].split('-', 1)
+            encoder_id = corpus_opt.get('enc_sharing_group', [src_lang])
+            decoder_id = corpus_opt.get('dec_sharing_group', [tgt_lang])
             weight = corpus_opt.get('weight', 1.0)
             if 'adapters' in corpus_opt:
                 encoder_adapter_ids = get_adapter_ids(opt, corpus_opt, 'encoder')

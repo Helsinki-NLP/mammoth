@@ -33,8 +33,8 @@ def build_vocab_main(opts):
     src_counters_by_lang = defaultdict(Counter)
     tgt_counters_by_lang = defaultdict(Counter)
 
-    assert len(opts.src_tgt) == len(opts.data)
-    for lang_pair, corpus_id in zip(opts.src_tgt, opts.data):
+    for corpus_id in opts.data:
+        lang_pair = opts.data[corpus_id]['src_tgt']
         src_lang, tgt_lang = lang_pair.split('-')
         task = TaskSpecs(
             node_rank=None,

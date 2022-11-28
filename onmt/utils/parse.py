@@ -1,5 +1,6 @@
 import configargparse as cfargparse
 import os
+import re
 import torch
 import yaml
 
@@ -7,6 +8,9 @@ import onmt.opts as opts
 from onmt.utils.logging import logger
 from onmt.constants import CorpusName, ModelTask
 from onmt.transforms import AVAILABLE_TRANSFORMS
+
+RE_NODE_GPU = re.compile(r'\d+:\d+')
+RE_SRC_TGT = re.compile(r'[^-]+-[^-]+')
 
 
 class DataOptsCheckerMixin(object):
@@ -29,12 +33,13 @@ class DataOptsCheckerMixin(object):
 
     @classmethod
     def _validate_data(cls, opt):
-        """Parse corpora specified in data field of YAML file."""
+        """Parse tasks/language-pairs/corpora specified in data field of YAML file."""
         default_transforms = opt.transforms
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
         corpora = yaml.safe_load(opt.data)
         logger.info("Parsing corpora")
+        n_without_node_gpu = 0
         for cname, corpus in corpora.items():
             logger.info("Parsing corpus '{}': {}".format(cname, corpus))
             # Check Transforms
@@ -95,6 +100,19 @@ class DataOptsCheckerMixin(object):
                         " We default it to 0 (start of training) for you."
                     )
                 corpus['introduce_at_training_step'] = 0
+            # Check sharing groups
+            enc_sharing_group = corpus.get('enc_sharing_group', None)
+            assert enc_sharing_group is None or isinstance(enc_sharing_group, list)
+            dec_sharing_group = corpus.get('dec_sharing_group', None)
+            assert dec_sharing_group is None or isinstance(dec_sharing_group, list)
+            # Node and gpu assignments
+            node_gpu = corpus.get('node_gpu', None)
+            if node_gpu is not None:
+                assert RE_NODE_GPU.match(node_gpu)
+                n_without_node_gpu += 1
+            src_tgt = corpus.get('src_tgt', None)
+            assert src_tgt is not None
+            assert RE_SRC_TGT.match(src_tgt)
 
             # Check features
             src_feats = corpus.get("src_feats", None)
@@ -107,6 +125,9 @@ class DataOptsCheckerMixin(object):
                     raise ValueError("'filterfeats' transform is required when setting source features")
             else:
                 corpus["src_feats"] = None
+
+        # Either all tasks should be assigned to a gpu, or none
+        assert n_without_node_gpu == 0 or n_without_node_gpu == len(corpora)
 
         logger.info(f"Parsed {len(corpora)} corpora from -data.")
         opt.data = corpora
@@ -253,8 +274,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             model_opt.freeze_word_vecs_dec = model_opt.fix_word_vecs_dec
 
         if model_opt.layers > 0:
-            model_opt.enc_layers = model_opt.layers
-            model_opt.dec_layers = model_opt.layers
+            raise Exception('--layers is deprecated')
 
         if model_opt.rnn_size > 0:
             model_opt.enc_rnn_size = model_opt.rnn_size
@@ -293,19 +313,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
                     model_opt.alignment_layer, model_opt.alignment_heads, model_opt.full_context_alignment
                 )
             )
-
-        if model_opt.enc_sharing_group:
-            model_opt.enc_sharing_group = [yaml.safe_load(item) for item in model_opt.enc_sharing_group]
-            assert isinstance(model_opt.enc_sharing_group, list), model_opt.enc_sharing_group
-            for grouplist in model_opt.enc_sharing_group:
-                assert isinstance(grouplist, list), grouplist
-                assert all(isinstance(val, str) for val in grouplist), grouplist
-        if model_opt.dec_sharing_group:
-            model_opt.dec_sharing_group = [yaml.safe_load(item) for item in model_opt.dec_sharing_group]
-            assert isinstance(model_opt.dec_sharing_group, list), model_opt.dec_sharing_group
-            for grouplist in model_opt.dec_sharing_group:
-                assert isinstance(grouplist, list), grouplist
-                assert all(isinstance(val, str) for val in grouplist), grouplist
 
     @classmethod
     def ckpt_model_opts(cls, ckpt_opt):

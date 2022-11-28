@@ -108,9 +108,6 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         help="List of datasets and their specifications. See examples/*.yaml for further details.",
     )
     group.add(
-        "-src_tgt", "--src_tgt", required=True, nargs='+', help="List of source and target language for each dataset. "
-    )
-    group.add(
         "-skip_empty_level",
         "--skip_empty_level",
         default="warning",
@@ -390,20 +387,6 @@ def model_opts(parser):
         help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
     )
     group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
-
-    group.add(
-        "--enc_sharing_group",
-        "-enc_sharing_group",
-        nargs='+',
-        help="List of (list of encoder sharing group id for each stack layer) for each dataset. ",
-    )
-    group.add(
-        "--dec_sharing_group",
-        "-dec_sharing_group",
-        nargs='+',
-        help="List of (list of decoder sharing group id for each stack layer) for each dataset. ",
-    )
-    group.add("--node_gpu", "-node_gpu", nargs='+', help="List of node:gpu assignments")
 
     group.add(
         '--encoder_type',

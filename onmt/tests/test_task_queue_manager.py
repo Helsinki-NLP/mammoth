@@ -15,13 +15,9 @@ def test_init_minimal():
         'gpu_ranks': [0, 1],
         'enc_layers': [1],
         'dec_layers': [1],
-        'src_tgt': ['a-b', 'c-d'],
-        'node_gpu': None,
-        'enc_sharing_group': None,
-        'dec_sharing_group': None,
         'data': {
-            'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy'},
-            'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+            'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy', 'src_tgt': 'a-b'},
+            'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy', 'src_tgt': 'c-d'},
         }
     }
     opt = Namespace(**opt_dict)
@@ -52,19 +48,51 @@ def create_basic_task_queue_manager():
         'gpu_ranks': [0, 1],
         'enc_layers': [1],
         'dec_layers': [1],
-        'src_tgt': ['a-b', 'c-d', 'a-d', 'e-b'],
-        # unconventional assignment: two on 0:1, none on 1:1
-        'node_gpu': ['0:0', '0:1', '0:1', '1:0'],
-        # x is twice, on two devices 0:0 and 0:1
-        'enc_sharing_group': [['x'], ['xx'], ['x'], ['xxx']],
-        # y is twice, on two devices 0:0 and 1:0
-        # yy is twice, but only on a single device 0:1
-        'dec_sharing_group': [['y'], ['yy'], ['yy'], ['y']],
+        # node_gpu unconventional assignment: two on 0:1, none on 1:1
+        # enc_sharing_group x is twice, on two devices 0:0 and 0:1
+        # dec_sharing_group y is twice, on two devices 0:0 and 1:0
+        # dec_sharing_group yy is twice, but only on a single device 0:1
         'data': {
-            'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy', 'weight': 2, 'introduce_at_training_step': 0},
-            'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy', 'weight': 1, 'introduce_at_training_step': 0},
-            'train_a-d': {'path_src': 'dummy', 'path_tgt': 'dummy', 'weight': 1, 'introduce_at_training_step': 10},
-            'train_e-b': {'path_src': 'dummy', 'path_tgt': 'dummy', 'weight': 1, 'introduce_at_training_step': 0},
+            'train_a-b': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'weight': 2,
+                'introduce_at_training_step': 0,
+                'src_tgt': 'a-b',
+                'node_gpu': '0:0',
+                'enc_sharing_group': ['x'],
+                'dec_sharing_group': ['y'],
+            },
+            'train_c-d': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'weight': 1,
+                'introduce_at_training_step': 0,
+                'src_tgt': 'c-d',
+                'node_gpu': '0:1',
+                'enc_sharing_group': ['xx'],
+                'dec_sharing_group': ['yy'],
+            },
+            'train_a-d': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'weight': 1,
+                'introduce_at_training_step': 10,
+                'src_tgt': 'a-d',
+                'node_gpu': '0:1',
+                'enc_sharing_group': ['x'],
+                'dec_sharing_group': ['yy'],
+            },
+            'train_e-b': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'weight': 1,
+                'introduce_at_training_step': 0,
+                'src_tgt': 'e-b',
+                'node_gpu': '1:0',
+                'enc_sharing_group': ['xxx'],
+                'dec_sharing_group': ['y'],
+            },
         }
     }
     opt = Namespace(**opt_dict)
@@ -155,13 +183,17 @@ def test_cpu_distributed_groups():
         'n_nodes': 1,
         'enc_layers': [1],
         'dec_layers': [1],
-        'src_tgt': ['a-b', 'c-d'],
-        'node_gpu': None,
-        'enc_sharing_group': None,
-        'dec_sharing_group': None,
         'data': {
-            'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy'},
-            'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+            'train_a-b': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'a-b',
+            },
+            'train_c-d': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'c-d',
+            },
         }
     }
     opt = Namespace(**opt_dict)
@@ -189,15 +221,31 @@ def test_distributed_groups_no_encoder_group():
         'dec_layers': [1],
         'gpu_ranks': [0, 1],
         # every language pair on its own gpu: no overlap
-        'src_tgt': ['a-b', 'c-d', 'b-a', 'd-c'],
-        'node_gpu': ['0:0', '0:1', '1:0', '1:1'],
-        'enc_sharing_group': None,
-        'dec_sharing_group': None,
         'data': {
-            'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy'},
-            'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
-            'train_b-a': {'path_src': 'dummy', 'path_tgt': 'dummy'},
-            'train_d-c': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+            'train_a-b': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'a-b',
+                'node_gpu': '0:0',
+            },
+            'train_c-d': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'c-d',
+                'node_gpu': '0:1',
+            },
+            'train_b-a': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'b-a',
+                'node_gpu': '1:0',
+            },
+            'train_d-c': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'd-c',
+                'node_gpu': '1:1',
+            },
         }
     }
     opt = Namespace(**opt_dict)
@@ -276,19 +324,21 @@ def test_init_layer_stack():
         'gpu_ranks': [0, 1],
         'enc_layers': [2, 2],
         'dec_layers': [1, 2, 1],
-        'src_tgt': ['a-b', 'c-d'],
-        'node_gpu': None,
-        'enc_sharing_group': [
-            ['a', 'full'],
-            ['c', 'full'],
-        ],
-        'dec_sharing_group': [
-            ['b', 'full', 'b'],
-            ['d', 'full', 'd'],
-        ],
         'data': {
-            'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy'},
-            'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy'},
+            'train_a-b': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'a-b',
+                'enc_sharing_group': ['a', 'full'],
+                'dec_sharing_group': ['b', 'full', 'b'],
+            },
+            'train_c-d': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'src_tgt': 'c-d',
+                'enc_sharing_group': ['c', 'full'],
+                'dec_sharing_group': ['d', 'full', 'd'],
+            },
         }
         # FIXME: add adapters
     }

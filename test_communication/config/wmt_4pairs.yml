@@ -10,23 +10,21 @@ overwrite: False
 
 data:
   train_en-cs:
+    src_tgt: en-cs
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-cs/wmt.en-cs.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-cs/wmt.en-cs.train.BPE.cs
   train_en-de:
+    src_tgt: en-de
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-de/wmt.en-de.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-de/wmt.en-de.train.BPE.de
   train_cs-en:
+    src_tgt: cs-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.en
   train_de-en:
+    src_tgt: de-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.de
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.en
-
-src_tgt:
-- en-cs
-- en-de
-- cs-en
-- de-en
 
 batch_size: 4096
 batch_type: tokens

@@ -105,10 +105,15 @@ class Statistics(object):
     def update_from_parameters(self, named_parameters):
         self.magnitude_denom += 1
         # Accumulate L2 norms of parameters and their gradients
+        # setting dim=None, ord=None flattens the matrix and computes a vector 2-norm
+        # in newer versions of torch, vector_norm could be used
         for name, param in named_parameters:
-            self.param_magnitudes[name] += norm(param.data, ord=2).item()
-            if param.requires_grad and param.grad is not None:
-                self.grad_magnitudes[name] += norm(param.grad.data, ord=2).item()
+            try:
+                self.param_magnitudes[name] += norm(param.data, dim=None, ord=None).item()
+                if param.requires_grad and param.grad is not None:
+                    self.grad_magnitudes[name] += norm(param.grad.data, dim=None, ord=None).item()
+            except RuntimeError as e:
+                logger.error(f'RuntimeError when updating stats for parameter {name}: {e}')
 
     def accuracy(self):
         """compute accuracy"""

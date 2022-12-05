@@ -12,30 +12,33 @@ from torch.nn.utils import clip_grad_norm_
 
 
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
-    multiOptims = {}
-    components = [
-        ('encoder', model.encoder, task_queue_manager.get_encoders),
-        ('decoder', model.decoder, task_queue_manager.get_decoders),
-    ]
-    for component_name, main_component, component_id_func in components:
-        for layer_stack_index in range(main_component.n_layer_stacks):
-            for component_id in component_id_func(layer_stack_index):
-                params = []
-                sub_component = main_component.get_submodule(layer_stack_index, component_id)
-                for name, param in sub_component.named_parameters():
-                    if not param.requires_grad:
-                        continue
-                    params.append(param)
-                optimizer = base_optimizer(params)
-                multiOptims[f'{component_name}_{layer_stack_index}_{component_id}'] = optimizer
+    suboptimizers = {}
+    my_grouped_components = task_queue_manager.get_grouped_components(model)
+    for component_type in my_grouped_components:
+        for component_id, component in my_grouped_components[component_type].items():
+            name = component_type + '_' + '_'.join([str(x) for x in component_id])
+            params = []
+            for param_name, param in component.named_parameters():
+                if not param.requires_grad:
+                    continue
+                if 'adapter' in param_name and 'adapter' not in component_type:
+                    # omit adapters from base component optimizers
+                    continue
+                params.append(param)
+            optimizer = base_optimizer(params)
+            if name in suboptimizers:
+                raise Exception(f'Trying to create second optimizer for "{name}"')
+            suboptimizers[name] = optimizer
+
     for generator_id in task_queue_manager.get_generators():
         generator = model.generator[f'generator_{generator_id}']
+        params = []
         for name, param in generator.named_parameters():
             if not param.requires_grad:
                 continue
             params.append(param)
         optimizer = base_optimizer(params)
-        multiOptims[f'generator_{generator_id}'] = optimizer
+        suboptimizers[f'generator_{generator_id}'] = optimizer
 
     attParam = []
     for name, param in model.attention_bridge.named_parameters():
@@ -46,9 +49,9 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     # skip AB optimizer if AB is not in use
     if len(attParam):
         optimizer = base_optimizer(attParam)
-        multiOptims["ATT"] = optimizer
+        suboptimizers["attention_bridge"] = optimizer
 
-    optimizer = MultipleOptimizer(multiOptims, None)
+    optimizer = MultipleOptimizer(suboptimizers, None)
     return optimizer
 
 

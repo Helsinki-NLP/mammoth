@@ -862,6 +862,59 @@ class TaskQueueManager:
 
         return my_distributed_groups
 
+    def get_grouped_components(self, model):
+        """
+        Returns pairs of (component_id, nn.Module).
+        Only components present on this GPU are returned.
+        Unlike get_distributed_groups, this method also returns components on a single device,
+        and it does not retrieve communication groups.
+        """
+        if self.components_to_groups is None:
+            raise Exception('Must call get_distributed_groups first')
+
+        my_grouped_components = {
+            'encoder': OrderedDict(),
+            'decoder': OrderedDict(),
+            'src_emb': OrderedDict(),
+            'tgt_emb': OrderedDict(),
+            'encoder_adapters': OrderedDict(),
+            'decoder_adapters': OrderedDict(),
+        }
+
+        global_rank = self.global_rank
+
+        for key, global_ranks in self.components_to_gpus.items():
+            if global_rank not in global_ranks:
+                # omit groups that are not on this device
+                continue
+            component_type = key[0]
+            component_id = key[1:]
+            if component_type == 'encoder':
+                layer_stack_index, encoder_id = component_id
+                component = model.encoder.get_submodule(layer_stack_index, encoder_id)
+            elif component_type == 'decoder':
+                component = model.decoder.get_submodule(layer_stack_index, encoder_id)
+            elif component_type == 'src_emb':
+                component = model.encoder.embeddings[f'embeddings_{component_id[0]}']
+            elif component_type == 'tgt_emb':
+                component = model.decoder.embeddings[f'embeddings_{component_id[0]}']
+            elif component_type == 'encoder_adapters':
+                layer_stack_index, decoder_id, adapter_group, sub_id = component_id
+                component = model.encoder.get_submodule(
+                    layer_stack_index, encoder_id
+                ).get_adapter(adapter_group, sub_id)
+            elif component_type == 'decoder_adapters':
+                layer_stack_index, decoder_id, adapter_group, sub_id = component_id
+                component = model.decoder.get_submodule(
+                    layer_stack_index, decoder_id
+                ).get_adapter(adapter_group, sub_id)
+            else:
+                raise Exception(f'Unknown component type {component_type}')
+
+            my_grouped_components[component_type][component_id] = component
+
+        return my_grouped_components
+
     # TODO: soon deprecated by #18 Data pipeline refactoring
     def get_fields(self, side: str, fields_dict):
         """Returns a list of tuples: (side, lang, component_id, fields)."""

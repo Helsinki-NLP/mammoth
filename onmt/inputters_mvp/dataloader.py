@@ -278,7 +278,7 @@ class DynamicDatasetIter(object):
                 else 'cpu'
             )
             corpus = get_corpus(
-                self.opts, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train
+                self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
             ).to(device)
 
             # iterator over minibatches

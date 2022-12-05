@@ -551,6 +551,7 @@ class Trainer(object):
 
                     total_stats.update(batch_stats)
                     report_stats.update(batch_stats)
+                    report_stats.update_task_loss(batch_stats.loss, metadata)
 
                 except Exception:
                     traceback.print_exc()

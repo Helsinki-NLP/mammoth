@@ -129,6 +129,9 @@ def main(
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
+    else:
+        # Initialize some data structures
+        _ = task_queue_manager.get_distributed_groups()
     enc, dec = model.count_parameters(log=logger.debug)
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
     logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))

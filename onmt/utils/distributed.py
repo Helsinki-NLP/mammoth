@@ -866,7 +866,7 @@ class TaskQueueManager:
 
     def get_grouped_components(self, model):
         """
-        Returns pairs of (component_id, nn.Module).
+        Returns nested dict of component_type -> component_id -> nn.Module.
         Only components present on this GPU are returned.
         Unlike get_distributed_groups, this method also returns components on a single device,
         and it does not retrieve communication groups.
@@ -883,37 +883,37 @@ class TaskQueueManager:
             'decoder_adapters': OrderedDict(),
         }
 
-        global_rank = self.global_rank
+        if not self.world_context.is_distributed():
+            tasks = self.tasks
+        else:
+            tasks = self.get_tasks()
 
-        for key, global_ranks in self.components_to_gpus.items():
-            if self.global_rank not in global_ranks:
-                # omit groups that are not on this device
-                continue
-            component_type = key[0]
-            component_id = key[1:]
-            if component_type == 'encoder':
-                layer_stack_index, encoder_id = component_id
+        for task in tasks:
+            # loop over my tasks, getting all the relevant module ids and modules
+            my_grouped_components['src_emb'][task.src_lang] = model.encoder.embeddings[f'embeddings_{task.src_lang}']
+            my_grouped_components['tgt_emb'][task.tgt_lang] = model.decoder.embeddings[f'embeddings_{task.tgt_lang}']
+            for layer_stack_index, encoder_id in enumerate(task.encoder_id):
                 component = model.encoder.get_submodule(layer_stack_index, encoder_id)
-            elif component_type == 'decoder':
-                component = model.decoder.get_submodule(layer_stack_index, encoder_id)
-            elif component_type == 'src_emb':
-                component = model.encoder.embeddings[f'embeddings_{component_id[0]}']
-            elif component_type == 'tgt_emb':
-                component = model.decoder.embeddings[f'embeddings_{component_id[0]}']
-            elif component_type == 'encoder_adapters':
-                layer_stack_index, decoder_id, adapter_group, sub_id = component_id
-                component = model.encoder.get_submodule(
-                    layer_stack_index, encoder_id
-                ).get_adapter(adapter_group, sub_id)
-            elif component_type == 'decoder_adapters':
-                layer_stack_index, decoder_id, adapter_group, sub_id = component_id
-                component = model.decoder.get_submodule(
-                    layer_stack_index, decoder_id
-                ).get_adapter(adapter_group, sub_id)
-            else:
-                raise Exception(f'Unknown component type {component_type}')
-
-            my_grouped_components[component_type][component_id] = component
+                my_grouped_components['encoder'][(layer_stack_index, encoder_id)] = component
+            for layer_stack_index, decoder_id in enumerate(task.decoder_id):
+                component = model.decoder.get_submodule(layer_stack_index, decoder_id)
+                my_grouped_components['decoder'][(layer_stack_index, decoder_id)] = component
+            if task.encoder_adapter_ids:
+                for layer_stack_index, adapter_group, sub_id in task.encoder_adapter_ids:
+                    encoder_id = task.encoder_id[layer_stack_index]
+                    key = (layer_stack_index, encoder_id, adapter_group, sub_id)
+                    component = model.encoder.get_submodule(
+                        layer_stack_index, encoder_id
+                    ).get_adapter(adapter_group, sub_id)
+                    my_grouped_components['encoder_adapters'][key] = component
+            if task.decoder_adapter_ids:
+                for layer_stack_index, adapter_group, sub_id in task.decoder_adapter_ids:
+                    decoder_id = task.decoder_id[layer_stack_index]
+                    key = (layer_stack_index, decoder_id, adapter_group, sub_id)
+                    component = model.decoder.get_submodule(
+                        layer_stack_index, decoder_id
+                    ).get_adapter(adapter_group, sub_id)
+                    my_grouped_components['decoder_adapters'][key] = component
 
         return my_grouped_components
 

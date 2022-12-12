@@ -886,7 +886,7 @@ class TaskQueueManager:
         global_rank = self.global_rank
 
         for key, global_ranks in self.components_to_gpus.items():
-            if global_rank not in global_ranks:
+            if self.global_rank not in global_ranks:
                 # omit groups that are not on this device
                 continue
             component_type = key[0]

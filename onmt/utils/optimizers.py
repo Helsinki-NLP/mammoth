@@ -24,10 +24,13 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 if 'adapter' in param_name and 'adapter' not in component_type:
                     # omit adapters from base component optimizers
                     continue
+                if 'embedding' in param_name:
+                    print(f'adding {param_name} to {name}')
                 params.append(param)
-            optimizer = base_optimizer(params)
             if name in suboptimizers:
                 raise Exception(f'Trying to create second optimizer for "{name}"')
+            print(f'****** suboptimizer: {name}')
+            optimizer = base_optimizer(params)
             suboptimizers[name] = optimizer
 
     for generator_id in task_queue_manager.get_generators():
@@ -38,6 +41,7 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 continue
             params.append(param)
         optimizer = base_optimizer(params)
+        print(f'****** suboptimizer: generator_{generator_id}')
         suboptimizers[f'generator_{generator_id}'] = optimizer
 
     attParam = []

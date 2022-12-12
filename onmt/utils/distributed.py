@@ -212,6 +212,11 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
     if len(grads) == 0:
         return
 
+    # If not, then set has_grad also on devices that did not train the parameter themselves.
+    # They now have a grad that they received from the other devices.
+    for name, p in require_grad:
+        p.has_grad = True
+
     # All devices communicate either a real gradient or a dummy zeros of the same size
     # Can not use rescale_denom, as each grad may have its own denominator
     all_reduce_and_rescale_tensors(grads, rescale_denom=1, group=group)

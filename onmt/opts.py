@@ -897,6 +897,13 @@ def _add_train_general_opts(parser):
         "max_grad_norm",
     )
     group.add(
+        '--weight_decay',
+        '-weight_decay',
+        type=float,
+        default=0,
+        help="L2 penalty (weight decay) regularizer",
+    )
+    group.add(
         '--dropout',
         '-dropout',
         type=float,

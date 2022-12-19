@@ -74,10 +74,18 @@ def build_torch_optimizer(model, opt, task_queue_manager):
     elif opt.optim == 'adadelta':
         optimizer = optim.Adadelta(params, lr=opt.learning_rate)
     elif opt.optim == 'adafactor':
-        optimizer = attention_bridge_optimizer(model, task_queue_manager, AdaFactorFairSeq)
+        optimizer = attention_bridge_optimizer(
+            model,
+            task_queue_manager,
+            lambda params: AdaFactorFairSeq(params, weight_decay=opt.weight_decay),
+        )
     elif opt.optim == 'adam':
         optimizer = attention_bridge_optimizer(
-            model, task_queue_manager, lambda params: optim.Adam(params, lr=opt.learning_rate, betas=betas, eps=1e-9)
+            model,
+            task_queue_manager,
+            lambda params: optim.Adam(
+                params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
+            )
         )
     elif opt.optim == 'sparseadam':
         encs = []
@@ -795,6 +803,7 @@ class AdaFactorFairSeq(torch.optim.Optimizer):
             relative_step=relative_step,
             warmup_init=warmup_init,
         )
+        print(f'weight_decay {defaults["weight_decay"]}')
         super(AdaFactorFairSeq, self).__init__(params, defaults)
 
     @property

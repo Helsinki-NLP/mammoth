@@ -1,12 +1,12 @@
 import argparse
 import csv
 import os
-import sys
 import warnings
 import yaml
 
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
+from itertools import compress
 
 
 def load_yaml(fname):
@@ -62,8 +62,15 @@ def add_configs_args(parser):
 
 
 def add_corpora_schedule_args(parser):
-    parser.add_argument('--use_weights', action='store_true')
-    parser.add_argument('--temperature', type=float)
+    parser.add_argument(
+        '--use_weight', action='store_true',
+        help='Use corpus weights based on temperature-adjusted corpus size'
+    )
+    parser.add_argument(
+        '--use_introduce_at_training_step', action='store_true',
+        help='Use a curriculum introducing corpora based on temperature-adjusted corpus size'
+    )
+    parser.add_argument('--temperature', type=float, default=1.0)
 
 
 def add_define_group_args(parser):
@@ -122,7 +129,7 @@ def corpora_schedule(opts):
     if opts.use_weight:
         for cname, corpus in opts.in_config[0]['data'].items():
             corpus['weight'] = 1 - corpora_weights[cname]
-    else:
+    if opts.use_introduce_at_training_step:
         # TODO: ensure this default always matches with opts.py
         total_steps = opts.in_config[0].get('train_steps', 100_000)
         for cname, corpus in opts.in_config[0]['data'].items():
@@ -141,10 +148,20 @@ def define_group(opts):
         warnings.warn(
             f"languages in the distance matrix are unused ({', ' .join(sim_langs - corpus_langs)})"
         )
+        # Omit unused languages before clustering. Otherwise they might consume entire clusters.
+        selector = [lang in corpus_langs for lang in opts.distance_matrix['header']]
+        dist = opts.distance_matrix['data']
+        dist = dist[selector][:, selector]
+        header = list(compress(opts.distance_matrix['header'], selector))
+        opts.distance_matrix = {
+            'data': dist,
+            'header': header,
+        }
 
     group_idx = AgglomerativeClustering(
         n_clusters=opts.n_groups,
-        affinity='precomputed',
+        metric='precomputed',
+        linkage='average',
         distance_threshold=opts.cutoff_threshold,
     ).fit_predict(opts.distance_matrix['data']).tolist()
     groups = {lang: f'group{idx}' for lang, idx in zip(opts.distance_matrix['header'], group_idx)}

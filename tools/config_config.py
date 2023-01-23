@@ -165,6 +165,19 @@ def define_group(opts):
         distance_threshold=opts.cutoff_threshold,
     ).fit_predict(opts.distance_matrix['data']).tolist()
     groups = {lang: f'group{idx}' for lang, idx in zip(opts.distance_matrix['header'], group_idx)}
+    # FIXME: storing groups in opts for later use like this is a problem:
+    # The adapter_config step can not be run without also running the
+    # define_group step in the same execution (i.e. using "config_all").
+    # A potential solution would be to save everything in the config structure:
+    #   - Configuration for the config-config (what is now specified as CLI params)
+    #   - Intermediary values computed in the steps (such as the lang -> group mapping)
+    #   - Final configuration values
+    # When reaching the end of the config-config, any excessive keys are
+    # dropped before saving the yaml (OpenNMT doesn't like extra keys).
+    # Why does this work? Any step can be omitted, by instead adding any
+    # intermediary values it would produce into the input config. E.g. the lang
+    # -> group mapping could be specified as a mapping in the input yaml instead of a csv.
+    opts.groups = groups
 
     for cname, corpus in opts.in_config[0]['data'].items():
         src, tgt = corpus['src_tgt'].split('-')
@@ -177,12 +190,59 @@ def allocate_devices(opts):
 
 
 def adapter_config(opts):
-    pass
+    if 'adapters' not in opts.in_config[0]:
+        warnings.warn('No adapter configuration, skipping this step')
+        return
+    src_langs, tgt_langs = _get_langs(opts)
+    src_groups = list(sorted(set(opts.groups[src] for src in src_langs)))
+    tgt_groups = list(sorted(set(opts.groups[tgt] for tgt in tgt_langs)))
+    encoder_adapters = opts.in_config[0]['adapters'].get('encoder', [])
+    decoder_adapters = opts.in_config[0]['adapters'].get('decoder', [])
+    for data_key, data_config in opts.in_config[0]['data'].items():
+        if 'adapters' not in data_config:
+            data_config['adapters'] = {'encoder': [], 'decoder': []}
+    for adapter_name, adapter_config in encoder_adapters.items():
+        if adapter_config['ids'] == 'LANGUAGE':
+            adapter_config['ids'] = src_langs
+            for data_key, data_config in opts.in_config[0]['data'].items():
+                data_src, data_tgt = data_config['src_tgt'].split('-')
+                data_config['adapters']['encoder'].append([adapter_name, data_src])
+        elif adapter_config['ids'] == 'GROUP':
+            adapter_config['ids'] = src_groups
+            for data_key, data_config in opts.in_config[0]['data'].items():
+                data_src, data_tgt = data_config['src_tgt'].split('-')
+                data_config['adapters']['encoder'].append([adapter_name, opts.groups[data_src]])
+        elif adapter_config['ids'] == 'FULL':
+            adapter_config['ids'] = ['full']
+            for data_key, data_config in opts.in_config[0]['data'].items():
+                data_config['adapters']['encoder'].append([adapter_name, 'full'])
+    for adapter_name, adapter_config in decoder_adapters.items():
+        if adapter_config['ids'] == 'LANGUAGE':
+            adapter_config['ids'] = tgt_langs
+            for data_key, data_config in opts.in_config[0]['data'].items():
+                data_src, data_tgt = data_config['src_tgt'].split('-')
+                data_config['adapters']['decoder'].append([adapter_name, data_tgt])
+        elif adapter_config['ids'] == 'GROUP':
+            adapter_config['ids'] = tgt_groups
+            for data_key, data_config in opts.in_config[0]['data'].items():
+                data_src, data_tgt = data_config['src_tgt'].split('-')
+                data_config['adapters']['decoder'].append([adapter_name, opts.groups[data_tgt]])
+        elif adapter_config['ids'] == 'FULL':
+            adapter_config['ids'] = ['full']
+            for data_key, data_config in opts.in_config[0]['data'].items():
+                data_config['adapters']['decoder'].append([adapter_name, 'full'])
+    opts.in_config[0]['adapters']['encoder'] = encoder_adapters
+    opts.in_config[0]['adapters']['decoder'] = decoder_adapters
+
+
+def _get_langs(opts):
+    src_langs = list(sorted(opts.in_config[0]['src_vocab'].keys()))
+    tgt_langs = list(sorted(opts.in_config[0]['tgt_vocab'].keys()))
+    return src_langs, tgt_langs
 
 
 def complete_language_pairs(opts):
-    src_langs = list(sorted(opts.in_config[0]['src_vocab'].keys()))
-    tgt_langs = list(sorted(opts.in_config[0]['tgt_vocab'].keys()))
+    src_langs, tgt_langs = _get_langs(opts)
     for src_lang in src_langs:
         for tgt_lang in tgt_langs:
             if src_lang == tgt_lang and not opts.autoencoder:

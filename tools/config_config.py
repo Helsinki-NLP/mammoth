@@ -1,5 +1,7 @@
 import argparse
 import csv
+import os
+import sys
 import warnings
 import yaml
 
@@ -30,12 +32,28 @@ def load_distmat_csv(fname):
 
 
 def save_yaml(opts):
-    with open(opts.out_config, 'w') as ostr:
-        yaml.dump(opts.in_config[0], ostr, default_flow_style=False, allow_unicode=True)
+    serialized = yaml.dump(opts.in_config[0], default_flow_style=False, allow_unicode=True)
+    if opts.out_config:
+        with open(opts.out_config, 'w') as ostr:
+            print(serialized, file=ostr)
+    else:
+        print(serialized)
 
 
 def add_complete_language_pairs_args(parser):
-    pass
+    parser.add_argument(
+        '--src_path', type=str, required=True,
+        help='path template to source data. Can use variables {src_lang} and {tgt_lang}'
+    )
+    parser.add_argument(
+        '--tgt_path', type=str, required=True,
+        help='path template to target data. Can use variables {src_lang} and {tgt_lang}'
+    )
+    parser.add_argument(
+        '--autoencoder',
+        action='store_true',
+        help='add autoencoder tasks, for which src_lang == tgt_lang'
+    )
 
 
 def add_configs_args(parser):
@@ -66,22 +84,22 @@ def add_adapter_config_args(parser):
 def get_opts():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
-    parser_corpora_schedule = subparsers.add_subparser('corpora_schedule')
+    parser_corpora_schedule = subparsers.add_parser('corpora_schedule')
     add_configs_args(parser_corpora_schedule)
     add_corpora_schedule_args(parser_corpora_schedule)
-    parser_define_group = subparsers.add_subparser('define_group')
+    parser_define_group = subparsers.add_parser('define_group')
     add_configs_args(parser_define_group)
     add_define_group_args(parser_define_group)
-    parser_allocate_devices = subparsers.add_subparser('allocate_devices')
+    parser_allocate_devices = subparsers.add_parser('allocate_devices')
     add_configs_args(parser_allocate_devices)
     add_allocate_device_args(parser_allocate_devices)
-    parser_adapter_config = subparsers.add_subparser('adapter_config')
+    parser_adapter_config = subparsers.add_parser('adapter_config')
     add_configs_args(parser_adapter_config)
     add_adapter_config_args(parser_adapter_config)
-    parser_complete_language_pairs = subparsers.add_subparser('complete_language_pairs')
+    parser_complete_language_pairs = subparsers.add_parser('complete_language_pairs')
     add_configs_args(parser_complete_language_pairs)
     add_complete_language_pairs_args(parser_complete_language_pairs)
-    parser_config_all = subparsers.add_subparser('config_all')
+    parser_config_all = subparsers.add_parser('config_all')
     add_configs_args(parser_config_all)
     add_corpora_schedule_args(parser_config_all)
     add_define_group_args(parser_config_all)
@@ -146,7 +164,32 @@ def adapter_config(opts):
 
 
 def complete_language_pairs(opts):
-    pass
+    src_langs = list(sorted(opts.in_config[0]['src_vocab'].keys()))
+    tgt_langs = list(sorted(opts.in_config[0]['tgt_vocab'].keys()))
+    for src_lang in src_langs:
+        for tgt_lang in tgt_langs:
+            if src_lang == tgt_lang and not opts.autoencoder:
+                continue
+            src_path = opts.src_path.format(src_lang=src_lang, tgt_lang=tgt_lang)
+            tgt_path = opts.tgt_path.format(src_lang=src_lang, tgt_lang=tgt_lang)
+            if os.path.exists(src_path) and os.path.exists(tgt_path):
+                _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path)
+            else:
+                print(f'Paths do NOT exist, omitting language pair: {src_path} {tgt_path}')
+    if len(opts.in_config[0].get('data', [])) == 0:
+        raise Exception('No language pairs were added. Check your path templates.')
+
+
+def _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path):
+    if 'data' not in opts.in_config[0]:
+        opts.in_config[0]['data'] = dict()
+    data_section = opts.in_config[0]['data']
+    key = f'train_{src_lang}-{tgt_lang}'
+    if key not in data_section:
+        data_section[key] = dict()
+    data_section[key]['src_tgt'] = f'{src_lang}-{tgt_lang}'
+    data_section[key]['path_src'] = src_path
+    data_section[key]['path_tgt'] = tgt_path
 
 
 def config_all(opts):
@@ -159,8 +202,8 @@ def config_all(opts):
 
 if __name__ == '__main__':
     opts = get_opts()
-    if not opts.out_config:
-        opts.out_config = opts.in_config[1]
+    # if not opts.out_config:
+    #     opts.out_config = opts.in_config[1]
     main = {
         func.__name__: func
         for func in (

@@ -8,6 +8,11 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from itertools import compress
 
+# Cost benefit of allocating language-specific components on the same device
+ALLOC_COST_LANG = 1
+# Cost benefit of allocating group-specific components on the same device
+ALLOC_COST_GROUP = 3
+
 
 def load_yaml(fname):
     with open(fname, 'r') as istr:
@@ -133,7 +138,13 @@ def corpora_schedule(opts):
         # TODO: ensure this default always matches with opts.py
         total_steps = opts.in_config[0].get('train_steps', 100_000)
         for cname, corpus in opts.in_config[0]['data'].items():
-            corpus['introduce_at_training_step'] = round(total_steps * corpora_weights[cname])
+            introduce_at_training_step = round(total_steps * corpora_weights[cname])
+            # High-resource language pairs (would train for over 75% of the training time)
+            # all start at 0. This avoids starting training with only one GPU doing work,
+            # while the other GPUs are idle waiting for their LPs to start.
+            if introduce_at_training_step < total_steps // 4:
+                introduce_at_training_step = 0
+            corpus['introduce_at_training_step'] = introduce_at_training_step
 
 
 def define_group(opts):
@@ -185,8 +196,32 @@ def define_group(opts):
         corpus['dec_sharing_group'] = [groups[tgt], 'full', groups[tgt]]
 
 
+def _alloc_cost(src_a, tgt_a, src_b, tgt_b):
+    src_group_a = opts.groups[src_a]
+    tgt_group_a = opts.groups[tgt_a]
+    src_group_b = opts.groups[src_b]
+    tgt_group_b = opts.groups[tgt_b]
+    cost = 0
+    if src_a != src_b:
+        cost += ALLOC_COST_LANG
+    if tgt_a != tgt_b:
+        cost += ALLOC_COST_LANG
+    if src_group_a != src_group_b:
+        cost += ALLOC_COST_GROUP
+    if tgt_group_a != tgt_group_b:
+        cost += ALLOC_COST_GROUP
+    return cost
+
+
 def allocate_devices(opts):
-    pass
+    n_tasks = len(opts.in_config[0]['data'])
+    dist = np.zeros((n_tasks, n_tasks))
+    for i, data_config_a in enumerate(opts.in_config[0]['data'].values()):
+        src_a, tgt_a = data_config_a['src_tgt'].split('-')
+        for j, data_config_b in enumerate(opts.in_config[0]['data'].values()):
+            src_b, tgt_b = data_config_b['src_tgt'].split('-')
+            dist[i, j] = _alloc_cost(src_a, tgt_a, src_b, tgt_b, opts)
+    # FIXME: call out to the heuristic solver
 
 
 def adapter_config(opts):

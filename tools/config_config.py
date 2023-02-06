@@ -8,10 +8,7 @@ import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from itertools import compress
 
-# Cost benefit of allocating language-specific components on the same device
-ALLOC_COST_LANG = 1
-# Cost benefit of allocating group-specific components on the same device
-ALLOC_COST_GROUP = 3
+from gpu_assignment import optimize_gpu_assignment
 
 
 def load_yaml(fname):
@@ -85,8 +82,9 @@ def add_define_group_args(parser):
 
 
 def add_allocate_device_args(parser):
-    parser.add_argument('--n_devices', type=int, required=True)
     parser.add_argument('--n_nodes', type=int, required=True)
+    parser.add_argument('--n_gpus_per_node', type=int, required=True)
+    parser.add_argument('--n_slots_per_gpu', type=int, default=None)
 
 
 def add_adapter_config_args(parser):
@@ -196,32 +194,39 @@ def define_group(opts):
         corpus['dec_sharing_group'] = [groups[tgt], 'full', groups[tgt]]
 
 
-def _alloc_cost(src_a, tgt_a, src_b, tgt_b):
-    src_group_a = opts.groups[src_a]
-    tgt_group_a = opts.groups[tgt_a]
-    src_group_b = opts.groups[src_b]
-    tgt_group_b = opts.groups[tgt_b]
-    cost = 0
-    if src_a != src_b:
-        cost += ALLOC_COST_LANG
-    if tgt_a != tgt_b:
-        cost += ALLOC_COST_LANG
-    if src_group_a != src_group_b:
-        cost += ALLOC_COST_GROUP
-    if tgt_group_a != tgt_group_b:
-        cost += ALLOC_COST_GROUP
-    return cost
-
-
 def allocate_devices(opts):
-    n_tasks = len(opts.in_config[0]['data'])
-    dist = np.zeros((n_tasks, n_tasks))
-    for i, data_config_a in enumerate(opts.in_config[0]['data'].values()):
-        src_a, tgt_a = data_config_a['src_tgt'].split('-')
-        for j, data_config_b in enumerate(opts.in_config[0]['data'].values()):
-            src_b, tgt_b = data_config_b['src_tgt'].split('-')
-            dist[i, j] = _alloc_cost(src_a, tgt_a, src_b, tgt_b, opts)
-    # FIXME: call out to the heuristic solver
+    lang_pairs = []
+    lps_ready_to_start = []
+    lp_to_key = {}
+    for key, data_config in opts.in_config[0]['data'].items():
+        src_lang, tgt_lang = data_config['src_tgt'].split('-')
+        ready_to_start = data_config.get('introduce_at_training_step', 0) == 0
+
+        lang_pairs.append((src_lang, tgt_lang))
+        if ready_to_start:
+            lps_ready_to_start.append((src_lang, tgt_lang))
+        lp_to_key[(src_lang, tgt_lang)] = key
+
+    if opts.n_slots_per_gpu is not None:
+        n_slots_per_gpu = opts.n_slots_per_gpu
+    else:
+        n_gpus_tot = opts.n_nodes * opts.n_gpus_per_node
+        n_slots_per_gpu = int(np.ceil(len(lang_pairs) / n_gpus_tot))
+
+    assignment = optimize_gpu_assignment(
+        n_nodes=opts.n_nodes,
+        n_gpus_per_node=opts.n_gpus_per_node,
+        n_slots_per_gpu=n_slots_per_gpu,
+        lang_pairs=lang_pairs,
+        lang_to_group_mapping=opts.groups,
+        lps_ready_to_start=lps_ready_to_start,
+    )
+
+    for gpu_slot, lp in assignment.items():
+        if lp is None:
+            continue
+        key = lp_to_key[lp]
+        opts.in_config[0]['data'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
 
 
 def adapter_config(opts):

@@ -16,7 +16,10 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     my_grouped_components = task_queue_manager.get_grouped_components(model)
     for component_type in my_grouped_components:
         for component_id, component in my_grouped_components[component_type].items():
-            name = component_type + '_' + '_'.join([str(x) for x in component_id])
+            if isinstance(component_id, str):
+                name = component_type + '_' + component_id
+            else:
+                name = component_type + '_' + '_'.join([str(x) for x in component_id])
             params = []
             for param_name, param in component.named_parameters():
                 if not param.requires_grad:
@@ -25,11 +28,10 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                     # omit adapters from base component optimizers
                     continue
                 if 'embedding' in param_name:
-                    print(f'adding {param_name} to {name}')
+                    print(f'adding {param_name} to suboptimizer {name}')
                 params.append(param)
             if name in suboptimizers:
                 raise Exception(f'Trying to create second optimizer for "{name}"')
-            print(f'****** suboptimizer: {name}')
             optimizer = base_optimizer(params)
             suboptimizers[name] = optimizer
 
@@ -41,7 +43,6 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 continue
             params.append(param)
         optimizer = base_optimizer(params)
-        print(f'****** suboptimizer: generator_{generator_id}')
         suboptimizers[f'generator_{generator_id}'] = optimizer
 
     attParam = []
@@ -820,7 +821,6 @@ class AdaFactorFairSeq(torch.optim.Optimizer):
             relative_step=relative_step,
             warmup_init=warmup_init,
         )
-        print(f'weight_decay {defaults["weight_decay"]}')
         super(AdaFactorFairSeq, self).__init__(params, defaults)
 
     @property

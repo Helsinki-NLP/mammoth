@@ -24,10 +24,13 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 if 'adapter' in param_name and 'adapter' not in component_type:
                     # omit adapters from base component optimizers
                     continue
+                if 'embedding' in param_name:
+                    print(f'adding {param_name} to {name}')
                 params.append(param)
-            optimizer = base_optimizer(params)
             if name in suboptimizers:
                 raise Exception(f'Trying to create second optimizer for "{name}"')
+            print(f'****** suboptimizer: {name}')
+            optimizer = base_optimizer(params)
             suboptimizers[name] = optimizer
 
     for generator_id in task_queue_manager.get_generators():
@@ -38,6 +41,7 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 continue
             params.append(param)
         optimizer = base_optimizer(params)
+        print(f'****** suboptimizer: generator_{generator_id}')
         suboptimizers[f'generator_{generator_id}'] = optimizer
 
     attParam = []
@@ -209,7 +213,7 @@ class MultipleOptimizer(object):
     def step(self, grad_scaler=None):
         """Step through all the suboptimizers"""
         for name in self.optimizers:
-            if self._any_param_has_grad(self.optimizers[name]):
+            if self._any_param_has_grad(self.optimizers[name], name):
                 self._steps[name] += 1
                 if grad_scaler is not None:
                     grad_scaler.unscale_(self.optimizers[name])
@@ -218,13 +222,15 @@ class MultipleOptimizer(object):
                     self.optimizers[name].step()
 
     @staticmethod
-    def _any_param_has_grad(optimizer):
+    def _any_param_has_grad(optimizer, name):
         for group in optimizer.param_groups:
             for param in group['params']:
+                if not param.requires_grad:
+                    continue
                 if not hasattr(param, 'has_grad'):
                     # if there are parameters not tracked by the hook,
                     # then always perform the step
-                    return True
+                    raise Exception(f'At least one parameter in {name} did not have the hook')
                 if param.has_grad:
                     return True
         return False

@@ -351,8 +351,14 @@ def build_task_specific_model(
 
     for module in nmt_model.modules():
         module.register_forward_hook(has_grad_hook)
+        for param in module.parameters(recurse=False):
+            if param.requires_grad:
+                param.has_grad = False
     for module in generators_md.modules():
         module.register_forward_hook(has_grad_hook)
+        for param in module.parameters(recurse=False):
+            if param.requires_grad:
+                param.has_grad = False
 
     return nmt_model, generators_md
 

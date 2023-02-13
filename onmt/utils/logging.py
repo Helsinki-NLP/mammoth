@@ -12,8 +12,9 @@ def init_logger(
     log_file_level=logging.NOTSET,
     rotate=False,
     log_level=logging.INFO,
+    gpu_id='',
 ):
-    log_format = logging.Formatter("[%(asctime)s %(process)s %(levelname)s] %(message)s")
+    log_format = logging.Formatter(f"[%(asctime)s %(process)s {gpu_id} %(levelname)s] %(message)s")
     logger = logging.getLogger()
     logger.setLevel(log_level)
 

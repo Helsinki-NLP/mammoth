@@ -112,7 +112,7 @@ def main(
     # at this point.
     # N.B: task_queue_manager is already local
 
-    init_logger(opt.log_file)
+    init_logger(opt.log_file, gpu_id=device_context.id)
     if device_context.is_distributed():
         configure_process(opt, device_context.local_rank)
         gpu_rank_t = torch.distributed.get_rank()

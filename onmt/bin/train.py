@@ -226,7 +226,7 @@ def train(opt):
             q = mp.Queue(opt.queue_size)
             semaphore = mp.Semaphore(opt.queue_size)
             queues.append(q)
-            semaphores.append(q)
+            semaphores.append(semaphore)
             procs.append(
                 mp.Process(
                     target=consumer,

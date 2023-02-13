@@ -194,34 +194,49 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
 
     # Communicate the ready bits, and reduce them using summation.
     # This gives the number of non-dummy gradients participating, for normalization
+    logger.warning(f'DEBUG: start of Communicate the ready bits. ready_list = {ready_list}')
     ready_t = torch.tensor(ready_list).to(device)
     if group is None:
+        logger.warning('DEBUG: no group, before')
         torch.distributed.all_reduce(ready_t)
+        logger.warning('DEBUG: no group, after')
     else:
+        logger.warning('DEBUG: with group, before')
         torch.distributed.all_reduce(ready_t, group=group)
+        logger.warning('DEBUG: with group, after')
     rescale_denoms = ready_t  # after reduction
+    logger.warning(f'DEBUG: after reduction. rescale_denoms = {rescale_denoms}')
 
     # Omit if all nodes sent a zero ready bit
     grads = [p.grad.data for name, p in require_grad]
+    logger.warning(f'DEBUG: grads len A {len(grads)}')
     grads = [grad for (grad, denom) in zip(grads, rescale_denoms) if denom > 0]
+    logger.warning(f'DEBUG: grads len B {len(grads)}')
     rescale_denoms = [denom for denom in rescale_denoms if denom > 0]
+    logger.warning(f'DEBUG: rescale_denoms len B {len(rescale_denoms)}')
     assert len(grads) == len(rescale_denoms)
+    logger.warning('DEBUG: passed assert')
     if len(grads) == 0:
+        logger.warning('DEBUG: returning early')
         return
+    logger.warning('DEBUG: NOT returning early')
 
     # If not, then set has_grad also on devices that did not train the parameter themselves.
     # They now have a grad that they received from the other devices.
     for name, p in require_grad:
         p.has_grad = True
+    logger.warning('DEBUG: everything now has has_grad')
 
     # All devices communicate either a real gradient or a dummy zeros of the same size
     # Can not use rescale_denom, as each grad may have its own denominator
     all_reduce_and_rescale_tensors(grads, rescale_denom=1, group=group)
+    logger.warning('DEBUG: after allreduce. grads len {len(grads)}')
 
     # Normalize using the previously computed values
     for grad, denom in zip(grads, rescale_denoms):
         if denom > 0:
             grad.div_(denom)
+    logger.warning('DEBUG: after allreduce, end of function')
     # Note: p.has_grad is reused in the optimizer to prevent the untrained components from being stepped
 
 

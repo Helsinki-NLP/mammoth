@@ -623,17 +623,27 @@ class TaskQueueManager:
     def from_opt(cls, opt: Namespace, world_context: WorldContext):
         n_tasks = len(opt.data)
 
+        # Sorting the keys, to ensure that tasks have a consistent order across devices.
+        # This in turn ensures the order in which components are created from those tasks.
+        corpus_ids = sorted(opt.data.keys())
+
         if world_context.is_distributed():
             if any(task.get('node_gpu', None) is not None for task in opt.data.values()):
-                node_gpu = [tuple(int(y) for y in task['node_gpu'].split(':', 1)) for task in opt.data.values()]
+                node_gpu = [
+                    tuple(int(y) for y in opt.data[corpus_id]['node_gpu'].split(':', 1))
+                    for corpus_id in corpus_ids]
             else:
                 # When --node_gpu is not set, assume an assigment that fills gpus in rank order
                 node_gpu = cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
         else:
             node_gpu = [(0, 0)] * n_tasks
 
-        enc_sharing_group = [task.get('enc_sharing_group', None) for task in opt.data.values()]
-        dec_sharing_group = [task.get('dec_sharing_group', None) for task in opt.data.values()]
+        enc_sharing_group = [
+            opt.data[corpus_id].get('enc_sharing_group', None) for corpus_id in corpus_ids
+        ]
+        dec_sharing_group = [
+            opt.data[corpus_id].get('dec_sharing_group', None) for corpus_id in corpus_ids
+        ]
         if any(x is not None for x in enc_sharing_group):
             assert all(len(enc_ids) == len(opt.enc_layers) for enc_ids in enc_sharing_group)
         else:
@@ -648,8 +658,6 @@ class TaskQueueManager:
             # it is assumed that there is only one decoder stack and it is language specific
             if not len(opt.dec_layers) == 1:
                 raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
-
-        corpus_ids = opt.data.keys()
 
         tasks = []
         uses_adapters = False

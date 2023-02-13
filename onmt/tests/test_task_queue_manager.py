@@ -53,7 +53,7 @@ def create_basic_task_queue_manager():
         # dec_sharing_group y is twice, on two devices 0:0 and 1:0
         # dec_sharing_group yy is twice, but only on a single device 0:1
         'data': {
-            'train_a-b': {
+            'train_0_a-b': {
                 'path_src': 'dummy',
                 'path_tgt': 'dummy',
                 'weight': 2,
@@ -63,17 +63,7 @@ def create_basic_task_queue_manager():
                 'enc_sharing_group': ['x'],
                 'dec_sharing_group': ['y'],
             },
-            'train_c-d': {
-                'path_src': 'dummy',
-                'path_tgt': 'dummy',
-                'weight': 1,
-                'introduce_at_training_step': 0,
-                'src_tgt': 'c-d',
-                'node_gpu': '0:1',
-                'enc_sharing_group': ['xx'],
-                'dec_sharing_group': ['yy'],
-            },
-            'train_a-d': {
+            'train_2_a-d': {
                 'path_src': 'dummy',
                 'path_tgt': 'dummy',
                 'weight': 1,
@@ -83,7 +73,7 @@ def create_basic_task_queue_manager():
                 'enc_sharing_group': ['x'],
                 'dec_sharing_group': ['yy'],
             },
-            'train_e-b': {
+            'train_3_e-b': {
                 'path_src': 'dummy',
                 'path_tgt': 'dummy',
                 'weight': 1,
@@ -92,6 +82,16 @@ def create_basic_task_queue_manager():
                 'node_gpu': '1:0',
                 'enc_sharing_group': ['xxx'],
                 'dec_sharing_group': ['y'],
+            },
+            'train_1_c-d': {
+                'path_src': 'dummy',
+                'path_tgt': 'dummy',
+                'weight': 1,
+                'introduce_at_training_step': 0,
+                'src_tgt': 'c-d',
+                'node_gpu': '0:1',
+                'enc_sharing_group': ['xx'],
+                'dec_sharing_group': ['yy'],
             },
         }
     }

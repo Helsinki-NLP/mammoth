@@ -197,9 +197,9 @@ def train(opt):
         node_rank = opt.node_rank
 
         queues = []
+        semaphores = []
         mp = torch.multiprocessing.get_context('spawn')
         logger.info("world_size = {}, queue_size = {}".format(opt.world_size, opt.queue_size))
-        semaphore = mp.Semaphore(opt.world_size * opt.queue_size)
         # Create a thread to listen for errors in the child processes.
         error_queue = mp.SimpleQueue()
         error_handler = ErrorHandler(error_queue)
@@ -224,7 +224,9 @@ def train(opt):
             current_env["LOCAL_RANK"] = str(device_context.local_rank)
 
             q = mp.Queue(opt.queue_size)
-            queues += [q]
+            semaphore = mp.Semaphore(opt.queue_size)
+            queues.append(q)
+            semaphores.append(q)
             procs.append(
                 mp.Process(
                     target=consumer,
@@ -249,7 +251,7 @@ def train(opt):
             )
 
             producer = mp.Process(
-                target=batch_producer, args=(train_iter, queues[local_rank], semaphore, opt, local_rank), daemon=True
+                target=batch_producer, args=(train_iter, q, semaphore, opt, local_rank), daemon=True
             )
             producers.append(producer)
             producers[local_rank].start()

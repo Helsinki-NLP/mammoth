@@ -230,7 +230,7 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
     # All devices communicate either a real gradient or a dummy zeros of the same size
     # Can not use rescale_denom, as each grad may have its own denominator
     all_reduce_and_rescale_tensors(grads, rescale_denom=1, group=group)
-    logger.warning('DEBUG: after allreduce. grads len {len(grads)}')
+    logger.warning(f'DEBUG: after allreduce. grads len {len(grads)}')
 
     # Normalize using the previously computed values
     for grad, denom in zip(grads, rescale_denoms):

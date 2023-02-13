@@ -78,7 +78,8 @@ class ParallelCorpus(IterableDataset):
     def _numericalize(self, tokens, side='src'):
         """Convert list of strings into list of indices"""
         vocab = self.vocabs[side]
-        indices = torch.tensor(list(map(vocab.stoi.__getitem__, tokens)), device=self.device)
+        unk = vocab[DefaultTokens.UNK]
+        indices = torch.tensor([vocab.stoi.get(token, unk) for token in tokens], device=self.device)
         return indices
 
     def to(self, device):

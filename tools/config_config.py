@@ -34,7 +34,7 @@ def load_distmat_csv(fname):
 
 
 def save_yaml(opts):
-    serialized = yaml.dump(opts.in_config[0], default_flow_style=False, allow_unicode=True)
+    serialized = yaml.safe_dump(opts.in_config[0], default_flow_style=False, allow_unicode=True)
     if opts.out_config:
         with open(opts.out_config, 'w') as ostr:
             print(serialized, file=ostr)
@@ -129,19 +129,22 @@ def corpora_schedule(opts):
         cname: (max_lines - clen) ** opts.temperature / max_lines
         for cname, clen in corpora_lens.items()
     }
-    if opts.use_weight:
-        for cname, corpus in opts.in_config[0]['data'].items():
-            corpus['weight'] = 1 - corpora_weights[cname]
-    if opts.use_introduce_at_training_step:
-        # TODO: ensure this default always matches with opts.py
-        total_steps = opts.in_config[0].get('train_steps', 100_000)
-        for cname, corpus in opts.in_config[0]['data'].items():
-            introduce_at_training_step = round(total_steps * corpora_weights[cname])
-            # High-resource language pairs (would train for over 75% of the training time)
-            # all start at 0. This avoids starting training with only one GPU doing work,
-            # while the other GPUs are idle waiting for their LPs to start.
-            if introduce_at_training_step < total_steps // 4:
+    for cname, corpus in opts.in_config[0]['data'].items():
+        weight = 1 - corpora_weights[cname]
+        if opts.use_weight and opts.use_introduce_at_training_step:
+            weight = float(np.sqrt(weight))
+        if opts.use_weight:
+            corpus['weight'] = weight
+        if opts.use_introduce_at_training_step:
+            # TODO: ensure this default always matches with opts.py
+            total_steps = opts.in_config[0].get('train_steps', 100_000)
+            if weight > 0.75:
+                # High-resource language pairs (would train for over 75% of the training time)
+                # all start at 0. This avoids starting training with only one GPU doing work,
+                # while the other GPUs are idle waiting for their LPs to start.
                 introduce_at_training_step = 0
+            else:
+                introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
 
 

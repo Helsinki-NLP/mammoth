@@ -71,7 +71,7 @@ def translate(opt):
         translator.translate_dynamic(
             src=src_shard,
             transform=transform,
-            src_feats=feats_shard,
+            # src_feats=feats_shard,  # TODO: put me back in
             tgt=tgt_shard,
             batch_size=opt.batch_size,
             batch_type=opt.batch_type,

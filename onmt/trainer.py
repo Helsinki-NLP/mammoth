@@ -398,7 +398,7 @@ class Trainer(object):
                 if hasattr(p, 'has_grad'):
                     p.has_grad = False
 
-            if step % 1000 == 0:
+            if step % 1000 == 0 and step > 0:
                 # TODO: if you are going to uncomment that block, please make it optional
                 # logger.info(f'After gradient sync {step}')
                 # for name, p in self.model.named_parameters():
@@ -409,6 +409,10 @@ class Trainer(object):
                 if hasattr(self.optim._optimizer, 'report_steps'):
                     for line in self.optim._optimizer.report_steps():
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} {line}')
+                total = sum(self.task_queue_manager.sampled_task_counts.values())
+                logger.info(f'Task sampling distribution: (total {total})')
+                for task, count in self.task_queue_manager.sampled_task_counts.most_common():
+                    logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)

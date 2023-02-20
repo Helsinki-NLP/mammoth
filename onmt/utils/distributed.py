@@ -11,7 +11,7 @@ import torch.distributed
 
 from abc import ABC, abstractmethod
 from argparse import Namespace
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict, namedtuple, Counter
 from dataclasses import dataclass
 from enum import Enum
 from itertools import cycle, islice
@@ -583,6 +583,7 @@ class TaskQueueManager:
 
         self.components_to_gpus = components_to_gpus
         self.components_to_groups = components_to_groups
+        self.sampled_task_counts = Counter()
 
     @property
     def gpus_per_node(self):
@@ -955,10 +956,12 @@ class TaskQueueManager:
         return result
 
     def sample_corpus_ids(self, communication_batch_id: int):
-        return self.task_distribution_strategy.sample_corpus_ids(
+        corpus_ids = self.task_distribution_strategy.sample_corpus_ids(
             self.tasks_per_communication_batch,
             communication_batch_id,
         )
+        self.sampled_task_counts.update(corpus_ids)
+        return corpus_ids
 
     def get_encoders(self, layer_stack_index: int):
         my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_tasks()]

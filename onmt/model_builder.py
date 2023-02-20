@@ -92,7 +92,7 @@ def load_test_multitask_model(opt, model_path=None):
             (f'encoder.embeddings.embeddings_{opt.src_lang}.', f'src_embeddings_{opt.src_lang}'),
             (f'decoder.embeddings.embeddings_{opt.tgt_lang}.', f'tgt_embeddings_{opt.tgt_lang}'),
             (f'generator.generator_{opt.tgt_lang}.', f'generator_{opt.tgt_lang}'),
-            ('', 'attention_bridge'),
+            ('attention_bridge.', 'attention_bridge'),
         ]
 
         for layer_stack_idx, layer_stack_opt in enumerate(opt.stack['encoder']):

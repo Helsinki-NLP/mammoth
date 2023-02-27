@@ -20,7 +20,7 @@ class DataOptsCheckerMixin(object):
     def _validate_file(file_path, info):
         """Check `file_path` is valid or raise `IOError`."""
         if not os.path.isfile(file_path):
-            raise IOError(f"Please check path of your {info} file!")
+            raise IOError(f"Please check path of your {info} file! {file_path}")
 
     @classmethod
     def _validate_adapters(cls, opt):

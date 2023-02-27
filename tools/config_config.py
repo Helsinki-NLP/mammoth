@@ -79,12 +79,31 @@ def add_define_group_args(parser):
     parser.add_argument('--distance_matrix', required=True, type=load_distmat_csv)
     parser.add_argument('--cutoff_threshold', type=float)
     parser.add_argument('--n_groups', type=int)
+    parser.add_argument(
+        '--enc_sharing_groups', type=str, action='append',
+        help='list of {LANGUAGE | GROUP | FULL}'
+    )
+    parser.add_argument(
+        '--dec_sharing_groups', type=str, action='append',
+        help='list of {LANGUAGE | GROUP | FULL}'
+    )
 
 
 def add_allocate_device_args(parser):
     parser.add_argument('--n_nodes', type=int, required=True)
     parser.add_argument('--n_gpus_per_node', type=int, required=True)
     parser.add_argument('--n_slots_per_gpu', type=int, default=None)
+
+
+def add_set_transforms_args(parser):
+    parser.add_argument(
+        '--transforms', type=str, action='append',
+        help='transforms to use for translation tasks'
+    )
+    parser.add_argument(
+        '--ae_transforms', type=str, action='append',
+        help='transforms to use for autoencoder tasks'
+    )
 
 
 def add_adapter_config_args(parser):
@@ -108,6 +127,9 @@ def get_opts():
     parser_allocate_devices = subparsers.add_parser('allocate_devices')
     add_configs_args(parser_allocate_devices)
     add_allocate_device_args(parser_allocate_devices)
+    parser_set_transforms = subparsers.add_parser('set_transforms')
+    add_configs_args(parser_set_transforms)
+    add_set_transforms_args(parser_set_transforms)
     parser_adapter_config = subparsers.add_parser('adapter_config')
     add_configs_args(parser_adapter_config)
     add_adapter_config_args(parser_adapter_config)
@@ -122,6 +144,7 @@ def get_opts():
     add_corpora_schedule_args(parser_config_all)
     add_define_group_args(parser_config_all)
     add_allocate_device_args(parser_config_all)
+    add_set_transforms_args(parser_config_all)
     add_complete_language_pairs_args(parser_config_all)
     add_adapter_config_args(parser_config_all)
     add_translation_configs_args(parser_config_all)
@@ -200,10 +223,39 @@ def define_group(opts):
     # -> group mapping could be specified as a mapping in the input yaml instead of a csv.
     opts.groups = groups
 
+    if not opts.enc_sharing_groups:
+        raise Exception('Must set --enc_sharing_groups')
+    if not opts.dec_sharing_groups:
+        raise Exception('Must set --dec_sharing_groups')
+    assert len(opts.enc_sharing_groups) == len(opts.in_config[0]['enc_layers'])
+    assert len(opts.dec_sharing_groups) == len(opts.in_config[0]['dec_layers'])
     for cname, corpus in opts.in_config[0]['data'].items():
         src, tgt = corpus['src_tgt'].split('-')
-        corpus['enc_sharing_group'] = [groups[src], 'full']
-        corpus['dec_sharing_group'] = [groups[tgt], 'full', groups[tgt]]
+        mapping_src = {
+            'LANGUAGE': src,
+            'GROUP': groups[src],
+            'FULL': 'full',
+        }
+        mapping_tgt = {
+            'LANGUAGE': tgt,
+            'GROUP': groups[tgt],
+            'FULL': 'full',
+        }
+        corpus['enc_sharing_group'] = [
+            mapping_src[sharing_group] for sharing_group in opts.enc_sharing_groups
+        ]
+        corpus['dec_sharing_group'] = [
+            mapping_tgt[sharing_group] for sharing_group in opts.dec_sharing_groups
+        ]
+
+
+def set_transforms(opts):
+    for cname, corpus in opts.in_config[0]['data'].items():
+        src, tgt = corpus['src_tgt'].split('-')
+        if src == tgt:
+            corpus['transforms'] = list(opts.ae_transforms)
+        else:
+            corpus['transforms'] = list(opts.transforms)
 
 
 def allocate_devices(opts):
@@ -431,6 +483,7 @@ def config_all(opts):
     corpora_schedule(opts)
     define_group(opts)
     allocate_devices(opts)
+    set_transforms(opts)
     adapter_config(opts)
     translation_configs(opts)
 
@@ -445,6 +498,7 @@ if __name__ == '__main__':
             complete_language_pairs,
             corpora_schedule,
             define_group,
+            set_transforms,
             allocate_devices,
             adapter_config,
             translation_configs,

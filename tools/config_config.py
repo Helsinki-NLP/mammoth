@@ -316,6 +316,10 @@ def allocate_devices(opts):
         key = lp_to_key[lp]
         opts.in_config[0]['data'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
 
+    opts.in_config[0]['n_nodes'] = n_nodes
+    opts.in_config[0]['world_size'] = n_gpus_tot
+    opts.in_config[0]['gpu_ranks'] = list(range(n_gpus_per_node))
+
 
 def adapter_config(opts):
     cc_opts = opts.in_config[0]['config_config']
@@ -450,6 +454,7 @@ def translation_configs(opts):
                     'zeroshot',
                     translation_config_dir,
                 )
+
 
 def _write_translation_config(
     src_lang,

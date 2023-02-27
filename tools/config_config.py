@@ -44,11 +44,11 @@ def save_yaml(opts):
 
 def add_complete_language_pairs_args(parser):
     parser.add_argument(
-        '--src_path', type=str, required=True,
+        '--src_path', type=str,
         help='path template to source data. Can use variables {src_lang} and {tgt_lang}'
     )
     parser.add_argument(
-        '--tgt_path', type=str, required=True,
+        '--tgt_path', type=str,
         help='path template to target data. Can use variables {src_lang} and {tgt_lang}'
     )
     parser.add_argument(
@@ -76,7 +76,7 @@ def add_corpora_schedule_args(parser):
 
 
 def add_define_group_args(parser):
-    parser.add_argument('--distance_matrix', required=True, type=load_distmat_csv)
+    parser.add_argument('--distance_matrix', type=load_distmat_csv)
     parser.add_argument('--cutoff_threshold', type=float)
     parser.add_argument('--n_groups', type=int)
     parser.add_argument(
@@ -90,9 +90,9 @@ def add_define_group_args(parser):
 
 
 def add_allocate_device_args(parser):
-    parser.add_argument('--n_nodes', type=int, required=True)
-    parser.add_argument('--n_gpus_per_node', type=int, required=True)
-    parser.add_argument('--n_slots_per_gpu', type=int, default=None)
+    parser.add_argument('--n_nodes', type=int)
+    parser.add_argument('--n_gpus_per_node', type=int)
+    parser.add_argument('--n_slots_per_gpu', type=int)
 
 
 def add_set_transforms_args(parser):
@@ -111,7 +111,7 @@ def add_adapter_config_args(parser):
 
 
 def add_translation_configs_args(parser):
-    parser.add_argument('--translation_config_dir', type=str, default='config/translation')
+    parser.add_argument('--translation_config_dir', type=str)
     parser.add_argument('--zero_shot', action='store_true')
 
 
@@ -139,6 +139,8 @@ def get_opts():
     parser_translation_configs = subparsers.add_parser('translation_configs')
     add_configs_args(parser_translation_configs)
     add_translation_configs_args(parser_translation_configs)
+    parser_remove_temporary_keys = subparsers.add_parser('remove_temporary_keys')
+    add_configs_args(parser_remove_temporary_keys)
     parser_config_all = subparsers.add_parser('config_all')
     add_configs_args(parser_config_all)
     add_corpora_schedule_args(parser_config_all)
@@ -152,22 +154,30 @@ def get_opts():
 
 
 def corpora_schedule(opts):
+    cc_opts = opts.in_config[0]['config_config']
+    temperature = opts.temperature if opts.temperature else cc_opts['temperature']
+    use_weight = opts.use_weight if opts.use_weight else cc_opts.get('use_weight', False)
+    use_introduce_at_training_step = (
+        opts.use_introduce_at_training_step if opts.use_introduce_at_training_step
+        else cc_opts.get('use_introduce_at_training_step', False)
+    )
+
     corpora_lens = {}
     for cname, corpus in opts.in_config[0]['data'].items():
         with open(corpus['path_src'], 'r') as istr:
             corpora_lens[cname] = sum(1 for _ in istr)
     max_lines = max(corpora_lens.values())
     corpora_weights = {
-        cname: (max_lines - clen) ** opts.temperature / max_lines
+        cname: (max_lines - clen) ** temperature / max_lines
         for cname, clen in corpora_lens.items()
     }
     for cname, corpus in opts.in_config[0]['data'].items():
         weight = 1 - corpora_weights[cname]
-        if opts.use_weight and opts.use_introduce_at_training_step:
+        if use_weight and use_introduce_at_training_step:
             weight = float(np.sqrt(weight))
-        if opts.use_weight:
+        if use_weight:
             corpus['weight'] = weight
-        if opts.use_introduce_at_training_step:
+        if use_introduce_at_training_step:
             # TODO: ensure this default always matches with opts.py
             total_steps = opts.in_config[0].get('train_steps', 100_000)
             if weight > 0.75:
@@ -181,7 +191,17 @@ def corpora_schedule(opts):
 
 
 def define_group(opts):
-    sim_langs = set(opts.distance_matrix['header'])
+    cc_opts = opts.in_config[0]['config_config']
+    n_groups = opts.n_groups if opts.n_groups else cc_opts['n_groups']
+    cutoff_threshold = opts.cutoff_threshold if opts.cutoff_threshold else cc_opts.get('cutoff_threshold', None)
+    enc_sharing_groups = opts.enc_sharing_groups if opts.enc_sharing_groups else cc_opts['enc_sharing_groups']
+    dec_sharing_groups = opts.dec_sharing_groups if opts.dec_sharing_groups else cc_opts['dec_sharing_groups']
+    if opts.distance_matrix:
+        distance_matrix = opts.distance_matrix
+    else:
+        distance_matrix = load_distmat_csv(cc_opts['distance_matrix'])
+
+    sim_langs = set(distance_matrix['header'])
     corpus_langs = set()
     for cname, corpus in opts.in_config[0]['data'].items():
         assert all([(lng in sim_langs) for lng in corpus['src_tgt'].split('-')]), \
@@ -193,25 +213,22 @@ def define_group(opts):
             f"languages in the distance matrix are unused ({', ' .join(sim_langs - corpus_langs)})"
         )
         # Omit unused languages before clustering. Otherwise they might consume entire clusters.
-        selector = [lang in corpus_langs for lang in opts.distance_matrix['header']]
-        dist = opts.distance_matrix['data']
+        selector = [lang in corpus_langs for lang in distance_matrix['header']]
+        dist = distance_matrix['data']
         dist = dist[selector][:, selector]
-        header = list(compress(opts.distance_matrix['header'], selector))
-        opts.distance_matrix = {
+        header = list(compress(distance_matrix['header'], selector))
+        distance_matrix = {
             'data': dist,
             'header': header,
         }
 
     group_idx = AgglomerativeClustering(
-        n_clusters=opts.n_groups,
+        n_clusters=n_groups,
         metric='precomputed',
         linkage='average',
-        distance_threshold=opts.cutoff_threshold,
-    ).fit_predict(opts.distance_matrix['data']).tolist()
-    groups = {lang: f'group{idx}' for lang, idx in zip(opts.distance_matrix['header'], group_idx)}
-    # FIXME: storing groups in opts for later use like this is a problem:
-    # The adapter_config step can not be run without also running the
-    # define_group step in the same execution (i.e. using "config_all").
+        distance_threshold=cutoff_threshold,
+    ).fit_predict(distance_matrix['data']).tolist()
+    groups = {lang: f'group{idx}' for lang, idx in zip(distance_matrix['header'], group_idx)}
     # A potential solution would be to save everything in the config structure:
     #   - Configuration for the config-config (what is now specified as CLI params)
     #   - Intermediary values computed in the steps (such as the lang -> group mapping)
@@ -221,14 +238,14 @@ def define_group(opts):
     # Why does this work? Any step can be omitted, by instead adding any
     # intermediary values it would produce into the input config. E.g. the lang
     # -> group mapping could be specified as a mapping in the input yaml instead of a csv.
-    opts.groups = groups
+    cc_opts['groups'] = groups
 
-    if not opts.enc_sharing_groups:
+    if not enc_sharing_groups:
         raise Exception('Must set --enc_sharing_groups')
-    if not opts.dec_sharing_groups:
+    if not dec_sharing_groups:
         raise Exception('Must set --dec_sharing_groups')
-    assert len(opts.enc_sharing_groups) == len(opts.in_config[0]['enc_layers'])
-    assert len(opts.dec_sharing_groups) == len(opts.in_config[0]['dec_layers'])
+    assert len(enc_sharing_groups) == len(opts.in_config[0]['enc_layers'])
+    assert len(dec_sharing_groups) == len(opts.in_config[0]['dec_layers'])
     for cname, corpus in opts.in_config[0]['data'].items():
         src, tgt = corpus['src_tgt'].split('-')
         mapping_src = {
@@ -242,23 +259,32 @@ def define_group(opts):
             'FULL': 'full',
         }
         corpus['enc_sharing_group'] = [
-            mapping_src[sharing_group] for sharing_group in opts.enc_sharing_groups
+            mapping_src[sharing_group] for sharing_group in enc_sharing_groups
         ]
         corpus['dec_sharing_group'] = [
-            mapping_tgt[sharing_group] for sharing_group in opts.dec_sharing_groups
+            mapping_tgt[sharing_group] for sharing_group in dec_sharing_groups
         ]
 
 
 def set_transforms(opts):
+    cc_opts = opts.in_config[0]['config_config']
+    ae_transforms = opts.ae_transforms if opts.ae_transforms else cc_opts.get('ae_transforms', [])
+    transforms = opts.transforms if opts.transforms else cc_opts.get('transforms', [])
+
     for cname, corpus in opts.in_config[0]['data'].items():
         src, tgt = corpus['src_tgt'].split('-')
         if src == tgt:
-            corpus['transforms'] = list(opts.ae_transforms)
+            corpus['transforms'] = list(ae_transforms)
         else:
-            corpus['transforms'] = list(opts.transforms)
+            corpus['transforms'] = list(transforms)
 
 
 def allocate_devices(opts):
+    cc_opts = opts.in_config[0]['config_config']
+    n_nodes = opts.n_nodes if opts.n_nodes else cc_opts['n_nodes']
+    n_gpus_per_node = opts.n_gpus_per_node if opts.n_gpus_per_node else cc_opts['n_gpus_per_node']
+    n_slots_per_gpu = opts.n_slots_per_gpu if opts.n_slots_per_gpu else cc_opts.get('n_slots_per_gpu', None)
+
     lang_pairs = []
     lps_ready_to_start = []
     lp_to_key = {}
@@ -271,18 +297,16 @@ def allocate_devices(opts):
             lps_ready_to_start.append((src_lang, tgt_lang))
         lp_to_key[(src_lang, tgt_lang)] = key
 
-    if opts.n_slots_per_gpu is not None:
-        n_slots_per_gpu = opts.n_slots_per_gpu
-    else:
-        n_gpus_tot = opts.n_nodes * opts.n_gpus_per_node
+    if n_slots_per_gpu is None:
+        n_gpus_tot = n_nodes * n_gpus_per_node
         n_slots_per_gpu = int(np.ceil(len(lang_pairs) / n_gpus_tot))
 
     assignment = optimize_gpu_assignment(
-        n_nodes=opts.n_nodes,
-        n_gpus_per_node=opts.n_gpus_per_node,
+        n_nodes=n_nodes,
+        n_gpus_per_node=n_gpus_per_node,
         n_slots_per_gpu=n_slots_per_gpu,
         lang_pairs=lang_pairs,
-        lang_to_group_mapping=opts.groups,
+        lang_to_group_mapping=cc_opts['groups'],
         lps_ready_to_start=lps_ready_to_start,
     )
 
@@ -294,18 +318,19 @@ def allocate_devices(opts):
 
 
 def adapter_config(opts):
+    cc_opts = opts.in_config[0]['config_config']
     if 'adapters' not in opts.in_config[0]:
         warnings.warn('No adapter configuration, skipping this step')
         return
     src_langs, tgt_langs = _get_langs(opts)
-    src_groups = list(sorted(set(opts.groups[src] for src in src_langs)))
-    tgt_groups = list(sorted(set(opts.groups[tgt] for tgt in tgt_langs)))
+    src_groups = list(sorted(set(cc_opts['groups'][src] for src in src_langs)))
+    tgt_groups = list(sorted(set(cc_opts['groups'][tgt] for tgt in tgt_langs)))
     encoder_adapters = opts.in_config[0]['adapters'].get('encoder', [])
     decoder_adapters = opts.in_config[0]['adapters'].get('decoder', [])
     for data_key, data_config in opts.in_config[0]['data'].items():
         if 'adapters' not in data_config:
             data_config['adapters'] = {'encoder': [], 'decoder': []}
-    for adapter_name, adapter_config in encoder_adapters.items():
+    for adapter_name, adapter_config in sorted(encoder_adapters.items()):
         if adapter_config['ids'] == 'LANGUAGE':
             adapter_config['ids'] = src_langs
             for data_key, data_config in opts.in_config[0]['data'].items():
@@ -315,12 +340,12 @@ def adapter_config(opts):
             adapter_config['ids'] = src_groups
             for data_key, data_config in opts.in_config[0]['data'].items():
                 data_src, data_tgt = data_config['src_tgt'].split('-')
-                data_config['adapters']['encoder'].append([adapter_name, opts.groups[data_src]])
+                data_config['adapters']['encoder'].append([adapter_name, cc_opts['groups'][data_src]])
         elif adapter_config['ids'] == 'FULL':
             adapter_config['ids'] = ['full']
             for data_key, data_config in opts.in_config[0]['data'].items():
                 data_config['adapters']['encoder'].append([adapter_name, 'full'])
-    for adapter_name, adapter_config in decoder_adapters.items():
+    for adapter_name, adapter_config in sorted(decoder_adapters.items()):
         if adapter_config['ids'] == 'LANGUAGE':
             adapter_config['ids'] = tgt_langs
             for data_key, data_config in opts.in_config[0]['data'].items():
@@ -330,7 +355,7 @@ def adapter_config(opts):
             adapter_config['ids'] = tgt_groups
             for data_key, data_config in opts.in_config[0]['data'].items():
                 data_src, data_tgt = data_config['src_tgt'].split('-')
-                data_config['adapters']['decoder'].append([adapter_name, opts.groups[data_tgt]])
+                data_config['adapters']['decoder'].append([adapter_name, cc_opts['groups'][data_tgt]])
         elif adapter_config['ids'] == 'FULL':
             adapter_config['ids'] = ['full']
             for data_key, data_config in opts.in_config[0]['data'].items():
@@ -349,7 +374,13 @@ def _adapters_to_stacks(task_adapters, opts, side):
 
 
 def translation_configs(opts):
-    translation_config_dir = opts.translation_config_dir
+    cc_opts = opts.in_config[0]['config_config']
+    translation_config_dir = (
+        opts.translation_config_dir if opts.translation_config_dir
+        else cc_opts.get('translation_config_dir', 'config/translation')
+    )
+    zero_shot = opts.zero_shot if opts.zero_shot else cc_opts.get('zero_shot', False)
+
     os.makedirs(translation_config_dir, exist_ok=True)
     encoder_stacks = defaultdict(dict)
     decoder_stacks = defaultdict(dict)
@@ -390,7 +421,7 @@ def translation_configs(opts):
             translation_config_dir,
         )
         supervised_pairs.add((src_lang, tgt_lang))
-    if opts.zero_shot:
+    if zero_shot:
         src_langs = encoder_stacks.keys()
         tgt_langs = decoder_stacks.keys()
         # verify that there is an unique stack for each language
@@ -419,7 +450,6 @@ def translation_configs(opts):
                     'zeroshot',
                     translation_config_dir,
                 )
-
 
 def _write_translation_config(
     src_lang,
@@ -451,13 +481,18 @@ def _get_langs(opts):
 
 
 def complete_language_pairs(opts):
+    cc_opts = opts.in_config[0]['config_config']
+    src_path_template = opts.src_path if opts.src_path else cc_opts['src_path']
+    tgt_path_template = opts.tgt_path if opts.tgt_path else cc_opts['tgt_path']
+    autoencoder = opts.autoencoder if opts.autoencoder else cc_opts.get('autoencoder', False)
+
     src_langs, tgt_langs = _get_langs(opts)
     for src_lang in src_langs:
         for tgt_lang in tgt_langs:
-            if src_lang == tgt_lang and not opts.autoencoder:
+            if src_lang == tgt_lang and not autoencoder:
                 continue
-            src_path = opts.src_path.format(src_lang=src_lang, tgt_lang=tgt_lang)
-            tgt_path = opts.tgt_path.format(src_lang=src_lang, tgt_lang=tgt_lang)
+            src_path = src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
+            tgt_path = tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
             if os.path.exists(src_path) and os.path.exists(tgt_path):
                 _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path)
             else:
@@ -478,6 +513,12 @@ def _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path):
     data_section[key]['path_tgt'] = tgt_path
 
 
+def remove_temporary_keys(opts):
+    # When reaching the end of the config-config, any excessive keys are
+    # dropped before saving the yaml (OpenNMT doesn't like extra keys).
+    del opts.in_config[0]['config_config']
+
+
 def config_all(opts):
     complete_language_pairs(opts)
     corpora_schedule(opts)
@@ -486,6 +527,7 @@ def config_all(opts):
     set_transforms(opts)
     adapter_config(opts)
     translation_configs(opts)
+    remove_temporary_keys(opts)
 
 
 if __name__ == '__main__':
@@ -502,6 +544,7 @@ if __name__ == '__main__':
             allocate_devices,
             adapter_config,
             translation_configs,
+            remove_temporary_keys,
             config_all,
         )
     }[opts.command]

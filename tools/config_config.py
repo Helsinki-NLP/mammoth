@@ -1,12 +1,12 @@
 import argparse
 import csv
+import numpy as np
 import os
 import warnings
 import yaml
-
-import numpy as np
-from sklearn.cluster import AgglomerativeClustering
+from collections import defaultdict
 from itertools import compress
+from sklearn.cluster import AgglomerativeClustering
 
 from gpu_assignment import optimize_gpu_assignment
 
@@ -91,6 +91,11 @@ def add_adapter_config_args(parser):
     pass
 
 
+def add_translation_configs_args(parser):
+    parser.add_argument('--translation_config_dir', type=str, default='config/translation')
+    parser.add_argument('--zero_shot', action='store_true')
+
+
 def get_opts():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
@@ -109,6 +114,9 @@ def get_opts():
     parser_complete_language_pairs = subparsers.add_parser('complete_language_pairs')
     add_configs_args(parser_complete_language_pairs)
     add_complete_language_pairs_args(parser_complete_language_pairs)
+    parser_translation_configs = subparsers.add_parser('translation_configs')
+    add_configs_args(parser_translation_configs)
+    add_translation_configs_args(parser_translation_configs)
     parser_config_all = subparsers.add_parser('config_all')
     add_configs_args(parser_config_all)
     add_corpora_schedule_args(parser_config_all)
@@ -116,6 +124,7 @@ def get_opts():
     add_allocate_device_args(parser_config_all)
     add_complete_language_pairs_args(parser_config_all)
     add_adapter_config_args(parser_config_all)
+    add_translation_configs_args(parser_config_all)
     return parser.parse_args()
 
 
@@ -278,6 +287,111 @@ def adapter_config(opts):
     opts.in_config[0]['adapters']['decoder'] = decoder_adapters
 
 
+def _adapters_to_stacks(task_adapters, opts, side):
+    adapter_specs = opts.in_config[0]['adapters']
+    adapters = [list() for _ in range(len(opts.in_config[0][f'{side}_layers']))]
+    for adapter_group, sub_id in task_adapters:
+        layer_stack_index = adapter_specs[f'{side}oder'][adapter_group]['layer_stack_index']
+        adapters[layer_stack_index].append([adapter_group, sub_id])
+    return adapters
+
+
+def translation_configs(opts):
+    translation_config_dir = opts.translation_config_dir
+    os.makedirs(translation_config_dir, exist_ok=True)
+    encoder_stacks = defaultdict(dict)
+    decoder_stacks = defaultdict(dict)
+    supervised_pairs = set()
+    for task_opts in opts.in_config[0]['data'].values():
+        src_lang, tgt_lang = task_opts['src_tgt'].split('-')
+        if src_lang == tgt_lang:
+            continue
+        # src / encoder
+        src_stack = [{'id': group} for group in task_opts['enc_sharing_group']]
+        if 'adapters' in task_opts:
+            adapters_by_stack = _adapters_to_stacks(task_opts['adapters']['encoder'], opts, 'enc')
+            print(f'src, src_stack {src_stack}')
+            print(f'src, adapters_by_stack {adapters_by_stack}')
+            assert len(src_stack) == len(adapters_by_stack)
+            for stack, adapters in zip(src_stack, adapters_by_stack):
+                stack['adapters'] = adapters
+        key = str(src_stack)    # An ugly way to freeze the mutable structure
+        encoder_stacks[src_lang][key] = src_stack
+        # tgt / decoder
+        tgt_stack = [{'id': group} for group in task_opts['dec_sharing_group']]
+        if 'adapters' in task_opts:
+            adapters_by_stack = _adapters_to_stacks(task_opts['adapters']['decoder'], opts, 'dec')
+            print(f'tgt, tgt_stack {tgt_stack}')
+            print(f'tgt, adapters_by_stack {adapters_by_stack}')
+            assert len(tgt_stack) == len(adapters_by_stack)
+            for stack, adapters in zip(tgt_stack, adapters_by_stack):
+                stack['adapters'] = adapters
+        key = str(tgt_stack)    # An ugly way to freeze the mutable structure
+        decoder_stacks[tgt_lang][key] = tgt_stack
+        # Write config for the supervised directions
+        _write_translation_config(
+            src_lang,
+            tgt_lang,
+            src_stack,
+            tgt_stack,
+            'supervised',
+            translation_config_dir,
+        )
+        supervised_pairs.add((src_lang, tgt_lang))
+    if opts.zero_shot:
+        src_langs = encoder_stacks.keys()
+        tgt_langs = decoder_stacks.keys()
+        # verify that there is an unique stack for each language
+        ambiguous_src = [src_lang for src_lang in encoder_stacks if len(encoder_stacks[src_lang]) > 1]
+        ambiguous_tgt = [tgt_lang for tgt_lang in decoder_stacks if len(decoder_stacks[tgt_lang]) > 1]
+        if len(ambiguous_src) > 0 or len(ambiguous_tgt) > 0:
+            raise Exception(
+                'Zero-shot translation configs can only be generated if each source (target) language '
+                'has an unambigous encoder (decoder) stack.\n'
+                'The following languages have more than one encoder/decoder stack:\n'
+                f'Source: {ambiguous_src}\nTarget: {ambiguous_tgt}'
+            )
+        for src_lang in src_langs:
+            for tgt_lang in tgt_langs:
+                if src_lang == tgt_lang:
+                    continue
+                if (src_lang, tgt_lang) in supervised_pairs:
+                    continue
+                src_stack = list(encoder_stacks[src_lang].values())[0]
+                tgt_stack = list(decoder_stacks[tgt_lang].values())[0]
+                _write_translation_config(
+                    src_lang,
+                    tgt_lang,
+                    src_stack,
+                    tgt_stack,
+                    'zeroshot',
+                    translation_config_dir,
+                )
+
+
+def _write_translation_config(
+    src_lang,
+    tgt_lang,
+    src_stack,
+    tgt_stack,
+    supervision,
+    translation_config_dir,
+):
+    # specify on command line: --model, --src
+    result = {
+        'src_lang': src_lang,
+        'tgt_lang': tgt_lang,
+        'stack': {
+            'encoder': src_stack,
+            'decoder': tgt_stack,
+        }
+    }
+    translation_config_path = f'{translation_config_dir}/trans.{supervision}.{src_lang}-{tgt_lang}.yaml'
+    with open(translation_config_path, 'w') as fout:
+        serialized = yaml.safe_dump(result, default_flow_style=False, allow_unicode=True)
+        print(serialized, file=fout)
+
+
 def _get_langs(opts):
     src_langs = list(sorted(opts.in_config[0]['src_vocab'].keys()))
     tgt_langs = list(sorted(opts.in_config[0]['tgt_vocab'].keys()))
@@ -318,6 +432,7 @@ def config_all(opts):
     define_group(opts)
     allocate_devices(opts)
     adapter_config(opts)
+    translation_configs(opts)
 
 
 if __name__ == '__main__':
@@ -332,6 +447,7 @@ if __name__ == '__main__':
             define_group,
             allocate_devices,
             adapter_config,
+            translation_configs,
             config_all,
         )
     }[opts.command]

@@ -541,6 +541,11 @@ def complete_language_pairs(opts):
                 print(f'Paths do NOT exist, omitting language pair: {src_path} {tgt_path}')
     if len(opts.in_config[0].get('data', [])) == 0:
         raise Exception('No language pairs were added. Check your path templates.')
+    # Allow using language variables for vocabulary definitions
+    for src_lang in src_langs:
+        opts.in_config[0]['src_vocab'][src_lang] = opts.in_config[0]['src_vocab'][src_lang].format(src_lang=src_lang)
+    for tgt_lang in tgt_langs:
+        opts.in_config[0]['tgt_vocab'][tgt_lang] = opts.in_config[0]['tgt_vocab'][tgt_lang].format(tgt_lang=tgt_lang)
 
 
 def _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path):

@@ -45,16 +45,16 @@ def save_yaml(opts):
 def add_complete_language_pairs_args(parser):
     parser.add_argument(
         '--src_path', type=str,
-        help='path template to source data. Can use variables {src_lang} and {tgt_lang}.'
+        help='path template to source data. Can use variables {src_lang}, {tgt_lang}, and {sorted_pair}.'
     )
     parser.add_argument(
         '--tgt_path', type=str,
-        help='path template to target data. Can use variables {src_lang} and {tgt_lang}.'
+        help='path template to target data. Can use variables {src_lang}, {tgt_lang}, and {sorted_pair}.'
     )
     parser.add_argument(
         '--ae_path', type=str,
         help='path template to monolingual data for autoencoder. '
-             'Can use the variables {src_lang} and {tgt_lang}. '
+             'Can use the variables {src_lang}, {tgt_lang}, and {sorted_pair}.'
              'If unset, autoencoder pairs will use src_path and tgt_path.'
     )
     parser.add_argument(
@@ -524,16 +524,17 @@ def complete_language_pairs(opts):
     src_langs, tgt_langs = _get_langs(opts)
     for src_lang in src_langs:
         for tgt_lang in tgt_langs:
+            sorted_pair = '-'.join(sorted((src_lang, tgt_lang)))
             if src_lang == tgt_lang:
                 # autoencoder task
                 if not autoencoder:
                     continue
-                src_path = ae_src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
-                tgt_path = ae_tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
+                src_path = ae_src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
+                tgt_path = ae_tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
             else:
                 # translation task
-                src_path = src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
-                tgt_path = tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
+                src_path = src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
+                tgt_path = tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
             if os.path.exists(src_path) and os.path.exists(tgt_path):
                 _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path)
             else:

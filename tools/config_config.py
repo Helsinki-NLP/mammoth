@@ -214,6 +214,7 @@ def cluster_languages(opts):
         if not distance_matrix_path:
             if 'groups' in cc_opts:
                 print('Using groups specified in yaml, without clustering.')
+                return
             else:
                 raise Exception(
                     'No distance matrix given. '

@@ -363,12 +363,12 @@ def adapter_config(opts):
             data_config['adapters'] = {'encoder': [], 'decoder': []}
     for adapter_name, adapter_config in sorted(encoder_adapters.items()):
         if adapter_config['ids'] == 'LANGUAGE':
-            adapter_config['ids'] = src_langs
+            adapter_config['ids'] = list(src_langs)
             for data_key, data_config in opts.in_config[0]['data'].items():
                 data_src, data_tgt = data_config['src_tgt'].split('-')
                 data_config['adapters']['encoder'].append([adapter_name, data_src])
         elif adapter_config['ids'] == 'GROUP':
-            adapter_config['ids'] = src_groups
+            adapter_config['ids'] = list(src_groups)
             for data_key, data_config in opts.in_config[0]['data'].items():
                 data_src, data_tgt = data_config['src_tgt'].split('-')
                 data_config['adapters']['encoder'].append([adapter_name, cc_opts['groups'][data_src]])
@@ -378,12 +378,12 @@ def adapter_config(opts):
                 data_config['adapters']['encoder'].append([adapter_name, 'full'])
     for adapter_name, adapter_config in sorted(decoder_adapters.items()):
         if adapter_config['ids'] == 'LANGUAGE':
-            adapter_config['ids'] = tgt_langs
+            adapter_config['ids'] = list(tgt_langs)
             for data_key, data_config in opts.in_config[0]['data'].items():
                 data_src, data_tgt = data_config['src_tgt'].split('-')
                 data_config['adapters']['decoder'].append([adapter_name, data_tgt])
         elif adapter_config['ids'] == 'GROUP':
-            adapter_config['ids'] = tgt_groups
+            adapter_config['ids'] = list(tgt_groups)
             for data_key, data_config in opts.in_config[0]['data'].items():
                 data_src, data_tgt = data_config['src_tgt'].split('-')
                 data_config['adapters']['decoder'].append([adapter_name, cc_opts['groups'][data_tgt]])

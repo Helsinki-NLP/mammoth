@@ -45,11 +45,17 @@ def save_yaml(opts):
 def add_complete_language_pairs_args(parser):
     parser.add_argument(
         '--src_path', type=str,
-        help='path template to source data. Can use variables {src_lang} and {tgt_lang}'
+        help='path template to source data. Can use variables {src_lang} and {tgt_lang}.'
     )
     parser.add_argument(
         '--tgt_path', type=str,
-        help='path template to target data. Can use variables {src_lang} and {tgt_lang}'
+        help='path template to target data. Can use variables {src_lang} and {tgt_lang}.'
+    )
+    parser.add_argument(
+        '--ae_path', type=str,
+        help='path template to monolingual data for autoencoder. '
+             'Can use the variables {src_lang} and {tgt_lang}. '
+             'If unset, autoencoder pairs will use src_path and tgt_path.'
     )
     parser.add_argument(
         '--autoencoder',
@@ -75,10 +81,13 @@ def add_corpora_schedule_args(parser):
     parser.add_argument('--temperature', type=float, default=1.0)
 
 
-def add_define_group_args(parser):
+def add_cluster_languages_args(parser):
     parser.add_argument('--distance_matrix', type=load_distmat_csv)
     parser.add_argument('--cutoff_threshold', type=float)
     parser.add_argument('--n_groups', type=int)
+
+
+def add_sharing_groups_args(parser):
     parser.add_argument(
         '--enc_sharing_groups', type=str, action='append',
         help='list of {LANGUAGE | GROUP | FULL}'
@@ -121,9 +130,12 @@ def get_opts():
     parser_corpora_schedule = subparsers.add_parser('corpora_schedule')
     add_configs_args(parser_corpora_schedule)
     add_corpora_schedule_args(parser_corpora_schedule)
-    parser_define_group = subparsers.add_parser('define_group')
-    add_configs_args(parser_define_group)
-    add_define_group_args(parser_define_group)
+    parser_cluster_languages = subparsers.add_parser('cluster_languages')
+    add_configs_args(parser_cluster_languages)
+    add_cluster_languages_args(parser_cluster_languages)
+    parser_sharing_groups = subparsers.add_parser('sharing_groups')
+    add_configs_args(parser_sharing_groups)
+    add_sharing_groups_args(parser_sharing_groups)
     parser_allocate_devices = subparsers.add_parser('allocate_devices')
     add_configs_args(parser_allocate_devices)
     add_allocate_device_args(parser_allocate_devices)
@@ -144,7 +156,8 @@ def get_opts():
     parser_config_all = subparsers.add_parser('config_all')
     add_configs_args(parser_config_all)
     add_corpora_schedule_args(parser_config_all)
-    add_define_group_args(parser_config_all)
+    add_cluster_languages_args(parser_config_all)
+    add_sharing_groups_args(parser_config_all)
     add_allocate_device_args(parser_config_all)
     add_set_transforms_args(parser_config_all)
     add_complete_language_pairs_args(parser_config_all)
@@ -190,16 +203,23 @@ def corpora_schedule(opts):
             corpus['introduce_at_training_step'] = introduce_at_training_step
 
 
-def define_group(opts):
+def cluster_languages(opts):
     cc_opts = opts.in_config[0]['config_config']
     n_groups = opts.n_groups if opts.n_groups else cc_opts['n_groups']
     cutoff_threshold = opts.cutoff_threshold if opts.cutoff_threshold else cc_opts.get('cutoff_threshold', None)
-    enc_sharing_groups = opts.enc_sharing_groups if opts.enc_sharing_groups else cc_opts['enc_sharing_groups']
-    dec_sharing_groups = opts.dec_sharing_groups if opts.dec_sharing_groups else cc_opts['dec_sharing_groups']
     if opts.distance_matrix:
         distance_matrix = opts.distance_matrix
     else:
-        distance_matrix = load_distmat_csv(cc_opts['distance_matrix'])
+        distance_matrix_path = cc_opts.get('distance_matrix', None)
+        if not distance_matrix_path:
+            if 'groups' in cc_opts:
+                print('Using groups specified in yaml, without clustering.')
+            else:
+                raise Exception(
+                    'No distance matrix given. '
+                    'Either specify --distance_matrix or directly give "groups" in the yaml.'
+                )
+        distance_matrix = load_distmat_csv(distance_matrix_path)
 
     sim_langs = set(distance_matrix['header'])
     corpus_langs = set()
@@ -240,6 +260,12 @@ def define_group(opts):
     # -> group mapping could be specified as a mapping in the input yaml instead of a csv.
     cc_opts['groups'] = groups
 
+
+def sharing_groups(opts):
+    cc_opts = opts.in_config[0]['config_config']
+    groups = cc_opts['groups']
+    enc_sharing_groups = opts.enc_sharing_groups if opts.enc_sharing_groups else cc_opts['enc_sharing_groups']
+    dec_sharing_groups = opts.dec_sharing_groups if opts.dec_sharing_groups else cc_opts['dec_sharing_groups']
     if not enc_sharing_groups:
         raise Exception('Must set --enc_sharing_groups')
     if not dec_sharing_groups:
@@ -397,8 +423,6 @@ def translation_configs(opts):
         src_stack = [{'id': group} for group in task_opts['enc_sharing_group']]
         if 'adapters' in task_opts:
             adapters_by_stack = _adapters_to_stacks(task_opts['adapters']['encoder'], opts, 'enc')
-            print(f'src, src_stack {src_stack}')
-            print(f'src, adapters_by_stack {adapters_by_stack}')
             assert len(src_stack) == len(adapters_by_stack)
             for stack, adapters in zip(src_stack, adapters_by_stack):
                 stack['adapters'] = adapters
@@ -408,8 +432,6 @@ def translation_configs(opts):
         tgt_stack = [{'id': group} for group in task_opts['dec_sharing_group']]
         if 'adapters' in task_opts:
             adapters_by_stack = _adapters_to_stacks(task_opts['adapters']['decoder'], opts, 'dec')
-            print(f'tgt, tgt_stack {tgt_stack}')
-            print(f'tgt, adapters_by_stack {adapters_by_stack}')
             assert len(tgt_stack) == len(adapters_by_stack)
             for stack, adapters in zip(tgt_stack, adapters_by_stack):
                 stack['adapters'] = adapters
@@ -490,14 +512,28 @@ def complete_language_pairs(opts):
     src_path_template = opts.src_path if opts.src_path else cc_opts['src_path']
     tgt_path_template = opts.tgt_path if opts.tgt_path else cc_opts['tgt_path']
     autoencoder = opts.autoencoder if opts.autoencoder else cc_opts.get('autoencoder', False)
+    if autoencoder:
+        ae_path_template = opts.ae_path if opts.ae_path else cc_opts.get('ae_path', None)
+    if ae_path_template:
+        ae_src_path_template = ae_path_template
+        ae_tgt_path_template = ae_path_template
+    else:
+        ae_src_path_template = src_path_template
+        ae_tgt_path_template = tgt_path_template
 
     src_langs, tgt_langs = _get_langs(opts)
     for src_lang in src_langs:
         for tgt_lang in tgt_langs:
-            if src_lang == tgt_lang and not autoencoder:
-                continue
-            src_path = src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
-            tgt_path = tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
+            if src_lang == tgt_lang:
+                # autoencoder task
+                if not autoencoder:
+                    continue
+                src_path = ae_src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
+                tgt_path = ae_tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
+            else:
+                # translation task
+                src_path = src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
+                tgt_path = tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang)
             if os.path.exists(src_path) and os.path.exists(tgt_path):
                 _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path)
             else:
@@ -527,7 +563,8 @@ def remove_temporary_keys(opts):
 def config_all(opts):
     complete_language_pairs(opts)
     corpora_schedule(opts)
-    define_group(opts)
+    cluster_languages(opts)
+    sharing_groups(opts)
     allocate_devices(opts)
     set_transforms(opts)
     adapter_config(opts)
@@ -544,7 +581,8 @@ if __name__ == '__main__':
         for func in (
             complete_language_pairs,
             corpora_schedule,
-            define_group,
+            cluster_languages,
+            sharing_groups,
             set_transforms,
             allocate_devices,
             adapter_config,

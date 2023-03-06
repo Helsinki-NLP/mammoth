@@ -409,10 +409,6 @@ class Trainer(object):
                 if hasattr(self.optim._optimizer, 'report_steps'):
                     for line in self.optim._optimizer.report_steps():
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} {line}')
-                total = sum(self.task_queue_manager.sampled_task_counts.values())
-                logger.info(f'Task sampling distribution: (total {total})')
-                for task, count in self.task_queue_manager.sampled_task_counts.most_common():
-                    logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)

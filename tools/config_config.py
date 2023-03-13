@@ -75,6 +75,10 @@ def add_corpora_schedule_args(parser):
         help='Use corpus weights based on temperature-adjusted corpus size'
     )
     parser.add_argument(
+        '--ae_weight', type=float, default=1.0,
+        help='Multiplier for the weight (but not starting step) of autoencoder tasks'
+    )
+    parser.add_argument(
         '--use_introduce_at_training_step', action='store_true',
         help='Use a curriculum introducing corpora based on temperature-adjusted corpus size'
     )
@@ -170,6 +174,7 @@ def corpora_schedule(opts):
     cc_opts = opts.in_config[0]['config_config']
     temperature = opts.temperature if opts.temperature else cc_opts['temperature']
     use_weight = opts.use_weight if opts.use_weight else cc_opts.get('use_weight', False)
+    ae_weight = opts.ae_weight if opts.ae_weight else cc_opts.get('ae_weight', 1.0)
     use_introduce_at_training_step = (
         opts.use_introduce_at_training_step if opts.use_introduce_at_training_step
         else cc_opts.get('use_introduce_at_training_step', False)
@@ -185,11 +190,13 @@ def corpora_schedule(opts):
         for cname, clen in corpora_lens.items()
     }
     for cname, corpus in opts.in_config[0]['data'].items():
+        src_lang, tgt_lang = corpus['src_tgt'].split('-')
         weight = 1 - corpora_weights[cname]
         if use_weight and use_introduce_at_training_step:
             weight = float(np.sqrt(weight))
         if use_weight:
-            corpus['weight'] = weight
+            multiplier = ae_weight if src_lang == tgt_lang else 1.0
+            corpus['weight'] = weight * multiplier
         if use_introduce_at_training_step:
             # TODO: ensure this default always matches with opts.py
             total_steps = opts.in_config[0].get('train_steps', 100_000)

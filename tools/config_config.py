@@ -419,9 +419,13 @@ def translation_configs(opts):
     )
     zero_shot = opts.zero_shot if opts.zero_shot else cc_opts.get('zero_shot', False)
 
+    src_subword_model = opts.in_config[0].get('src_subword_model', None)
+    tgt_subword_model = opts.in_config[0].get('tgt_subword_model', None)
+
     os.makedirs(translation_config_dir, exist_ok=True)
     encoder_stacks = defaultdict(dict)
     decoder_stacks = defaultdict(dict)
+    transforms_by_lang = defaultdict(dict)
     supervised_pairs = set()
     for task_opts in opts.in_config[0]['data'].values():
         src_lang, tgt_lang = task_opts['src_tgt'].split('-')
@@ -445,12 +449,18 @@ def translation_configs(opts):
                 stack['adapters'] = adapters
         key = str(tgt_stack)    # An ugly way to freeze the mutable structure
         decoder_stacks[tgt_lang][key] = tgt_stack
+        # Transforms and subword models
+        transforms = None if 'transforms' not in task_opts else list(task_opts['transforms'])
+        transforms_by_lang[src_lang] = transforms
         # Write config for the supervised directions
         _write_translation_config(
             src_lang,
             tgt_lang,
             src_stack,
             tgt_stack,
+            transforms,
+            src_subword_model,
+            tgt_subword_model,
             'supervised',
             translation_config_dir,
         )
@@ -476,11 +486,15 @@ def translation_configs(opts):
                     continue
                 src_stack = list(encoder_stacks[src_lang].values())[0]
                 tgt_stack = list(decoder_stacks[tgt_lang].values())[0]
+                transforms = transforms_by_lang[src_lang]
                 _write_translation_config(
                     src_lang,
                     tgt_lang,
                     src_stack,
                     tgt_stack,
+                    transforms,
+                    src_subword_model,
+                    tgt_subword_model,
                     'zeroshot',
                     translation_config_dir,
                 )
@@ -491,6 +505,9 @@ def _write_translation_config(
     tgt_lang,
     src_stack,
     tgt_stack,
+    transforms,
+    src_subword_model,
+    tgt_subword_model,
     supervision,
     translation_config_dir,
 ):
@@ -503,6 +520,12 @@ def _write_translation_config(
             'decoder': tgt_stack,
         }
     }
+    if transforms:
+        result['transforms'] = transforms
+    if src_subword_model:
+        result['src_subword_model'] = src_subword_model
+    if tgt_subword_model:
+        result['tgt_subword_model'] = tgt_subword_model
     translation_config_path = f'{translation_config_dir}/trans.{supervision}.{src_lang}-{tgt_lang}.yaml'
     with open(translation_config_path, 'w') as fout:
         serialized = yaml.safe_dump(result, default_flow_style=False, allow_unicode=True)

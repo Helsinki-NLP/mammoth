@@ -222,10 +222,12 @@ class SentencePieceTransform(TokenizerTransform):
     def apply(self, example, is_train=False, stats=None, **kwargs):
         """Apply sentencepiece subword encode to src & tgt."""
         src_out = self._tokenize(example['src'], 'src', is_train)
-        tgt_out = self._tokenize(example['tgt'], 'tgt', is_train)
+        tgt_out = self._tokenize(example['tgt'], 'tgt', is_train) if example['tgt'] is not None else None
         if stats is not None:
-            n_words = len(example['src']) + len(example['tgt'])
-            n_subwords = len(src_out) + len(tgt_out)
+            tgt_len_in = 0 if example['tgt'] is None else len(example['tgt'])
+            tgt_len_out = 0 if tgt_out is None else len(tgt_out)
+            n_words = len(example['src']) + tgt_len_in
+            n_subwords = len(src_out) + tgt_len_out
             stats.update(SubwordStats(n_subwords, n_words))
         example['src'], example['tgt'] = src_out, tgt_out
         return example

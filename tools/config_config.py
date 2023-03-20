@@ -449,8 +449,14 @@ def translation_configs(opts):
                 stack['adapters'] = adapters
         key = str(tgt_stack)    # An ugly way to freeze the mutable structure
         decoder_stacks[tgt_lang][key] = tgt_stack
-        # Transforms and subword models
-        transforms = None if 'transforms' not in task_opts else list(task_opts['transforms'])
+        # Transforms and subword models also need to be respecified during translation
+        if 'transforms' not in task_opts:
+            transforms = None
+        else:
+            transforms = [
+                transform for transform in task_opts['transforms']
+                if not transform == 'filtertoolong'
+            ]
         transforms_by_lang[src_lang] = transforms
         # Write config for the supervised directions
         _write_translation_config(

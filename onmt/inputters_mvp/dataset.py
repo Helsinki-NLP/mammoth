@@ -63,23 +63,20 @@ class ParallelCorpus(IterableDataset):
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
-        """Split string, surround with specials"""
-        vocab = self.vocabs[side]
-        tokens = [
-            DefaultTokens.BOS,
-            *(
-                word if word in vocab.stoi else DefaultTokens.UNK
-                for word in string.split()
-            ),
-            DefaultTokens.EOS,
-        ]
-        return tokens
+        """Split string, accompanied by a drumroll"""
+        return string.split()
 
     def _numericalize(self, tokens, side='src'):
-        """Convert list of strings into list of indices"""
+        """Convert list of strings into list of indices, surround by specials"""
         vocab = self.vocabs[side]
+        bos = vocab[DefaultTokens.BOS]
+        eos = vocab[DefaultTokens.EOS]
         unk = vocab[DefaultTokens.UNK]
-        indices = torch.tensor([vocab.stoi.get(token, unk) for token in tokens], device=self.device)
+        indices = torch.tensor([
+            bos,
+            *(vocab.stoi.get(token, unk) for token in tokens),
+            eos,
+        ], device=self.device)
         return indices
 
     def to(self, device):

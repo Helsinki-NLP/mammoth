@@ -29,7 +29,10 @@ def translate(opt):
             for group_id, sub_id in stack['adapters']:
                 decoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
 
-    # only src_lang and tgt_lang are used at the moment
+    logger.info(
+        'It is ok that src_vocab and tgt_vocab are None here. '
+        'The vocabs are separately loaded in model_builder.'
+    )
     task = TaskSpecs(
         node_rank=None,
         local_rank=None,

@@ -1,3 +1,5 @@
+# For documentation, see: OpenNMT-py-v2/docs/config_config.md
+# For an example config, see : OpenNMT-py-v2/examples/config_config.yaml
 import argparse
 import csv
 import numpy as np

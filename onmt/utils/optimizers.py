@@ -190,8 +190,6 @@ def rsqrt_decay(step, warmup_steps):
 
 class MultipleOptimizer(object):
     """Implement multiple optimizers needed for sparse adam"""
-    # Indicate to the amp GradScaler that we use customized scale-handling logic
-    _step_supports_amp_scaling = True
 
     def __init__(self, op, multiOptims_Langs=None):
         self.optimizers = op
@@ -216,11 +214,7 @@ class MultipleOptimizer(object):
         for name in self.optimizers:
             if self._any_param_has_grad(self.optimizers[name], name):
                 self._steps[name] += 1
-                if grad_scaler is not None:
-                    grad_scaler.unscale_(self.optimizers[name])
-                    grad_scaler.step(self.optimizers[name])
-                else:
-                    self.optimizers[name].step()
+                self.optimizers[name].step()
 
     @staticmethod
     def _any_param_has_grad(optimizer, name):

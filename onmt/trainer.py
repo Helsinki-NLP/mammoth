@@ -98,7 +98,6 @@ def build_trainer(
         dropout_steps=dropout_steps,
         task_queue_manager=task_queue_manager,
         report_stats_from_parameters=opt.report_stats_from_parameters,
-        lca_loginterval=opt.lca_loginterval,
     )
     return trainer
 
@@ -153,7 +152,6 @@ class Trainer(object):
         dropout_steps=[0],
         task_queue_manager=None,
         report_stats_from_parameters=False,
-        lca_loginterval=-1,
     ):
         # Basic attributes.
         self.model = model
@@ -188,8 +186,6 @@ class Trainer(object):
         self.my_tgt_emb_groups = my_component_groups['tgt_emb']
         self.my_encoder_adapter_groups = my_component_groups['encoder_adapters']
         self.my_decoder_adapter_groups = my_component_groups['decoder_adapters']
-
-        self.lca_loginterval = lca_loginterval
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -285,17 +281,6 @@ class Trainer(object):
         total_stats = onmt.utils.Statistics()
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
-        # LCA
-        if self.lca_loginterval > 0:
-            lca_logs = {
-                k: dict() for k, v in self.model.named_parameters() if v.requires_grad and 'attention_bridge' in k
-            }
-            lca_params = {
-                k: torch.zeros_like(v.data)
-                for k, v in self.model.named_parameters()
-                if v.requires_grad and 'attention_bridge' in k
-            }
-        # /LCA
         self.optim.zero_grad()
         trainEnum = enumerate(self._accum_batches(train_iter))
 
@@ -303,18 +288,6 @@ class Trainer(object):
 
             step = self.optim.training_step
             self._maybe_update_dropout(step)
-
-            # LCA:
-            #   1. get θ_t
-            #   2. train step; grad = ∇_t, params: θ_{t+1}
-            #   3. log changelca_params = (θ_{t+1} - θ_t) * ∇_t
-            if self.lca_loginterval > 0:
-                theta_t = {
-                    k: v.data.clone()
-                    for k, v in self.model.named_parameters()
-                    if v.requires_grad and k.find('attention_bridge') >= 0
-                }
-            # /LCA
 
             i, (batches_with_meta, normalization) = next(trainEnum)
 
@@ -375,22 +348,6 @@ class Trainer(object):
                 )
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
-
-            # LCA
-            if (self.lca_loginterval > 0) and (step % self.lca_loginterval == 0) and (device_context.is_master()):
-                for k, v in self.model.named_parameters():
-                    if not v.requires_grad or isinstance(v.grad, type(None)) or k.find('attention_bridge') < 0:
-                        continue
-                    lca_params[k] = (v.data - theta_t[k]) * v.grad
-
-                # dump logs at each checkpoint and 10 times during training
-                dump_logs = (step % (train_steps // 10) == 0) or (
-                    save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0
-                )
-                dumppath = f'{self.model_saver.base_path}_lca_logs.json'
-                onmt.utils.logging.log_lca_values(step, lca_logs, lca_params, dumppath, dump_logs)
-
-            # /LCA
 
             self.optim.step()
             self.optim.zero_grad()

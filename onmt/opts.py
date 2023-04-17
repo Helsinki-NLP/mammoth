@@ -65,13 +65,6 @@ def _add_logging_opts(parser, is_train=True):
             action="store_true",
             help="Report parameter-level statistics in tensorboard",
         )
-        group.add(
-            '--lca_loginterval',
-            '-lca_loginterval',
-            type=int,
-            default=-1,
-            help="Compute and print the att-bridge LCA at this interval.",
-        )
 
     else:
         # Options only during inference

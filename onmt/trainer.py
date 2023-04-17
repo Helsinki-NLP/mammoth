@@ -9,13 +9,15 @@
           users of this library) for the strategy things we do.
 """
 
-import torch
-import traceback
 
 import onmt.utils
-from onmt.utils.logging import logger
-import torch.nn as nn
+import torch
 import torch.distributed
+import torch.nn as nn
+import traceback
+
+from itertools import islice
+from onmt.utils.logging import logger
 
 
 def build_trainer(
@@ -210,36 +212,6 @@ class Trainer(object):
                 self.model.update_dropout(self.dropout[i])
                 logger.info("Updated dropout to %f from step %d" % (self.dropout[i], step))
 
-    def _accum_batches(self, iterator):
-        batches = []
-        normalization = 0
-        current_comm_batch_id = None
-        # accum_count now refers to number of tasks in one communication batch
-        # i.e. minibatches to process before synching gradients
-        self.accum_count = self._accum_count(self.optim.training_step)
-        self.task_queue_manager.tasks_per_communication_batch = self.accum_count
-        for batch, metadata, communication_batch_id in iterator:
-            if current_comm_batch_id is None:
-                current_comm_batch_id = communication_batch_id
-            # when communication_batch_id changes, we might be ready to synch
-            if current_comm_batch_id != communication_batch_id:
-                current_comm_batch_id = communication_batch_id
-                yield batches, normalization
-                self.accum_count = self._accum_count(self.optim.training_step)
-                self.task_queue_manager.tasks_per_communication_batch = self.accum_count
-                batches = []
-                normalization = 0
-            batches.append((batch, metadata))
-            if self.norm_method == "tokens":
-                num_tokens = (
-                    batch.tgt[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
-                )
-                normalization += num_tokens.item()
-            else:
-                normalization += batch.batch_size
-        if batches:
-            yield batches, normalization
-
     def _update_average(self, step):
         if self.moving_average is None:
             copy_params = [params.detach().float() for params in self.model.parameters()]
@@ -282,18 +254,20 @@ class Trainer(object):
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
         self.optim.zero_grad()
-        trainEnum = enumerate(self._accum_batches(train_iter))
 
+        i = -1
         while True:
+            i += 1
 
             step = self.optim.training_step
             self._maybe_update_dropout(step)
 
-            i, (batches_with_meta, normalization) = next(trainEnum)
+            self.accum_count = self._accum_count(self.optim.training_step)
+            self.task_queue_manager.tasks_per_communication_batch = self.accum_count
+            batches_with_meta = islice(train_iter, self.accum_count)
 
-            self._gradient_accumulation_overLangPair(
+            self._gradient_accumulation_over_lang_pairs(
                 batches_with_meta,
-                normalization,
                 total_stats,
                 report_stats,
             )
@@ -454,14 +428,24 @@ class Trainer(object):
 
         return stats
 
-    def _gradient_accumulation_overLangPair(
+    def _gradient_accumulation_over_lang_pairs(
         self,
         batches_with_meta,
-        normalization,
         total_stats,
         report_stats,
     ):
-        for k, (batch, metadata) in enumerate(batches_with_meta):
+        normalization = 0
+        seen_comm_batches = set()
+        for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
+            seen_comm_batches.add(comm_batch)
+            if self.norm_method == "tokens":
+                num_tokens = (
+                    batch.tgt[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
+                )
+                normalization += num_tokens.item()
+            else:
+                normalization += batch.batch_size
+
             # logger.info(f'batch with metadata {metadata}')
 
             target_size = batch.tgt.size(0)
@@ -512,6 +496,8 @@ class Trainer(object):
                 except Exception:
                     traceback.print_exc()
                     logger.info("At step %d, we removed a batch - accum %d", self.training_step_all, k)
+        if len(seen_comm_batches) != 1:
+            logger.warning('Communication batches out of synch with batch accumulation')
 
     def _start_report_manager(self, start_time=None):
         """

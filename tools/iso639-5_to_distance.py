@@ -18,6 +18,7 @@ def get_langs(config):
 
 
 def read_iso_lang_families() -> Dict[str, Set[str]]:
+    """ Returns: family -> set of lang codes """
     families = dict()
     with open(ISO_DATA_PATH, 'r') as fin:
         for line in fin:
@@ -42,15 +43,44 @@ def read_glottolog():
     return parents, iso_to_glottolog
 
 
-def read_glottolog_lang_families(langs, macrolanguages) -> Dict[str, Set[str]]:
-    parents, iso_to_glottolog = read_glottolog()
-    all_seen_langs = set(iso_to_glottolog.values())
-    found_mappings = find_macrolanguages(langs, all_seen_langs, macrolanguages)
-    for lang in langs:
-        glottolog_id = iso_to_glottolog.get(lang, None)
-        if glottolog_id is None:
-            # for each lang -> macrolang: macrolang == lang, do the entire traversal?
+def transitive_closure(initial, graph):
+    found = set([initial])
+    if initial in graph:
+        parent = graph[initial]
+        if parent and not pd.isna(parent):
+            found.update(transitive_closure(parent, graph))
+    return found
 
+
+def read_glottolog_lang_families(langs, macrolanguages) -> Dict[str, Set[str]]:
+    """Read language familes from Glottolog data.
+    langs: language codes in the corpus.
+    macrolanguages: macrolanguage to set of language code mapping from iso-639-3
+    Returns: glottolog-family -> set of lang codes
+    """
+    parents, iso_to_glottolog = read_glottolog()
+    all_seen_langs = set(iso_to_glottolog.keys())
+    found_mappings = find_macrolanguages(langs, all_seen_langs, macrolanguages)
+    inverted_mappings = defaultdict(set)
+    for k, v in found_mappings.items():
+        inverted_mappings[v].add(k)
+
+    result = defaultdict(set)
+    for lang in langs:
+        glottolog_ids = set()
+        glottolog_id = iso_to_glottolog.get(lang, None)
+        if glottolog_id is not None:
+            glottolog_ids.add(glottolog_id)
+        else:
+            for sublang in inverted_mappings[lang]:
+                glottolog_id = iso_to_glottolog.get(sublang, None)
+                if glottolog_id:
+                    glottolog_ids.add(glottolog_id)
+        for glottolog_id in glottolog_ids:
+            closure = transitive_closure(glottolog_id, parents)
+            for family in closure:
+                result[family].add(lang)
+    return result
 
 
 def read_macrolanguages():
@@ -99,12 +129,20 @@ def determine_distances(langs, families):
                 if lang_a not in langs or lang_b not in langs:
                     continue
                 counter[(lang_a, lang_b)] += 1
-    max_count = max(counter.values())
+    maxes = Counter()
+    for (lang_a, lang_b), val in counter.items():
+        maxes[lang_a] = max(maxes[lang_a], val)
+        maxes[lang_b] = max(maxes[lang_b], val)
+
+    def dist(lang_a, lang_b, counter, maxes):
+        max_count = max(maxes[lang_a], maxes[lang_b])
+        return (max_count - counter[(lang_a, lang_b)]) / max_count
+
     df_long = pd.DataFrame.from_records([
         {
             'lang_a': lang_a,
             'lang_b': lang_b,
-            'dist': (max_count - counter[(lang_a, lang_b)]) / max_count,
+            'dist': dist(lang_a, lang_b, counter, maxes),
         }
         for lang_a, lang_b in counter.keys()
     ])
@@ -115,12 +153,18 @@ def determine_distances(langs, families):
 @click.command()
 @click.option('--infile', type=Path, required=True)
 @click.option('--outfile', type=Path, required=True)
-def main(infile: Path, outfile: Path):
+@click.option('--taxonomy', type=str, default='glottolog')
+def main(infile: Path, outfile: Path, taxonomy: str):
     with infile.open('r') as fin:
         config = yaml.safe_load(fin)
     langs = get_langs(config)
-    families = read_iso_lang_families()
     macrolanguages = read_macrolanguages()
+    if taxonomy == 'iso':
+        families = read_iso_lang_families()
+    elif taxonomy == 'glottolog':
+        families = read_glottolog_lang_families(langs, macrolanguages)
+    else:
+        raise Exception(f'Unknown taxonomy "{taxonomy}"')
     add_macrolanguages(langs, families, macrolanguages)
     df = determine_distances(langs, families)
     with outfile.open('w') as fout:

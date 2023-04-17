@@ -5,7 +5,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, Set
 
-DATA_PATH = 'config/iso639-5_to_iso639-3.tsv'
+ISO_DATA_PATH = 'config/iso639-5_to_iso639-3.tsv'
+GLOTTOLOG_DATA_PATH = 'config/languoid.csv'
 MACROLANG_PATH = 'config/iso-639-3-macrolanguages_20200130.tab'
 
 
@@ -16,9 +17,9 @@ def get_langs(config):
     return langs
 
 
-def read_lang_families() -> Dict[str, Set[str]]:
+def read_iso_lang_families() -> Dict[str, Set[str]]:
     families = dict()
-    with open(DATA_PATH, 'r') as fin:
+    with open(ISO_DATA_PATH, 'r') as fin:
         for line in fin:
             line = line.strip()
             parts = line.split('\t')
@@ -29,6 +30,27 @@ def read_lang_families() -> Dict[str, Set[str]]:
             langs = set(parts[2].split())
             families[group] = langs
     return families
+
+
+def read_glottolog():
+    parents = dict()
+    iso_to_glottolog = dict()
+    df = pd.read_csv(GLOTTOLOG_DATA_PATH)
+    for tpl in df.itertuples():
+        parents[tpl.id] = tpl.parent_id
+        iso_to_glottolog[tpl.iso639P3code] = tpl.id
+    return parents, iso_to_glottolog
+
+
+def read_glottolog_lang_families(langs, macrolanguages) -> Dict[str, Set[str]]:
+    parents, iso_to_glottolog = read_glottolog()
+    all_seen_langs = set(iso_to_glottolog.values())
+    found_mappings = find_macrolanguages(langs, all_seen_langs, macrolanguages)
+    for lang in langs:
+        glottolog_id = iso_to_glottolog.get(lang, None)
+        if glottolog_id is None:
+            # for each lang -> macrolang: macrolang == lang, do the entire traversal?
+
 
 
 def read_macrolanguages():
@@ -46,10 +68,7 @@ def read_macrolanguages():
     return macrolanguages
 
 
-def add_macrolanguages(langs, families, macrolanguages):
-    all_seen_langs = set()
-    for langs_in_family in families.values():
-        all_seen_langs.update(langs_in_family)
+def find_macrolanguages(langs, all_seen_langs, macrolanguages):
     found_mappings = dict()
     for maybe_macrolang in langs:
         if maybe_macrolang not in all_seen_langs:
@@ -57,6 +76,14 @@ def add_macrolanguages(langs, families, macrolanguages):
             for lang in macrolanguages[maybe_macrolang]:
                 print(f'macrolanguage {maybe_macrolang} maps to {lang}')
                 found_mappings[lang] = maybe_macrolang
+    return found_mappings
+
+
+def add_macrolanguages(langs, families, macrolanguages):
+    all_seen_langs = set()
+    for langs_in_family in families.values():
+        all_seen_langs.update(langs_in_family)
+    found_mappings = find_macrolanguages(langs, all_seen_langs, macrolanguages)
     for family, langs_in_family in families.items():
         for lang in set(langs_in_family):
             if lang in found_mappings:
@@ -92,7 +119,7 @@ def main(infile: Path, outfile: Path):
     with infile.open('r') as fin:
         config = yaml.safe_load(fin)
     langs = get_langs(config)
-    families = read_lang_families()
+    families = read_iso_lang_families()
     macrolanguages = read_macrolanguages()
     add_macrolanguages(langs, families, macrolanguages)
     df = determine_distances(langs, families)

@@ -7,6 +7,7 @@ import os
 import warnings
 import yaml
 from collections import defaultdict
+from copy import deepcopy
 from itertools import compress
 from sklearn.cluster import AgglomerativeClustering
 
@@ -172,6 +173,25 @@ def get_opts():
     return parser.parse_args()
 
 
+def _split_large_language_pairs(opts, corpora_lens, split_treshold):
+    corpora_out = deepcopy(opts.in_config[0]['data'])
+    corpora_lens_out = dict()
+    for cname, length in corpora_lens.items():
+        if length > split_treshold:
+            n_copies = int(np.ceil(length / split_treshold))
+            copy_length = length // n_copies
+            for i in range(n_copies):
+                cname_copy = f'{cname}_split{i}'
+                dict_copy = deepcopy(corpora_out[cname])
+                corpora_out[cname_copy] = dict_copy
+                corpora_lens_out[cname_copy] = copy_length
+            del corpora_out[cname]
+        else:
+            corpora_lens_out[cname] = length
+    opts.in_config[0]['data'] = corpora_out
+    return corpora_lens_out
+
+
 def corpora_schedule(opts):
     cc_opts = opts.in_config[0]['config_config']
     temperature = opts.temperature if opts.temperature else cc_opts['temperature']
@@ -186,6 +206,9 @@ def corpora_schedule(opts):
     for cname, corpus in opts.in_config[0]['data'].items():
         with open(corpus['path_src'], 'r') as istr:
             corpora_lens[cname] = sum(1 for _ in istr)
+    split_treshold = cc_opts.get('split_large_language_pairs', 0)
+    if split_treshold:
+        corpora_lens = _split_large_language_pairs(opts, corpora_lens, split_treshold)
     max_lines = max(corpora_lens.values())
     corpora_weights = {
         cname: (max_lines - clen) ** temperature / max_lines
@@ -323,7 +346,7 @@ def allocate_devices(opts):
 
     lang_pairs = []
     lps_ready_to_start = []
-    lp_to_key = {}
+    lp_to_key = defaultdict(list)
     for key, data_config in opts.in_config[0]['data'].items():
         src_lang, tgt_lang = data_config['src_tgt'].split('-')
         ready_to_start = data_config.get('introduce_at_training_step', 0) == 0
@@ -331,7 +354,7 @@ def allocate_devices(opts):
         lang_pairs.append((src_lang, tgt_lang))
         if ready_to_start:
             lps_ready_to_start.append((src_lang, tgt_lang))
-        lp_to_key[(src_lang, tgt_lang)] = key
+        lp_to_key[(src_lang, tgt_lang)].append(key)
 
     if n_slots_per_gpu is None:
         n_gpus_tot = n_nodes * n_gpus_per_node
@@ -349,7 +372,7 @@ def allocate_devices(opts):
     for gpu_slot, lp in assignment.items():
         if lp is None:
             continue
-        key = lp_to_key[lp]
+        key = lp_to_key[lp].pop()
         opts.in_config[0]['data'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
 
     opts.in_config[0]['n_nodes'] = n_nodes

@@ -8,6 +8,7 @@ INTRA_NODE_COST = 1
 HOMOGENEITY_WEIGHT = 0.1
 READY_TO_START_WEIGHT = 0.5
 UNASSIGNED_WEIGHT = 100
+SPLIT_LPS_WEIGHT = 50
 NOT_READY_TO_START = 500
 VERY_BAD = 99999999
 
@@ -67,11 +68,13 @@ class AssignmentOptimizer:
         cost_homogeneity = self._homogeneity_cost(assignment)
         cost_ready_to_start = self._ready_to_start_cost(assignment)
         cost_unassigned = self._unassigned_cost(assignment)
+        cost_split_lps = self._split_lps_cost(assignment)
         return (
             cost_communication
             + (HOMOGENEITY_WEIGHT * cost_homogeneity)
             + (READY_TO_START_WEIGHT * cost_ready_to_start)
             + (UNASSIGNED_WEIGHT * cost_unassigned)
+            + (SPLIT_LPS_WEIGHT * cost_split_lps)
         )
 
     def _communication_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
@@ -152,6 +155,24 @@ class AssignmentOptimizer:
         max_filled = max(filled.values())
         penalty = extra_empty_penalty if min_filled == 0 else 0
         return max_filled - min_filled + penalty
+
+    def _split_lps_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
+        """
+        Penalize putting multiple copies of a split LP on a single device.
+        This assignment is very homogenous, but the point of splitting LPs is
+        to increase the weight of the LP by running multiple copies of it in parallel.
+        """
+        lps = Counter()
+        for gpu_slot, lp in assignment.items():
+            if lp is None:
+                continue
+            src_lang, tgt_lang = lp
+            lps[(gpu_slot.node, gpu_slot.gpu, src_lang, tgt_lang)] += 1
+        result = 0
+        for count in lps.values():
+            if count > 1:
+                result += VERY_BAD * count
+        return result
 
     def swap(self, slot_a: GpuSlot, slot_b: GpuSlot, assignment):
         lp_a = assignment.get(slot_a, None)

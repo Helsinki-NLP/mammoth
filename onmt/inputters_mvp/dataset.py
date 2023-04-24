@@ -25,7 +25,14 @@ class Batch():
         return self
 
 
-def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):
+def read_examples_from_files(
+    src_path,
+    tgt_path,
+    tokenize_fn=str.split,
+    transforms_fn=lambda x: x,
+    stride=None,
+    offset=None,
+):
     """Helper function to read examples"""
 
     def _make_example_dict(packed):
@@ -41,6 +48,9 @@ def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transfor
     tgt_fh = open(tgt_path) if tgt_path is not None else itertools.repeat(None)
 
     examples = zip(src_fh, tgt_fh)
+    if stride is not None and offset is not None:
+        # Start by skipping offset examples. After that return every stride:th example.
+        examples = itertools.islice(examples, offset, None, stride)
     examples = map(_make_example_dict, examples)
     examples = map(transforms_fn, examples)
     examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
@@ -53,7 +63,17 @@ def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transfor
 
 class ParallelCorpus(IterableDataset):
     """Torch-style dataset"""
-    def __init__(self, src_file, tgt_file, src_vocab, tgt_vocab, transforms, device='cpu'):
+    def __init__(
+        self,
+        src_file,
+        tgt_file,
+        src_vocab,
+        tgt_vocab,
+        transforms,
+        device='cpu',
+        stride=None,
+        offset=None,
+    ):
         self.src_file = src_file
         self.tgt_file = tgt_file
         self.transforms = transforms
@@ -62,6 +82,8 @@ class ParallelCorpus(IterableDataset):
             'src': src_vocab,
             'tgt': tgt_vocab,
         }
+        self.stride = stride
+        self.offset = offset
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -100,6 +122,8 @@ class ParallelCorpus(IterableDataset):
             self.tgt_file,
             tokenize_fn=self._tokenize,
             transforms_fn=self.transforms.apply if self.transforms is not None else lambda x: x,
+            stride=self.stride,
+            offset=self.offset,
         )
         examples = map(_cast, examples)
         yield from examples
@@ -131,6 +155,8 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         src_vocab,
         tgt_vocab,
         TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs, task=task).values()),
+        stride=corpus_opts.get('stride', None),
+        offset=corpus_opts.get('offset', None),
     )
     return dataset
 

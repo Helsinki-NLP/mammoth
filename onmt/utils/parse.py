@@ -126,6 +126,16 @@ class DataOptsCheckerMixin(object):
             else:
                 corpus["src_feats"] = None
 
+            stride = corpus.get("stride", None)
+            offset = corpus.get("offset", None)
+            if stride is not None or offset is not None:
+                if stride is None:
+                    raise ValueError('stride and offset must be used together')
+                if offset is None:
+                    raise ValueError('stride and offset must be used together')
+                if offset > stride:
+                    logger.warning(f'offset {offset} stride {stride} is probably not what you want')
+
         # Either all tasks should be assigned to a gpu, or none
         assert n_without_node_gpu == 0 or n_without_node_gpu == len(corpora)
 

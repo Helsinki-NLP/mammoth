@@ -85,7 +85,10 @@ def add_corpora_schedule_args(parser):
         '--use_introduce_at_training_step', action='store_true',
         help='Use a curriculum introducing corpora based on temperature-adjusted corpus size'
     )
-    parser.add_argument('--temperature', type=float, default=1.0)
+    parser.add_argument(
+        '--temperature', type=float,
+        help='Temperature (1/T): 1.0 for empirical, 0.0 for uniform'
+    )
 
 
 def add_cluster_languages_args(parser):
@@ -173,28 +176,31 @@ def get_opts():
     return parser.parse_args()
 
 
-def _split_large_language_pairs(opts, corpora_lens, split_treshold):
+def _split_large_language_pairs(opts, corpora_weights, split_treshold):
     corpora_out = deepcopy(opts.in_config[0]['data'])
-    corpora_lens_out = dict()
-    for cname, length in corpora_lens.items():
-        if length > split_treshold:
-            n_copies = int(np.ceil(length / split_treshold))
-            copy_length = length // n_copies
+    corpora_weights_out = dict()
+    for cname, weight in corpora_weights.items():
+        if weight > split_treshold:
+            n_copies = int(np.ceil(weight / split_treshold))
+            copy_weight = weight / n_copies
+            print(f'Splitting {cname} into {n_copies} copies')
             for i in range(n_copies):
                 cname_copy = f'{cname}_split{i}'
                 dict_copy = deepcopy(corpora_out[cname])
                 corpora_out[cname_copy] = dict_copy
-                corpora_lens_out[cname_copy] = copy_length
+                corpora_out[cname_copy]['stride'] = n_copies
+                corpora_out[cname_copy]['offset'] = i
+                corpora_weights_out[cname_copy] = copy_weight
             del corpora_out[cname]
         else:
-            corpora_lens_out[cname] = length
+            corpora_weights_out[cname] = weight
     opts.in_config[0]['data'] = corpora_out
-    return corpora_lens_out
+    return corpora_weights_out
 
 
 def corpora_schedule(opts):
     cc_opts = opts.in_config[0]['config_config']
-    temperature = opts.temperature if opts.temperature else cc_opts['temperature']
+    temperature = opts.temperature if opts.temperature else cc_opts.get('temperature', 1.0)
     use_weight = opts.use_weight if opts.use_weight else cc_opts.get('use_weight', False)
     ae_weight = opts.ae_weight if opts.ae_weight else cc_opts.get('ae_weight', 1.0)
     use_introduce_at_training_step = (
@@ -206,17 +212,19 @@ def corpora_schedule(opts):
     for cname, corpus in opts.in_config[0]['data'].items():
         with open(corpus['path_src'], 'r') as istr:
             corpora_lens[cname] = sum(1 for _ in istr)
-    split_treshold = cc_opts.get('split_large_language_pairs', 0)
-    if split_treshold:
-        corpora_lens = _split_large_language_pairs(opts, corpora_lens, split_treshold)
-    max_lines = max(corpora_lens.values())
+
+    tot_lines = sum(corpora_lens.values())
     corpora_weights = {
-        cname: (max_lines - clen) ** temperature / max_lines
+        cname: (clen / tot_lines) ** temperature
         for cname, clen in corpora_lens.items()
     }
+    split_treshold = cc_opts.get('split_large_language_pairs', 0.0)
+    if split_treshold:
+        corpora_weights = _split_large_language_pairs(opts, corpora_weights, split_treshold)
+
     for cname, corpus in opts.in_config[0]['data'].items():
         src_lang, tgt_lang = corpus['src_tgt'].split('-')
-        weight = 1 - corpora_weights[cname]
+        weight = corpora_weights[cname]
         if use_weight and use_introduce_at_training_step:
             weight = float(np.sqrt(weight))
         if use_weight:

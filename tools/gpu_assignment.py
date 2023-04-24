@@ -8,6 +8,7 @@ INTRA_NODE_COST = 1
 HOMOGENEITY_WEIGHT = 0.1
 READY_TO_START_WEIGHT = 0.5
 UNASSIGNED_WEIGHT = 100
+UNASSIGNED_PREFER_MASTER = 10
 SPLIT_LPS_WEIGHT = 50
 NOT_READY_TO_START = 500
 VERY_BAD = 99999999
@@ -154,6 +155,10 @@ class AssignmentOptimizer:
         min_filled = min(filled.values())
         max_filled = max(filled.values())
         penalty = extra_empty_penalty if min_filled == 0 else 0
+        if filled[(0, 0)] > min_filled:
+            # There are unassigned slots, but more of them on some other device than master (0:0)
+            # Master has some extra duties, so it is the optimal place for empty slots
+            penalty += UNASSIGNED_PREFER_MASTER
         return max_filled - min_filled + penalty
 
     def _split_lps_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:

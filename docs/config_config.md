@@ -12,6 +12,10 @@ Other functionality that is cumbersome to specify by hand includes:
 
 To ease the creation of configs, the config-config tool reads in a human-writable configuration template, and computes the specific values expected by OpenNMT, writing them out as a less-readable yaml file.
 
+## Command
+
+python3 OpenNMT-py-v2/tools/config\_config.py config\_all --in\_config input.yaml --out\_config output.yaml
+
 ## Inputs
 
 The primary input is a yaml file, which contains two types of parameters

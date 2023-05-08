@@ -12,22 +12,38 @@ from torch.nn.utils import clip_grad_norm_
 
 
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
-    multiOptims = {}
-    components = [
-        ('encoder', model.encoder, task_queue_manager.get_encoders()),
-        ('decoder', model.decoder, task_queue_manager.get_decoders()),
-        ('generator', model.generator, task_queue_manager.get_generators()),
-    ]
-    for component_name, components, component_ids in components:
-        for component_id in component_ids:
+    suboptimizers = {}
+    my_grouped_components = task_queue_manager.get_grouped_components(model)
+    for component_type in my_grouped_components:
+        for component_id, component in my_grouped_components[component_type].items():
+            if isinstance(component_id, str):
+                name = component_type + '_' + component_id
+            else:
+                name = component_type + '_' + '_'.join([str(x) for x in component_id])
             params = []
-            comp = components[f'{component_name}{component_id}']
-            for name, param in comp.named_parameters():
+            for param_name, param in component.named_parameters():
                 if not param.requires_grad:
                     continue
+                if 'adapter' in param_name and 'adapter' not in component_type:
+                    # omit adapters from base component optimizers
+                    continue
+                if 'embedding' in param_name:
+                    print(f'adding {param_name} to suboptimizer {name}')
                 params.append(param)
-            ada = base_optimizer(params)
-            multiOptims[f'{component_name}_{component_id}'] = ada
+            if name in suboptimizers:
+                raise Exception(f'Trying to create second optimizer for "{name}"')
+            optimizer = base_optimizer(params)
+            suboptimizers[name] = optimizer
+
+    for generator_id in task_queue_manager.get_generators():
+        generator = model.generator[f'generator_{generator_id}']
+        params = []
+        for name, param in generator.named_parameters():
+            if not param.requires_grad:
+                continue
+            params.append(param)
+        optimizer = base_optimizer(params)
+        suboptimizers[f'generator_{generator_id}'] = optimizer
 
     attParam = []
     for name, param in model.attention_bridge.named_parameters():
@@ -37,10 +53,10 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
 
     # skip AB optimizer if AB is not in use
     if len(attParam):
-        ada = base_optimizer(attParam)
-        multiOptims["ATT"] = ada
+        optimizer = base_optimizer(attParam)
+        suboptimizers["attention_bridge"] = optimizer
 
-    optimizer = MultipleOptimizer(multiOptims, None)
+    optimizer = MultipleOptimizer(suboptimizers, None)
     return optimizer
 
 
@@ -174,8 +190,6 @@ def rsqrt_decay(step, warmup_steps):
 
 class MultipleOptimizer(object):
     """Implement multiple optimizers needed for sparse adam"""
-    # Indicate to the amp GradScaler that we use customized scale-handling logic
-    _step_supports_amp_scaling = True
 
     def __init__(self, op, multiOptims_Langs=None):
         self.optimizers = op
@@ -198,22 +212,20 @@ class MultipleOptimizer(object):
     def step(self, grad_scaler=None):
         """Step through all the suboptimizers"""
         for name in self.optimizers:
-            if self._any_param_has_grad(self.optimizers[name]):
+            if self._any_param_has_grad(self.optimizers[name], name):
                 self._steps[name] += 1
-                if grad_scaler is not None:
-                    grad_scaler.unscale_(self.optimizers[name])
-                    grad_scaler.step(self.optimizers[name])
-                else:
-                    self.optimizers[name].step()
+                self.optimizers[name].step()
 
     @staticmethod
-    def _any_param_has_grad(optimizer):
+    def _any_param_has_grad(optimizer, name):
         for group in optimizer.param_groups:
             for param in group['params']:
+                if not param.requires_grad:
+                    continue
                 if not hasattr(param, 'has_grad'):
                     # if there are parameters not tracked by the hook,
                     # then always perform the step
-                    return True
+                    raise Exception(f'At least one parameter in {name} did not have the hook')
                 if param.has_grad:
                     return True
         return False
@@ -803,7 +815,6 @@ class AdaFactorFairSeq(torch.optim.Optimizer):
             relative_step=relative_step,
             warmup_init=warmup_init,
         )
-        print(f'weight_decay {defaults["weight_decay"]}')
         super(AdaFactorFairSeq, self).__init__(params, defaults)
 
     @property

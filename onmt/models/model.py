@@ -61,13 +61,11 @@ class NMTModel(BaseModel):
     def forward(self, src, tgt, lengths, bptt=False, with_align=False, metadata=None):
         dec_in = tgt[:-1]  # exclude last target from inputs
 
-        encoder = self.encoder[f'encoder{metadata.encoder_id}']
-        decoder = self.decoder[f'decoder{metadata.decoder_id}']
-        # Activate the correct pluggable embeddings
-        encoder.embeddings.activate(metadata.src_lang)
-        decoder.embeddings.activate(metadata.tgt_lang)
+        # Activate the correct pluggable embeddings and modules
+        self.encoder.activate(metadata)
+        self.decoder.activate(metadata)
 
-        enc_state, memory_bank, lengths, mask = encoder(src, lengths)
+        enc_state, memory_bank, lengths, mask = self.encoder(src, lengths)
 
         memory_bank, alphas = self.attention_bridge(memory_bank, mask)
         if self.attention_bridge.is_fixed_length:
@@ -75,8 +73,8 @@ class NMTModel(BaseModel):
             lengths = None
 
         if not bptt:
-            decoder.init_state(src, memory_bank, enc_state)
-        dec_out, attns = decoder(dec_in, memory_bank, memory_lengths=lengths, with_align=with_align)
+            self.decoder.init_state(src, memory_bank, enc_state)
+        dec_out, attns = self.decoder(dec_in, memory_bank, memory_lengths=lengths, with_align=with_align)
         return dec_out, attns
 
     def update_dropout(self, dropout):

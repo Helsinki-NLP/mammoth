@@ -7,6 +7,7 @@ from onmt.translate.translator import build_translator
 from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe
 
 import onmt.opts as opts
+from onmt.utils.distributed import TaskSpecs
 from onmt.utils.parse import ArgumentParser
 
 
@@ -17,7 +18,38 @@ def translate(opt):
     ArgumentParser.validate_translate_opts_dynamic(opt)
     logger = init_logger(opt.log_file)
 
-    translator = build_translator(opt, logger=logger, report_score=True)
+    encoder_adapter_ids = set()
+    for layer_stack_idx, stack in enumerate(opt.stack['encoder']):
+        if 'adapters' in stack:
+            for group_id, sub_id in stack['adapters']:
+                encoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
+    decoder_adapter_ids = set()
+    for layer_stack_idx, stack in enumerate(opt.stack['decoder']):
+        if 'adapters' in stack:
+            for group_id, sub_id in stack['adapters']:
+                decoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
+
+    logger.info(
+        'It is ok that src_vocab and tgt_vocab are None here. '
+        'The vocabs are separately loaded in model_builder.'
+    )
+    task = TaskSpecs(
+        node_rank=None,
+        local_rank=None,
+        src_lang=opt.src_lang,
+        tgt_lang=opt.tgt_lang,
+        encoder_id=[stack['id'] for stack in opt.stack['encoder']],
+        decoder_id=[stack['id'] for stack in opt.stack['decoder']],
+        corpus_id='trans',
+        weight=1,
+        corpus_opt=dict(),
+        src_vocab=None,
+        tgt_vocab=None,
+        encoder_adapter_ids=encoder_adapter_ids,
+        decoder_adapter_ids=decoder_adapter_ids,
+    )
+
+    translator = build_translator(opt, task, logger=logger, report_score=True)
 
     # data_reader = InferenceDataReader(opt.src, opt.tgt, opt.src_feats)
     src_shards = split_corpus(opt.src, opt.shard_size)
@@ -31,7 +63,7 @@ def translate(opt):
 
     # Build transforms
     transforms_cls = get_transforms_cls(opt._all_transform)
-    transforms = make_transforms(opt, transforms_cls, translator.vocabs)
+    transforms = make_transforms(opt, transforms_cls, translator.vocabs, task=task)
     data_transform = [
         transforms[name] for name in opt.transforms if name in transforms
     ]
@@ -42,7 +74,7 @@ def translate(opt):
         translator.translate_dynamic(
             src=src_shard,
             transform=transform,
-            src_feats=feats_shard,
+            # src_feats=feats_shard,  # TODO: put me back in
             tgt=tgt_shard,
             batch_size=opt.batch_size,
             batch_type=opt.batch_type,

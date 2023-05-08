@@ -9,13 +9,15 @@
           users of this library) for the strategy things we do.
 """
 
-import torch
-import traceback
 
 import onmt.utils
-from onmt.utils.logging import logger
-import torch.nn as nn
+import torch
 import torch.distributed
+import torch.nn as nn
+import traceback
+
+from itertools import islice
+from onmt.utils.logging import logger
 
 
 def build_trainer(
@@ -47,7 +49,7 @@ def build_trainer(
     logger.info("BUILD TRAINER")
 
     for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_vocabs('tgt', vocabs_dict):
-        generator = generators_md[f"generator{lang}"]
+        generator = generators_md[f'generator_{lang}']
         train_loss_md.add_module(
             f'trainloss{lang}',
             onmt.utils.loss.build_loss_compute(model, tgt_vocab, opt, train=True, generator=generator),
@@ -98,7 +100,6 @@ def build_trainer(
         dropout_steps=dropout_steps,
         task_queue_manager=task_queue_manager,
         report_stats_from_parameters=opt.report_stats_from_parameters,
-        lca_loginterval=opt.lca_loginterval,
     )
     return trainer
 
@@ -153,7 +154,6 @@ class Trainer(object):
         dropout_steps=[0],
         task_queue_manager=None,
         report_stats_from_parameters=False,
-        lca_loginterval=-1,
     ):
         # Basic attributes.
         self.model = model
@@ -186,8 +186,8 @@ class Trainer(object):
         self.my_decoder_groups = my_component_groups['decoder']
         self.my_src_emb_groups = my_component_groups['src_emb']
         self.my_tgt_emb_groups = my_component_groups['tgt_emb']
-
-        self.lca_loginterval = lca_loginterval
+        self.my_encoder_adapter_groups = my_component_groups['encoder_adapters']
+        self.my_decoder_adapter_groups = my_component_groups['decoder_adapters']
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -211,36 +211,6 @@ class Trainer(object):
             if step > 1 and step == self.dropout_steps[i] + 1:
                 self.model.update_dropout(self.dropout[i])
                 logger.info("Updated dropout to %f from step %d" % (self.dropout[i], step))
-
-    def _accum_batches(self, iterator):
-        batches = []
-        normalization = 0
-        current_comm_batch_id = None
-        # accum_count now refers to number of tasks in one communication batch
-        # i.e. minibatches to process before synching gradients
-        self.accum_count = self._accum_count(self.optim.training_step)
-        self.task_queue_manager.tasks_per_communication_batch = self.accum_count
-        for batch, metadata, communication_batch_id in iterator:
-            if current_comm_batch_id is None:
-                current_comm_batch_id = communication_batch_id
-            # when communication_batch_id changes, we might be ready to synch
-            if current_comm_batch_id != communication_batch_id:
-                current_comm_batch_id = communication_batch_id
-                yield batches, normalization
-                self.accum_count = self._accum_count(self.optim.training_step)
-                self.task_queue_manager.tasks_per_communication_batch = self.accum_count
-                batches = []
-                normalization = 0
-            batches.append((batch, metadata))
-            if self.norm_method == "tokens":
-                num_tokens = (
-                    batch.tgt[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
-                )
-                normalization += num_tokens.item()
-            else:
-                normalization += batch.batch_size
-        if batches:
-            yield batches, normalization
 
     def _update_average(self, step):
         if self.moving_average is None:
@@ -283,76 +253,67 @@ class Trainer(object):
         total_stats = onmt.utils.Statistics()
         report_stats = onmt.utils.Statistics()
         self._start_report_manager(start_time=total_stats.start_time)
-        # LCA
-        if self.lca_loginterval > 0:
-            lca_logs = {
-                k: dict() for k, v in self.model.named_parameters() if v.requires_grad and 'attention_bridge' in k
-            }
-            lca_params = {
-                k: torch.zeros_like(v.data)
-                for k, v in self.model.named_parameters()
-                if v.requires_grad and 'attention_bridge' in k
-            }
-        # /LCA
         self.optim.zero_grad()
-        trainEnum = enumerate(self._accum_batches(train_iter))
 
+        i = -1
         while True:
+            i += 1
 
             step = self.optim.training_step
             self._maybe_update_dropout(step)
 
-            # LCA:
-            #   1. get θ_t
-            #   2. train step; grad = ∇_t, params: θ_{t+1}
-            #   3. log changelca_params = (θ_{t+1} - θ_t) * ∇_t
-            if self.lca_loginterval > 0:
-                theta_t = {
-                    k: v.data.clone()
-                    for k, v in self.model.named_parameters()
-                    if v.requires_grad and k.find('attention_bridge') >= 0
-                }
-            # /LCA
+            self.accum_count = self._accum_count(self.optim.training_step)
+            self.task_queue_manager.tasks_per_communication_batch = self.accum_count
+            batches_with_meta = islice(train_iter, self.accum_count)
 
-            i, (batches_with_meta, normalization) = next(trainEnum)
-
-            self._gradient_accumulation_overLangPair(
+            self._gradient_accumulation_over_lang_pairs(
                 batches_with_meta,
-                normalization,
                 total_stats,
                 report_stats,
             )
 
             # Note that all group ids are tuples, some with length 1
-            for (encoder_id,), (_, group) in self.my_encoder_groups.items():
+            for (layer_stack_index, encoder_id), (_, group) in self.my_encoder_groups.items():
                 params = [
-                    (name, p)
-                    for (name, p) in self.model.encoder[f'encoder{encoder_id}'].named_parameters()
-                    if 'embeddings' not in name
+                    (name, p) for (name, p)
+                    in self.model.encoder.get_submodule(layer_stack_index, encoder_id).named_parameters()
+                    if 'embeddings' not in name and 'adapter' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
-            for (decoder_id,), (_, group) in self.my_decoder_groups.items():
+            for (layer_stack_index, decoder_id), (_, group) in self.my_decoder_groups.items():
                 params = [
-                    (name, p)
-                    for (name, p) in self.model.decoder[f'decoder{decoder_id}'].named_parameters()
-                    if 'embeddings' not in name
+                    (name, p) for (name, p)
+                    in self.model.decoder.get_submodule(layer_stack_index, decoder_id).named_parameters()
+                    if 'embeddings' not in name and 'adapter' not in name
                 ]
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
-            for src_emb_id, (_, group) in self.my_src_emb_groups.items():
-                src_lang, encoder_id = src_emb_id
-                embs = self.model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
+            for (src_lang,), (_, group) in self.my_src_emb_groups.items():
+                embs = self.model.encoder.embeddings[f'embeddings_{src_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
-            for tgt_emb_id, (_, group) in self.my_tgt_emb_groups.items():
-                tgt_lang, decoder_id = tgt_emb_id
-                embs = self.model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
+            for (tgt_lang,), (_, group) in self.my_tgt_emb_groups.items():
+                embs = self.model.decoder.embeddings[f'embeddings_{tgt_lang}']
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
                 onmt.utils.distributed.only_ready_reduce_and_rescale_grads(
-                    self.model.generator[f'generator{tgt_lang}'].named_parameters(), group=group
+                    self.model.generator[f'generator_{tgt_lang}'].named_parameters(), group=group
                 )
+
+            for adapter_id, (_, group) in self.my_encoder_adapter_groups.items():
+                layer_stack_index, encoder_id, adapter_group, sub_id = adapter_id
+                adapter = self.model.encoder.get_submodule(layer_stack_index, encoder_id).get_adapter(
+                    adapter_group, sub_id
+                )
+                onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
+
+            for adapter_id, (_, group) in self.my_decoder_adapter_groups.items():
+                layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
+                adapter = self.model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(
+                    adapter_group, sub_id
+                )
+                onmt.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             # a group is not specified: reduce across all devices
             if device_context.is_distributed():
@@ -362,31 +323,15 @@ class Trainer(object):
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
-            # LCA
-            if (self.lca_loginterval > 0) and (step % self.lca_loginterval == 0) and (device_context.is_master()):
-                for k, v in self.model.named_parameters():
-                    if not v.requires_grad or isinstance(v.grad, type(None)) or k.find('attention_bridge') < 0:
-                        continue
-                    lca_params[k] = (v.data - theta_t[k]) * v.grad
-
-                # dump logs at each checkpoint and 10 times during training
-                dump_logs = (step % (train_steps // 10) == 0) or (
-                    save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0
-                )
-                dumppath = f'{self.model_saver.base_path}_lca_logs.json'
-                onmt.utils.logging.log_lca_values(step, lca_logs, lca_params, dumppath, dump_logs)
-
-            # /LCA
-
             self.optim.step()
             self.optim.zero_grad()
             for p in self.model.parameters():
                 if hasattr(p, 'has_grad'):
                     p.has_grad = False
 
-            if step % 1000 == 0:
+            if step % 1000 == 0 and step > 0:
                 # TODO: if you are going to uncomment that block, please make it optional
-                # logger.info(f'Aftesyncr gradient sync {step}')
+                # logger.info(f'After gradient sync {step}')
                 # for name, p in self.model.named_parameters():
                 #     logger.info(
                 #         f'{device_context.node_rank}:{device_context.local_rank}'
@@ -483,19 +428,30 @@ class Trainer(object):
 
         return stats
 
-    def _gradient_accumulation_overLangPair(
+    def _gradient_accumulation_over_lang_pairs(
         self,
         batches_with_meta,
-        normalization,
         total_stats,
         report_stats,
     ):
-        for k, (batch, metadata) in enumerate(batches_with_meta):
+        normalization = 0
+        seen_comm_batches = set()
+        for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
+            seen_comm_batches.add(comm_batch)
+            if self.norm_method == "tokens":
+                num_tokens = (
+                    batch.tgt[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
+                )
+                normalization += num_tokens.item()
+            else:
+                normalization += batch.batch_size
+
             # logger.info(f'batch with metadata {metadata}')
 
             target_size = batch.tgt.size(0)
             # Truncated BPTT: reminder not compatible with accum > 1
             if self.trunc_size:
+                raise Exception('Truncated BPTT not supported')
                 trunc_size = self.trunc_size
             else:
                 trunc_size = target_size
@@ -535,14 +491,13 @@ class Trainer(object):
 
                     total_stats.update(batch_stats)
                     report_stats.update(batch_stats)
+                    report_stats.update_task_loss(batch_stats.loss, metadata)
 
                 except Exception:
                     traceback.print_exc()
                     logger.info("At step %d, we removed a batch - accum %d", self.training_step_all, k)
-
-                # If truncated, don't backprop fully.
-                if self.model.decoder[f'decoder{metadata.decoder_id}'].state is not None:
-                    self.model.decoder[f'decoder{metadata.decoder_id}'].detach_state()
+        if len(seen_comm_batches) != 1:
+            logger.warning('Communication batches out of synch with batch accumulation')
 
     def _start_report_manager(self, start_time=None):
         """

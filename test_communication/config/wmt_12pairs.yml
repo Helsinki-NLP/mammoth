@@ -19,57 +19,55 @@ overwrite: False
 data:
   # en-X
   train_en-cs:
+    src_tgt: en-cs
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-cs/wmt.en-cs.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-cs/wmt.en-cs.train.BPE.cs
   train_en-de:
+    src_tgt: en-de
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-de/wmt.en-de.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-de/wmt.en-de.train.BPE.de
   train_en-et:
+    src_tgt: en-et
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-et/wmt.en-et.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-et/wmt.en-et.train.BPE.et
   train_en-fi:
+    src_tgt: en-fi
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-fi/wmt.en-fi.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-fi/wmt.en-fi.train.BPE.fi
   train_en-ru:
+    src_tgt: en-ru
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-ru/wmt.en-ru.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-ru/wmt.en-ru.train.BPE.ru
   train_en-zh:
+    src_tgt: en-zh
     path_src: /home/local/scaleUpMNMT-data/wmt/train/en-zh/wmt.en-zh.train.BPE.en
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/en-zh/wmt.en-zh.train.BPE.zh
   # X-en
   train_cs-en:
+    src_tgt: cs-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.cs
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/cs-en/wmt.cs-en.train.BPE.en
   train_de-en:
+    src_tgt: de-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.de
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/de-en/wmt.de-en.train.BPE.en
   train_et-en:
+    src_tgt: et-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/et-en/wmt.et-en.train.BPE.et
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/et-en/wmt.et-en.train.BPE.en
   train_fi-en:
+    src_tgt: fi-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/fi-en/wmt.fi-en.train.BPE.fi
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/fi-en/wmt.fi-en.train.BPE.en
   train_ru-en:
+    src_tgt: ru-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/ru-en/wmt.ru-en.train.BPE.ru
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/ru-en/wmt.ru-en.train.BPE.en
   train_zh-en:
+    src_tgt: zh-en
     path_src: /home/local/scaleUpMNMT-data/wmt/train/zh-en/wmt.zh-en.train.BPE.zh
     path_tgt: /home/local/scaleUpMNMT-data/wmt/train/zh-en/wmt.zh-en.train.BPE.en
 
-
-src_tgt:
-- en-cs
-- en-de
-- en-et
-- en-fi
-- en-ru
-- en-zh
-- cs-en
-- de-en
-- et-en
-- fi-en
-- ru-en
-- zh-en
 
 batch_size: 4096
 batch_type: tokens
@@ -86,8 +84,8 @@ rnn_size: 256
 word_vec_size: 256
 transformer_ff: 2048
 heads: 2
-enc_layers: 2
-dec_layers: 2
+enc_layers: [2]
+dec_layers: [2]
 dropout: 0.1
 label_smoothing: 0.1
 param_init: 0.0

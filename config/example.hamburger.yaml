@@ -1,0 +1,311 @@
+# This is a dummy example config, showing how multiple layer stacks can be used in encoder and decoder.
+# The encoder has 2 groupwise shared layers followed by 2 fully shared layers
+# The decoder has a hamburger structure: 1 groupwise + 2 fully shared + 1 groupwise
+# Both language-specific and groupwise shared adapters are added to multiple stacks.
+# group "foo" is used for uu and fr
+# group "bar" is used for en, de, and vv
+save_data: generated/smoketest.groups
+src_vocab: 
+  en: generated/smoketest.groups/vocab.en.src
+  de: generated/smoketest.groups/vocab.de.src
+  uu: generated/smoketest.groups/vocab.uu.src
+tgt_vocab:
+  de: generated/smoketest.groups/vocab.de.tgt
+  fr: generated/smoketest.groups/vocab.fr.tgt
+  vv: generated/smoketest.groups/vocab.vv.tgt
+overwrite: False
+
+adapters:
+  encoder:
+    enc_group:
+      layer_stack_index: 0
+      layers: [0, 1]
+      hidden_size: 8  # 512 (rnn_size) / 64 (reduction factor)
+      ids:
+        - foo
+        - bar
+    enc_highresource:
+      layer_stack_index: 0
+      layers: [0, 1]
+      hidden_size: 8
+      ids:
+        - en
+        - de
+    enc_lowresource:
+      layer_stack_index: 0
+      layers: [0]
+      hidden_size: 8
+      ids:
+        - uu
+  decoder:
+    dec_group:
+      layer_stack_index: 0
+      layers: [0]
+      hidden_size: 8
+      ids:
+        - foo
+        - bar
+    dec_highresource:
+      layer_stack_index: 1
+      layers: [0, 1]
+      hidden_size: 16
+      ids:
+        - en
+        - de
+        - fr
+    dec_lowresource:
+      layer_stack_index: 1
+      layers: [0]
+      hidden_size: 8
+      ids:
+        - vv
+
+data:
+  train_uu-de:
+    src_tgt: uu-de
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.de
+    enc_sharing_group: ["aaa", "full"]
+    dec_sharing_group: ["aa", "full", "aa"]
+    adapters:
+      encoder:
+        - ["enc_group", "foo"]
+        - ["enc_lowresource", "uu"]
+      decoder:
+        - ["dec_group", "bar"]
+        - ["dec_highresource", "de"]
+  train_en-de:
+    src_tgt: en-de
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.de
+    enc_sharing_group: ["aaa", "full"]
+    dec_sharing_group: ["bb", "full", "bb"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "bar"]
+        - ["dec_highresource", "de"]
+  train_en-fr:
+    src_tgt: en-fr
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["aaa", "full"]
+    dec_sharing_group: ["cc", "full", "cc"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_de-fr:
+    src_tgt: de-fr
+    path_src: data/smoketest/train.de
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["aaa", "full"]
+    dec_sharing_group: ["aa", "full", "aa"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "de"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_en2-de2:
+    src_tgt: en-de
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.de
+    enc_sharing_group: ["xxx", "full"]
+    dec_sharing_group: ["bb", "full", "bb"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "bar"]
+        - ["dec_highresource", "de"]
+  train_en3-de3:
+    src_tgt: en-de
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.de
+    enc_sharing_group: ["bbb", "full"]
+    dec_sharing_group: ["cc", "full", "cc"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "bar"]
+        - ["dec_highresource", "de"]
+  train_de2-fr2:
+    src_tgt: de-fr
+    path_src: data/smoketest/train.de
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["bbb", "full"]
+    dec_sharing_group: ["aa", "full", "aa"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "de"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_de3-fr3:
+    src_tgt: de-fr
+    path_src: data/smoketest/train.de
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["bbb", "full"]
+    dec_sharing_group: ["bb", "full", "bb"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "de"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_en-vv:
+    src_tgt: en-vv
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.de
+    enc_sharing_group: ["bbb", "full"]
+    dec_sharing_group: ["cc", "full", "cc"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "bar"]
+        - ["dec_lowresource", "vv"]
+  train_en4-de4:
+    src_tgt: en-de
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.de
+    enc_sharing_group: ["bbb", "full"]
+    dec_sharing_group: ["aa", "full", "aa"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "bar"]
+        - ["dec_highresource", "de"]
+  train_de4-fr4:
+    src_tgt: de-fr
+    path_src: data/smoketest/train.de
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["bbb", "full"]
+    dec_sharing_group: ["bb", "full", "bb"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "de"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_de5-fr5:
+    src_tgt: de-fr
+    path_src: data/smoketest/train.de
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["ccc", "full"]
+    dec_sharing_group: ["cc", "full", "cc"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "de"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_en2-fr2:
+    src_tgt: en-fr
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["ccc", "full"]
+    dec_sharing_group: ["yy", "full", "yy"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_en3-fr3:
+    src_tgt: en-fr
+    path_src: data/smoketest/train.en
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["ccc", "full"]
+    dec_sharing_group: ["bb", "full", "bb"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "en"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_de6-fr6:
+    src_tgt: de-fr
+    path_src: data/smoketest/train.de
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["ccc", "full"]
+    dec_sharing_group: ["cc", "full", "cc"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "de"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+  train_de7-fr7:
+    src_tgt: de-fr
+    path_src: data/smoketest/train.de
+    path_tgt: data/smoketest/train.fr
+    enc_sharing_group: ["bbb", "full"]
+    dec_sharing_group: ["aa", "full", "aa"]
+    adapters:
+      encoder:
+        - ["enc_group", "bar"]
+        - ["enc_highresource", "de"]
+      decoder:
+        - ["dec_group", "foo"]
+        - ["dec_highresource", "fr"]
+
+
+save_model: models/smoketest.hamburger
+
+batch_size: 4096
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 4096
+max_generator_batches: 2
+use_attention_bridge: true
+layer_type_ab: none
+hidden_ab_size: 4096
+attention_heads: 50
+encoder_type: transformer
+decoder_type: transformer
+rnn_size: 512
+word_vec_size: 512
+transformer_ff: 2048
+heads: 8
+enc_layers: [2, 2]
+dec_layers: [1, 2, 1]
+dropout: 0.1
+label_smoothing: 0.1
+param_init: 0.0
+param_init_glorot: true
+position_encoding: true
+train_steps: 150000
+valid_steps: 1000000
+warmup_steps: 10000
+report_every: 100
+save_checkpoint_steps: 25000
+keep_checkpoint: 10
+optim: adam
+adam_beta1: 0.9
+adam_beta2: 0.998
+decay_method: rsqrt
+learning_rate: 0.01
+max_grad_norm: 0.0
+seed: 3435
+model_type: text

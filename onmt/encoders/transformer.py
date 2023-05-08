@@ -146,20 +146,30 @@ class TransformerEncoder(EncoderBase):
             pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
         )
 
-    def forward(self, src, lengths=None):
+    def forward(self, src, lengths=None, skip_embedding=False, mask=None):
         """See :func:`EncoderBase.forward()`"""
-        self._check_args(src, lengths)
 
-        emb = self.embeddings(src)
+        if skip_embedding:
+            out = src
+            emb = None
+        else:
+            self._check_args(src, lengths)
+            emb = self.embeddings(src)
+            out = emb.transpose(0, 1).contiguous()
+            if mask is None:
+                mask = ~sequence_mask(lengths).unsqueeze(1)
 
-        out = emb.transpose(0, 1).contiguous()
-        mask = ~sequence_mask(lengths).unsqueeze(1)
         # Run the forward pass of every layer of the tranformer.
-        for layer in self.transformer:
-            out = layer(out, mask)
+        out = self._forward_loop(out, mask)
         out = self.layer_norm(out)
 
-        return emb, out.transpose(0, 1).contiguous(), lengths, mask
+        # caller should call transpose and contiguous if they need it
+        return emb, out, lengths, mask
+
+    def _forward_loop(self, out, mask):
+        """ Run the forward pass of every layer of the transformer. """
+        for layer in self.transformer:
+            out = layer(out, mask)
 
     def update_dropout(self, dropout, attention_dropout):
         self.embeddings.update_dropout(dropout)

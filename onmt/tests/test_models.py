@@ -143,26 +143,31 @@ TEST PARAMETERS
 '''
 opt.brnn = False
 
-test_embeddings = [[], [('decoder_type', 'transformer')]]
+# FIXME: Most tests disabled: FoTraNMT only supports Transformer
+test_embeddings = [
+    # [],
+    [('decoder_type', 'transformer')]
+]
 
 for p in test_embeddings:
     _add_test(p, 'embeddings_forward')
 
+# FIXME: All tests disabled: FoTraNMT only supports Transformer, and the test for Transformer is broken
 tests_encoder = [
-    [],
-    [('encoder_type', 'mean')],
-    # [('encoder_type', 'transformer'),
-    # ('word_vec_size', 16), ('rnn_size', 16)],
-    [],
+    # [],
+    # [('encoder_type', 'mean')],
+    # [('encoder_type', 'transformer'), ('word_vec_size', 16), ('rnn_size', 16)],
+    # [],
 ]
 
 for p in tests_encoder:
     _add_test(p, 'encoder_forward')
 
+# FIXME: Most tests disabled: FoTraNMT only supports Transformer
 tests_nmtmodel = [
-    [('rnn_type', 'GRU')],
-    [('layers', 10)],
-    [('input_feed', 0)],
+    # [('rnn_type', 'GRU')],
+    # [('layers', 10)],
+    # [('input_feed', 0)],
     [
         ('decoder_type', 'transformer'),
         ('encoder_type', 'transformer'),
@@ -178,19 +183,19 @@ tests_nmtmodel = [
         ('rnn_size', 16),
         ('position_encoding', True),
     ],
-    [('coverage_attn', True)],
-    [('copy_attn', True)],
-    [('global_attention', 'mlp')],
-    [('context_gate', 'both')],
-    [('context_gate', 'target')],
-    [('context_gate', 'source')],
-    [('encoder_type', "brnn"), ('brnn_merge', 'sum')],
-    [('encoder_type', "brnn")],
-    [('decoder_type', 'cnn'), ('encoder_type', 'cnn')],
-    [('encoder_type', 'rnn'), ('global_attention', None)],
-    [('encoder_type', 'rnn'), ('global_attention', None), ('copy_attn', True), ('copy_attn_type', 'general')],
-    [('encoder_type', 'rnn'), ('global_attention', 'mlp'), ('copy_attn', True), ('copy_attn_type', 'general')],
-    [],
+    # [('coverage_attn', True)],
+    # [('copy_attn', True)],
+    # [('global_attention', 'mlp')],
+    # [('context_gate', 'both')],
+    # [('context_gate', 'target')],
+    # [('context_gate', 'source')],
+    # [('encoder_type', "brnn"), ('brnn_merge', 'sum')],
+    # [('encoder_type', "brnn")],
+    # [('decoder_type', 'cnn'), ('encoder_type', 'cnn')],
+    # [('encoder_type', 'rnn'), ('global_attention', None)],
+    # [('encoder_type', 'rnn'), ('global_attention', None), ('copy_attn', True), ('copy_attn_type', 'general')],
+    # [('encoder_type', 'rnn'), ('global_attention', 'mlp'), ('copy_attn', True), ('copy_attn_type', 'general')],
+    # [],
 ]
 
 if onmt.models.sru.check_sru_requirement():

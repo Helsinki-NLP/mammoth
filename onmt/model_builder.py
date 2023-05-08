@@ -10,18 +10,22 @@ from collections import defaultdict
 # from torchtext.legacy.data import Field
 
 import onmt.modules
-from onmt.encoders import str2enc
 
-from onmt.decoders import str2dec
-
+from onmt.models.adapters import (
+    Adapter,
+    EncoderAdapterLayer,
+    DecoderAdapterLayer,
+)
+from onmt.constants import ModelTask, DefaultTokens
+from onmt.decoders.layer_stack_decoder import LayerStackDecoder
+from onmt.encoders.layer_stack_encoder import LayerStackEncoder
 from onmt.modules import Embeddings
 from onmt.modules.embeddings import PluggableEmbeddings
 from onmt.modules.util_class import Cast
-from onmt.utils.misc import use_gpu
 from onmt.utils.logging import logger
+from onmt.utils.misc import use_gpu
+from onmt.utils.module_splitter import _combine_ordered_dicts
 from onmt.utils.parse import ArgumentParser
-from onmt.utils.module_splitter import create_bilingual_statedict
-from onmt.constants import ModelTask, DefaultTokens
 
 from onmt.attention_bridge import AttentionBridge
 
@@ -51,26 +55,26 @@ def build_embeddings(opt, vocab, for_encoder=True):
     return emb
 
 
-def build_encoder(opt, embeddings):
+def build_encoder(opt, embeddings, task_queue_manager):
     """
     Various encoder dispatcher function.
     Args:
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this encoder.
     """
-    enc_type = opt.encoder_type if opt.model_type == "text" else opt.model_type
-    return str2enc[enc_type].from_opt(opt, embeddings)
+    assert opt.encoder_type == 'transformer', 'Only Transformer is supported'
+    return LayerStackEncoder.from_opt(opt, embeddings, task_queue_manager)
 
 
-def build_decoder(opt, embeddings):
+def build_decoder(opt, embeddings, task_queue_manager):
     """
     Various decoder dispatcher function.
     Args:
         opt: the option in current environment.
         embeddings (Embeddings): vocab embeddings for this decoder.
     """
-    dec_type = "ifrnn" if opt.decoder_type == "rnn" and opt.input_feed else opt.decoder_type
-    return str2dec[dec_type].from_opt(opt, embeddings)
+    assert opt.decoder_type == 'transformer', 'Only Transformer is supported'
+    return LayerStackDecoder.from_opt(opt, embeddings, task_queue_manager)
 
 
 def load_test_multitask_model(opt, model_path=None):
@@ -84,30 +88,58 @@ def load_test_multitask_model(opt, model_path=None):
     if model_path.endswith('.pt'):
         return load_test_model(opt, model_path)
     else:
-        enc_id = opt.enc_id if opt.enc_id else opt.src_lang
-        dec_id = opt.dec_id if opt.dec_id else opt.tgt_lang
-        model_path = model_path if model_path.endswith('_') else f'{model_path}_'
-        enc_path = model_path + enc_id + '_enc.pt'
-        dec_path = model_path + dec_id + '_dec.pt'
-        opt.generator = model_path + opt.tgt_lang + '_gen.pt' if opt.generator is None else opt.generator
-        opt.bridge = model_path + 'bridge.pt' if opt.bridge is None else opt.bridge
-        opt.model_frame = model_path + 'frame.pt' if opt.model_frame is None else opt.model_frame
+        checkpoint_modules = [
+            (f'encoder.embeddings.embeddings_{opt.src_lang}.', f'src_embeddings_{opt.src_lang}'),
+            (f'decoder.embeddings.embeddings_{opt.tgt_lang}.', f'tgt_embeddings_{opt.tgt_lang}'),
+            (f'generator.generator_{opt.tgt_lang}.', f'generator_{opt.tgt_lang}'),
+            ('attention_bridge.', 'attention_bridge'),
+        ]
 
-        encoder = torch.load(enc_path, map_location=lambda storage, loc: storage)
-        decoder = torch.load(dec_path, map_location=lambda storage, loc: storage)
-        bridge = torch.load(opt.bridge, map_location=lambda storage, loc: storage)
-        generator = torch.load(opt.generator, map_location=lambda storage, loc: storage)
+        for layer_stack_idx, layer_stack_opt in enumerate(opt.stack['encoder']):
+            layer_stack_key = layer_stack_opt['id']
+            checkpoint_modules.append(
+                (
+                    f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.',
+                    f'encoder_{layer_stack_idx}_{layer_stack_key}'
+                )
+            )
+            for adapter_group, sub_id in layer_stack_opt.get('adapters', []):
+                checkpoint_modules.append(
+                    (
+                        f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
+                        f'encoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+                    )
+                )
+        for layer_stack_idx, layer_stack_opt in enumerate(opt.stack['decoder']):
+            layer_stack_key = layer_stack_opt['id']
+            checkpoint_modules.append(
+                (
+                    f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.',
+                    f'decoder_{layer_stack_idx}_{layer_stack_key}'
+                )
+            )
+            for adapter_group, sub_id in layer_stack_opt.get('adapters', []):
+                checkpoint_modules.append(
+                    (
+                        f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
+                        f'decoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+                    )
+                )
+
+        model_path = model_path.rstrip('_')
+        checkpoint_paths = [
+            (prefix, f'{model_path}_{key}.pt') for (prefix, key) in checkpoint_modules
+        ]
+
+        opt.model_frame = model_path + '_frame.pt'
         frame = torch.load(opt.model_frame, map_location=lambda storage, loc: storage)
 
-        ckpt_state_dict = create_bilingual_statedict(
-            enc_id=enc_id,
-            dec_id=dec_id,
-            tgt_lang=opt.tgt_lang,
-            enc_module=encoder,
-            dec_module=decoder,
-            ab_module=bridge,
-            gen_module=generator,
-        )
+        checkpoint_state_dicts = {
+            prefix: torch.load(path, map_location=lambda storage, loc: storage)
+            for prefix, path in checkpoint_paths
+        }
+
+        combined_state_dict = _combine_ordered_dicts(checkpoint_state_dicts)
 
         vocabs_dict = {
             'src': frame["vocab"].get(('src', opt.src_lang)),
@@ -122,18 +154,20 @@ def load_test_multitask_model(opt, model_path=None):
         model = create_bilingual_model(
             src_lang=opt.src_lang,
             tgt_lang=opt.tgt_lang,
-            enc_id=enc_id,
-            dec_id=dec_id,
+            opt_stack=opt.stack,
             model_opt=model_opt,
             vocabs_dict=vocabs_dict
             )
         model_params = {name for name, p in model.named_parameters()}
         model_params.update(name for name, p in model.named_buffers())
-        for key in set(ckpt_state_dict.keys()):
+        for key in set(combined_state_dict.keys()):
             if key not in model_params:
-                logger.debug(f'deleting unnecessary key: {key}')
-                del ckpt_state_dict[key]
-        model.load_state_dict(ckpt_state_dict)
+                print(f'Deleting unnecessary key: {key}')
+                del combined_state_dict[key]
+        for key in model_params:
+            if key not in combined_state_dict:
+                print(f'Key missing {key}')
+        model.load_state_dict(combined_state_dict)
         device = torch.device("cuda" if use_gpu(opt) else "cpu")
         model.to(device)
 
@@ -192,12 +226,11 @@ def load_test_model(opt, model_path=None):
     return vocabs_dict, model, model_opt
 
 
-def create_bilingual_model(src_lang, tgt_lang, enc_id, dec_id, model_opt, vocabs_dict):
-    """For translation - state dict to be loaded to this model."""
-
-    encoder = nn.ModuleDict()
-    decoder = nn.ModuleDict()
-    generator = nn.ModuleDict()
+def create_bilingual_model(
+    src_lang, tgt_lang, opt_stack, model_opt, vocabs_dict
+):
+    """For translation."""
+    generators_md = nn.ModuleDict()
 
     src_emb = build_src_emb(model_opt, vocabs_dict['src'])
     tgt_emb = build_tgt_emb(model_opt, vocabs_dict['tgt'])
@@ -206,9 +239,10 @@ def create_bilingual_model(src_lang, tgt_lang, enc_id, dec_id, model_opt, vocabs
 
     pluggable_src_emb.activate(src_lang)
     pluggable_tgt_emb.activate(tgt_lang)
-    encoder.add_module(f'encoder{enc_id}', build_only_enc(model_opt, pluggable_src_emb))
-    decoder.add_module(f'decoder{dec_id}', build_only_dec(model_opt, pluggable_tgt_emb))
-    generator.add_module(f'generator{tgt_lang}', build_generator(model_opt, len(vocabs_dict['tgt']), tgt_emb))
+    encoder = LayerStackEncoder.from_trans_opt(model_opt, pluggable_src_emb, opt_stack)
+    decoder = LayerStackDecoder.from_trans_opt(model_opt, pluggable_tgt_emb, opt_stack)
+    generator = build_generator(model_opt, len(vocabs_dict['tgt']), tgt_emb)
+    generators_md.add_module(f'generator_{tgt_lang}', generator)
 
     attention_bridge = AttentionBridge.from_opt(model_opt)
 
@@ -218,7 +252,15 @@ def create_bilingual_model(src_lang, tgt_lang, enc_id, dec_id, model_opt, vocabs
         attention_bridge=attention_bridge
     )
 
-    nmt_model.generator = generator
+    if uses_adapters(model_opt):
+        logger.info('Creating adapters...')
+        create_bilingual_adapters(nmt_model, model_opt, src_lang, tgt_lang, opt_stack)
+    else:
+        logger.info('Does not use adapters...')
+    print('built model:')
+    print(nmt_model)
+
+    nmt_model.generator = generators_md
     return nmt_model
 
 
@@ -252,33 +294,27 @@ def build_task_specific_model(
     if not model_opt.model_task == ModelTask.SEQ2SEQ:
         raise ValueError(f"Only ModelTask.SEQ2SEQ works - {model_opt.model_task} task")
 
-    src_embs_by_encoder = defaultdict(dict)
-    tgt_embs_by_decoder = defaultdict(dict)
+    src_embs = dict()
+    tgt_embs = dict()
 
-    encoders_md = nn.ModuleDict()
-    decoders_md = nn.ModuleDict()
     generators_md = nn.ModuleDict()
 
     # FIXME: it's getting late and I just want this to compile
-    for side, lang, encoder_id, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
+    for side, lang, _, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
         src_emb = build_src_emb(model_opt, vocab)
-        src_embs_by_encoder[encoder_id][lang] = src_emb
+        src_embs[lang] = src_emb
 
-    for encoder_id in task_queue_manager.get_encoders():
-        pluggable_src_emb = PluggableEmbeddings(src_embs_by_encoder[encoder_id])
-        encoder = build_only_enc(model_opt, pluggable_src_emb)
-        encoders_md.add_module(f'encoder{encoder_id}', encoder)
+    pluggable_src_emb = PluggableEmbeddings(src_embs)
+    encoder = build_only_enc(model_opt, pluggable_src_emb, task_queue_manager)
 
-    for side, lang, decoder_id, vocab in task_queue_manager.get_vocabs(side='tgt', vocabs_dict=vocabs_dict):
+    for side, lang, _, vocab in task_queue_manager.get_vocabs(side='tgt', vocabs_dict=vocabs_dict):
         tgt_emb = build_tgt_emb(model_opt, vocab)
-        tgt_embs_by_decoder[decoder_id][lang] = tgt_emb
+        tgt_embs[lang] = tgt_emb
         generator = build_generator(model_opt, len(vocab), tgt_emb)
-        generators_md.add_module(f'generator{lang}', generator)
+        generators_md.add_module(f'generator_{lang}', generator)
 
-    for decoder_id in task_queue_manager.get_decoders():
-        pluggable_tgt_emb = PluggableEmbeddings(tgt_embs_by_decoder[decoder_id])
-        decoder = build_only_dec(model_opt, pluggable_tgt_emb)
-        decoders_md.add_module(f'decoder{decoder_id}', decoder)
+    pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
+    decoder = build_only_dec(model_opt, pluggable_tgt_emb, task_queue_manager)
 
     # TODO: implement hierarchical approach to layer sharing
     attention_bridge = AttentionBridge.from_opt(model_opt)
@@ -293,7 +329,16 @@ def build_task_specific_model(
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         attention_bridge.half()
 
-    nmt_model = onmt.models.NMTModel(encoder=encoders_md, decoder=decoders_md, attention_bridge=attention_bridge)
+    nmt_model = onmt.models.NMTModel(
+        encoder=encoder,
+        decoder=decoder,
+        attention_bridge=attention_bridge
+    )
+    if uses_adapters(model_opt):
+        logger.info('Creating adapters...')
+        create_all_adapters(nmt_model, model_opt, task_queue_manager)
+    print('built model:')
+    print(nmt_model)
 
     # register a forward hook to keep track of which parameters have valid gradients.
     # p.grad is None can not be used: grad is None only before first update.
@@ -306,15 +351,21 @@ def build_task_specific_model(
 
     for module in nmt_model.modules():
         module.register_forward_hook(has_grad_hook)
+        for param in module.parameters(recurse=False):
+            if param.requires_grad:
+                param.has_grad = False
     for module in generators_md.modules():
         module.register_forward_hook(has_grad_hook)
+        for param in module.parameters(recurse=False):
+            if param.requires_grad:
+                param.has_grad = False
 
     return nmt_model, generators_md
 
 
-def build_only_enc(model_opt, src_emb):
+def build_only_enc(model_opt, src_emb, task_queue_manager):
     """Truly only builds encoder: no embeddings"""
-    encoder = build_encoder(model_opt, src_emb)
+    encoder = build_encoder(model_opt, src_emb, task_queue_manager)
     if model_opt.param_init != 0.0:
         for p in encoder.parameters():
             p.data.uniform_(-model_opt.param_init, model_opt.param_init)
@@ -328,8 +379,8 @@ def build_only_enc(model_opt, src_emb):
     return encoder
 
 
-def build_only_dec(model_opt, tgt_emb):
-    decoder = build_decoder(model_opt, tgt_emb)
+def build_only_dec(model_opt, tgt_emb, task_queue_manager):
+    decoder = build_decoder(model_opt, tgt_emb, task_queue_manager)
 
     if model_opt.param_init != 0.0:
         for p in decoder.parameters():
@@ -450,6 +501,132 @@ def build_base_model_langspec(
     model.to(device)
 
     return model, generators_md
+
+
+def uses_adapters(opt):
+    return 'adapters' in opt and opt.adapters
+
+
+def create_all_adapters(model, opt, task_queue_manager):
+    my_enc_adapter_ids = set()
+    my_dec_adapter_ids = set()
+    adapter_to_encoder_ids = defaultdict(set)
+    adapter_to_decoder_ids = defaultdict(set)
+    for task in task_queue_manager.get_tasks():
+        for adapter_id in task.encoder_adapter_ids:
+            adapter_id = tuple(adapter_id)
+            my_enc_adapter_ids.add(adapter_id)
+            adapter_to_encoder_ids[adapter_id].add(tuple(task.encoder_id))
+        for adapter_id in task.decoder_adapter_ids:
+            adapter_id = tuple(adapter_id)
+            my_dec_adapter_ids.add(adapter_id)
+            adapter_to_decoder_ids[adapter_id].add(tuple(task.decoder_id))
+    _create_adapters(
+        model,
+        opt,
+        my_enc_adapter_ids,
+        adapter_to_encoder_ids,
+        my_dec_adapter_ids,
+        adapter_to_decoder_ids,
+    )
+
+
+def create_bilingual_adapters(model, opt, src_lang, tgt_lang, opt_stack):
+    my_enc_adapter_ids = []
+    my_dec_adapter_ids = []
+    adapter_to_encoder_ids = {}
+    adapter_to_decoder_ids = {}
+
+    enc_ids = [layer_stack_opts['id'] for layer_stack_opts in opt_stack['encoder']]
+    dec_ids = [layer_stack_opts['id'] for layer_stack_opts in opt_stack['decoder']]
+
+    for layer_stack_index, layer_stack_opts in enumerate(opt_stack['encoder']):
+        for group_id, sub_id in layer_stack_opts.get('adapters', []):
+            adapter_id = (layer_stack_index, group_id, sub_id)
+            my_enc_adapter_ids.append(adapter_id)
+            adapter_to_encoder_ids[adapter_id] = [enc_ids]
+
+    for layer_stack_index, layer_stack_opts in enumerate(opt_stack['decoder']):
+        for group_id, sub_id in layer_stack_opts.get('adapters', []):
+            adapter_id = (layer_stack_index, group_id, sub_id)
+            my_dec_adapter_ids.append(adapter_id)
+            adapter_to_decoder_ids[adapter_id] = [dec_ids]
+
+    _create_adapters(
+        model,
+        opt,
+        my_enc_adapter_ids,
+        adapter_to_encoder_ids,
+        my_dec_adapter_ids,
+        adapter_to_decoder_ids,
+    )
+
+
+def _create_adapters(
+    model,
+    opt,
+    my_enc_adapter_ids,
+    adapter_to_encoder_ids,
+    my_dec_adapter_ids,
+    adapter_to_decoder_ids,
+):
+    my_enc_adapter_ids = [tuple(item) for item in my_enc_adapter_ids]
+    my_dec_adapter_ids = [tuple(item) for item in my_dec_adapter_ids]
+    for adapter_group, adapter_opts in opt.adapters['encoder'].items():
+        layer_stack_index = adapter_opts['layer_stack_index']
+        for sub_id in adapter_opts['ids']:
+            adapter_id_long = (layer_stack_index, adapter_group, sub_id)
+            if adapter_id_long not in my_enc_adapter_ids:
+                continue
+            adapter = Adapter(adapter_group, sub_id)
+            input_dim = opt.rnn_size
+            hidden_dim = adapter_opts['hidden_size']
+
+            # all stacks to which this adapter should be added
+            adapted_stacks = set(
+                stacks[layer_stack_index] for stacks in adapter_to_encoder_ids[adapter_id_long]
+            )
+            adapter_cls = EncoderAdapterLayer
+
+            for layer_idx in adapter_opts['layers']:
+                adapter.add_layer(
+                    layer_idx,
+                    adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
+                )
+            model.encoder.add_adapter(
+                adapter_group=adapter_group,
+                sub_id=sub_id,
+                adapter=adapter,
+                layer_stack_index=layer_stack_index,
+                module_ids=adapted_stacks,
+            )
+    for adapter_group, adapter_opts in opt.adapters['decoder'].items():
+        layer_stack_index = adapter_opts['layer_stack_index']
+        for sub_id in adapter_opts['ids']:
+            adapter_id_long = (layer_stack_index, adapter_group, sub_id)
+            if adapter_id_long not in my_dec_adapter_ids:
+                continue
+            adapter = Adapter(adapter_group, sub_id)
+            input_dim = opt.rnn_size
+            hidden_dim = adapter_opts['hidden_size']
+
+            adapted_stacks = set(
+                stacks[layer_stack_index] for stacks in adapter_to_decoder_ids[adapter_id_long]
+            )
+            adapter_cls = DecoderAdapterLayer
+
+            for layer_idx in adapter_opts['layers']:
+                adapter.add_layer(
+                    layer_idx,
+                    adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
+                )
+            model.decoder.add_adapter(
+                adapter_group=adapter_group,
+                sub_id=sub_id,
+                adapter=adapter,
+                layer_stack_index=layer_stack_index,
+                module_ids=adapted_stacks,
+            )
 
 
 def build_model(model_opt, opt, vocabs_dict, task_queue_manager, checkpoint):

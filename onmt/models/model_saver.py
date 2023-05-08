@@ -124,18 +124,6 @@ class ModelSaver(ModelSaverBase):
         real_model = model.module if isinstance(model, nn.DataParallel) else model
 
         model_state_dict = real_model.state_dict()
-        encoder_ids = {
-            index: lang[0].replace('encoder', '')
-            for index, lang in enumerate(model.encoder.named_children())
-        }
-        decoder_ids = {
-            index: lang[0].replace('decoder', '')
-            for index, lang in enumerate(model.decoder.named_children())
-        }
-        generator_ids = {
-            index: lang[0].replace('generator', '')
-            for index, lang in enumerate(model.generator.named_children())
-        }
 
         checkpoint = {
             "model": model_state_dict,
@@ -155,47 +143,24 @@ class ModelSaver(ModelSaverBase):
             torch.save(checkpoint, checkpoint_path)
             tmp_checkpoint_paths.append(checkpoint_path)
 
-        encoders, decoders, attention_bridge, generators, model_frame = explode_model(checkpoint)
+        modules, model_frame = explode_model(checkpoint)
 
-        # TODO: save embeddings for each language separately from the encoders/decoders
-        # encoder modules
-        for i, encoder in enumerate(encoders):
-            checkpoint_path = "{}_step_{}_{}_enc.pt".format(self.base_path, step, encoder_ids[i])
+        for key, module in modules.items():
+            # All processes will try to save the modules present on that device
+            # Not that a race condition is possible:
+            # the process can be preempted after the check for existence, but before the save.
+            # This shouldn't be a problem, if writes are atomic.
+            checkpoint_path = f'{self.base_path}_step_{step}_{key}.pt'
             if os.path.isfile(checkpoint_path):
                 logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
             else:
-                logger.info("Saving encoder checkpoint {}".format(checkpoint_path))
-                torch.save(encoder, checkpoint_path)
-                tmp_checkpoint_paths.append(checkpoint_path)
-        # decoder modules
-        for i, decoder in enumerate(decoders):
-            checkpoint_path = "{}_step_{}_{}_dec.pt".format(self.base_path, step, decoder_ids[i])
-            if os.path.isfile(checkpoint_path):
-                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
-            else:
-                logger.info("Saving decoder checkpoint {}".format(checkpoint_path))
-                torch.save(decoder, checkpoint_path)
-                tmp_checkpoint_paths.append(checkpoint_path)
-        # generator modules
-        for i, generator in enumerate(generators):
-            checkpoint_path = "{}_step_{}_{}_gen.pt".format(
-                self.base_path, step, generator_ids[i]
-            )
-            if os.path.isfile(checkpoint_path):
-                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
-            else:
-                logger.info("Saving generator checkpoint {}".format(checkpoint_path))
-                torch.save(generator, checkpoint_path)
+                logger.info("Saving module checkpoint {}".format(checkpoint_path))
+                torch.save(module, checkpoint_path)
                 tmp_checkpoint_paths.append(checkpoint_path)
 
         if device_context.is_master():
             # TODO: not sure how to deal with model_state_dict, fields, model_opt and optim.state_dict() in a multi-gpu
             #  setting. Is it OK to save only from master?
-            # attention bridge module
-            checkpoint_path = "{}_step_{}_bridge.pt".format(self.base_path, step)
-            logger.info("Saving attention bridge checkpoint {}".format(checkpoint_path))
-            torch.save(attention_bridge, checkpoint_path)
-            tmp_checkpoint_paths.append(checkpoint_path)
 
             # model frame
             checkpoint_path = "{}_step_{}_frame.pt".format(self.base_path, step)

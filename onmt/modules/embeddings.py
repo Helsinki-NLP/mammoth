@@ -273,17 +273,19 @@ class PluggableEmbeddings(nn.ModuleDict):
     def __init__(self, embedding_dict):
         super().__init__()
         for key, embeddings in embedding_dict.items():
-            self.add_module(f'embeddings{key}', embeddings)
+            self.add_module(f'embeddings_{key}', embeddings)
         self.active_key = None
 
     def activate(self, key):
-        assert f'embeddings{key}' in self, f'Embeddings "embeddings{key}" not in {self.keys()}'
+        assert f'embeddings_{key}' in self, f'Embeddings "embeddings_{key}" not in {self.keys()}'
         self.active_key = key
 
     @property
     def _active_embeddings(self):
-        active_embeddings = self[f'embeddings{self.active_key}']
-        # print(f'plugging in embeddings{self.active_key}')
+        if self.active_key is None:
+            raise Exception('Must activate PluggableEmbeddings before forward')
+        active_embeddings = self[f'embeddings_{self.active_key}']
+        # print(f'plugging in embeddings_{self.active_key}')
         return active_embeddings
 
     def forward(self, source, step=None):

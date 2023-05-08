@@ -11,6 +11,7 @@ class Transform(object):
         """Initialize Transform by parsing `opts` and add them as attribute."""
         self.opts = opts
         self._parse_opts()
+        self.task = None
 
     def _set_seed(self, seed):
         """Reproducibility: Set seed for non-deterministic transform."""
@@ -20,6 +21,9 @@ class Transform(object):
     def require_vocab(cls):
         """Override this method to inform it need vocab to start."""
         return False
+
+    def set_task(self, task):
+        self.task = task
 
     def warm_up(self, vocabs=None):
         """Procedure needed after initialize and before apply.
@@ -68,7 +72,7 @@ class Transform(object):
 
     def __getstate__(self):
         """Pickling following for rebuild."""
-        state = {"opts": self.opts}
+        state = {"opts": self.opts, "task": self.task}
         if hasattr(self, 'vocabs'):
             state['vocabs'] = self.vocabs
         return state
@@ -86,6 +90,7 @@ class Transform(object):
     def __setstate__(self, state):
         """Reload when unpickling from save file."""
         self.opts = state["opts"]
+        self.task = state["task"]
         self._parse_opts()
         vocabs = state.get('vocabs', None)
         self.warm_up(vocabs=vocabs)
@@ -223,14 +228,15 @@ class TransformPipe(Transform):
         return ', '.join(info_args)
 
 
-def make_transforms(opts, transforms_cls, vocabs):
-    """Build transforms in `transforms_cls` with `vocabs`."""
+def make_transforms(opts, transforms_cls, vocabs, task):
+    """Build transforms in `transforms_cls` with vocab of `fields`."""
     transforms = {}
     for name, transform_cls in transforms_cls.items():
         if transform_cls.require_vocab() and vocabs is None:
             logger.warning(f"{transform_cls.__name__} require vocab to apply, skip it.")
             continue
         transform_obj = transform_cls(opts)
+        transform_obj.set_task(task)
         transform_obj.warm_up(vocabs)
         transforms[name] = transform_obj
     return transforms

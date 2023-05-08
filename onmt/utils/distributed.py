@@ -7,17 +7,14 @@ import numpy as np
 import os
 import pickle
 import signal
-import torch
 import torch.distributed
 
 from abc import ABC, abstractmethod
 from argparse import Namespace
-from collections import OrderedDict, namedtuple
+from collections import OrderedDict, namedtuple, Counter
 from dataclasses import dataclass
 from enum import Enum
-from itertools import compress, cycle, islice
-
-# from onmt.inputters_mvp import get_corpus
+from itertools import cycle, islice
 from pprint import pformat
 from typing import Any, Optional, List
 
@@ -497,7 +494,10 @@ TASK_DISTRIBUTION_STRATEGIES = {
     'roundrobin': RoundRobinTaskDistributionStrategy,
 }
 
-DatasetMetadata = namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
+DatasetMetadata = namedtuple(
+    'DatasetMetadata',
+    'src_lang tgt_lang encoder_id decoder_id corpus_id encoder_adapter_ids decoder_adapter_ids'
+)
 
 
 @dataclass
@@ -506,13 +506,15 @@ class TaskSpecs():
     local_rank: int
     src_lang: str
     tgt_lang: str
-    encoder_id: str
-    decoder_id: str
+    encoder_id: List[str]
+    decoder_id: List[str]
     corpus_id: str
     weight: int
     corpus_opt: dict
     src_vocab: Any  # FIXME: type
     tgt_vocab: Any
+    encoder_adapter_ids: List[str]
+    decoder_adapter_ids: List[str]
 
     def get_serializable_metadata(self):
         """
@@ -526,7 +528,23 @@ class TaskSpecs():
             encoder_id=self.encoder_id,
             decoder_id=self.decoder_id,
             corpus_id=self.corpus_id,
+            encoder_adapter_ids=self.encoder_adapter_ids,
+            decoder_adapter_ids=self.decoder_adapter_ids,
         )
+
+
+def get_adapter_ids(opt, corpus_opt, side):
+    if 'adapters' not in opt or 'adapters' not in corpus_opt:
+        return []
+    global_adapters_opt = opt.adapters.get(side, None)
+    corpus_adapter_opt = corpus_opt['adapters'].get(side, None)
+    if not global_adapters_opt or not corpus_adapter_opt:
+        return []
+    result = []
+    for adapter_group, sub_id in corpus_adapter_opt:
+        layer_stack_index = global_adapters_opt[adapter_group]['layer_stack_index']
+        result.append((layer_stack_index, adapter_group, sub_id))
+    return result
 
 
 class TaskQueueManager:
@@ -539,6 +557,7 @@ class TaskQueueManager:
         components_to_gpus=None,
         components_to_groups=None,
         task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
+        uses_adapters: bool = False,
     ):
         """
         Schedules tasks (language pairs) to devices.
@@ -556,6 +575,7 @@ class TaskQueueManager:
         self.task_distribution_strategy = task_distribution_strategy
         self.world_context = world_context
         self.device_context = device_context
+        self.uses_adapters = uses_adapters
 
         if self.world_context and self.device_context:
             logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
@@ -563,6 +583,7 @@ class TaskQueueManager:
 
         self.components_to_gpus = components_to_gpus
         self.components_to_groups = components_to_groups
+        self.sampled_task_counts = Counter()
 
     @property
     def gpus_per_node(self):
@@ -586,53 +607,65 @@ class TaskQueueManager:
 
     @classmethod
     def from_opt(cls, opt: Namespace, world_context: WorldContext):
-        n_tasks = len(opt.src_tgt)
+        n_tasks = len(opt.data)
+
+        # Sorting the keys, to ensure that tasks have a consistent order across devices.
+        # This in turn ensures the order in which components are created from those tasks.
+        corpus_ids = sorted(opt.data.keys())
 
         if world_context.is_distributed():
-            # When --node_gpu is not set, assume an assigment that fills gpus in rank order
-            node_gpu = (
-                [tuple(int(y) for y in x.split(':', 1)) for x in opt.node_gpu] if opt.node_gpu
-                else cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
-            )
+            if any(task.get('node_gpu', None) is not None for task in opt.data.values()):
+                node_gpu = [
+                    tuple(int(y) for y in opt.data[corpus_id]['node_gpu'].split(':', 1))
+                    for corpus_id in corpus_ids]
+            else:
+                # When --node_gpu is not set, assume an assigment that fills gpus in rank order
+                node_gpu = cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
         else:
             node_gpu = [(0, 0)] * n_tasks
-        lang_pairs = [lang_pair.split('-') for lang_pair in opt.src_tgt]
 
-        if opt.enc_sharing_group:
-            encoder_ids = opt.enc_sharing_group
+        enc_sharing_group = [
+            opt.data[corpus_id].get('enc_sharing_group', None) for corpus_id in corpus_ids
+        ]
+        dec_sharing_group = [
+            opt.data[corpus_id].get('dec_sharing_group', None) for corpus_id in corpus_ids
+        ]
+        if any(x is not None for x in enc_sharing_group):
+            assert all(len(enc_ids) == len(opt.enc_layers) for enc_ids in enc_sharing_group)
         else:
-            # if no encoder sharing groups are defined, encoders are language specific
-            encoder_ids = [src_lang for src_lang, tgt_lang in lang_pairs]
-        if opt.dec_sharing_group:
-            decoder_ids = opt.dec_sharing_group
+            # if no encoder sharing groups are defined,
+            # it is assumed that there is only one encoder stack and it is language specific
+            if not len(opt.enc_layers) == 1:
+                raise Exception('With more than one encoder stack, you must explictly define enc_sharing_group')
+        if any(x is not None for x in dec_sharing_group):
+            assert all(len(dec_ids) == len(opt.dec_layers) for dec_ids in dec_sharing_group)
         else:
-            # if no decoder sharing groups are defined, decoders are language specific
-            decoder_ids = [tgt_lang for src_lang, tgt_lang in lang_pairs]
-
-        corpus_ids = opt.data.keys()
-
-        assert len(node_gpu) == n_tasks, f'{len(node_gpu)} != {n_tasks}'
-        assert len(lang_pairs) == n_tasks, f'{len(lang_pairs)} != {n_tasks}'
-        assert len(encoder_ids) == n_tasks, f'{len(encoder_ids)} != {n_tasks}'
-        assert len(decoder_ids) == n_tasks, f'{len(decoder_ids)} != {n_tasks}'
-        assert len(corpus_ids) == n_tasks, f'{len(corpus_ids)} != {n_tasks}'
+            # if no decoder sharing groups are defined,
+            # it is assumed that there is only one decoder stack and it is language specific
+            if not len(opt.dec_layers) == 1:
+                raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
 
         tasks = []
+        uses_adapters = False
         for (
             (node_rank, local_rank),
-            (src_lang, tgt_lang),
-            encoder_id,
-            decoder_id,
             corpus_id
         ) in zip(
             node_gpu,
-            lang_pairs,
-            encoder_ids,
-            decoder_ids,
             corpus_ids
         ):
             corpus_opt = opt.data[corpus_id]
+            src_lang, tgt_lang = corpus_opt['src_tgt'].split('-', 1)
+            encoder_id = corpus_opt.get('enc_sharing_group', [src_lang])
+            decoder_id = corpus_opt.get('dec_sharing_group', [tgt_lang])
             weight = corpus_opt.get('weight', 1.0)
+            if 'adapters' in corpus_opt:
+                encoder_adapter_ids = get_adapter_ids(opt, corpus_opt, 'encoder')
+                decoder_adapter_ids = get_adapter_ids(opt, corpus_opt, 'decoder')
+                uses_adapters = True
+            else:
+                encoder_adapter_ids = None
+                decoder_adapter_ids = None
             task = TaskSpecs(
                 node_rank=node_rank,
                 local_rank=local_rank,
@@ -645,12 +678,15 @@ class TaskQueueManager:
                 corpus_opt=corpus_opt,
                 src_vocab=None,
                 tgt_vocab=None,
+                encoder_adapter_ids=encoder_adapter_ids,
+                decoder_adapter_ids=decoder_adapter_ids,
             )
             tasks.append(task)
         return cls(
             tasks,
             world_context=world_context,
             tasks_per_communication_batch=opt.accum_count,
+            uses_adapters=uses_adapters,
         )
 
     def global_to_local(self, node_rank, local_rank, opt):
@@ -666,6 +702,7 @@ class TaskQueueManager:
             components_to_gpus=self.components_to_gpus,
             components_to_groups=self.components_to_groups,
             task_distribution_strategy=task_distribution_strategy,
+            uses_adapters=self.uses_adapters,
         )
 
     def _get_strategy(self, node_rank, local_rank, opt):
@@ -687,7 +724,15 @@ class TaskQueueManager:
     def __repr__(self):
         kwargs = ',\n '.join(
             f'{key}={pformat(self.__getattribute__(key))}'
-            for key in ['tasks', 'gpus_per_node', 'n_nodes', 'node_rank', 'local_rank']
+            for key in [
+                'tasks',
+                'gpus_per_node',
+                'n_nodes',
+                'node_rank',
+                'local_rank',
+                'task_distribution_strategy',
+                'uses_adapters',
+            ]
         )
         return f'{self.__class__.__name__}(\n{kwargs}\n)'
 
@@ -723,10 +768,12 @@ class TaskQueueManager:
         # Single OrderedDict contains all components.
         # Keys are tuples of strings.
         # The length of the key varies depending on the component:
-        # ('encoder', encoder_id)
-        # ('decoder', decoder_id)
-        # ('src_emb', lang, encoder_id)
-        # ('tgt_emb', lang, decoder_id)
+        # ('encoder', layer_stack_index, encoder_id)
+        # ('decoder', layer_stack_index, decoder_id)
+        # ('src_emb', lang)
+        # ('tgt_emb', lang)
+        # ('encoder_adapters', layer_stack_index, encoder_id, adapter_group, sub_id)
+        # ('decoder_adapters', layer_stack_index, decoder_id, adapter_group, sub_id)
         self.components_to_gpus = OrderedDict()
 
         for node_rank in range(self.n_nodes):
@@ -736,19 +783,36 @@ class TaskQueueManager:
 
                 for task in tasks:
                     keys = [
-                        ('encoder', task.encoder_id),
-                        ('decoder', task.decoder_id),
-                        ('src_emb', task.src_lang, task.encoder_id),
-                        ('tgt_emb', task.tgt_lang, task.decoder_id),
+                        ('src_emb', task.src_lang),
+                        ('tgt_emb', task.tgt_lang),
                     ]
+                    for layer_stack_index, encoder_id in enumerate(task.encoder_id):
+                        keys.append(('encoder', layer_stack_index, encoder_id))
+                    for layer_stack_index, decoder_id in enumerate(task.decoder_id):
+                        keys.append(('decoder', layer_stack_index, decoder_id))
                     for key in keys:
                         # Using setdefault to treat OrderedDict as defaultdict
                         self.components_to_gpus.setdefault(key, set()).add(global_rank)
 
+                    if task.encoder_adapter_ids:
+                        for layer_stack_index, adapter_group, sub_id in task.encoder_adapter_ids:
+                            encoder_id = task.encoder_id[layer_stack_index]
+                            key = ('encoder_adapters', layer_stack_index, encoder_id, adapter_group, sub_id)
+                            self.components_to_gpus.setdefault(key, set()).add(global_rank)
+                    if task.decoder_adapter_ids:
+                        for layer_stack_index, adapter_group, sub_id in task.decoder_adapter_ids:
+                            decoder_id = task.decoder_id[layer_stack_index]
+                            key = ('decoder_adapters', layer_stack_index, decoder_id, adapter_group, sub_id)
+                            self.components_to_gpus.setdefault(key, set()).add(global_rank)
+
         # Structured, each component in a separate OrderedDict
         self.components_to_groups = {
-            component_type:  OrderedDict() for component_type in ('encoder', 'decoder', 'src_emb', 'tgt_emb')
+            component_type: OrderedDict() for component_type
+            in ('encoder', 'decoder', 'src_emb', 'tgt_emb')
         }
+        if self.uses_adapters:
+            self.components_to_groups['encoder_adapters'] = OrderedDict()
+            self.components_to_groups['decoder_adapters'] = OrderedDict()
         for key, global_ranks in self.components_to_gpus.items():
             if len(global_ranks) < 2:
                 # only create a process group if the component is on 2 or more gpus
@@ -786,6 +850,8 @@ class TaskQueueManager:
             'decoder': OrderedDict(),
             'src_emb': OrderedDict(),
             'tgt_emb': OrderedDict(),
+            'encoder_adapters': OrderedDict(),
+            'decoder_adapters': OrderedDict(),
         }
 
         if self.global_rank is None:
@@ -810,30 +876,69 @@ class TaskQueueManager:
 
         return my_distributed_groups
 
+    def get_grouped_components(self, model):
+        """
+        Returns nested dict of component_type -> component_id -> nn.Module.
+        Only components present on this GPU are returned.
+        Unlike get_distributed_groups, this method also returns components on a single device,
+        and it does not retrieve communication groups.
+        """
+        if self.components_to_groups is None:
+            raise Exception('Must call get_distributed_groups first')
+
+        my_grouped_components = {
+            'encoder': OrderedDict(),
+            'decoder': OrderedDict(),
+            'src_emb': OrderedDict(),
+            'tgt_emb': OrderedDict(),
+            'encoder_adapters': OrderedDict(),
+            'decoder_adapters': OrderedDict(),
+        }
+
+        if not self.world_context.is_distributed():
+            tasks = self.tasks
+        else:
+            tasks = self.get_tasks()
+
+        for task in tasks:
+            # loop over my tasks, getting all the relevant module ids and modules
+            my_grouped_components['src_emb'][task.src_lang] = model.encoder.embeddings[f'embeddings_{task.src_lang}']
+            my_grouped_components['tgt_emb'][task.tgt_lang] = model.decoder.embeddings[f'embeddings_{task.tgt_lang}']
+            for layer_stack_index, encoder_id in enumerate(task.encoder_id):
+                component = model.encoder.get_submodule(layer_stack_index, encoder_id)
+                my_grouped_components['encoder'][(layer_stack_index, encoder_id)] = component
+            for layer_stack_index, decoder_id in enumerate(task.decoder_id):
+                component = model.decoder.get_submodule(layer_stack_index, decoder_id)
+                my_grouped_components['decoder'][(layer_stack_index, decoder_id)] = component
+            if task.encoder_adapter_ids:
+                for layer_stack_index, adapter_group, sub_id in task.encoder_adapter_ids:
+                    encoder_id = task.encoder_id[layer_stack_index]
+                    key = (layer_stack_index, encoder_id, adapter_group, sub_id)
+                    component = model.encoder.get_submodule(
+                        layer_stack_index, encoder_id
+                    ).get_adapter(adapter_group, sub_id)
+                    my_grouped_components['encoder_adapters'][key] = component
+            if task.decoder_adapter_ids:
+                for layer_stack_index, adapter_group, sub_id in task.decoder_adapter_ids:
+                    decoder_id = task.decoder_id[layer_stack_index]
+                    key = (layer_stack_index, decoder_id, adapter_group, sub_id)
+                    component = model.decoder.get_submodule(
+                        layer_stack_index, decoder_id
+                    ).get_adapter(adapter_group, sub_id)
+                    my_grouped_components['decoder_adapters'][key] = component
+
+        return my_grouped_components
+
     # TODO: soon deprecated by #18 Data pipeline refactoring
     def get_fields(self, side: str, fields_dict):
         """Returns a list of tuples: (side, lang, component_id, fields)."""
         raise RuntimeError
 
-    # def get_corpora(self, is_train=False, vocabs_dict=None) -> Dict[str, Any]:
-    #     corpus_ids = self.opt.data.keys()
-    #     my_lang_pairs = compress(self.lang_pairs, self._selector)
-    #     my_corpus_ids = compress(corpus_ids, self._selector)
-    #     src_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='src', vocabs_dict=vocabs_dict)}
-    #     tgt_vocabs = {lang: vocab for (_, lang, _, vocab) in self.get_vocabs(side='tgt', vocabs_dict=vocabs_dict)}
-    #     device = torch.device(self.local_rank)
-    #     return {
-    #         corpus_id: get_corpus(self.opt, corpus_id, src_vocabs[src], tgt_vocabs[tgt], is_train=is_train).to(device)
-    #         for (corpus_id, (src, tgt)) in zip(my_corpus_ids, my_lang_pairs)
-    #     }
-
     # FIXME: merge with below
     def get_vocabularies(self, opt: Namespace, side: str):
-        my_lang_pairs = compress(self.lang_pairs, self._selector)
         result = []
-        for lang_pair in my_lang_pairs:
-            src_lang, tgt_lang = lang_pair
-            lang = src_lang if side == 'src' else tgt_lang
+        for task in self.get_tasks():
+            lang = self.src_lang if side == 'src' else self.tgt_lang
             vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
             result.append((lang, vocab_path))
         return result
@@ -842,45 +947,43 @@ class TaskQueueManager:
         """Returns a list of tuples: (side, lang, component_id, vocabs).
         side:           Either 'src' or 'tgt'.
         lang:           The language code. Vocabularies are language specific.
-        component_id:   The encoder or decoder id. Embeddings are stored in
-                        the encoders/decoders, so that component needs to be identified
-                        in order to access the correct embeddings,
-                        even if the embeddings are language specific.
-        vocabs_dict:         The actual vocabs.
+        component_id:   None
+        vocabs_dict:    The actual vocabs.
         """
         seen = set()
         result = []
+        component_id = None     # for hysterical raisins
         for task in self.get_tasks():
             if side == 'src':
                 lang = task.src_lang
-                component_id = task.encoder_id
             else:
                 lang = task.tgt_lang
-                component_id = task.decoder_id
             if not (side, lang, component_id) in seen:
                 result.append((side, lang, component_id, vocabs_dict[(side, lang)]))
             seen.add((side, lang, component_id))
         return result
 
     def sample_corpus_ids(self, communication_batch_id: int):
-        return self.task_distribution_strategy.sample_corpus_ids(
+        corpus_ids = self.task_distribution_strategy.sample_corpus_ids(
             self.tasks_per_communication_batch,
             communication_batch_id,
         )
+        self.sampled_task_counts.update(corpus_ids)
+        return corpus_ids
 
-    def get_encoders(self):
-        my_encoder_ids = [task.encoder_id for task in self.get_tasks()]
+    def get_encoders(self, layer_stack_index: int):
+        my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_tasks()]
         return my_encoder_ids
 
-    def get_decoders(self):
-        my_decoder_ids = [task.decoder_id for task in self.get_tasks()]
+    def get_decoders(self, layer_stack_index: int):
+        my_decoder_ids = [task.decoder_id[layer_stack_index] for task in self.get_tasks()]
         return my_decoder_ids
 
-    def get_src_embs(self):
-        return [(task.src_lang, task.encoder_id) for task in self.get_tasks()]
+    def get_src_langs(self):
+        return [task.src_lang for task in self.get_tasks()]
 
-    def get_tgt_embs(self):
-        return [(task.tgt_lang, task.decoder_id) for task in self.get_tasks()]
+    def get_tgt_langs(self):
+        return [task.tgt_lang for task in self.get_tasks()]
 
     def get_generators(self):
         return [task.tgt_lang for task in self.get_tasks()]

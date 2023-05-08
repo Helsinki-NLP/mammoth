@@ -36,10 +36,21 @@ class TestTraining(TestCase):
 
     @staticmethod
     def _get_model_components(opt) -> List[str]:
-        components_enc = ["{}_enc".format(src_lang) for src_lang in ast.literal_eval(opt.src_vocab).keys()]
-        components_dec = ["{}_dec".format(tgt_lang) for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()]
-        components_gen = ["{}_gen".format(tgt_lang) for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()]
-        return ["frame", "bridge", *components_enc, *components_dec, *components_gen]
+        # N.B: These components are only valid for very vanilla language-specific xcoder with fully shared AB models
+        components_enc = [f"encoder_0_{src_lang}" for src_lang in ast.literal_eval(opt.src_vocab).keys()]
+        components_dec = [f"encoder_0_{tgt_lang}" for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()]
+        components_gen = [f"generator_{tgt_lang}" for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()]
+        components_src_emb = [f"src_embeddings_{src_lang}" for src_lang in ast.literal_eval(opt.src_vocab).keys()]
+        components_tgt_emb = [f"tgt_embeddings_{tgt_lang}" for tgt_lang in ast.literal_eval(opt.tgt_vocab).keys()]
+        return [
+            "frame",
+            "attention_bridge",
+            *components_enc,
+            *components_dec,
+            *components_gen,
+            *components_src_emb,
+            *components_tgt_emb,
+        ]
 
     @timeout_decorator.timeout(60)
     def test_training_1gpu_4pairs(self):

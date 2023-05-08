@@ -1,0 +1,148 @@
+config_config:
+  src_path: "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/{sorted_pair}/opus.{sorted_pair}-train.{src_lang}"
+  tgt_path: "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/{sorted_pair}/opus.{sorted_pair}-train.{tgt_lang}"
+  ae_path:  "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/en-{tgt_lang}/opus.en-{tgt_lang}-train.{tgt_lang}" # FIXME: this doesn't actually support all langs, only langs sorting after en.
+  # A better way would be to keep monolingual data separate.
+  # If we want to support this, we need something ugly like {sorted_pair_with_pivot}
+  autoencoder: True
+  # distance_matrix: not set here, but could use examples/config_config.distance.csv
+  n_groups: 6
+  use_weight: True
+  use_introduce_at_training_step: True
+  zero_shot: True
+  transforms:
+    - sentencepiece
+    - filtertoolong
+  ae_transforms:
+    - sentencepiece
+    - filtertoolong
+    - bart
+  enc_sharing_groups:
+    - GROUP
+    - FULL
+  dec_sharing_groups:
+    - GROUP
+    - FULL
+    - GROUP
+  translation_config_dir: config/translation.opus
+  n_gpus_per_node: 4
+  n_nodes: 2
+  
+  # Note that this specifies the groups manually instead of clustering
+  groups:
+    "en": "en"
+    "af": "af+nl"
+    "da": "da+sv"
+    "es": "es+it"
+    "et": "et+fi"
+    "fi": "et+fi"
+    "it": "es+it"
+    "nl": "af+nl"
+    "sv": "da+sv"
+
+
+save_data: generated/opus.spm32k
+# vocabs serve two purposes: defines the vocab files, and gives the potential languages to consider
+src_vocab: 
+  "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
+  "da": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.dan.32k.spm.vocab"
+  "en": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.eng.32k.spm.vocab"
+  "es": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.spa.32k.spm.vocab"
+  "et": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.est.32k.spm.vocab"
+  "fi": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.fin.32k.spm.vocab"
+  "it": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.ita.32k.spm.vocab"
+  "nl": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.nld.32k.spm.vocab"
+  "sv": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.swe.32k.spm.vocab"
+tgt_vocab:
+  "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
+  "da": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.dan.32k.spm.vocab"
+  "en": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.eng.32k.spm.vocab"
+  "es": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.spa.32k.spm.vocab"
+  "et": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.est.32k.spm.vocab"
+  "fi": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.fin.32k.spm.vocab"
+  "it": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.ita.32k.spm.vocab"
+  "nl": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.nld.32k.spm.vocab"
+  "sv": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.swe.32k.spm.vocab"
+overwrite: False
+
+adapters:
+  encoder:
+    enc_lang_bottom:
+      layer_stack_index: 0
+      layers: [0, 1, 2]
+      hidden_size: 8
+      ids: LANGUAGE
+    enc_lang_top:
+      layer_stack_index: 1
+      layers: [0, 1, 2]
+      hidden_size: 8
+      ids: LANGUAGE
+  decoder:
+    dec_lang_bottom:
+      layer_stack_index: 0
+      layers: [0, 1]
+      hidden_size: 16
+      ids: LANGUAGE
+    dec_lang_mid:
+      layer_stack_index: 1
+      layers: [0, 1, 2]
+      hidden_size: 16
+      ids: LANGUAGE
+    dec_lang_top:
+      layer_stack_index: 2
+      layers: [0]
+      hidden_size: 16
+      ids: LANGUAGE
+
+save_model: models/opus.spm32k.adafactor.hamburger.l2.dsae/opus.spm32k.adafactor.hamburger.l2.dsae
+
+batch_size: 32768
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 4096
+max_generator_batches: 2
+use_attention_bridge: false
+attention_heads: 50
+encoder_type: transformer
+decoder_type: transformer
+rnn_size: 512
+word_vec_size: 512
+transformer_ff: 2048
+heads: 8
+enc_layers: [3, 3]
+dec_layers: [2, 3, 1]
+dropout: 0.1
+label_smoothing: 0.1
+weight_decay: 0.05
+param_init: 0.0
+param_init_glorot: true
+position_encoding: true
+train_steps: 150000
+valid_steps: 500000
+warmup_steps: 10000
+report_every: 100
+save_checkpoint_steps: 5000
+keep_checkpoint: 3
+accum_count: 12
+optim: adafactor
+decay_method: none
+learning_rate: 3.0
+max_grad_norm: 0.0
+seed: 3435
+model_type: text
+#### Sentencepiece
+src_subword_type: sentencepiece
+trg_subword_type: sentencepiece
+src_subword_nbest: 5
+tgt_subword_nbest: 5
+# Note that the variables here are populated by OpenNMT code, not config_config
+src_subword_model: models/tatoeba_spm/opusTC.{src_lang}.32k.spm
+tgt_subword_model: models/tatoeba_spm/opusTC.{tgt_lang}.32k.spm
+#### Filter
+src_seq_length: 200
+tgt_seq_length: 200
+#### Bart
+mask_length: span-poisson
+poisson_lambda: 3.0
+mask_ratio: 0.2
+replace_length: 1

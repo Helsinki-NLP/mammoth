@@ -171,7 +171,15 @@ class SentencePieceTransform(TokenizerTransform):
         import sentencepiece as spm
 
         load_src_model = spm.SentencePieceProcessor()
-        load_src_model.Load(self.src_subword_model)
+        if self.task:
+            concrete_model = self.src_subword_model.format(
+                src_lang=self.task.src_lang,
+                tgt_lang=self.task.tgt_lang,
+            )
+        else:
+            concrete_model = self.src_subword_model
+        logger.info(f'Concrete SentencePiece model, src: {concrete_model}')
+        load_src_model.Load(concrete_model)
         _diff_vocab = (
             self.src_subword_vocab != self.tgt_subword_vocab or self.src_vocab_threshold != self.tgt_vocab_threshold
         )
@@ -181,7 +189,15 @@ class SentencePieceTransform(TokenizerTransform):
             self.load_models = {'src': load_src_model, 'tgt': load_src_model}
         else:
             load_tgt_model = spm.SentencePieceProcessor()
-            load_tgt_model.Load(self.tgt_subword_model)
+            if self.task:
+                concrete_model = self.tgt_subword_model.format(
+                    src_lang=self.task.src_lang,
+                    tgt_lang=self.task.tgt_lang,
+                )
+            else:
+                concrete_model = self.tgt_subword_model
+            logger.info(f'Concrete SentencePiece model, tgt: {concrete_model}')
+            load_tgt_model.Load(concrete_model)
             if self.tgt_subword_vocab != "" and self.tgt_vocab_threshold > 0:
                 load_tgt_model.LoadVocabulary(self.tgt_subword_vocab, self.tgt_vocab_threshold)
             self.load_models = {'src': load_src_model, 'tgt': load_tgt_model}
@@ -206,10 +222,12 @@ class SentencePieceTransform(TokenizerTransform):
     def apply(self, example, is_train=False, stats=None, **kwargs):
         """Apply sentencepiece subword encode to src & tgt."""
         src_out = self._tokenize(example['src'], 'src', is_train)
-        tgt_out = self._tokenize(example['tgt'], 'tgt', is_train)
+        tgt_out = self._tokenize(example['tgt'], 'tgt', is_train) if example['tgt'] is not None else None
         if stats is not None:
-            n_words = len(example['src']) + len(example['tgt'])
-            n_subwords = len(src_out) + len(tgt_out)
+            tgt_len_in = 0 if example['tgt'] is None else len(example['tgt'])
+            tgt_len_out = 0 if tgt_out is None else len(tgt_out)
+            n_words = len(example['src']) + tgt_len_in
+            n_subwords = len(src_out) + tgt_len_out
             stats.update(SubwordStats(n_subwords, n_words))
         example['src'], example['tgt'] = src_out, tgt_out
         return example

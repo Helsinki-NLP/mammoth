@@ -278,7 +278,7 @@ class DynamicDatasetIter(object):
                 else 'cpu'
             )
             corpus = get_corpus(
-                self.opts, task.corpus_id, src_vocab, tgt_vocab, is_train=self.is_train
+                self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
             ).to(device)
 
             # iterator over minibatches
@@ -306,3 +306,8 @@ class DynamicDatasetIter(object):
                 ordered_iter, metadata = self.dataset_iterators[corpus_id]
                 yield next(ordered_iter), metadata, communication_batch_id
             communication_batch_id += 1
+            if communication_batch_id % 1000 == 0:
+                total = sum(self.task_queue_manager.sampled_task_counts.values())
+                logger.info(f'Task sampling distribution: (total {total})')
+                for task, count in self.task_queue_manager.sampled_task_counts.most_common():
+                    logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')

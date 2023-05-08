@@ -49,31 +49,45 @@ def _build_valid_iter(opt, vocabs, transforms_cls):
 
 def init_distributed(model, task_queue_manager):
     my_component_groups = task_queue_manager.get_distributed_groups()
-    for (encoder_id,), (min_rank, group) in my_component_groups['encoder'].items():
+    for (layer_stack_index, encoder_id), (min_rank, group) in my_component_groups['encoder'].items():
         weights = [
-            p.data for name, p in model.encoder[f'encoder{encoder_id}'].named_parameters() if 'embeddings' not in name
+            p.data for name, p
+            in model.encoder.get_submodule(layer_stack_index, encoder_id).named_parameters()
+            if 'embeddings' not in name and 'adapter' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-    for (decoder_id,), (min_rank, group) in my_component_groups['decoder'].items():
+    for (layer_stack_index, decoder_id), (min_rank, group) in my_component_groups['decoder'].items():
         weights = [
-            p.data for name, p in model.decoder[f'decoder{decoder_id}'].named_parameters() if 'embeddings' not in name
+            p.data for name, p
+            in model.decoder.get_submodule(layer_stack_index, decoder_id).named_parameters()
+            if 'embeddings' not in name and 'adapter' not in name
         ]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-    for src_emb_id, (min_rank, group) in my_component_groups['src_emb'].items():
-        src_lang, encoder_id = src_emb_id
-        embs = model.encoder[f'encoder{encoder_id}'].embeddings[f'embeddings{src_lang}']
+    for (src_lang,), (min_rank, group) in my_component_groups['src_emb'].items():
+        embs = model.encoder.embeddings[f'embeddings_{src_lang}']
         weights = [p.data for p in embs.parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-    for tgt_emb_id, (min_rank, group) in my_component_groups['tgt_emb'].items():
-        tgt_lang, decoder_id = tgt_emb_id
-        embs = model.decoder[f'decoder{decoder_id}'].embeddings[f'embeddings{tgt_lang}']
+    for (tgt_lang,), (min_rank, group) in my_component_groups['tgt_emb'].items():
+        embs = model.decoder.embeddings[f'embeddings_{tgt_lang}']
         weights = [p.data for p in embs.parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
-        weights = [p.data for p in model.generator[f'generator{tgt_lang}'].parameters()]
+        weights = [p.data for p in model.generator[f'generator_{tgt_lang}'].parameters()]
+        broadcast_tensors(weights, src=min_rank, group=group)
+
+    for adapter_id, (min_rank, group) in my_component_groups['encoder_adapters'].items():
+        layer_stack_index, encoder_id, adapter_group, sub_id = adapter_id
+        adapter = model.encoder.get_submodule(layer_stack_index, encoder_id).get_adapter(adapter_group, sub_id)
+        weights = [p.data for name, p in adapter.named_parameters()]
+        broadcast_tensors(weights, src=min_rank, group=group)
+
+    for adapter_id, (min_rank, group) in my_component_groups['decoder_adapters'].items():
+        layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
+        adapter = model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(adapter_group, sub_id)
+        weights = [p.data for name, p in adapter.named_parameters()]
         broadcast_tensors(weights, src=min_rank, group=group)
 
     weights = [p.data for p in model.attention_bridge.parameters()]
@@ -82,6 +96,15 @@ def init_distributed(model, task_queue_manager):
     logger.debug('After init_distributed')
     for name, p in model.named_parameters():
         logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: {p.flatten()[:10]}')
+
+
+def iter_on_device(iterator, device_context):
+    if device_context.is_gpu():
+        device = torch.device(f'cuda:{device_context.local_rank}')
+    else:
+        device = torch.device('cpu')
+    for batch, meta, comm_batch_id in iterator:
+        yield batch.to(device), meta, comm_batch_id
 
 
 def main(
@@ -98,7 +121,7 @@ def main(
     # at this point.
     # N.B: task_queue_manager is already local
 
-    init_logger(opt.log_file)
+    init_logger(opt.log_file, gpu_id=device_context.id)
     if device_context.is_distributed():
         configure_process(opt, device_context.local_rank)
         gpu_rank_t = torch.distributed.get_rank()
@@ -115,6 +138,9 @@ def main(
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
+    else:
+        # Initialize some data structures
+        _ = task_queue_manager.get_distributed_groups()
     enc, dec = model.count_parameters(log=logger.debug)
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
     logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))
@@ -170,6 +196,7 @@ def main(
                 yield batch, metadata, communication_batch_id
 
         train_iter = _train_iter()
+    train_iter = iter_on_device(train_iter, device_context)
     logger.info("Device {} - Valid iter".format(device_context.id))
     valid_iter = _build_valid_iter(opt, vocabs_dict, transforms_cls)
     if valid_iter is not None:

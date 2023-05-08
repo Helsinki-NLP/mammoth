@@ -20,10 +20,19 @@ class Batch():
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
-        self.tgt = self.tgt.to(device)
+        if self.tgt is not None:
+            self.tgt = self.tgt.to(device)
+        return self
 
 
-def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transforms_fn=lambda x: x):
+def read_examples_from_files(
+    src_path,
+    tgt_path,
+    tokenize_fn=str.split,
+    transforms_fn=lambda x: x,
+    stride=None,
+    offset=None,
+):
     """Helper function to read examples"""
 
     def _make_example_dict(packed):
@@ -39,6 +48,9 @@ def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transfor
     tgt_fh = open(tgt_path) if tgt_path is not None else itertools.repeat(None)
 
     examples = zip(src_fh, tgt_fh)
+    if stride is not None and offset is not None:
+        # Start by skipping offset examples. After that return every stride:th example.
+        examples = itertools.islice(examples, offset, None, stride)
     examples = map(_make_example_dict, examples)
     examples = map(transforms_fn, examples)
     examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
@@ -51,7 +63,17 @@ def read_examples_from_files(src_path, tgt_path, tokenize_fn=str.split, transfor
 
 class ParallelCorpus(IterableDataset):
     """Torch-style dataset"""
-    def __init__(self, src_file, tgt_file, src_vocab, tgt_vocab, transforms, device='cpu'):
+    def __init__(
+        self,
+        src_file,
+        tgt_file,
+        src_vocab,
+        tgt_vocab,
+        transforms,
+        device='cpu',
+        stride=None,
+        offset=None,
+    ):
         self.src_file = src_file
         self.tgt_file = tgt_file
         self.transforms = transforms
@@ -60,25 +82,25 @@ class ParallelCorpus(IterableDataset):
             'src': src_vocab,
             'tgt': tgt_vocab,
         }
+        self.stride = stride
+        self.offset = offset
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
-        """Split string, surround with specials"""
-        vocab = self.vocabs[side]
-        tokens = [
-            DefaultTokens.BOS,
-            *(
-                word if word in vocab.stoi else DefaultTokens.UNK
-                for word in string.split()
-            ),
-            DefaultTokens.EOS,
-        ]
-        return tokens
+        """Split string, accompanied by a drumroll"""
+        return string.split()
 
     def _numericalize(self, tokens, side='src'):
         """Convert list of strings into list of indices"""
         vocab = self.vocabs[side]
-        indices = torch.tensor(list(map(vocab.stoi.__getitem__, tokens)), device=self.device)
+        bos = vocab[DefaultTokens.BOS]
+        eos = vocab[DefaultTokens.EOS]
+        unk = vocab[DefaultTokens.UNK]
+        indices = torch.tensor([
+            bos,
+            *(vocab.stoi.get(token, unk) for token in tokens),
+            eos,
+        ], device='cpu')
         return indices
 
     def to(self, device):
@@ -100,6 +122,8 @@ class ParallelCorpus(IterableDataset):
             self.tgt_file,
             tokenize_fn=self._tokenize,
             transforms_fn=self.transforms.apply if self.transforms is not None else lambda x: x,
+            stride=self.stride,
+            offset=self.offset,
         )
         examples = map(_cast, examples)
         yield from examples
@@ -109,18 +133,18 @@ class ParallelCorpus(IterableDataset):
         has_tgt = 'tgt' in examples[0].keys()
         src_padidx = self.vocabs['src'][DefaultTokens.PAD]
         tgt_padidx = self.vocabs['tgt'][DefaultTokens.PAD]
-        src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device=self.device)
+        src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
         src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx).unsqueeze(-1), src_lengths)
         tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1) if has_tgt else None
         batch = Batch(src, tgt, len(examples))
         return batch
 
 
-def get_corpus(opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
+def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
-    corpus_opts = opts.data[corpus_id]
+    corpus_opts = opts.data[task.corpus_id]
     transforms_cls = get_transforms_cls(corpus_opts.get('transforms', opts.transforms))
 
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
@@ -130,7 +154,9 @@ def get_corpus(opts, corpus_id: str, src_vocab: Vocab, tgt_vocab: Vocab, is_trai
         corpus_opts["path_tgt"],
         src_vocab,
         tgt_vocab,
-        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs).values()),
+        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs, task=task).values()),
+        stride=corpus_opts.get('stride', None),
+        offset=corpus_opts.get('offset', None),
     )
     return dataset
 

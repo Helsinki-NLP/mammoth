@@ -65,13 +65,6 @@ def _add_logging_opts(parser, is_train=True):
             action="store_true",
             help="Report parameter-level statistics in tensorboard",
         )
-        group.add(
-            '--lca_loginterval',
-            '-lca_loginterval',
-            type=int,
-            default=-1,
-            help="Compute and print the att-bridge LCA at this interval.",
-        )
 
     else:
         # Options only during inference
@@ -106,9 +99,6 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         "--data",
         required=True,
         help="List of datasets and their specifications. See examples/*.yaml for further details.",
-    )
-    group.add(
-        "-src_tgt", "--src_tgt", required=True, nargs='+', help="List of source and target language for each dataset. "
     )
     group.add(
         "-skip_empty_level",
@@ -392,20 +382,6 @@ def model_opts(parser):
     group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
 
     group.add(
-        "--enc_sharing_group",
-        "-enc_sharing_group",
-        nargs='+',
-        help="List of encoder sharing group id for each dataset. ",
-    )
-    group.add(
-        "--dec_sharing_group",
-        "-dec_sharing_group",
-        nargs='+',
-        help="List of decoder sharing group id for each dataset. ",
-    )
-    group.add("--node_gpu", "-node_gpu", nargs='+', help="List of node:gpu assignments")
-
-    group.add(
         '--encoder_type',
         '-encoder_type',
         type=str,
@@ -426,9 +402,9 @@ def model_opts(parser):
         "[rnn|transformer|cnn|transformer].",
     )
 
-    group.add('--layers', '-layers', type=int, default=-1, help='Number of layers in enc/dec.')
-    group.add('--enc_layers', '-enc_layers', type=int, default=2, help='Number of layers in the encoder')
-    group.add('--dec_layers', '-dec_layers', type=int, default=2, help='Number of layers in the decoder')
+    group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
+    group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder')
+    group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder')
     group.add(
         '--rnn_size',
         '-rnn_size',
@@ -670,6 +646,11 @@ def model_opts(parser):
         choices=['none', 'rmsnorm', 'layernorm'],
         help="""Use layer normalization after lin, simple and feedforward bridge layers""",
     )
+
+    # adapter options are in a dict "adapters", and in the corpus options
+    group = parser.add_argument_group("Adapters")
+    group.add('-adapters', '--adapters',
+              help="""Adapter specifications""")
 
 
 def _add_train_general_opts(parser):
@@ -1298,38 +1279,10 @@ def build_bilingual_model(parser):
         required=True,
         help="The 2-character target language code",
     )
-    group.add("--enc_id", "-enc_id", default=None, help="The encoder id. If unset, defaults to the src_lang")
-    group.add("--dec_id", "-dec_id", default=None, help="The decoder id. If unset, defaults to the tgt_lang")
-    group = parser.add_argument_group("Model Modules")
     group.add(
-        "--encoder",
-        "-encoder",
-        required=False,
-        help="Path to the encoder module .pt file NOT NEEDED IF --model gives a path+model_preffix",
-    )
-    group.add(
-        "--decoder",
-        "-decoder",
-        required=False,
-        help="Path to the decoder module .pt file NOT NEEDED IF --model gives a path+model_preffix",
-    )
-    group.add(
-        "--bridge",
-        "-bridge",
-        required=False,
-        help="Path to the attention bridge module .pt file",
-    )
-    group.add(
-        "--generator",
-        "-generator",
-        required=False,
-        help="Path to the generator module .pt file",
-    )
-    group.add(
-        "--model_frame",
-        "-model_frame",
-        required=False,
-        help="Path to the model frame .pt file",
+        "--stack",
+        required=True,
+        help="The stack of modules to use. Use a yaml conf, for your own sanity"
     )
     group.add(
         "--output_model",

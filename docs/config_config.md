@@ -94,7 +94,7 @@ Each list element takes one of 3 values:
 
   - `FULL`: fully shared parameters. Will be named using the constant "full".
   - `GROUP`: groupwise shared paramters. Will be named according to the cluster id.
-  - `LANGUAGE`: language specific parameters. Will be named according to the langauge code.
+  - `LANGUAGE`: language specific parameters. Will be named according to the language code.
 
 #### `n_nodes` and `n_gpus_per_node`
 

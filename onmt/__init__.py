@@ -1,5 +1,5 @@
 """ Main entry point of the ONMT library """
-import onmt.inputters_mvp
+import onmt.inputters
 import onmt.encoders
 import onmt.decoders
 import onmt.models
@@ -14,7 +14,7 @@ onmt.utils.optimizers.Optim = onmt.utils.optimizers.Optimizer
 sys.modules["onmt.Optim"] = onmt.utils.optimizers
 
 __all__ = [
-    onmt.inputters_mvp,
+    onmt.inputters,
     onmt.encoders,
     onmt.decoders,
     onmt.models,

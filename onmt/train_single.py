@@ -11,7 +11,7 @@ from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 
 from onmt.utils.distributed import broadcast_tensors
-from onmt.inputters_mvp import DynamicDatasetIter
+from onmt.inputters import DynamicDatasetIter
 from onmt.transforms import get_transforms_cls
 
 

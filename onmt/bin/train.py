@@ -19,11 +19,11 @@ from onmt.utils.logging import init_logger, logger
 
 from onmt.models.model_saver import load_checkpoint
 from onmt.train_single import main as single_main
-from onmt.inputters_mvp import DynamicDatasetIter
+from onmt.inputters import DynamicDatasetIter
 
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import train_opts
-from onmt.inputters_mvp import get_vocab, DEFAULT_SPECIALS
+from onmt.inputters import get_vocab, DEFAULT_SPECIALS
 from onmt.transforms import get_transforms_cls
 from collections import OrderedDict
 from onmt.constants import ModelTask

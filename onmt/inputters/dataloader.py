@@ -4,7 +4,7 @@ import random
 
 import torch
 
-from onmt.inputters_mvp.dataset import get_corpus
+from onmt.inputters.dataset import get_corpus
 from onmt.utils.logging import logger
 
 
@@ -13,7 +13,7 @@ def infinite_iterator(iterable):
 
 
 def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True):
-    """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
+    """Convert an onmt.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         return iter(InferenceBatcher(dataset, batch_size))
 

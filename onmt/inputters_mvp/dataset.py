@@ -47,16 +47,16 @@ def read_examples_from_files(
 
     if src_path.endswith('.gz'):
         logger.info(f'Detected source GZ: {src_path}')
-        src_fh = gzip.open(src_path)
+        src_fh = gzip.open(src_path, 'rt')
     else:
-        src_fh = open(src_path)
+        src_fh = open(src_path, 'rt')
     if tgt_path is None:
         tgt_fh = itertools.repeat(None)
     elif tgt_path.endswith('.gz'):
         logger.info(f'Detected target GZ: {tgt_path}')
-        tgt_fh = gzip.open(tgt_path)
+        tgt_fh = gzip.open(tgt_path, 'rt')
     else:
-        tgt_fh = open(tgt_path)
+        tgt_fh = open(tgt_path, 'rt')
 
     examples = zip(src_fh, tgt_fh)
     if stride is not None and offset is not None:

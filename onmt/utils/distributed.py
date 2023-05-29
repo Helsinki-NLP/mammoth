@@ -220,7 +220,7 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
 
     # Normalize using the previously computed values
     for grad, denom in zip(grads, rescale_denoms):
-        if denom > 0:
+        if denom > 1:
             grad.div_(denom)
     # Note: p.has_grad is reused in the optimizer to prevent the untrained components from being stepped
 

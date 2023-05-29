@@ -2,6 +2,7 @@
 # For an example config, see : OpenNMT-py-v2/examples/config_config.yaml
 import argparse
 import csv
+import gzip
 import numpy as np
 import os
 import warnings
@@ -210,8 +211,16 @@ def corpora_schedule(opts):
 
     corpora_lens = {}
     for cname, corpus in opts.in_config[0]['data'].items():
-        with open(corpus['path_src'], 'r') as istr:
+        if corpus['path_src'].endswith('.gz'):
+            print('Detected gzip ending: {}'.format(corpus['path_src']))
+            open_fn = gzip.open
+        else:
+            open_fn = open
+        with open_fn(corpus['path_src'], 'rt') as istr:
             corpora_lens[cname] = sum(1 for _ in istr)
+    print('corpora_lens:')
+    for cname, len in corpora_lens.items():
+        print(f'{cname}:\t{len}')
 
     tot_lines = sum(corpora_lens.values())
     corpora_weights = {

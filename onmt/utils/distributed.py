@@ -202,7 +202,7 @@ def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
     rescale_denoms = ready_t  # after reduction
 
     # Omit if all nodes sent a zero ready bit
-    denoms_mask = rescale_denoms > 0
+    denoms_mask = (rescale_denoms > 0).cpu()
     params_with_grad = [p for ((name, p), m) in zip(require_grad, denoms_mask) if m]
     grads = [p.grad.data for p in params_with_grad]
     rescale_denoms = [denom for (denom, m) in zip(rescale_denoms, denoms_mask) if m]

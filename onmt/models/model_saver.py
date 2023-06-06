@@ -130,7 +130,7 @@ class ModelSaver(ModelSaverBase):
             # 'generator': generator_state_dict,
             "vocab": self.vocabs_dict,
             "opt": self.model_opt,
-            "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
+            "optim": self.optim.state_dict(),
             "whole_model": self.model,
         }
 

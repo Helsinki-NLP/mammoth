@@ -236,7 +236,7 @@ class MultipleOptimizer(object):
             count = self._steps[name]
             result.append(f'Optimizer "{name}" has been stepped {count} times')
         return result
-    
+
     def state_dict(self):
         """Returns the state dictionary"""
         return {
@@ -244,7 +244,7 @@ class MultipleOptimizer(object):
             'multiOptims_Langs': self.multiOptims_Langs,
             'steps': self._steps,
         }
-    
+
     def load_state_dict(self, state_dict):
         """Loads the optimizer from the state dictionary"""
         for k in state_dict["optimizers"].keys():

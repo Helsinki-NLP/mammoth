@@ -249,8 +249,9 @@ class MultipleOptimizer(object):
         """Loads the optimizer from the state dictionary"""
         for k in state_dict["optimizers"].keys():
             self.optimizers[k].load_state_dict(state_dict["optimizers"][k])
-        self.multiOptims_Langs= state_dict["multiOptims_Langs"]
+        self.multiOptims_Langs = state_dict["multiOptims_Langs"]
         self._steps = state_dict["steps"]
+
 
 class Optimizer(object):
     """

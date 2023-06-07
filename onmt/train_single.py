@@ -9,6 +9,7 @@ from onmt.trainer import build_trainer
 from onmt.models import build_model_saver
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
+from onmt.models.model_saver import load_checkpoint
 
 from onmt.utils.distributed import broadcast_tensors
 from onmt.inputters_mvp import DynamicDatasetIter
@@ -128,7 +129,7 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opt._all_transform)
-    checkpoint = None
+    checkpoint = load_checkpoint(ckpt_path=opt.train_from)
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.

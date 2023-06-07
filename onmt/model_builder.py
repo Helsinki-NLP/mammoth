@@ -305,19 +305,27 @@ def build_task_specific_model(
         src_embs[lang] = src_emb
 
     pluggable_src_emb = PluggableEmbeddings(src_embs)
-    encoder = build_only_enc(model_opt, pluggable_src_emb, task_queue_manager)
+    encoder = build_only_enc(model_opt, pluggable_src_emb, task_queue_manager, checkpoint)
 
     for side, lang, _, vocab in task_queue_manager.get_vocabs(side='tgt', vocabs_dict=vocabs_dict):
         tgt_emb = build_tgt_emb(model_opt, vocab)
         tgt_embs[lang] = tgt_emb
         generator = build_generator(model_opt, len(vocab), tgt_emb)
         generators_md.add_module(f'generator_{lang}', generator)
+        if checkpoint:
+            trainstep= int(checkpoint['optim']['training_step'])-1
+            for modname, gen in generators_md.items():
+                module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_{modname}.pt")
+                gen.load_state_dict(module)
 
     pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
-    decoder = build_only_dec(model_opt, pluggable_tgt_emb, task_queue_manager)
+    decoder = build_only_dec(model_opt, pluggable_tgt_emb, task_queue_manager, checkpoint)
 
     # TODO: implement hierarchical approach to layer sharing
     attention_bridge = AttentionBridge.from_opt(model_opt)
+    if checkpoint:
+        # trainstep= int(checkpoint['optim']['training_step'])-1 - already recoderd in generators
+        attention_bridge.load_state_dict(torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_attention_bridge.pt"))
 
     if model_opt.param_init != 0.0:
         for p in attention_bridge.parameters():
@@ -360,27 +368,53 @@ def build_task_specific_model(
             if param.requires_grad:
                 param.has_grad = False
 
+
     return nmt_model, generators_md
 
 
-def build_only_enc(model_opt, src_emb, task_queue_manager):
+def build_only_enc(model_opt, src_emb, task_queue_manager, checkpoint=None):
     """Truly only builds encoder: no embeddings"""
     encoder = build_encoder(model_opt, src_emb, task_queue_manager)
-    if model_opt.param_init != 0.0:
-        for p in encoder.parameters():
-            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-    if model_opt.param_init_glorot:
-        for p in encoder.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+    if checkpoint:
+        trainstep= int(checkpoint['optim']['training_step'])-1
+        for _, srctgt in checkpoint['opt'].data.items():
+            for idx,modname in enumerate(srctgt['enc_sharing_group']):
+                # load embs
+                if idx == 0:
+                    module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_src_embeddings_{modname}.pt")
+                    encoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
+
+                # load layers
+                module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
+                encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
+    else:
+        if model_opt.param_init != 0.0:
+            for p in encoder.parameters():
+                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+        if model_opt.param_init_glorot:
+            for p in encoder.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         encoder.half()
 
     return encoder
 
 
-def build_only_dec(model_opt, tgt_emb, task_queue_manager):
+def build_only_dec(model_opt, tgt_emb, task_queue_manager, checkpoint=None):
     decoder = build_decoder(model_opt, tgt_emb, task_queue_manager)
+    if checkpoint:
+        trainstep= int(checkpoint['optim']['training_step'])-1
+        for _, srctgt in checkpoint['opt'].data.items():
+            for idx,modname in enumerate(srctgt['dec_sharing_group']):
+                # load embs
+                if idx == (len(srctgt['dec_sharing_group'])-1):
+                    module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
+                    decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
+
+                # load layers
+                module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
+                decoder.decoders._modules[str(idx)][modname].load_state_dict(module)
 
     if model_opt.param_init != 0.0:
         for p in decoder.parameters():
@@ -406,6 +440,7 @@ def build_generator(model_opt, n_tgts, tgt_emb):
     generator = nn.Sequential(
         nn.Linear(model_opt.dec_rnn_size, n_tgts), Cast(torch.float32), gen_func
     )
+
 
     if model_opt.share_decoder_embeddings:
         generator[0].weight = tgt_emb.word_lut.weight

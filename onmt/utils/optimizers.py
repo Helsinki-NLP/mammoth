@@ -237,6 +237,21 @@ class MultipleOptimizer(object):
             result.append(f'Optimizer "{name}" has been stepped {count} times')
         return result
 
+    def state_dict(self):
+        """Returns the state dictionary"""
+        return {
+            'optimizers': {k: v.state_dict() for k, v in self.optimizers.items()},
+            'multiOptims_Langs': self.multiOptims_Langs,
+            'steps': self._steps,
+        }
+
+    def load_state_dict(self, state_dict):
+        """Loads the optimizer from the state dictionary"""
+        for k in state_dict["optimizers"].keys():
+            self.optimizers[k].load_state_dict(state_dict["optimizers"][k])
+        self.multiOptims_Langs = state_dict["multiOptims_Langs"]
+        self._steps = state_dict["steps"]
+
 
 class Optimizer(object):
     """
@@ -287,9 +302,9 @@ class Optimizer(object):
             ckpt_opt = checkpoint['opt']
             ckpt_state_dict = {}
             if isinstance(optim, Optimizer):  # Backward compatibility.
-                ckpt_state_dict['training_step'] = optim._step + 1
-                ckpt_state_dict['decay_step'] = optim._step + 1
-                ckpt_state_dict['optimizer'] = optim.optimizer.state_dict()
+                ckpt_state_dict['training_step'] = optim._training_step
+                ckpt_state_dict['decay_step'] = optim._decay_step
+                ckpt_state_dict['optimizer'] = optim._optimizer.state_dict()
             else:
                 ckpt_state_dict = optim
 

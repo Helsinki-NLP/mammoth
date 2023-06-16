@@ -2,11 +2,11 @@
 # For an example config, see : OpenNMT-py-v2/examples/config_config.yaml
 import argparse
 import csv
-import gzip
 import numpy as np
 import os
 import warnings
 import yaml
+import subprocess
 from collections import defaultdict
 from copy import deepcopy
 from itertools import compress
@@ -44,6 +44,36 @@ def save_yaml(opts):
             print(serialized, file=ostr)
     else:
         print(serialized)
+
+
+def external_linecount(file_path):
+    """ Use external program wc to determine line count.
+
+    Faster than iterating over lines in python.
+    Transparently supports gzip files based on .gz ending.
+    """
+    if file_path.endswith('.gz'):
+        ext_lc = subprocess.check_output(
+            ['zcat {} | wc -l'.format(file_path)], shell=True).split()[0]
+    else:
+        ext_lc = subprocess.check_output(['wc', '-l', file_path]).split()[0]
+    ext_lc = int(ext_lc.decode('utf-8'))
+    return ext_lc
+
+
+def read_cached_linecounts(fname):
+    try:
+        line_counts = dict()
+        with open(fname, 'r') as fin:
+            for line in fin:
+                line = line.strip()
+                if len(line) == 0:
+                    continue
+                count, path = line.split('\t')
+                line_counts[path] = int(count)
+        return line_counts
+    except Exception:
+        return dict()
 
 
 def add_complete_language_pairs_args(parser):
@@ -89,6 +119,10 @@ def add_corpora_schedule_args(parser):
     parser.add_argument(
         '--temperature', type=float,
         help='Temperature (1/T): 1.0 for empirical, 0.0 for uniform'
+    )
+    parser.add_argument(
+        '--keep_lc_cache', action='store_true',
+        help='Do not delete line count cache after successful run'
     )
 
 
@@ -209,16 +243,23 @@ def corpora_schedule(opts):
         else cc_opts.get('use_introduce_at_training_step', False)
     )
 
+    corpora_lens_cache_file = './.corpora_length_cache'
+    corpora_lens_cache = read_cached_linecounts(corpora_lens_cache_file)
+    print('cached corpora_lens:')
+    for path, len in corpora_lens_cache.items():
+        print(f'{path}:\t{len}')
     corpora_lens = {}
     for cname, corpus in opts.in_config[0]['data'].items():
-        if corpus['path_src'].endswith('.gz'):
-            print('Detected gzip ending: {}'.format(corpus['path_src']))
-            open_fn = gzip.open
+        if corpus['path_src'] in corpora_lens_cache:
+            length = corpora_lens_cache[corpus['path_src']]
+            corpora_lens[cname] = length
         else:
-            open_fn = open
-        with open_fn(corpus['path_src'], 'rt') as istr:
-            corpora_lens[cname] = sum(1 for _ in istr)
-    print('corpora_lens:')
+            length = external_linecount(corpus['path_src'])
+            corpora_lens[cname] = length
+            with open(corpora_lens_cache_file, 'a') as cache_out:
+                print(f'{length}\t{corpus["path_src"]}', file=cache_out)
+                print(f'{length}\t{corpus["path_src"]}')
+    print('final corpora_lens:')
     for cname, len in corpora_lens.items():
         print(f'{cname}:\t{len}')
 
@@ -250,6 +291,9 @@ def corpora_schedule(opts):
             else:
                 introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
+
+    if not opts.keep_lc_cache:
+        os.remove(corpora_lens_cache_file)
 
 
 def cluster_languages(opts):

@@ -242,6 +242,7 @@ def corpora_schedule(opts):
         opts.use_introduce_at_training_step if opts.use_introduce_at_training_step
         else cc_opts.get('use_introduce_at_training_step', False)
     )
+    keep_lc_cache = opts.keep_lc_cache if opts.keep_lc_cache else cc_opts.get('keep_lc_cache', False)
 
     corpora_lens_cache_file = './.corpora_length_cache'
     corpora_lens_cache = read_cached_linecounts(corpora_lens_cache_file)
@@ -292,7 +293,7 @@ def corpora_schedule(opts):
                 introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
 
-    if not opts.keep_lc_cache:
+    if not keep_lc_cache:
         os.remove(corpora_lens_cache_file)
 
 

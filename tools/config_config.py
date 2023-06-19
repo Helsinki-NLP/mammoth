@@ -7,7 +7,6 @@ import numpy as np
 import os
 import subprocess
 import time
-import warnings
 import yaml
 from collections import defaultdict
 from copy import deepcopy
@@ -25,6 +24,7 @@ def init_logging():
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(funcName)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+
 
 def load_yaml(fname):
     with open(fname, 'r') as istr:
@@ -332,7 +332,7 @@ def cluster_languages(opts):
             f'was not found in the distance matrix (supports {" ".join(sim_langs)})'
         corpus_langs = corpus_langs | set(corpus['src_tgt'].split('-'))
     if sim_langs != corpus_langs:
-        warnings.warn(
+        logger.warning(
             f"languages in the distance matrix are unused ({', ' .join(sim_langs - corpus_langs)})"
         )
         # Omit unused languages before clustering. Otherwise they might consume entire clusters.

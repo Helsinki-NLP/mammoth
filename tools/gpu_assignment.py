@@ -273,7 +273,8 @@ class AssignmentOptimizer:
     def best_swap_for(self, slot_a: GpuSlot, assignment, current_cost):
         costs = [(current_cost, slot_a)]
         for i, slot_b in enumerate(self.gpu_slots):
-            if slot_a == slot_b:
+            if slot_a.node == slot_b.node and slot_a.gpu == slot_b.gpu:
+                # No point swapping pairs already on the same device
                 continue
             proposal = assignment.swap(slot_a, slot_b, self)
             costs.append((self.cost(proposal), slot_b))

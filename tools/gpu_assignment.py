@@ -48,7 +48,7 @@ class Assignment:
         self.component_to_gpus: defaultdict = component_to_gpus
         self._ready_to_start_cost = None
         self._unassigned_cost = None
-    
+
     @classmethod
     def new(cls, assignment, ao):
         component_to_gpus = cls._compute_component_to_gpus(assignment, ao)

@@ -483,7 +483,7 @@ def adapter_config(opts):
 
     cc_opts = opts.in_config[0]['config_config']
     if 'adapters' not in opts.in_config[0]:
-        warnings.warn('No adapter configuration, skipping this step')
+        logger.warning('No adapter configuration, skipping this step')
         return
     src_langs, tgt_langs = _get_langs(opts)
     src_groups = list(sorted(set(cc_opts['groups'][src] for src in src_langs)))

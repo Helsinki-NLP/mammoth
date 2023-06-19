@@ -120,10 +120,6 @@ def add_corpora_schedule_args(parser):
         '--temperature', type=float,
         help='Temperature (1/T): 1.0 for empirical, 0.0 for uniform'
     )
-    parser.add_argument(
-        '--keep_lc_cache', action='store_true',
-        help='Do not delete line count cache after successful run'
-    )
 
 
 def add_cluster_languages_args(parser):
@@ -242,9 +238,8 @@ def corpora_schedule(opts):
         opts.use_introduce_at_training_step if opts.use_introduce_at_training_step
         else cc_opts.get('use_introduce_at_training_step', False)
     )
-    keep_lc_cache = opts.keep_lc_cache if opts.keep_lc_cache else cc_opts.get('keep_lc_cache', False)
 
-    corpora_lens_cache_file = './.corpora_length_cache'
+    corpora_lens_cache_file = './corpora_length_cache'
     corpora_lens_cache = read_cached_linecounts(corpora_lens_cache_file)
     print('cached corpora_lens:')
     for path, len in corpora_lens_cache.items():
@@ -292,9 +287,6 @@ def corpora_schedule(opts):
             else:
                 introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
-
-    if not keep_lc_cache:
-        os.remove(corpora_lens_cache_file)
 
 
 def cluster_languages(opts):

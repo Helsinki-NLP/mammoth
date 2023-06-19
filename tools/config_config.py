@@ -280,6 +280,7 @@ def corpora_schedule(opts):
     if split_treshold:
         corpora_weights = _split_large_language_pairs(opts, corpora_weights, split_treshold)
 
+    min_introduce_at_training_step = opts.in_config[0].get('train_steps', 100_000)
     for cname, corpus in opts.in_config[0]['data'].items():
         src_lang, tgt_lang = corpus['src_tgt'].split('-')
         weight = corpora_weights[cname]
@@ -299,6 +300,12 @@ def corpora_schedule(opts):
             else:
                 introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
+            min_introduce_at_training_step = min(min_introduce_at_training_step, introduce_at_training_step)
+    if use_introduce_at_training_step and min_introduce_at_training_step > 0:
+        # With a single very large task that gets split, it is possible that no task can start
+        for cname, corpus in opts.in_config[0]['data'].items():
+            if 'introduce_at_training_step' in corpus:
+                corpus['introduce_at_training_step'] -= min_introduce_at_training_step
     duration = time.time() - start
     logger.info(f'step took {duration} s')
 
@@ -473,6 +480,24 @@ def allocate_devices(opts):
     opts.in_config[0]['n_nodes'] = n_nodes
     opts.in_config[0]['world_size'] = n_gpus_tot
     opts.in_config[0]['gpu_ranks'] = list(range(n_gpus_per_node))
+
+    # Ensure that all devices can start training (will crash otherwise)
+    train_steps = opts.in_config[0].get('train_steps', 100_000)
+    min_introduce_at_training_step = defaultdict(lambda: train_steps)
+    for cname, corpus in opts.in_config[0]['data'].items():
+        if 'introduce_at_training_step' not in corpus:
+            continue
+        min_introduce_at_training_step[corpus['node_gpu']] = min(
+            corpus['introduce_at_training_step'],
+            min_introduce_at_training_step[corpus['node_gpu']]
+        )
+    for cname, corpus in opts.in_config[0]['data'].items():
+        if 'introduce_at_training_step' not in corpus:
+            continue
+        adjust = min_introduce_at_training_step[corpus['node_gpu']]
+        if adjust > 0:
+            logger.warning(f'Reducing introduce_at_training_step of {cname} by {adjust}')
+            corpus['introduce_at_training_step'] -= adjust
 
     duration = time.time() - start
     logger.info(f'step took {duration} s')

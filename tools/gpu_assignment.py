@@ -46,6 +46,8 @@ class Assignment:
     def __init__(self, assignment, component_to_gpus):
         self.assignment: Dict[GpuSlot, Tuple[str, str]] = assignment
         self.component_to_gpus: defaultdict = component_to_gpus
+        self._ready_to_start_cost = None
+        self._unassigned_cost = None
     
     @classmethod
     def new(cls, assignment, ao):
@@ -60,23 +62,34 @@ class Assignment:
         result[slot_b] = lp_a
 
         component_to_gpus = copy_counters(self.component_to_gpus)
-        src_lang_a, tgt_lang_a = lp_a
-        src_lang_b, tgt_lang_b = lp_b
         gpu_a = (slot_a.node, slot_a.gpu)
         gpu_b = (slot_b.node, slot_b.gpu)
-        components_a = ao.get_components(src_lang_a, tgt_lang_a)
-        components_b = ao.get_components(src_lang_b, tgt_lang_b)
-        for component in components_a:
-            # remove from a
-            component_to_gpus[component][gpu_a] -= 1
-            # add to b
-            component_to_gpus[component][gpu_b] += 1
-        for component in components_b:
-            # remove from b
-            component_to_gpus[component][gpu_b] -= 1
-            # add to a
-            component_to_gpus[component][gpu_a] += 1
-        return Assignment(result, component_to_gpus)
+        a_ready_to_start = None
+        b_ready_to_start = None
+        if lp_a is not None:
+            src_lang_a, tgt_lang_a = lp_a
+            components_a = ao.get_components(src_lang_a, tgt_lang_a)
+            for component in components_a:
+                # remove from a
+                component_to_gpus[component][gpu_a] -= 1
+                # add to b
+                component_to_gpus[component][gpu_b] += 1
+            a_ready_to_start = ao._is_ready_to_start(lp_a)
+        if lp_b is not None:
+            src_lang_b, tgt_lang_b = lp_b
+            components_b = ao.get_components(src_lang_b, tgt_lang_b)
+            for component in components_b:
+                # remove from b
+                component_to_gpus[component][gpu_b] -= 1
+                # add to a
+                component_to_gpus[component][gpu_a] += 1
+            b_ready_to_start = ao._is_ready_to_start(lp_b)
+        new_assignment = Assignment(result, component_to_gpus)
+        if a_ready_to_start == b_ready_to_start:
+            new_assignment._ready_to_start_cost = self._ready_to_start_cost
+        if lp_a is not None and lp_b is not None:
+            new_assignment._unassigned_cost = self._unassigned_cost
+        return new_assignment
 
     @staticmethod
     def _compute_component_to_gpus(assignment, ao):
@@ -198,19 +211,23 @@ class AssignmentOptimizer:
         """
         if self.ready_to_start:
             return 0
-        return self._spread_evenly(
-            assignment,
-            criterion=self._is_ready_to_start,
-            extra_empty_penalty=NOT_READY_TO_START,
-        )
+        if assignment._ready_to_start_cost is None:
+            assignment._ready_to_start_cost = self._spread_evenly(
+                assignment,
+                criterion=self._is_ready_to_start,
+                extra_empty_penalty=NOT_READY_TO_START,
+            )
+        return assignment._ready_to_start_cost
 
     def _unassigned_cost(self, assignment: Assignment) -> float:
         """ Penalize gpus with many unassigned slots if other gpus are full """
-        return self._spread_evenly(
-            assignment,
-            criterion=_lp_is_not_none,
-            extra_empty_penalty=VERY_BAD,
-        )
+        if assignment._unassigned_cost is None:
+            assignment._unassigned_cost = self._spread_evenly(
+                assignment,
+                criterion=_lp_is_not_none,
+                extra_empty_penalty=VERY_BAD,
+            )
+        return assignment._unassigned_cost
 
     def _spread_evenly(
         self,
@@ -260,21 +277,17 @@ class AssignmentOptimizer:
                 continue
             proposal = assignment.swap(slot_a, slot_b, self)
             costs.append((self.cost(proposal), slot_b))
-            if i > 0 and i % 50 == 0:
+            if i > 0 and i % 100 == 0:
                 print('.', end='', flush=True)
-            if i > 0 and i % 1000 == 0:
-                import sys
-                sys.exit()
         costs = sorted(costs)
         best_cost, slot_b = costs[0]
-        best_assignment = self.swap(slot_a, slot_b, assignment)
+        best_assignment = assignment.swap(slot_a, slot_b, self)
         return best_cost, best_assignment
 
     def swap_all_slots_once(self, assignment, current_cost):
         for i, slot_a in enumerate(self.gpu_slots):
             current_cost, assignment = self.best_swap_for(slot_a, assignment, current_cost)
-            if i > 0 and i % 100 == 0:
-                print('o', end='', flush=True)
+            print('o', end='', flush=True)
         return current_cost, assignment
 
     def optimize(self, assignment, current_cost, iterations=10, patience=1):

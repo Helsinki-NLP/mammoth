@@ -444,6 +444,11 @@ def allocate_devices(opts):
     if n_slots_per_gpu is None:
         n_gpus_tot = n_nodes * n_gpus_per_node
         n_slots_per_gpu = int(np.ceil(len(lang_pairs) / n_gpus_tot))
+    logger.info(f'n_nodes:          {n_nodes}')
+    logger.info(f'n_gpus_per_node:  {n_gpus_per_node}')
+    logger.info(f'n_slots_per_gpu:  {n_slots_per_gpu}')
+    logger.info(f'total slots:      {n_nodes * n_gpus_per_node * n_slots_per_gpu}')
+    logger.info(f'lang_pairs:       {len(lang_pairs)}')
 
     assignment = optimize_gpu_assignment(
         n_nodes=n_nodes,

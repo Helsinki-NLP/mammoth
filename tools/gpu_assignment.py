@@ -27,6 +27,11 @@ def make_get_components_func(group_mapping: Dict[str, str]):
     return get_components
 
 
+# avoid huge number of lambdas created
+def _lp_is_not_none(lp):
+    return lp is not None
+
+
 GpuSlot = namedtuple('GpuSlot', ['node', 'gpu', 'slot'])
 
 
@@ -78,6 +83,16 @@ class AssignmentOptimizer:
             + (SPLIT_LPS_WEIGHT * cost_split_lps)
         )
 
+    @lru_cache(maxsize=100_000)
+    def _communication_cost_inner(self, gpus):
+        cost = 0
+        nodes = set(node for (node, gpu) in gpus)
+        # inter-node communcation is expensive
+        cost += INTER_NODE_COST * (len(nodes) - 1)
+        # intra-node is cheaper than inter-node
+        cost += INTRA_NODE_COST * (len(gpus) - 1)
+        return cost
+
     def _communication_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
         """ amount of communication: on how many gpus is each component? """
         component_to_gpus = defaultdict(set)
@@ -91,11 +106,7 @@ class AssignmentOptimizer:
                 component_to_gpus[component].add(gpu)
         cost = 0
         for component, gpus in component_to_gpus.items():
-            nodes = set(node for (node, gpu) in gpus)
-            # inter-node communcation is expensive
-            cost += INTER_NODE_COST * (len(nodes) - 1)
-            # intra-node is cheaper than inter-node
-            cost += INTRA_NODE_COST * (len(gpus) - 1)
+            cost += self._communication_cost_inner(tuple(gpus))
         return cost
 
     def _homogeneity_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
@@ -117,6 +128,9 @@ class AssignmentOptimizer:
                 cost += self.n_slots_per_gpu - count
         return cost
 
+    def _is_ready_to_start(self, lp):
+        return lp in self.ready_to_start
+
     def _ready_to_start_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
         """
         When using a curriculum, all GPUs should contain at least one task that
@@ -126,7 +140,7 @@ class AssignmentOptimizer:
             return 0
         return self._spread_evenly(
             assignment,
-            criterion=lambda lp: lp in self.ready_to_start,
+            criterion=self._is_ready_to_start,
             extra_empty_penalty=NOT_READY_TO_START,
         )
 
@@ -134,7 +148,7 @@ class AssignmentOptimizer:
         """ Penalize gpus with many unassigned slots if other gpus are full """
         return self._spread_evenly(
             assignment,
-            criterion=lambda lp: lp is not None,
+            criterion=_lp_is_not_none,
             extra_empty_penalty=VERY_BAD,
         )
 
@@ -189,19 +203,26 @@ class AssignmentOptimizer:
 
     def best_swap_for(self, slot_a: GpuSlot, assignment, current_cost):
         costs = [(current_cost, slot_a)]
-        for slot_b in self.gpu_slots:
+        for i, slot_b in enumerate(self.gpu_slots):
             if slot_a == slot_b:
                 continue
             proposal = self.swap(slot_a, slot_b, assignment)
             costs.append((self.cost(proposal), slot_b))
+            if i > 0 and i % 50 == 0:
+                print('.', end='', flush=True)
+            if i > 0 and i % 1000 == 0:
+                import sys
+                sys.exit()
         costs = sorted(costs)
         best_cost, slot_b = costs[0]
         best_assignment = self.swap(slot_a, slot_b, assignment)
         return best_cost, best_assignment
 
     def swap_all_slots_once(self, assignment, current_cost):
-        for slot_a in self.gpu_slots:
+        for i, slot_a in enumerate(self.gpu_slots):
             current_cost, assignment = self.best_swap_for(slot_a, assignment, current_cost)
+            if i > 0 and i % 100 == 0:
+                print('o', end='', flush=True)
         return current_cost, assignment
 
     def optimize(self, assignment, current_cost, iterations=10, patience=1):

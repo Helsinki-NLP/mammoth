@@ -207,17 +207,17 @@ class AssignmentOptimizer:
     def optimize(self, assignment, current_cost, iterations=10, patience=1):
         prev_cost = None
         stalled = 0
-        print(f'initial cost: {current_cost}')
+        print(f'initial cost: {current_cost}', flush=True)
         for i in range(iterations):
             prev_cost = current_cost
             current_cost, assignment = self.swap_all_slots_once(assignment, current_cost)
-            print(f'iteration {i} cost: {current_cost}')
+            print(f'iteration {i} cost: {current_cost}', flush=True)
             if prev_cost == current_cost:
                 stalled += 1
             else:
                 stalled = 0
             if stalled > patience:
-                print('No improvement, finishing early')
+                print('No improvement, finishing early', flush=True)
                 break
         return current_cost, assignment
 
@@ -228,7 +228,7 @@ def print_assignment(assignment, group_mapping, ready_to_start=None):
         slot_str = f'gpu {gpu_slot.node}:{gpu_slot.gpu} slot {gpu_slot.slot}'
         if lp is None:
             print(
-                f'{slot_str}: UNASSIGNED'
+                f'{slot_str}: UNASSIGNED', flush=True
             )
             continue
         src_lang, tgt_lang = lp
@@ -236,7 +236,7 @@ def print_assignment(assignment, group_mapping, ready_to_start=None):
         tgt_group = group_mapping[tgt_lang]
         ready = 'ready to start' if lp in ready_to_start else ''
         print(
-            f'{slot_str}: {src_lang}-{tgt_lang}\t({src_group}, {tgt_group})\t{ready}'
+            f'{slot_str}: {src_lang}-{tgt_lang}\t({src_group}, {tgt_group})\t{ready}', flush=True
         )
 
 
@@ -260,7 +260,7 @@ def optimize_gpu_assignment(
     initial_cost = optimizer.cost(initial)
     best_cost, assignment = optimizer.optimize(initial, initial_cost)
     print_assignment(assignment, lang_to_group_mapping, ready_to_start=lps_ready_to_start)
-    print(f'assignment cost {best_cost}')
+    print(f'assignment cost {best_cost}', flush=True)
     return assignment
 
 

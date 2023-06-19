@@ -425,7 +425,7 @@ def allocate_devices(opts):
     start = time.time()
 
     cc_opts = opts.in_config[0]['config_config']
-    n_nodes = opts.n_nodes if opts.n_nodes else cc_opts['n_nodes']
+    n_nodes = opts.n_nodes if opts.n_nodes else cc_opts.get('n_nodes', None)
     n_gpus_per_node = opts.n_gpus_per_node if opts.n_gpus_per_node else cc_opts['n_gpus_per_node']
     n_slots_per_gpu = opts.n_slots_per_gpu if opts.n_slots_per_gpu else cc_opts.get('n_slots_per_gpu', None)
 
@@ -441,6 +441,11 @@ def allocate_devices(opts):
             lps_ready_to_start.append((src_lang, tgt_lang))
         lp_to_key[(src_lang, tgt_lang)].append(key)
 
+    if n_nodes is None and n_slots_per_gpu is None:
+        raise Exception('You must specify either n_nodes or n_slots_per_gpu')
+    if n_nodes is None:
+        n_slots_per_node = n_gpus_per_node * n_slots_per_gpu
+        n_nodes = int(np.ceil(len(lang_pairs) / n_slots_per_node))
     if n_slots_per_gpu is None:
         n_gpus_tot = n_nodes * n_gpus_per_node
         n_slots_per_gpu = int(np.ceil(len(lang_pairs) / n_gpus_tot))

@@ -33,8 +33,23 @@ The meta-parameters under the `config_config` key:
 
 Path templates for source and target corpora, respectively.
 The path templates can contain the following variables that will be substituted by `config_config`:
-`{src_lang}`, `{tgt_lang}`, and `{sorted_pair}`.
-The `{sorted_pair}` contains the source and target languages in alphabetical order, separated by a hyphen.
+
+  - Directional corpus mode 
+        - `{src_lang}`: The source language of the task
+        - `{tgt_lang}`: The target language of the task
+        - `{lang_pair}`: `{src_lang}-{tgt_lang}` for convenience
+  - Symmetric corpus mode
+        - `{lang_a}`: The alphabetically first language
+        - `{lang_b}`: The alphabetically second language
+        - `{side_a}`: 'src' if the language pair is used in the "forward" direction, otherwise 'trg'.  Tatoeba uses 'trg', not 'tgt'. Deal with it.
+        - `{side_b}`: 'trg' if the language pair is used in the "forward" direction, otherwise 'src'.
+        - `{sorted_pair}`: the source and target languages in alphabetical order, separated by a hyphen.
+
+So for example, let's say your corpus contains the files `eng-ben/train.src.gz` (English side) and `eng-ben/train.trg.gz` (Bengali side).
+You want to use the data symmetrically for both ben-to-eng and eng-to-ben directions.
+For the first, `{lang_pair}` and `{sorted_pair}` are the same.
+For the second, `{lang_pair}` is "eng-ben", but `{sorted_pair}` is "ben-eng".
+In order to use the files in the correct order, you should use the template `{sorted_pair}/train.{side_a}.gz` for the source template, and `{sorted_pair}/train.{side_b}.gz` for the target template.
 
 #### `ae_path`
 

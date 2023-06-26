@@ -721,17 +721,41 @@ def complete_language_pairs(opts):
     src_langs, tgt_langs = _get_langs(opts)
     for src_lang in src_langs:
         for tgt_lang in tgt_langs:
-            sorted_pair = '-'.join(sorted((src_lang, tgt_lang)))
+            lang_a, lang_b = sorted((src_lang, tgt_lang))
+            lang_pair = f'{src_lang}-{tgt_lang}'
+            sorted_pair = f'{lang_a}-{lang_b}'
+            if lang_pair == sorted_pair:
+                # parallel data is used in "forward" direction
+                side_a = 'src'
+                side_b = 'trg'  # Tatoeba uses 'trg', not 'tgt'. Deal with it.
+                lang_a = src_lang
+                lang_b = tgt_lang
+            else:
+                # parallel data is used in "backward" direction
+                side_a = 'trg'
+                side_b = 'src'
+                lang_a = tgt_lang
+                lang_b = src_lang
+            template_variables = {
+                'src_lang': src_lang,
+                'tgt_lang': tgt_lang,
+                'lang_a': lang_a,
+                'lang_b': lang_b,
+                'side_a': side_a,
+                'side_b': side_b,
+                'lang_pair': lang_pair,
+                'sorted_pair': sorted_pair
+            }
             if src_lang == tgt_lang:
                 # autoencoder task
                 if not autoencoder:
                     continue
-                src_path = ae_src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
-                tgt_path = ae_tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
+                src_path = ae_src_path_template.format(**template_variables)
+                tgt_path = ae_tgt_path_template.format(**template_variables)
             else:
                 # translation task
-                src_path = src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
-                tgt_path = tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
+                src_path = src_path_template.format(**template_variables)
+                tgt_path = tgt_path_template.format(**template_variables)
             if os.path.exists(src_path) and os.path.exists(tgt_path):
                 _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path)
             else:

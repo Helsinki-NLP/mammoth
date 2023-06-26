@@ -711,12 +711,12 @@ def complete_language_pairs(opts):
     autoencoder = opts.autoencoder if opts.autoencoder else cc_opts.get('autoencoder', False)
     if autoencoder:
         ae_path_template = opts.ae_path if opts.ae_path else cc_opts.get('ae_path', None)
-    if ae_path_template:
-        ae_src_path_template = ae_path_template
-        ae_tgt_path_template = ae_path_template
-    else:
-        ae_src_path_template = src_path_template
-        ae_tgt_path_template = tgt_path_template
+        if ae_path_template:
+            ae_src_path_template = ae_path_template
+            ae_tgt_path_template = ae_path_template
+        else:
+            ae_src_path_template = src_path_template
+            ae_tgt_path_template = tgt_path_template
 
     src_langs, tgt_langs = _get_langs(opts)
     for src_lang in src_langs:

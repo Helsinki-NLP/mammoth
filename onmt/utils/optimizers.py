@@ -188,6 +188,14 @@ def rsqrt_decay(step, warmup_steps):
     return 1.0 / sqrt(max(step, warmup_steps))
 
 
+def linear_warmup_decay(step, warmup_steps, rate, decay_steps):
+    end_rate = 0.001 * rate
+    if step <= warmup_steps:
+        return (step / warmup_steps)
+    else:
+        return max(end_rate, (decay_steps - step) / (decay_steps - warmup_steps))
+
+
 class MultipleOptimizer(object):
     """Implement multiple optimizers needed for sparse adam"""
 

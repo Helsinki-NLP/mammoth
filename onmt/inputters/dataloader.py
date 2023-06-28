@@ -309,7 +309,22 @@ class DynamicDatasetIter(object):
             while True:
                 for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
                     ordered_iter, metadata = self.dataset_iterators[corpus_id]
-                    yield next(ordered_iter), metadata, communication_batch_id
+                    batch = next(ordered_iter)
+                    if communication_batch_id == 0:
+                        # De-numericalize a few sentences for debugging
+                        print(
+                            f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
+                            f'batch size: {batch.batch_size}'
+                        )
+                        src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
+                        tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]
+                        for sent_idx in range(3):
+                            toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src[0][:, sent_idx, 0]]
+                            print(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
+                            toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
+                            print(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
+                    yield batch, metadata, communication_batch_id
+
                 communication_batch_id += 1
                 if communication_batch_id % 1000 == 0:
                     total = sum(self.task_queue_manager.sampled_task_counts.values())

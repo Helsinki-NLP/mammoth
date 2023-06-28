@@ -103,6 +103,14 @@ def build_torch_optimizer(model, opt, task_queue_manager):
                 params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
             )
         )
+    elif opt.optim == 'adamw':
+        optimizer = attention_bridge_optimizer(
+            model,
+            task_queue_manager,
+            lambda params: optim.AdamW(
+                params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
+            )
+        )
     elif opt.optim == 'sparseadam':
         encs = []
         decs = []

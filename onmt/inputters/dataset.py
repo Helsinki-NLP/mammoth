@@ -1,6 +1,7 @@
 import collections
 from dataclasses import dataclass
 import itertools
+from functools import partial
 import gzip
 
 import torch
@@ -84,6 +85,7 @@ class ParallelCorpus(IterableDataset):
         device='cpu',
         stride=None,
         offset=None,
+        is_train=False,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -95,6 +97,7 @@ class ParallelCorpus(IterableDataset):
         }
         self.stride = stride
         self.offset = offset
+        self.is_train = is_train
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -132,7 +135,10 @@ class ParallelCorpus(IterableDataset):
             self.src_file,
             self.tgt_file,
             tokenize_fn=self._tokenize,
-            transforms_fn=self.transforms.apply if self.transforms is not None else lambda x: x,
+            transforms_fn=(
+                partial(self.transforms.apply, is_train=self.is_train)
+                if self.transforms is not None else lambda x: x
+            ),
             stride=self.stride,
             offset=self.offset,
         )
@@ -168,6 +174,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs, task=task).values()),
         stride=corpus_opts.get('stride', None),
         offset=corpus_opts.get('offset', None),
+        is_train=is_train,
     )
     return dataset
 

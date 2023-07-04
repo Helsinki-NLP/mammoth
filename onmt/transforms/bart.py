@@ -327,6 +327,11 @@ class BARTNoiseTransform(Transform):
     def __init__(self, opts):
         super().__init__(opts)
 
+    @classmethod
+    def get_specials(cls, opts):
+        # FIXME: If a different mask token is used, then it is up to you to add it to specials
+        return ({DefaultTokens.MASK}, set())
+
     def _set_seed(self, seed):
         """set seed to ensure reproducibility."""
         BARTNoising.set_random_seed(seed)

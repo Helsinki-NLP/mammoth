@@ -161,6 +161,9 @@ class Statistics(object):
                 time.time() - start,
             )
         )
+        if len(self.loss_per_task) > 0:
+            for key, loss in self.loss_per_task.items():
+                logger.info(f'{step} loss_per_task/{key}: {loss}')
         sys.stdout.flush()
 
     def log_tensorboard(self, prefix, writer, learning_rate, patience, step):

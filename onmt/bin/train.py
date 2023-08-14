@@ -239,15 +239,12 @@ def train(opt):
             error_handler.add_child(procs[local_rank].pid)
 
             # Get the iterator to generate from
-            # We can't stride here without losing data: each dataset only goes to one GPU
             train_iter = DynamicDatasetIter.from_opts(
                 task_queue_manager=task_queue_manager,
                 transforms_cls=transforms_cls,
                 vocabs_dict=vocabs_dict,
                 opts=opt,
                 is_train=True,
-                stride=1,
-                offset=0,
             )
 
             producer = mp.Process(

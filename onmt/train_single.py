@@ -39,11 +39,18 @@ def _get_model_opts(opt, checkpoint=None):
     return model_opt
 
 
-def _build_valid_iter(opt, vocabs, transforms_cls):
+def _build_valid_iter(opt, vocabs_dict, transforms_cls, task_queue_manager):
     """Build iterator used for validation."""
-    # valid_iter = DynamicDatasetIter(
-    #     vocabs, transforms_cls, opt, is_train=False)
-    valid_iter = iter([])  # FIXME: validation temporarily disabled
+    if not any(opt.data[corpus_id].get('path_valid_src', False) for corpus_id in opt.data.keys()):
+        return None
+    logger.info("creating validation iterator")
+    valid_iter = DynamicDatasetIter.from_opts(
+        task_queue_manager=task_queue_manager,
+        transforms_cls=transforms_cls,
+        vocabs_dict=vocabs_dict,
+        opts=opt,
+        is_train=False,
+    )
     return valid_iter
 
 
@@ -177,8 +184,6 @@ def main(
             vocabs_dict=vocabs_dict,
             opts=opt,
             is_train=True,
-            stride=1,
-            offset=0,
         )
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():
@@ -198,10 +203,9 @@ def main(
         train_iter = _train_iter()
     train_iter = iter_on_device(train_iter, device_context)
     logger.info("Device {} - Valid iter".format(device_context.id))
-    valid_iter = _build_valid_iter(opt, vocabs_dict, transforms_cls)
+    valid_iter = _build_valid_iter(opt, vocabs_dict, transforms_cls, task_queue_manager)
     if valid_iter is not None:
-        # valid_iter = IterOnDevice(valid_iter, local_rank)
-        pass
+        valid_iter = iter_on_device(valid_iter, device_context)
 
     if len(opt.gpu_ranks):
         if device_context.is_master():

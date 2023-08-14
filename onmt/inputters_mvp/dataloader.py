@@ -212,8 +212,6 @@ class DynamicDatasetIter(object):
         bucket_size=2048,
         n_buckets=1024,
         skip_empty_level='warning',
-        stride=1,
-        offset=0,
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -222,22 +220,19 @@ class DynamicDatasetIter(object):
         self.corpora_info = corpora_info
         self.is_train = is_train
         self.init_iterators = False
+
         self.batch_type = batch_type
         self.batch_size = batch_size
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
         self.bucket_size = bucket_size
         self.n_buckets = n_buckets
-        if stride <= 0:
-            raise ValueError(f"Invalid argument for stride={stride}.")
-        self.stride = stride
-        self.offset = offset
         if skip_empty_level not in ['silent', 'warning', 'error']:
             raise ValueError(f"Invalid argument skip_empty_level={skip_empty_level}")
         self.skip_empty_level = skip_empty_level
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, stride=1, offset=0):
+    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -258,8 +253,6 @@ class DynamicDatasetIter(object):
             bucket_size=opts.bucket_size,
             n_buckets=opts.n_buckets,
             skip_empty_level=opts.skip_empty_level,
-            stride=stride,
-            offset=offset,
         )
 
     def _init_datasets(self):
@@ -277,20 +270,27 @@ class DynamicDatasetIter(object):
                 if self.task_queue_manager.device_context.is_gpu()
                 else 'cpu'
             )
-            corpus = get_corpus(
-                self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
-            ).to(device)
 
-            # iterator over minibatches
-            ordered_iter = build_dataloader(
-                corpus,
-                self.batch_size,
-                self.batch_type,
-                self.bucket_size,
-                n_buckets=self.n_buckets,
-            )
+            # Case 1: we are training, and the task must contain some path to training data
+            # Case 2: we are validation (hence self.is_train := False), we need an iterator
+            # if and only the task defines validation data, i.e. if the key `path_valid_src`
+            # is defined
+            if self.is_train or self.opts.data[task.corpus_id].get('path_valid_src', None) is not None:
+                corpus = get_corpus(
+                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
+                ).to(device)
 
-            self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
+                # iterator over minibatches
+                ordered_iter = build_dataloader(
+                    corpus,
+                    self.batch_size,
+                    self.batch_type,
+                    self.bucket_size,
+                    n_buckets=self.n_buckets,
+                    cycle=self.is_train,
+                )
+
+                self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
 
         self.init_iterators = True
 
@@ -298,16 +298,21 @@ class DynamicDatasetIter(object):
         if self.init_iterators is False:
             self._init_datasets()
 
-        # All minibatches with the same communication_batch_id should be trained on
-        # before synching gradients between devices
-        communication_batch_id = 0
-        while True:
-            for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
-                ordered_iter, metadata = self.dataset_iterators[corpus_id]
-                yield next(ordered_iter), metadata, communication_batch_id
-            communication_batch_id += 1
-            if communication_batch_id % 1000 == 0:
-                total = sum(self.task_queue_manager.sampled_task_counts.values())
-                logger.info(f'Task sampling distribution: (total {total})')
-                for task, count in self.task_queue_manager.sampled_task_counts.most_common():
-                    logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+        if not self.is_train:
+            for ordered_iter, metadata in self.dataset_iterators.values():
+                yield from zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
+
+        else:
+            # All minibatches with the same communication_batch_id should be trained on
+            # before synching gradients between devices
+            communication_batch_id = 0
+            while True:
+                for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
+                    ordered_iter, metadata = self.dataset_iterators[corpus_id]
+                    yield next(ordered_iter), metadata, communication_batch_id
+                communication_batch_id += 1
+                if communication_batch_id % 1000 == 0:
+                    total = sum(self.task_queue_manager.sampled_task_counts.values())
+                    logger.info(f'Task sampling distribution: (total {total})')
+                    for task, count in self.task_queue_manager.sampled_task_counts.most_common():
+                        logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')

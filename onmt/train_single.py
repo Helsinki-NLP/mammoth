@@ -51,7 +51,6 @@ def _build_valid_iter(opt, vocabs_dict, transforms_cls, task_queue_manager):
         opts=opt,
         is_train=False,
     )
-    # valid_iter = iter([])  # FIXME: validation temporarily disabled
     return valid_iter
 
 

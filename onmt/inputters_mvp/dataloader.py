@@ -271,6 +271,10 @@ class DynamicDatasetIter(object):
                 else 'cpu'
             )
 
+            # Case 1: we are training, and the task must contain some path to training data
+            # Case 2: we are validation (hence self.is_train := False), we need an iterator
+            # if and only the task defines validation data, i.e. if the key `path_valid_src`
+            # is defined
             if self.is_train or self.opts.data[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
                     self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train

@@ -361,7 +361,7 @@ class Trainer(object):
                 valid_stats = self._maybe_gather_stats(valid_stats)
                 if self.gpu_verbose_level > 0:
                     logger.info(f'{device_context.node_rank}:{device_context.local_rank} report stat step {step}')
-                self._report_step(self.optim.learning_rate(), #learning_rate_to_show, #self.optim.learning_rate(),
+                self._report_step(self.optim.learning_rate(),  # learning_rate_to_show, #self.optim.learning_rate(),
                                   step, valid_stats=valid_stats)
             #     # Run patience mechanism
             #     if self.earlystopper is not None:
@@ -399,7 +399,11 @@ class Trainer(object):
         valid_model.eval()
 
         with torch.no_grad():
-            stats = None  #onmt.utils.Statistics()
+
+            # Tasks need not define validation paths: hence, a device need not contain
+            # any validation path. This would cause statistics equals to 0 word seen,
+            # which would then cause a zero devision when normalizing PPL per words.
+            stats = None  # onmt.utils.Statistics()
 
             for batch, metadata, _ in valid_iter:
                 if stats is None:

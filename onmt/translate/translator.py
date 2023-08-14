@@ -519,6 +519,7 @@ class Inference(object):
         start_time = time.time()
 
         for batch in batches:
+            batch.to(corpus.device)
             batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
 

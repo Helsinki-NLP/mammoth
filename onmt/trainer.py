@@ -351,21 +351,18 @@ class Trainer(object):
                 report_stats,
             )
 
-            # if valid_iter is not None and step % valid_steps == 0:
-            #     if self.gpu_verbose_level > 0:
-            #         logger.info('GpuRank %d: validate step %d'
-            #                     % (self.gpu_rank, step))
-            #     valid_stats = self.validate(
-            #         valid_iter, moving_average=self.moving_average, sourceLang=sourceLang, targetLang=targetLang)
-            #     if self.gpu_verbose_level > 0:
-            #         logger.info('GpuRank %d: gather valid stat \
-            #                         step %d' % (self.gpu_rank, step))
-            #     valid_stats = self._maybe_gather_stats(valid_stats)
-            #     if self.gpu_verbose_level > 0:
-            #         logger.info('GpuRank %d: report stat step %d'
-            #                     % (self.gpu_rank, step))
-            #     self._report_step(self.optim.learning_rate(), #learning_rate_to_show, #self.optim.learning_rate(),
-            #                       step, valid_stats=valid_stats)
+            if valid_iter is not None and step % valid_steps == 0:
+                if self.gpu_verbose_level > 0:
+                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
+                valid_stats = self.validate(
+                    valid_iter, moving_average=self.moving_average)
+                if self.gpu_verbose_level > 0:
+                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} gather valid stat step {step}')
+                valid_stats = self._maybe_gather_stats(valid_stats)
+                if self.gpu_verbose_level > 0:
+                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} report stat step {step}')
+                self._report_step(self.optim.learning_rate(), #learning_rate_to_show, #self.optim.learning_rate(),
+                                  step, valid_stats=valid_stats)
             #     # Run patience mechanism
             #     if self.earlystopper is not None:
             #         self.earlystopper(valid_stats, step)
@@ -383,7 +380,7 @@ class Trainer(object):
             self.model_saver.save(step, moving_average=self.moving_average)
         return total_stats
 
-    def validate(self, valid_iter, moving_average=None, sourceLang=None, targetLang=None):
+    def validate(self, valid_iter, moving_average=None, task=None):
         """Validate model.
             valid_iter: validate data iterator
         Returns:
@@ -402,20 +399,23 @@ class Trainer(object):
         valid_model.eval()
 
         with torch.no_grad():
-            stats = onmt.utils.Statistics()
+            stats = None  #onmt.utils.Statistics()
 
-            for batch in valid_iter:
+            for batch, metadata, _ in valid_iter:
+                if stats is None:
+                    stats = onmt.utils.Statistics()
+
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
                 tgt = batch.tgt
 
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     # F-prop through the model.
                     outputs, attns = valid_model(
-                        src, tgt, src_lengths, with_align=self.with_align, src_task=sourceLang, tgt_task=targetLang
+                        src, tgt, src_lengths, with_align=self.with_align, metadata=metadata
                     )
 
                     # Compute loss.
-                    _, batch_stats = self.valid_loss_md["valloss" + targetLang](batch, outputs, attns)
+                    _, batch_stats = self.valid_loss_md[f"valloss{metadata.tgt_lang}"](batch, outputs, attns)
 
                 # Update statistics.
                 stats.update(batch_stats)

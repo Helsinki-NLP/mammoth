@@ -161,8 +161,8 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
     # build Dataset proper
     dataset = ParallelCorpus(
-        corpus_opts["path_src"],
-        corpus_opts["path_tgt"],
+        corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
+        corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],
         src_vocab,
         tgt_vocab,
         TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs, task=task).values()),

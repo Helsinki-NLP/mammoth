@@ -17,8 +17,8 @@ from onmt.utils.misc import tile, set_random_seed, report_matrix
 from onmt.utils.alignment import extract_alignment, build_align_pharaoh
 from onmt.modules.copy_generator import collapse_copy_scores
 from onmt.constants import ModelTask, DefaultTokens
-from onmt.inputters_mvp.dataset import ParallelCorpus
-from onmt.inputters_mvp.dataloader import build_dataloader
+from onmt.inputters.dataset import ParallelCorpus
+from onmt.inputters.dataloader import build_dataloader
 
 
 def build_translator(opt, task, report_score=True, logger=None, out_file=None):
@@ -91,7 +91,7 @@ class Inference(object):
 
     Args:
         model (onmt.modules.NMTModel): NMT model to use for translation
-        vocabs (dict[str, onmt.inputters_mvp.Vocab]): A dict
+        vocabs (dict[str, onmt.inputters.Vocab]): A dict
             mapping each side to its Vocab.
         src_file_path (str): Source file to read.
         tgt_reader (src): Target file, if necessary.
@@ -253,7 +253,7 @@ class Inference(object):
 
         Args:
             model (onmt.modules.NMTModel): See :func:`__init__()`.
-            vocabs (dict[str, onmt.inputters_mvp.Vocab]): See
+            vocabs (dict[str, onmt.inputters.Vocab]): See
                 :func:`__init__()`.
             opt (argparse.Namespace): Command line options
             model_opt (argparse.Namespace): Command line options saved with

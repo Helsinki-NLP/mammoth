@@ -10,7 +10,7 @@ from torch.utils.data import IterableDataset
 from onmt.constants import DefaultTokens
 from onmt.transforms import TransformPipe, get_transforms_cls, make_transforms
 from onmt.utils.logging import logger
-from onmt.inputters_mvp.vocab import Vocab
+from onmt.inputters.vocab import Vocab
 
 
 @dataclass

@@ -7,8 +7,8 @@ import numpy as np
 import torch
 import tqdm
 
-from onmt.inputters_mvp.dataset import ParallelCorpus
-from onmt.inputters_mvp.dataloader import build_dataloader
+from onmt.inputters.dataset import ParallelCorpus
+from onmt.inputters.dataloader import build_dataloader
 from onmt.model_builder import load_test_multitask_model
 from onmt.opts import build_bilingual_model, _add_dynamic_transform_opts
 from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe

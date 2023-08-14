@@ -6,7 +6,7 @@ import torch
 import onmt
 import onmt.opts
 from onmt.model_builder import build_embeddings, build_encoder, build_decoder
-from onmt.inputters_mvp.vocab import Vocab, DEFAULT_SPECIALS
+from onmt.inputters.vocab import Vocab, DEFAULT_SPECIALS
 from onmt.utils.parse import ArgumentParser
 
 parser = ArgumentParser(description='train.py')

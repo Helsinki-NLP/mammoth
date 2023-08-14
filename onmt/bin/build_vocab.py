@@ -5,7 +5,7 @@ from onmt.utils.logging import init_logger
 from onmt.utils.misc import set_random_seed, check_path
 from onmt.utils.parse import ArgumentParser
 from onmt.opts import dynamic_prepare_opts
-from onmt.inputters_mvp import build_vocab_counts
+from onmt.inputters import build_vocab_counts
 from onmt.transforms import make_transforms, get_transforms_cls
 from onmt.utils.distributed import TaskSpecs
 

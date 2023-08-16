@@ -377,15 +377,18 @@ def build_only_enc(model_opt, src_emb, task_queue_manager, checkpoint=None):
     encoder = build_encoder(model_opt, src_emb, task_queue_manager)
     if checkpoint:
         trainstep= int(checkpoint['optim']['training_step'])-1
-        for _, srctgt in checkpoint['opt'].data.items():
-            # load embs
-            modname = srctgt['src_tgt'].split('-')[0]
+        embnames = [ srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opt'].data.values()]
+        embnames = set(embnames)
+        groupnames = [ (idx,modname) for srctgt in checkpoint['opt'].data.values() for idx,modname in enumerate(srctgt['enc_sharing_group'])]
+        groupnames = set(groupnames)
+        # load embs
+        for modname in embnames:
             module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_src_embeddings_{modname}.pt")
             encoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
-            # load layers
-            for idx,modname in enumerate(srctgt['enc_sharing_group']):
-                module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
-                encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
+        # load layers
+        for idx,modname in groupnames:
+            module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
+            encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
     else:
         if model_opt.param_init != 0.0:
             for p in encoder.parameters():
@@ -403,15 +406,17 @@ def build_only_enc(model_opt, src_emb, task_queue_manager, checkpoint=None):
 def build_only_dec(model_opt, tgt_emb, task_queue_manager, checkpoint=None):
     decoder = build_decoder(model_opt, tgt_emb, task_queue_manager)
     if checkpoint:
-        import ipdb; ipdb.set_trace()
         trainstep= int(checkpoint['optim']['training_step'])-1
-        for _, srctgt in checkpoint['opt'].data.items():
-            # load embs
-            modname = srctgt['src_tgt'].split('-')[1]
+        embnames = [ srctgt['src_tgt'].split('-')[1] for srctgt in checkpoint['opt'].data.values()]
+        embnames = set(embnames)
+        groupnames = [ (idx,modname) for srctgt in checkpoint['opt'].data.values() for idx,modname in enumerate(srctgt['dec_sharing_group'])]
+        groupnames = set(groupnames)
+        # load embs
+        for modname in embnames:
             module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
             decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
-            # load layers
-            for idx,modname in enumerate(srctgt['dec_sharing_group']):
+        # load layers
+        for idx,modname in groupnames:
                 module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
                 decoder.decoders._modules[str(idx)][modname].load_state_dict(module)
 

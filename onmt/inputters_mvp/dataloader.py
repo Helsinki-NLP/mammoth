@@ -11,8 +11,8 @@ from onmt.utils.logging import logger
 def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
-
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True):
+def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, buckets=None):
+    # TODO: build with with dataState \in frame \in checkpoint
     """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         return iter(InferenceBatcher(dataset, batch_size))
@@ -46,7 +46,9 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
             return true_size
 
     collate_fn = dataset.collate_fn
-    lab = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn)
+    lab = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, buckets)
+    # TODO: return both lab and iter(lab), 
+    # save lab state with every checkpoint
     return iter(lab)
 
 
@@ -72,16 +74,25 @@ class InferenceBatcher():
 
 
 class LookAheadBucketing():
-    def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn):
+    def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, buckets=None):
         self.examples_stream = examples_stream
-        self._buckets = [[] for _ in range(n_buckets)]
-        self._lens = [0 for _ in range(n_buckets)]
+        if buckets is None:
+            self._buckets = [[] for _ in range(n_buckets)]
+            self._lens = [0 for _ in range(n_buckets)]
+        else:
+            self._buckets = buckets
+            self._lens = list(map(len, buckets))
         self.look_ahead_size = look_ahead_size
         self.batch_size = batch_size
         self.bucket_fn = bucket_fn
         self.numel_fn = numel_fn
         self.collate_fn = collate_fn
-        self._init()
+        self.current_file_index = None
+        if buckets is not None:
+            logger.info('LookAheadBucketing: relying on pre-computed buckets, no initialization')
+        else:
+            self._init()
+    # TODO: save buckets, current index, and load accordingly
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
@@ -95,6 +106,7 @@ class LookAheadBucketing():
         """look up one more example to add to this reservoir."""
         try:
             example = next(self.examples_stream)
+            self.current_file_index = example['idx']
             bucket_idx = self.bucket_fn(example)
             creates_new_bucket = self._lens[bucket_idx] == 0
             self._buckets[bucket_idx].append(example)
@@ -214,6 +226,7 @@ class DynamicDatasetIter(object):
         skip_empty_level='warning',
         stride=1,
         offset=0,
+        data_state=dict(),
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -235,9 +248,10 @@ class DynamicDatasetIter(object):
         if skip_empty_level not in ['silent', 'warning', 'error']:
             raise ValueError(f"Invalid argument skip_empty_level={skip_empty_level}")
         self.skip_empty_level = skip_empty_level
+        self.data_state = data_state
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, stride=1, offset=0):
+    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, stride=1, offset=0, data_state=dict()):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -260,10 +274,14 @@ class DynamicDatasetIter(object):
             skip_empty_level=opts.skip_empty_level,
             stride=stride,
             offset=offset,
+            data_state=data_state,
         )
 
     def _init_datasets(self):
         self.dataset_iterators = dict()
+        idxs = self.data_state.get('indices',dict())  # either dependant on: src, task or trg
+        buckets = self.data_state.get('buckets',dict()) 
+
         for task in self.task_queue_manager.get_tasks():
             src_vocab = self.vocabs_dict[('src', task.src_lang)]
             tgt_vocab = self.vocabs_dict[('tgt', task.tgt_lang)]
@@ -277,8 +295,14 @@ class DynamicDatasetIter(object):
                 if self.task_queue_manager.device_context.is_gpu()
                 else 'cpu'
             )
+            # Recover current file index from the data state
+            idx4thisfile = idxs.get(task.corpus_id,0)
+            # TODO: plug the buckets properly.
+            thisfilebuckets = buckets.get(task.corpus_id,None)
+            if idx4thisfile > 0:
+                logger.info(f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {idx4thisfile} in corpus')
             corpus = get_corpus(
-                self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
+                self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train, current_file_index=idx4thisfile
             ).to(device)
 
             # iterator over minibatches
@@ -288,6 +312,7 @@ class DynamicDatasetIter(object):
                 self.batch_type,
                 self.bucket_size,
                 n_buckets=self.n_buckets,
+                buckets = thisfilebuckets,
             )
 
             self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)

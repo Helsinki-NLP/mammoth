@@ -1,6 +1,6 @@
 import os
 from glob import glob
-from collections import deque
+from collections import deque, defaultdict
 from onmt.utils.logging import logger
 
 import torch
@@ -65,6 +65,7 @@ class ModelSaverBase(object):
         assert device_context is not None
         self.device_context = device_context
         self.all_gpus = all_gpus
+        self.data_state = defaultdict(dict)
 
     def save(self, step, moving_average=None):
         """Main entry point for model saver
@@ -150,7 +151,7 @@ class ModelSaver(ModelSaverBase):
             tmp_checkpoint_paths.append(checkpoint_path)
 
         modules, model_frame = explode_model(checkpoint)
-
+        model_frame["data_state"] = self.data_state
         for key, module in modules.items():
             # All processes will try to save the modules present on that device
             # Not that a race condition is possible:

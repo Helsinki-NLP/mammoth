@@ -130,9 +130,10 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opt._all_transform)
-    checkpoint = None
+    checkpoint, data_state = None, dict()
     if opt.train_from:
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
+        data_state = checkpoint.get('data_state',dict())
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.
@@ -174,6 +175,7 @@ def main(
     )
     logger.info("{} - Trainer built".format(device_context.id))
 
+    # build dataset iterator
     if batch_queue is None:
         train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,
@@ -183,6 +185,7 @@ def main(
             is_train=True,
             stride=1,
             offset=0,
+            data_state=data_state,
         )
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():

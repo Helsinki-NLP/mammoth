@@ -18,13 +18,14 @@ class Batch():
     src: tuple  # of torch Tensors
     tgt: torch.Tensor
     batch_size: int
+    idx:torch.Tensor
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
         if self.tgt is not None:
             self.tgt = self.tgt.to(device)
+        self.idx = self.idx
         return self
-
 
 def read_examples_from_files(
     src_path,
@@ -33,15 +34,17 @@ def read_examples_from_files(
     transforms_fn=lambda x: x,
     stride=None,
     offset=None,
+    start_index=0,
 ):
     """Helper function to read examples"""
-
+    idaux =  itertools.count(start_index)
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
         src_str, tgt_str = packed
         return {
             'src': tokenize_fn(src_str, side='src'),
             'tgt': tokenize_fn(tgt_str, side='tgt') if tgt_str is not None else None,
+            'idx': next(idaux)
             # 'align': None,
         }
 
@@ -59,6 +62,10 @@ def read_examples_from_files(
         tgt_fh = open(tgt_path, 'rt')
 
     examples = zip(src_fh, tgt_fh)
+    if start_index > 0:
+        # ignore 1st start_index examples when we restart training
+        examples = itertools.islice(examples, start_index + 1, None)
+
     if stride is not None and offset is not None:
         # Start by skipping offset examples. After that return every stride:th example.
         examples = itertools.islice(examples, offset, None, stride)
@@ -84,6 +91,7 @@ class ParallelCorpus(IterableDataset):
         device='cpu',
         stride=None,
         offset=None,
+        current_file_index=None,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -95,6 +103,8 @@ class ParallelCorpus(IterableDataset):
         }
         self.stride = stride
         self.offset = offset
+        self.current_file_index = current_file_index 
+
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -120,10 +130,11 @@ class ParallelCorpus(IterableDataset):
 
     def __iter__(self):
         """Read file, produce batches of examples"""
-
+        start_index = self.current_file_index
+        self.current_file_index = None
         def _cast(example_dict):
             return {
-                k: self._numericalize(v, side=k)
+                k: self._numericalize(v, side=k) if k != 'idx' else v
                 for k, v in example_dict.items()
                 if v is not None
             }
@@ -135,6 +146,7 @@ class ParallelCorpus(IterableDataset):
             transforms_fn=self.transforms.apply if self.transforms is not None else lambda x: x,
             stride=self.stride,
             offset=self.offset,
+            start_index=start_index,
         )
         examples = map(_cast, examples)
         yield from examples
@@ -147,11 +159,12 @@ class ParallelCorpus(IterableDataset):
         src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
         src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx).unsqueeze(-1), src_lengths)
         tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1) if has_tgt else None
-        batch = Batch(src, tgt, len(examples))
+        idx = torch.tensor([ex['idx'] for ex in examples]).max()
+        batch = Batch(src, tgt, len(examples), idx)
         return batch
 
 
-def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
+def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False, current_file_index=None):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
@@ -168,6 +181,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs, task=task).values()),
         stride=corpus_opts.get('stride', None),
         offset=corpus_opts.get('offset', None),
+        current_file_index=current_file_index,
     )
     return dataset
 

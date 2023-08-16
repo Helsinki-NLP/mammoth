@@ -182,6 +182,7 @@ def main(
     )
     logger.info("{} - Trainer built".format(device_context.id))
 
+    # build dataset iterator
     if batch_queue is None:
         train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,
@@ -189,6 +190,7 @@ def main(
             vocabs_dict=vocabs_dict,
             opts=opt,
             is_train=True,
+            data_state=data_state,
         )
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():

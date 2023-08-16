@@ -489,6 +489,7 @@ class Trainer(object):
                     )
                     # logger.info(loss)
 
+                self.model_saver.data_state['indices'][f'{metadata.corpus_id}'] = batch.idx
                 try:
                     if loss is not None:
                         self.optim.backward(loss)

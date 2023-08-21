@@ -142,11 +142,15 @@ def add_cluster_languages_args(parser):
 def add_sharing_groups_args(parser):
     parser.add_argument(
         '--enc_sharing_groups', type=str, action='append',
-        help='list of {LANGUAGE | GROUP | FULL}'
+        help='list of {LANGUAGE | GROUP | FULL}. '
+        'The first two may be prefixed, e.g. SRC_LANGUAGE or TGT_GROUP. '
+        'Default prefix for encoder is SRC.'
     )
     parser.add_argument(
         '--dec_sharing_groups', type=str, action='append',
-        help='list of {LANGUAGE | GROUP | FULL}'
+        help='list of {LANGUAGE | GROUP | FULL}.'
+        'The first two may be prefixed, e.g. SRC_LANGUAGE or TGT_GROUP. '
+        'Default prefix for decoder is TGT.'
     )
 
 
@@ -393,11 +397,19 @@ def sharing_groups(opts):
             'LANGUAGE': src,
             'GROUP': groups[src],
             'FULL': 'full',
+            'SRC_LANGUAGE': src,
+            'SRC_GROUP': groups[src],
+            'TGT_LANGUAGE': tgt,
+            'TGT_GROUP': groups[tgt],
         }
         mapping_tgt = {
             'LANGUAGE': tgt,
             'GROUP': groups[tgt],
             'FULL': 'full',
+            'SRC_LANGUAGE': src,
+            'SRC_GROUP': groups[src],
+            'TGT_LANGUAGE': tgt,
+            'TGT_GROUP': groups[tgt],
         }
         corpus['enc_sharing_group'] = [
             mapping_src[sharing_group] for sharing_group in enc_sharing_groups
@@ -518,6 +530,7 @@ def adapter_config(opts):
     for data_key, data_config in opts.in_config[0]['data'].items():
         if 'adapters' not in data_config:
             data_config['adapters'] = {'encoder': [], 'decoder': []}
+    # TODO: refactor and add support for {SRC|TGT}_{LANGUAGE|GROUP} also to adapters
     for adapter_name, adapter_config in sorted(encoder_adapters.items()):
         if adapter_config['ids'] == 'LANGUAGE':
             adapter_config['ids'] = list(src_langs)

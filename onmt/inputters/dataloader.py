@@ -276,21 +276,21 @@ class DynamicDatasetIter(object):
             # if and only the task defines validation data, i.e. if the key `path_valid_src`
             # is defined
             if self.is_train or self.opts.data[task.corpus_id].get('path_valid_src', None) is not None:
-            corpus = get_corpus(
-                self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
-            ).to(device)
+                corpus = get_corpus(
+                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
+                ).to(device)
 
-            # iterator over minibatches
-            ordered_iter = build_dataloader(
-                corpus,
-                self.batch_size,
-                self.batch_type,
-                self.bucket_size,
-                n_buckets=self.n_buckets,
+                # iterator over minibatches
+                ordered_iter = build_dataloader(
+                    corpus,
+                    self.batch_size,
+                    self.batch_type,
+                    self.bucket_size,
+                    n_buckets=self.n_buckets,
                     cycle=self.is_train,
-            )
+                )
 
-            self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
+                self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
 
         self.init_iterators = True
 
@@ -303,31 +303,31 @@ class DynamicDatasetIter(object):
                 yield from zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
 
         else:
-        # All minibatches with the same communication_batch_id should be trained on
-        # before synching gradients between devices
-        communication_batch_id = 0
-        while True:
-            for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
-                ordered_iter, metadata = self.dataset_iterators[corpus_id]
-                batch = next(ordered_iter)
-                if communication_batch_id == 0:
-                    # De-numericalize a few sentences for debugging
-                    logger.warning(
-                            f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
-                            f'batch size: {batch.batch_size}'
-                    )
-                    src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
-                    tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]
-                    for sent_idx in range(3):
-                        toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src[0][:, sent_idx, 0]]
-                        logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
-                        toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
-                        logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
-                yield batch, metadata, communication_batch_id
+            # All minibatches with the same communication_batch_id should be trained on
+            # before synching gradients between devices
+            communication_batch_id = 0
+            while True:
+                for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
+                    ordered_iter, metadata = self.dataset_iterators[corpus_id]
+                    batch = next(ordered_iter)
+                    if communication_batch_id == 0:
+                        # De-numericalize a few sentences for debugging
+                        logger.warning(
+                                f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
+                                f'batch size: {batch.batch_size}'
+                        )
+                        src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
+                        tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]
+                        for sent_idx in range(3):
+                            toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src[0][:, sent_idx, 0]]
+                            logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
+                            toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
+                            logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
+                    yield batch, metadata, communication_batch_id
 
-            communication_batch_id += 1
-            if communication_batch_id % 1000 == 0:
-                total = sum(self.task_queue_manager.sampled_task_counts.values())
-                logger.info(f'Task sampling distribution: (total {total})')
-                for task, count in self.task_queue_manager.sampled_task_counts.most_common():
-                    logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+                communication_batch_id += 1
+                if communication_batch_id % 1000 == 0:
+                    total = sum(self.task_queue_manager.sampled_task_counts.values())
+                    logger.info(f'Task sampling distribution: (total {total})')
+                    for task, count in self.task_queue_manager.sampled_task_counts.most_common():
+                        logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')

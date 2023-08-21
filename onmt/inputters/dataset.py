@@ -86,6 +86,7 @@ class ParallelCorpus(IterableDataset):
         stride=None,
         offset=None,
         is_train=False,
+        task=None,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -98,6 +99,7 @@ class ParallelCorpus(IterableDataset):
         self.stride = stride
         self.offset = offset
         self.is_train = is_train
+        self.corpus_id = task.corpus_id
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -136,7 +138,11 @@ class ParallelCorpus(IterableDataset):
             self.tgt_file,
             tokenize_fn=self._tokenize,
             transforms_fn=(
-                partial(self.transforms.apply, is_train=self.is_train)
+                partial(
+                    self.transforms.apply,
+                    is_train=self.is_train,
+                    corpus_name=self.corpus_id,
+                )
                 if self.transforms is not None else lambda x: x
             ),
             stride=self.stride,
@@ -175,6 +181,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         stride=corpus_opts.get('stride', None),
         offset=corpus_opts.get('offset', None),
         is_train=is_train,
+        task=task,
     )
     return dataset
 

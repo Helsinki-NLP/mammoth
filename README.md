@@ -9,5 +9,5 @@
 
 
 The official documentation is available [here](https://opennmt.net/OpenNMT-py/).  
-Our own modifications are documented under `docs'. A preview is available https://github.com/Helsinki-NLP/mammoth-docs.  
+Our own modifications are documented under `docs`. A preview is available https://github.com/Helsinki-NLP/mammoth-docs.  
 During development, we document our features under `docs` markdown. In the official release, we integrate docs into Actions. 

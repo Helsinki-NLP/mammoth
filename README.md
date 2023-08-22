@@ -9,5 +9,5 @@
 
 
 The official documentation is available [here](https://opennmt.net/OpenNMT-py/).  
-Our own modifications are documented on [Notion](https://www.notion.so/helsinki-nlp/OpenNMT-1e5ac49fe4c34225ae85d35598262ee0).  
-If we have any release plans in the future, we could export Notion pages as markdown files or directly make the Notion page public.
+Our own modifications are documented under `docs'. A preview is available https://github.com/Helsinki-NLP/mammoth-docs.  
+During development, we document our features under `docs` markdown. In the official release, we integrate docs into Actions. 

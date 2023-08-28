@@ -1,0 +1,322 @@
+# Testing with 6 languages (total 18 language pairs)
+# train_([a-z][a-z])-*\1  regex for matching only autoencoding tasks (and edit with multi-caret - thanks pycharm!)
+#save_data: /scratch/project_2005099/data/unpc-all-directions-vocabs
+src_vocab:
+  "es":  /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "cni": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "aym": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "bzd": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "gn":  /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "en":  /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "oto": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "nah": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "quy": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "tar": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "shp": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "hch": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "czn": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+
+tgt_vocab:
+  "es":  /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "cni": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "aym": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "bzd": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "gn":  /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "en":  /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "oto": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "nah": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "quy": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "tar": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "shp": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "hch": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+  "czn": /scratch/project_462000088/members/jrvc/data/all_32k.vocab
+
+
+# Tokenization options
+src_subword_type: sentencepiece
+src_subword_model: /scratch/project_462000088/members/jrvc/data/all_32k.model
+tgt_subword_type: sentencepiece
+tgt_subword_model: /scratch/project_462000088/members/jrvc/data/all_32k.model
+
+# Number of candidates for SentencePiece sampling
+subword_nbest: 20
+# Smoothing parameter for SentencePiece sampling
+subword_alpha: 0.1
+# Specific arguments for pyonmttok
+src_onmttok_kwargs: "{'mode': 'none', 'spacer_annotate': True}"
+tgt_onmttok_kwargs: "{'mode': 'none', 'spacer_annotate': True}"
+
+
+overwrite: False
+
+data:
+  ## GPU 0: es-cni, cni, es-aym, aym, es-tar, tar
+  train_es-cni:
+    src_tgt: es-cni
+    node_gpu: "0:0"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["cni", "all", "cni"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-cni.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-cni.cni
+    transforms: [onmt_tokenize, filtertoolong]
+  train_cni-cni:
+    src_tgt: cni-cni
+    node_gpu: "0:0"
+    enc_sharing_group: ["cni", "all"]
+    dec_sharing_group: ["cni", "all", "cni"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-cni.cni
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-cni.cni
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-aym:
+    src_tgt: es-aym
+    node_gpu: "0:0"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["aym", "all", "aym"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-aym.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-aym.aym
+    transforms: [onmt_tokenize, filtertoolong]
+  train_aym-aym:
+    src_tgt: aym-aym
+    node_gpu: "0:0"
+    enc_sharing_group: ["aym", "all"]
+    dec_sharing_group: ["aym", "all", "aym"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-aym.aym
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-aym.aym
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-tar:
+    src_tgt: es-tar
+    node_gpu: "0:0"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["tar", "all", "tar"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-tar.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-tar.tar
+    transforms: [onmt_tokenize, filtertoolong]
+  train_tar-tar:
+    src_tgt: tar-tar
+    node_gpu: "0:0"
+    enc_sharing_group: ["tar", "all"]
+    dec_sharing_group: ["tar", "all", "tar"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-tar.tar
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-tar.tar
+    transforms: [onmt_tokenize, filtertoolong, bart]
+
+
+  ## GPU 1: es-bzd, bzd, es-gn, gn, es-shp, shp
+  train_es-bzd:
+    src_tgt: es-bzd
+    node_gpu: "0:1"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["bzd", "all", "bzd"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-bzd.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-bzd.bzd
+    transforms: [onmt_tokenize, filtertoolong]  
+  train_bzd-bzd:
+    src_tgt: bzd-bzd
+    node_gpu: "0:1"
+    enc_sharing_group: ["bzd", "all"]
+    dec_sharing_group: ["bzd", "all", "bzd"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-bzd.bzd
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-bzd.bzd
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-gn:
+    src_tgt: es-gn
+    node_gpu: "0:1"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["gn", "all", "gn"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-gn.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-gn.gn
+    transforms: [onmt_tokenize, filtertoolong]
+  train_gn-gn:
+    src_tgt: gn-gn
+    node_gpu: "0:1"
+    enc_sharing_group: ["gn", "all"]
+    dec_sharing_group: ["gn", "all", "gn"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-gn.gn
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-gn.gn
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-shp:
+    src_tgt: es-shp
+    node_gpu: "0:1"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["shp", "all", "shp"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-shp.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-shp.shp
+    transforms: [onmt_tokenize, filtertoolong]
+  train_shp-shp:
+    src_tgt: shp-shp
+    node_gpu: "0:1"
+    enc_sharing_group: ["shp", "all"]
+    dec_sharing_group: ["shp", "all", "shp"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-shp.shp
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-shp.shp
+    transforms: [onmt_tokenize, filtertoolong, bart]
+
+  ## GPU 2: es-en,  en,  es-oto, oto, es-hch, hch
+  train_es-en:
+    src_tgt: es-en
+    node_gpu: "0:2"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["en", "all", "en"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-en.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-en.en
+    transforms: [onmt_tokenize, filtertoolong]
+  train_en-en:
+    src_tgt: en-en
+    node_gpu: "0:2"
+    enc_sharing_group: ["en", "all"]
+    dec_sharing_group: ["en", "all", "en"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-en.en
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-en.en
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-oto:
+    src_tgt: es-oto
+    node_gpu: "0:2"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["oto", "all", "oto"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-oto.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-oto.oto
+    transforms: [onmt_tokenize, filtertoolong]
+  train_oto-oto:
+    src_tgt: oto-oto
+    node_gpu: "0:2"
+    enc_sharing_group: ["oto", "all"]
+    dec_sharing_group: ["oto", "all", "oto"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-oto.oto
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-oto.oto
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-hch:
+    src_tgt: es-hch
+    node_gpu: "0:2"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["hch", "all", "hch"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-hch.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-hch.hch
+    transforms: [onmt_tokenize, filtertoolong]
+  train_hch-hch:
+    src_tgt: hch-hch
+    node_gpu: "0:2"
+    enc_sharing_group: ["hch", "all"]
+    dec_sharing_group: ["hch", "all", "hch"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-hch.hch
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-hch.hch
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  
+  ## GPU 3: es-nah, nah, es-quy, quy, es-czn, czn, es
+  train_es-nah:
+    src_tgt: es-nah
+    node_gpu: "0:3"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["nah", "all", "nah"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-nah.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-nah.nah
+    transforms: [onmt_tokenize, filtertoolong]
+  train_nah-nah:
+    src_tgt: nah-nah
+    node_gpu: "0:3"
+    enc_sharing_group: ["nah", "all"]
+    dec_sharing_group: ["nah", "all", "nah"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-nah.nah
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-nah.nah
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-quy:
+    src_tgt: es-quy
+    node_gpu: "0:3"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["quy", "all", "quy"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-quy.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-quy.quy
+    transforms: [onmt_tokenize, filtertoolong]
+  train_quy-quy:
+    src_tgt: quy-quy
+    node_gpu: "0:3"
+    enc_sharing_group: ["quy", "all"]
+    dec_sharing_group: ["quy", "all", "quy"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-quy.quy
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-quy.quy
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-czn:
+    src_tgt: es-czn
+    node_gpu: "0:3"
+    enc_sharing_group: ["czn", "all"]
+    dec_sharing_group: ["czn", "all", "czn"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-czn.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-czn.czn
+    transforms: [onmt_tokenize, filtertoolong]
+  train_czn-czn:
+    src_tgt: czn-czn
+    node_gpu: "0:0"
+    enc_sharing_group: ["czn", "all"]
+    dec_sharing_group: ["czn", "all", "czn"]
+    path_src: /scratch/project_462000088/members/jrvc/data/train.es-czn.czn
+    path_tgt: /scratch/project_462000088/members/jrvc/data/train.es-czn.czn
+    transforms: [onmt_tokenize, filtertoolong, bart]
+  train_es-es:
+    src_tgt: es-es
+    node_gpu: "0:3"
+    enc_sharing_group: ["es", "all"]
+    dec_sharing_group: ["es", "all", "es"]
+    path_src: /scratch/project_462000088/members/jrvc/data/all-es.es
+    path_tgt: /scratch/project_462000088/members/jrvc/data/all-es.es
+    transforms: [onmt_tokenize, filtertoolong, bart]
+
+
+
+
+
+
+### Transform related opts:
+#### Filter
+src_seq_length: 200
+tgt_seq_length: 200
+#### Bart
+src_subword_type: sentencepiece
+tgt_subword_type: sentencepiece
+mask_ratio: 0.2
+replace_length: 1
+
+# silently ignore empty lines in the data
+skip_empty_level: silent
+
+batch_size: 4096
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 4096
+max_generator_batches: 2
+src_vocab_size: 100000
+tgt_vocab_size: 100000
+encoder_type: transformer
+decoder_type: transformer
+rnn_size: 512
+word_vec_size: 512
+transformer_ff: 2048
+heads: 8
+enc_layers: [3,3]
+dec_layers: [2,2,2]
+dropout: 0.1
+label_smoothing: 0.1
+param_init: 0.0
+param_init_glorot: true
+position_encoding: true
+valid_steps: 1000000
+warmup_steps: 20000
+#warmup_steps: 40
+report_every: 50
+#report_every: 5
+save_checkpoint_steps: 50000
+keep_checkpoint: -1
+accum_count: 1
+optim: adafactor
+decay_method: none
+learning_rate: 3.0
+weight_decay: 0.05
+max_grad_norm: 0.0
+seed: 3435
+model_type: text
+save_all_gpus: false
+
+world_size: 4
+gpu_ranks: [0,1,2,3]
+node_rank: 0
+
+
+

@@ -39,7 +39,6 @@ class FilterTooLongTransform(Transform):
         tgt_len = len(example['tgt'])
         if src_len == 0 or tgt_len == 0:
             # also filter empty strings
-            logger.warning(f'Empty string, src_len {src_len} tgt_len {tgt_len}')
             return None
         if src_len > self.src_seq_length or tgt_len > self.tgt_seq_length:
             if stats is not None:

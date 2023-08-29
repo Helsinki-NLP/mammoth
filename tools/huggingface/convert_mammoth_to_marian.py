@@ -4,6 +4,8 @@ import sentencepiece as spm
 
 from onmt.utils.parse import ArgumentParser
 from onmt.constants import DefaultTokens
+import os
+import json
 from onmt.opts import train_opts, build_bilingual_model
 
 def _get_parser():
@@ -11,6 +13,10 @@ def _get_parser():
     train_opts(parser)
     build_bilingual_model(parser)
     parser.add_argument('--hf_output_dir')  # @TODO: uncomment this: , required=True)
+    parser.add_argument("--src_spm_model")
+    parser.add_argument("--src_spm_vocab")
+    parser.add_argument("--tgt_spm_model")
+    parser.add_argument("--tgt_spm_vocab")
     return parser
 
 
@@ -45,7 +51,7 @@ def initialize_marian_config(opt):
 
 
 def initialize_marian_tokenizer(opt) -> MarianTokenizer:
-    def init_spm(vocabs_str: str, lang: str):
+    def init_spm(vocabs_str: str, lang: str) -> None:
         def generate_subwords(vocab_path):
             with open(vocab_path, "r") as vocab_in:
                 for word in vocab_in:
@@ -55,17 +61,42 @@ def initialize_marian_tokenizer(opt) -> MarianTokenizer:
         # @TODO: feed `subwords` to spm
         subwords = list(generate_subwords(vocabs[lang]))
         return sp
-    # @TODO: create an SP model -> instantiate the MarianTokenizer
-    # initialize the SPM properly with src/tgt vocabularies provided by
-    # the config file and src/tgt languages
-    src_spm = init_spm(opt.src_vocab, opt.src_lang)
-    try:
-        tgt_spm = init_spm(opt.tgt_vocab, opt.tgt_lang)
-    except:
-        tgt_spm = src_spm
+
+    def read_vocab(spm_vocab_path: str) -> str:
+        json_vocab = {}
+        json_vocab_path = os.path.join(os.path.dirname(spm_vocab_path), "vocab.json")
+        with open(spm_vocab_path, "r") as spm_vocab_in:
+            for idx, subword in enumerate(spm_vocab_in):
+                json_vocab[subword] = idx
+        with open(json_vocab_path, "w") as json_out:
+            json.dump(json_vocab, json_out)
+        return json_vocab_path
+
+    src_spm, tgt_spm, vocab = "", "", ""
+    if not opt.src_spm_model:
+        # create an SP model -> instantiate the MarianTokenizer
+        # @TODO: initialize the SPM properly with src/tgt vocabularies provided by
+        # the config file and src/tgt languages
+        src_spm = init_spm(opt.src_vocab, opt.src_lang)
+        # @TODO: get vocab?
+    else:
+        src_spm = opt.src_spm_model
+    if not opt.target_spm_model:
+        try:
+            tgt_spm = init_spm(opt.tgt_vocab, opt.tgt_lang)
+        except:
+            tgt_spm = src_spm
+        # @TODO: MarianTokenizer requires the spm paths, so we need to save these SPMs
+    else:
+        tgt_spm = opt.tgt_spm_model
+
+    if not vocab:
+        vocab = read_vocab(opt.source_spm_vocab)
+
     return MarianTokenizer(
-        src_spm,
-        tgt_spm,
+        source_spm=src_spm,
+        target_spm=tgt_spm,
+        vocab=vocab,
         source_lang=opt.src_lang,
         target_lang=opt.tgt_lang,
         unk_token=DefaultTokens.UNK,

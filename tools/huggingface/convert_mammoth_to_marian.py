@@ -1,18 +1,30 @@
 from transformers import MarianConfig
 import sys
 import yaml
-import argparse
+
+from onmt.utils.parse import ArgumentParser
+from onmt.opts import train_opts
+
+
+def _get_parser():
+    parser = ArgumentParser(description='convert_mammoth_to_marian.py')
+    train_opts(parser)
+    parser.add_argument('hf_ckpt_dir', required=True)
+    return parser
+
+
+
 
 
 def convert_mammoth_to_marian(mammoth_config_path: str, marian_config_path: str) -> None:
     """
     """
-    with (
-        open(mammoth_config_path, "r") if mammoth_config_path is not sys.stdin else sys.stdin as mammoth_config,
-        open(marian_config_path, "w") if marian_config_path is not sys.stdout else sys.stdout as marian_config
-    ):
-        config_dict = yaml.safe_load(mammoth_config)
-        marian = MarianConfig(
+    parser = _get_parser()
+
+    opt, unknown = parser.parse_known_args()
+
+    config_dict = opt # yaml.safe_load(mammoth_config)
+    marian = MarianConfig(
             vocab_size=config_dict["src_vocab_size"],
             decoder_vocab_size=config_dict["src_vocab_size"],
             max_position_embeddings=1024,  # default
@@ -26,9 +38,9 @@ def convert_mammoth_to_marian(mammoth_config_path: str, marian_config_path: str)
             decoder_layerdrop=0.0,  # default
             use_cache=True,  # default
             is_encoder_decoder=True,  # default
-            activation_function="gelu",  # default
-            d_model=1024,  # default
-            dropout=0.1,  # default
+            activation_function=config_dict['pos_ffn_activation_fn'],  # default
+            d_model=config_dict['rnn_size'],  # default
+            dropout=confiog_dict['dropout'],  # default
             attention_dropout=0,  # default
             activation_dropout=0,  # default
             init_std=0.02,  # default
@@ -44,7 +56,6 @@ def convert_mammoth_to_marian(mammoth_config_path: str, marian_config_path: str)
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--src", "-s", dest="mammoth_config_path", default=sys.stdin)
-    parser.add_argument("--tgt", "-t", dest="marian_config_path", default=sys.stdout)
     return parser.parse_args()
 
 

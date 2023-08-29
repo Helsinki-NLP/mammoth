@@ -3,6 +3,7 @@ from transformers import MarianTokenizer
 import sentencepiece as spm
 
 from onmt.utils.parse import ArgumentParser
+from onmt.constants import DefaultTokens
 from onmt.opts import train_opts, build_bilingual_model
 
 def _get_parser():
@@ -67,9 +68,9 @@ def initialize_marian_tokenizer(opt) -> MarianTokenizer:
         tgt_spm,
         source_lang=opt.src_lang,
         target_lang=opt.tgt_lang,
-        unk_token=2,
-        eos_token=1,
-        pad_token=3,
+        unk_token=DefaultTokens.UNK,
+        eos_token=DefaultTokens.EOS,
+        pad_token=DefaultTokens.PAD,
         model_max_length=opt.src_seq_length,
     )
 

@@ -201,3 +201,46 @@ class LayerStackDecoder(DecoderBase):
             for layer_stack_index, adapter_group, sub_id in metadata.decoder_adapter_ids:
                 module_id = metadata.decoder_id[layer_stack_index]
                 self.activate_adapter(module_id, adapter_group, sub_id)
+
+    def make_shallow(self, module_keys: List[str], model_opt):
+        """Utility function for HF port.
+        Simplifies the structure of the layerstack for easier statedict mapping
+        """
+
+        assert len(module_keys) == self.n_layer_stacks, \
+            "Need all module keys for a given task to make the encoder shallow"
+
+        shallow_decoder = AdaptedTransformerDecoder(
+            0,
+            model_opt.dec_rnn_size,
+            model_opt.heads,
+            model_opt.transformer_ff,
+            model_opt.copy_attn,
+            model_opt.self_attn_type,
+            model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
+            (
+                model_opt.attention_dropout[0]
+                if type(model_opt.attention_dropout) is list
+                else model_opt.attention_dropout
+            ),
+            None,  # embeddings,
+            model_opt.max_relative_positions,
+            model_opt.aan_useffn,
+            model_opt.full_context_alignment,
+            model_opt.alignment_layer,
+            alignment_heads=model_opt.alignment_heads,
+            pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+            is_on_top=True,
+        )
+        shallow_decoder.layer_norm = self.decoders[-1][module_keys[-1]].layer_norm
+
+        for idx, key in enumerate(module_keys):
+            stack = self.decoders[idx][key].transformer
+            shallow_decoder.transformer.extend(stack)
+
+        wrapped = nn.ModuleList([
+            nn.ModuleDict({
+                'shallow': shallow_decoder
+            })
+        ])
+        return self.__class__(self.embeddings, wrapped)

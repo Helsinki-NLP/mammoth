@@ -165,16 +165,39 @@ class LayerStackEncoder(EncoderBase):
                 module_id = metadata.encoder_id[layer_stack_index]
                 self.activate_adapter(module_id, adapter_group, sub_id)
 
-    # def make_shallow(self, module_keys: List[str]) -> LayerStackEncoder:
-    #     """utility function for HF port"""
-    #     assert len(module_keys) == self.n_layer_stacks, \
-    #         "Need all module keys for a given task to make the encoder shallow"
-    #     n_layers = sum(
-    #         len(self.encoders[i][key].transformer)
-    #         for i, key in enumerate(module_keys)
-    #     )
-    #
-    #     shallow_encoder = nn.ModuleList([
-    #         nn.ModuleDict({'shallow':
-    #         })
-    #     ])
+    def make_shallow(self, module_keys: List[str], model_opt):
+        """Utility function for HF port.
+        Simplifies the structure of the layerstack for easier statedict mapping
+        """
+
+        assert len(module_keys) == self.n_layer_stacks, \
+            "Need all module keys for a given task to make the encoder shallow"
+
+        shallow_encoder = AdaptedTransformerEncoder(
+            0,
+            model_opt.enc_rnn_size,
+            model_opt.heads,
+            model_opt.transformer_ff,
+            model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
+            (
+                model_opt.attention_dropout[0]
+                if type(model_opt.attention_dropout) is list
+                else model_opt.attention_dropout
+            ),
+            None,  # embeddings,
+            model_opt.max_relative_positions,
+            pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+            is_on_top=True,
+        )
+        shallow_encoder.layer_norm = self.encoders[-1][module_keys[-1]].layer_norm
+
+        for idx, key in enumerate(module_keys):
+            stack = self.encoders[idx][key].transformer
+            shallow_encoder.transformer.extend(stack)
+
+        wrapped = nn.ModuleList([
+            nn.ModuleDict({
+                'shallow': shallow_encoder
+            })
+        ])
+        return self.__class__(self.embeddings, wrapped)

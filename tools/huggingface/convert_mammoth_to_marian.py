@@ -43,7 +43,7 @@ def initialize_marian_config(opt):
     )
 
 
-def initialize_marian_tokenizer(opt: Namespace) -> MarianTokenizer:
+def initialize_marian_tokenizer(opt) -> MarianTokenizer:
     def init_spm(vocabs_str: str, lang: str):
         def generate_subwords(vocab_path):
             with open(vocab_path, "r") as vocab_in:
@@ -54,9 +54,9 @@ def initialize_marian_tokenizer(opt: Namespace) -> MarianTokenizer:
         # @TODO: feed `subwords` to spm
         subwords = list(generate_subwords(vocabs[lang]))
         return sp
-    # @TODO: create sp model -> instantiate the MarianTokenizer
-    # initialize the SPM properly with src/tgt vocabularies probide by
-    # config file and src/tgt languages
+    # @TODO: create an SP model -> instantiate the MarianTokenizer
+    # initialize the SPM properly with src/tgt vocabularies provided by
+    # the config file and src/tgt languages
     src_spm = init_spm(opt.src_vocab, opt.src_lang)
     try:
         tgt_spm = init_spm(opt.tgt_vocab, opt.tgt_lang)

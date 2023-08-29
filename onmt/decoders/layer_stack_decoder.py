@@ -17,7 +17,7 @@ class LayerStackDecoder(DecoderBase):
         self._active: List[str] = []
 
     @classmethod
-    def from_opt(cls, opt, embeddings, task_queue_manager):
+    def from_opt(cls, opt, embeddings, task_queue_manager, is_on_top=False):
         """Alternate constructor for use during training."""
         decoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.dec_layers):
@@ -78,6 +78,7 @@ class LayerStackDecoder(DecoderBase):
                 model_opt.alignment_layer,
                 alignment_heads=model_opt.alignment_heads,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+                is_on_top=layer_stack_index == len(model_opt.dec_layers) - 1
             )
             decoders.append(stacks)
         return cls(embeddings, decoders)

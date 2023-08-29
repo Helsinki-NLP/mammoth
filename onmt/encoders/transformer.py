@@ -111,6 +111,7 @@ class TransformerEncoder(EncoderBase):
         embeddings,
         max_relative_positions,
         pos_ffn_activation_fn=ActivationFunction.relu,
+        layer_norm_module=None,
     ):
         super(TransformerEncoder, self).__init__()
 
@@ -129,10 +130,10 @@ class TransformerEncoder(EncoderBase):
                 for i in range(num_layers)
             ]
         )
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
+        self.layer_norm = layer_norm_module
 
     @classmethod
-    def from_opt(cls, opt, embeddings):
+    def from_opt(cls, opt, embeddings, is_on_top=False):
         """Alternate constructor."""
         return cls(
             opt.enc_layers,
@@ -144,6 +145,10 @@ class TransformerEncoder(EncoderBase):
             embeddings,
             opt.max_relative_positions,
             pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
+            layer_norm_module=(
+                nn.LayerNorm(opt.enc_rnn_size, eps=1e-6) if is_on_top
+                else nn.Identity()
+            )
         )
 
     def forward(self, src, lengths=None, skip_embedding=False, mask=None):

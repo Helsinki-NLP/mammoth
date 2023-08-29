@@ -66,6 +66,7 @@ class LayerStackEncoder(EncoderBase):
                 None,  # embeddings,
                 model_opt.max_relative_positions,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+                is_on_top=layer_stack_index == len(model_opt.enc_layers) - 1
             )
             encoders.append(stacks)
         return cls(embeddings, encoders)
@@ -163,3 +164,17 @@ class LayerStackEncoder(EncoderBase):
             for layer_stack_index, adapter_group, sub_id in metadata.encoder_adapter_ids:
                 module_id = metadata.encoder_id[layer_stack_index]
                 self.activate_adapter(module_id, adapter_group, sub_id)
+
+    # def make_shallow(self, module_keys: List[str]) -> LayerStackEncoder:
+    #     """utility function for HF port"""
+    #     assert len(module_keys) == self.n_layer_stacks, \
+    #         "Need all module keys for a given task to make the encoder shallow"
+    #     n_layers = sum(
+    #         len(self.encoders[i][key].transformer)
+    #         for i, key in enumerate(module_keys)
+    #     )
+    #
+    #     shallow_encoder = nn.ModuleList([
+    #         nn.ModuleDict({'shallow':
+    #         })
+    #     ])

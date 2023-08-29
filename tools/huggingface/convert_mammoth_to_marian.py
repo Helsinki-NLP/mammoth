@@ -67,6 +67,8 @@ def initialize_marian_tokenizer(opt) -> MarianTokenizer:
         json_vocab_path = os.path.join(os.path.dirname(spm_vocab_path), "vocab.json")
         with open(spm_vocab_path, "r") as spm_vocab_in:
             for idx, subword in enumerate(spm_vocab_in):
+                if "\t" in subword:
+                    subword = subword.split("\t")[0]
                 json_vocab[subword] = idx
         with open(json_vocab_path, "w") as json_out:
             json.dump(json_vocab, json_out)

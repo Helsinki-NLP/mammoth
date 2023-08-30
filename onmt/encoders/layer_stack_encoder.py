@@ -22,6 +22,7 @@ class LayerStackEncoder(EncoderBase):
         encoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.enc_layers):
             stacks = nn.ModuleDict()
+            is_on_top = layer_stack_index == len(opt.enc_layers) -1
             for module_id in task_queue_manager.get_encoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
@@ -40,6 +41,10 @@ class LayerStackEncoder(EncoderBase):
                     None,  # embeddings,
                     opt.max_relative_positions,
                     pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
+                    layer_norm_module=(
+                        nn.LayerNorm(opt.enc_rnn_size, eps=1e-6) if is_on_top
+                        else nn.Identity()
+                    )
                 )
             encoders.append(stacks)
         return cls(embeddings, encoders)
@@ -52,6 +57,7 @@ class LayerStackEncoder(EncoderBase):
             stacks = nn.ModuleDict()
             module_opts = opt_stack['encoder'][layer_stack_index]
             module_id = module_opts['id']
+            is_on_top = layer_stack_index == len(model_opt.enc_layers) - 1
             stacks[module_id] = AdaptedTransformerEncoder(
                 n_layers,
                 model_opt.enc_rnn_size,
@@ -66,7 +72,10 @@ class LayerStackEncoder(EncoderBase):
                 None,  # embeddings,
                 model_opt.max_relative_positions,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
-                is_on_top=layer_stack_index == len(model_opt.enc_layers) - 1
+                layer_norm_module=(
+                    nn.LayerNorm(opt.enc_rnn_size, eps=1e-6) if is_on_top
+                    else nn.Identity()
+                )
             )
             encoders.append(stacks)
         return cls(embeddings, encoders)
@@ -187,7 +196,7 @@ class LayerStackEncoder(EncoderBase):
             None,  # embeddings,
             model_opt.max_relative_positions,
             pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
-            is_on_top=True,
+            layer_norm_module=nn.LayerNorm(model_opt.enc_rnn_size, eps=1e-6)
         )
         shallow_encoder.layer_norm = self.encoders[-1][module_keys[-1]].layer_norm
 

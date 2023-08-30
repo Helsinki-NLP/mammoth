@@ -1,18 +1,20 @@
-from transformers import MarianConfig
-from transformers import MarianTokenizer
+from transformers import MarianConfig, MarianTokenizer, MarianModel
 import sentencepiece as spm
 
 from onmt.utils.parse import ArgumentParser
 from onmt.constants import DefaultTokens
 import os
+import torch
 import json
 from onmt.opts import train_opts, build_bilingual_model
+from onmt.model_builder import load_test_multitask_model
 
 def _get_parser():
     parser = ArgumentParser(description='convert_mammoth_to_marian.py')
     train_opts(parser)
     build_bilingual_model(parser)
-    parser.add_argument('--hf_output_dir')  # @TODO: uncomment this: , required=True)
+    parser.add_argument("--model", dest="checkpoint_path")
+    parser.add_argument("--hf_output_dir", dest="pytorch_dump_folder", required=True)
     parser.add_argument("--src_spm_model")
     parser.add_argument("--src_spm_vocab")
     parser.add_argument("--tgt_spm_model")
@@ -108,13 +110,24 @@ def initialize_marian_tokenizer(opt) -> MarianTokenizer:
     )
 
 
+def convert_mammoth_checkpoint(
+    opt,
+    marian_config: MarianConfig,
+) -> None:
+    vocab_dict, model, model_opt = load_test_multitask_model(opt, opt.checkpoint_path)
+    marian_model = MarianModel(marian_config)
+    marian_model._init_weights(model)
+
+
+
 def convert_mammoth_to_marian() -> None:
     """
     """
     parser = _get_parser()
     opt, unknown = parser.parse_known_args()
     config = initialize_marian_config(opt)
-    tokenizer = initialize_marian_tokenizer(opt)
+    tokenizer = initialize_marian_tokenizer(opt, )
+
 
 
 if __name__ == "__main__":

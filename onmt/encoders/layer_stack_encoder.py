@@ -22,7 +22,7 @@ class LayerStackEncoder(EncoderBase):
         encoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.enc_layers):
             stacks = nn.ModuleDict()
-            is_on_top = layer_stack_index == len(opt.enc_layers) -1
+            is_on_top = layer_stack_index == len(opt.enc_layers) - 1
             for module_id in task_queue_manager.get_encoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
@@ -73,7 +73,7 @@ class LayerStackEncoder(EncoderBase):
                 model_opt.max_relative_positions,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
                 layer_norm_module=(
-                    nn.LayerNorm(opt.enc_rnn_size, eps=1e-6) if is_on_top
+                    nn.LayerNorm(model_opt.enc_rnn_size, eps=1e-6) if is_on_top
                     else nn.Identity()
                 )
             )

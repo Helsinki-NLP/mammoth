@@ -21,6 +21,7 @@ class LayerStackDecoder(DecoderBase):
         """Alternate constructor for use during training."""
         decoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.dec_layers):
+            is_on_top = layer_stack_index == len(opt.dec_layers) - 1
             stacks = nn.ModuleDict()
             for module_id in task_queue_manager.get_decoders(layer_stack_index):
                 if module_id in stacks:
@@ -46,6 +47,10 @@ class LayerStackDecoder(DecoderBase):
                     opt.alignment_layer,
                     alignment_heads=opt.alignment_heads,
                     pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
+                    layer_norm_module=(
+                        nn.LayerNorm(opt.dec_rnn_size, eps=1e-6) if is_on_top
+                        else nn.Identity()
+                    ),
                 )
             decoders.append(stacks)
         return cls(embeddings, decoders)
@@ -56,6 +61,7 @@ class LayerStackDecoder(DecoderBase):
         decoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(model_opt.dec_layers):
             stacks = nn.ModuleDict()
+            is_on_top = layer_stack_index == len(model_opt.dec_layers) - 1
             module_opts = opt_stack['decoder'][layer_stack_index]
             module_id = module_opts['id']
             stacks[module_id] = AdaptedTransformerDecoder(
@@ -78,7 +84,10 @@ class LayerStackDecoder(DecoderBase):
                 model_opt.alignment_layer,
                 alignment_heads=model_opt.alignment_heads,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
-                is_on_top=layer_stack_index == len(model_opt.dec_layers) - 1
+                layer_norm_module=(
+                    nn.LayerNorm(model_opt.dec_rnn_size, eps=1e-6) if is_on_top
+                    else nn.Identity()
+                ),
             )
             decoders.append(stacks)
         return cls(embeddings, decoders)
@@ -230,7 +239,7 @@ class LayerStackDecoder(DecoderBase):
             model_opt.alignment_layer,
             alignment_heads=model_opt.alignment_heads,
             pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
-            is_on_top=True,
+            layer_norm_module=nn.LayerNorm(model_opt.dec_rnn_size, eps=1e-6),
         )
         shallow_decoder.layer_norm = self.decoders[-1][module_keys[-1]].layer_norm
 

@@ -395,8 +395,9 @@ class TransformerDecoder(TransformerDecoderBase):
         alignment_layer,
         alignment_heads,
         pos_ffn_activation_fn=ActivationFunction.relu,
+        layer_norm_module=None,
     ):
-        super(TransformerDecoder, self).__init__(d_model, copy_attn, embeddings, alignment_layer)
+        super(TransformerDecoder, self).__init__(d_model, copy_attn, embeddings, alignment_layer, layer_norm_module)
 
         self.transformer_layers = nn.ModuleList(
             [

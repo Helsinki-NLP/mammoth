@@ -5,7 +5,7 @@ and creates each encoder and decoder accordingly.
 import torch
 import torch.nn as nn
 from torch.nn.init import xavier_uniform_
-
+from pathlib import Path
 from collections import defaultdict
 # from torchtext.legacy.data import Field
 
@@ -315,8 +315,12 @@ def build_task_specific_model(
         if checkpoint:
             trainstep= int(checkpoint['optim']['training_step'])-1
             for modname, gen in generators_md.items():
-                module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_{modname}.pt")
-                gen.load_state_dict(module)
+                mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_{modname}.pt")
+                if mod_path.exists():
+                    module=torch.load(mod_path)
+                    gen.load_state_dict(module)
+                    logger.info(f"Successfully loaded {modname} from the checkpoint.")
+
 
     pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
     decoder = build_only_dec(model_opt, pluggable_tgt_emb, task_queue_manager, checkpoint)
@@ -325,15 +329,19 @@ def build_task_specific_model(
     attention_bridge = AttentionBridge.from_opt(model_opt)
     if checkpoint:
         # trainstep= int(checkpoint['optim']['training_step'])-1 - already recoderd in generators
-        attention_bridge.load_state_dict(torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_attention_bridge.pt"))
+        attn_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_attention_bridge.pt")
+        if attn_path.exists():
+            attention_bridge.load_state_dict(torch.load(attn_path))
+            logger.info(f"Successfully loaded the attention bridge  from the checkpoint.")
 
-    if model_opt.param_init != 0.0:
-        for p in attention_bridge.parameters():
-            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-    if model_opt.param_init_glorot:
-        for p in attention_bridge.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+    else:
+        if model_opt.param_init != 0.0:
+            for p in attention_bridge.parameters():
+                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+        if model_opt.param_init_glorot:
+            for p in attention_bridge.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         attention_bridge.half()
 
@@ -384,11 +392,18 @@ def build_only_enc(model_opt, src_emb, task_queue_manager, checkpoint=None):
         # load embs
         for modname in embnames:
             module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_src_embeddings_{modname}.pt")
-            encoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
+            if f'embeddings_{modname}' in encoder.embeddings._modules.keys():
+                encoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
+                logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
+
         # load layers
         for idx,modname in groupnames:
-            module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
-            encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
+            mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
+            if mod_path.exists() and modname in encoder.encoders._modules[str(idx)].keys():
+                module=torch.load(mod_path)
+                encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
+                logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
+
     else:
         if model_opt.param_init != 0.0:
             for p in encoder.parameters():
@@ -413,20 +428,27 @@ def build_only_dec(model_opt, tgt_emb, task_queue_manager, checkpoint=None):
         groupnames = set(groupnames)
         # load embs
         for modname in embnames:
-            module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
-            decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
+            if f'embeddings_{modname}' in decoder.embeddings._modules.keys():
+                module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
+                decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
+                logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
+
         # load layers
         for idx,modname in groupnames:
-                module=torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
+            mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
+            if mod_path.exists() and modname in decoder.decoders._modules[str(idx)].keys():
+                module=torch.load(mod_path)
                 decoder.decoders._modules[str(idx)][modname].load_state_dict(module)
+                logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
 
-    if model_opt.param_init != 0.0:
-        for p in decoder.parameters():
-            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-    if model_opt.param_init_glorot:
-        for p in decoder.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+    else:
+        if model_opt.param_init != 0.0:
+            for p in decoder.parameters():
+                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+        if model_opt.param_init_glorot:
+            for p in decoder.parameters():
+                if p.dim() > 1:
+                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
 
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         decoder.half()

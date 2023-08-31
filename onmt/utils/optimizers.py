@@ -9,6 +9,7 @@ from collections import Counter
 from math import sqrt
 from onmt.utils.misc import fn_args
 from torch.nn.utils import clip_grad_norm_
+from onmt.utils.logging import logger
 
 
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
@@ -247,8 +248,19 @@ class MultipleOptimizer(object):
 
     def load_state_dict(self, state_dict):
         """Loads the optimizer from the state dictionary"""
+
+        #do not load any optimizer state if one component is missing 
+        do_load =True
         for k in state_dict["optimizers"].keys():
-            self.optimizers[k].load_state_dict(state_dict["optimizers"][k])
+            if k not in self.optimizers.keys():
+                do_load =False
+               
+        if do_load is True:
+            for k in state_dict["optimizers"].keys():
+                self.optimizers[k].load_state_dict(state_dict["optimizers"][k])
+        else:
+            logger.info("Some components do not match. Do not load optimizer from checkpoint.")
+
         self.multiOptims_Langs = state_dict["multiOptims_Langs"]
         self._steps = state_dict["steps"]
 

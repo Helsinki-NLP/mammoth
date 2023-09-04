@@ -436,6 +436,14 @@ def set_transforms(opts):
         else:
             corpus['transforms'] = list(transforms)
 
+        if 'prefix' in corpus['transforms']:
+            if cc_opts.get('use_src_lang_token', False):
+                prefix = f'<from_{src}> <to_{tgt}>'
+            else:
+                prefix = f'<to_{tgt}>'
+            corpus['src_prefix'] = prefix
+            corpus['tgt_prefix'] = ''   # does not work, but must be set nonetheless
+
     duration = time.time() - start
     logger.info(f'step took {duration} s')
 
@@ -589,6 +597,7 @@ def translation_configs(opts):
 
     src_subword_model = opts.in_config[0].get('src_subword_model', None)
     tgt_subword_model = opts.in_config[0].get('tgt_subword_model', None)
+    use_src_lang_token = cc_opts.get('use_src_lang_token', False)
 
     os.makedirs(translation_config_dir, exist_ok=True)
     encoder_stacks = defaultdict(dict)
@@ -637,6 +646,7 @@ def translation_configs(opts):
             tgt_subword_model,
             'supervised',
             translation_config_dir,
+            use_src_lang_token,
         )
         supervised_pairs.add((src_lang, tgt_lang))
     if zero_shot:
@@ -671,6 +681,7 @@ def translation_configs(opts):
                     tgt_subword_model,
                     'zeroshot',
                     translation_config_dir,
+                    use_src_lang_token,
                 )
 
     duration = time.time() - start
@@ -687,6 +698,7 @@ def _write_translation_config(
     tgt_subword_model,
     supervision,
     translation_config_dir,
+    use_src_lang_token,
 ):
     # specify on command line: --model, --src
     result = {
@@ -699,6 +711,13 @@ def _write_translation_config(
     }
     if transforms:
         result['transforms'] = transforms
+        if 'prefix' in transforms:
+            if use_src_lang_token:
+                prefix = f'<from_{src_lang}> <to_{tgt_lang}>'
+            else:
+                prefix = f'<to_{tgt_lang}>'
+            result['src_prefix'] = prefix
+            result['tgt_prefix'] = ''   # does not work, but must be set nonetheless
     if src_subword_model:
         result['src_subword_model'] = src_subword_model
     if tgt_subword_model:

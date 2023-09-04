@@ -131,7 +131,7 @@ def main(
 
     init_logger(opt.log_file, gpu_id=device_context.id)
     if device_context.is_distributed():
-        sleep_s = device_context.local_rank * 2
+        sleep_s = device_context.local_rank * 3
         logger.warning(f'sleeping {sleep_s}s to alleviate ROCm deadlock')
         time.sleep(sleep_s)
         configure_process(opt, device_context.local_rank)

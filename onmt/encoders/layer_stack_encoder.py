@@ -22,6 +22,7 @@ class LayerStackEncoder(EncoderBase):
         encoders = nn.ModuleList()
         for layer_stack_index, n_layers in enumerate(opt.enc_layers):
             stacks = nn.ModuleDict()
+            is_on_top = layer_stack_index == len(opt.enc_layers) - 1
             for module_id in task_queue_manager.get_encoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
@@ -40,6 +41,10 @@ class LayerStackEncoder(EncoderBase):
                     None,  # embeddings,
                     opt.max_relative_positions,
                     pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
+                    layer_norm_module=(
+                        nn.LayerNorm(opt.enc_rnn_size, eps=1e-6) if is_on_top
+                        else nn.Identity()
+                    )
                 )
             encoders.append(stacks)
         return cls(embeddings, encoders)
@@ -52,6 +57,7 @@ class LayerStackEncoder(EncoderBase):
             stacks = nn.ModuleDict()
             module_opts = opt_stack['encoder'][layer_stack_index]
             module_id = module_opts['id']
+            is_on_top = layer_stack_index == len(model_opt.enc_layers) - 1
             stacks[module_id] = AdaptedTransformerEncoder(
                 n_layers,
                 model_opt.enc_rnn_size,
@@ -66,6 +72,10 @@ class LayerStackEncoder(EncoderBase):
                 None,  # embeddings,
                 model_opt.max_relative_positions,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+                layer_norm_module=(
+                    nn.LayerNorm(model_opt.enc_rnn_size, eps=1e-6) if is_on_top
+                    else nn.Identity()
+                )
             )
             encoders.append(stacks)
         return cls(embeddings, encoders)
@@ -163,3 +173,40 @@ class LayerStackEncoder(EncoderBase):
             for layer_stack_index, adapter_group, sub_id in metadata.encoder_adapter_ids:
                 module_id = metadata.encoder_id[layer_stack_index]
                 self.activate_adapter(module_id, adapter_group, sub_id)
+
+    def make_shallow(self, module_keys: List[str], model_opt):
+        """Utility function for HF port.
+        Simplifies the structure of the layerstack for easier statedict mapping
+        """
+
+        assert len(module_keys) == self.n_layer_stacks, \
+            "Need all module keys for a given task to make the encoder shallow"
+
+        shallow_encoder = AdaptedTransformerEncoder(
+            0,
+            model_opt.enc_rnn_size,
+            model_opt.heads,
+            model_opt.transformer_ff,
+            model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
+            (
+                model_opt.attention_dropout[0]
+                if type(model_opt.attention_dropout) is list
+                else model_opt.attention_dropout
+            ),
+            None,  # embeddings,
+            model_opt.max_relative_positions,
+            pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+            layer_norm_module=nn.LayerNorm(model_opt.enc_rnn_size, eps=1e-6)
+        )
+        shallow_encoder.layer_norm = self.encoders[-1][module_keys[-1]].layer_norm
+
+        for idx, key in enumerate(module_keys):
+            stack = self.encoders[idx][key].transformer
+            shallow_encoder.transformer.extend(stack)
+
+        wrapped = nn.ModuleList([
+            nn.ModuleDict({
+                'shallow': shallow_encoder
+            })
+        ])
+        return self.__class__(self.embeddings, wrapped)

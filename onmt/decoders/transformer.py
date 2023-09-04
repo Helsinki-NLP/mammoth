@@ -266,7 +266,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
 
 
 class TransformerDecoderBase(DecoderBase):
-    def __init__(self, d_model, copy_attn, embeddings, alignment_layer):
+    def __init__(self, d_model, copy_attn, embeddings, alignment_layer, layer_norm_module):
         super(TransformerDecoderBase, self).__init__()
 
         self.embeddings = embeddings
@@ -278,12 +278,12 @@ class TransformerDecoderBase(DecoderBase):
         # attention. But it was never actually used -- the "copy" attention
         # just reuses the context attention.
         self._copy = copy_attn
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
+        self.layer_norm = layer_norm_module
 
         self.alignment_layer = alignment_layer
 
     @classmethod
-    def from_opt(cls, opt, embeddings):
+    def from_opt(cls, opt, embeddings, is_on_top=False):
         """Alternate constructor."""
         return cls(
             opt.dec_layers,
@@ -301,6 +301,10 @@ class TransformerDecoderBase(DecoderBase):
             opt.alignment_layer,
             alignment_heads=opt.alignment_heads,
             pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
+            layer_norm_module=(
+                nn.LayerNorm(opt.dec_rnn_size, eps=1e-6) if is_on_top
+                else nn.Identity()
+            ),
         )
 
     def init_state(self, src, memory_bank, enc_hidden):
@@ -391,8 +395,9 @@ class TransformerDecoder(TransformerDecoderBase):
         alignment_layer,
         alignment_heads,
         pos_ffn_activation_fn=ActivationFunction.relu,
+        layer_norm_module=None,
     ):
-        super(TransformerDecoder, self).__init__(d_model, copy_attn, embeddings, alignment_layer)
+        super(TransformerDecoder, self).__init__(d_model, copy_attn, embeddings, alignment_layer, layer_norm_module)
 
         self.transformer_layers = nn.ModuleList(
             [

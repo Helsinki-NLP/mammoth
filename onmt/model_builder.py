@@ -327,6 +327,14 @@ def build_task_specific_model(
 
     # TODO: implement hierarchical approach to layer sharing
     attention_bridge = AttentionBridge.from_opt(model_opt)
+    if model_opt.param_init != 0.0:
+        for p in attention_bridge.parameters():
+            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+    if model_opt.param_init_glorot:
+        for p in attention_bridge.parameters():
+            if p.dim() > 1:
+                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+
     if checkpoint:
         # trainstep= int(checkpoint['optim']['training_step'])-1 - already recoderd in generators
         attn_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_attention_bridge.pt")
@@ -334,14 +342,7 @@ def build_task_specific_model(
             attention_bridge.load_state_dict(torch.load(attn_path))
             logger.info(f"Successfully loaded the attention bridge  from the checkpoint.")
 
-    else:
-        if model_opt.param_init != 0.0:
-            for p in attention_bridge.parameters():
-                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-        if model_opt.param_init_glorot:
-            for p in attention_bridge.parameters():
-                if p.dim() > 1:
-                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+        
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         attention_bridge.half()
 
@@ -383,6 +384,14 @@ def build_task_specific_model(
 def build_only_enc(model_opt, src_emb, task_queue_manager, checkpoint=None):
     """Truly only builds encoder: no embeddings"""
     encoder = build_encoder(model_opt, src_emb, task_queue_manager)
+    if model_opt.param_init != 0.0:
+        for p in encoder.parameters():
+            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+    if model_opt.param_init_glorot:
+        for p in encoder.parameters():
+            if p.dim() > 1:
+                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+
     if checkpoint:
         trainstep= int(checkpoint['optim']['training_step'])-1
         embnames = [ srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opt'].data.values()]
@@ -404,14 +413,8 @@ def build_only_enc(model_opt, src_emb, task_queue_manager, checkpoint=None):
                 encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
                 logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
 
-    else:
-        if model_opt.param_init != 0.0:
-            for p in encoder.parameters():
-                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-        if model_opt.param_init_glorot:
-            for p in encoder.parameters():
-                if p.dim() > 1:
-                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+    
+        
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         encoder.half()
 
@@ -420,6 +423,14 @@ def build_only_enc(model_opt, src_emb, task_queue_manager, checkpoint=None):
 
 def build_only_dec(model_opt, tgt_emb, task_queue_manager, checkpoint=None):
     decoder = build_decoder(model_opt, tgt_emb, task_queue_manager)
+    if model_opt.param_init != 0.0:
+        for p in decoder.parameters():
+            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
+    if model_opt.param_init_glorot:
+        for p in decoder.parameters():
+            if p.dim() > 1:
+                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+
     if checkpoint:
         trainstep= int(checkpoint['optim']['training_step'])-1
         embnames = [ srctgt['src_tgt'].split('-')[1] for srctgt in checkpoint['opt'].data.values()]
@@ -441,14 +452,8 @@ def build_only_dec(model_opt, tgt_emb, task_queue_manager, checkpoint=None):
                 decoder.decoders._modules[str(idx)][modname].load_state_dict(module)
                 logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
 
-    else:
-        if model_opt.param_init != 0.0:
-            for p in decoder.parameters():
-                p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-        if model_opt.param_init_glorot:
-            for p in decoder.parameters():
-                if p.dim() > 1:
-                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+   
+        
 
     if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
         decoder.half()

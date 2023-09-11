@@ -63,7 +63,8 @@ def _add_logging_opts(parser, is_train=True):
             '--report_stats_from_parameters',
             '-report_stats_from_parameters=',
             action="store_true",
-            help="Report parameter-level statistics in tensorboard",
+            help="Report parameter-level statistics in tensorboard. "
+            "This has a huge impact on performance: only use for debugging.",
         )
 
     else:

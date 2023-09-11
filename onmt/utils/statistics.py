@@ -2,6 +2,7 @@
 import time
 import math
 import sys
+import warnings
 
 from collections import Counter
 from torch.linalg import norm
@@ -178,6 +179,10 @@ class Statistics(object):
             writer.add_scalar(prefix + "/patience", patience, step)
 
         if self.magnitude_denom > 0:
+            warnings.warn(
+                '!!!!!!!!!!!!!!! --report_stats_from_parameters has a huge impact on performance: '
+                'only use for debugging !!!!!!!!!!!!!'
+            )
             # log parameter-level statistics
             for param, magnitude in self.param_magnitudes.items():
                 writer.add_scalar(f'params/{param}', magnitude / self.magnitude_denom, step)

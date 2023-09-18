@@ -55,7 +55,7 @@ DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang e
 
 class InferenceBatcher():
     """Iterator for inference"""
-    def __init__(self, dataset, batch_size, as_iter=False):
+    def __init__(self, dataset, batch_size):
         self.examples_stream = dataset
         self.collate_fn = dataset.collate_fn
         self.batch_size = batch_size

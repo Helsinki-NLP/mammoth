@@ -106,15 +106,6 @@ def init_distributed(model, task_queue_manager):
         logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: {p.flatten()[:10]}')
 
 
-# def iter_on_device(iterator, device_context):
-#     if device_context.is_gpu():
-#         device = torch.device(f'cuda:{device_context.local_rank}')
-#     else:
-#         device = torch.device('cpu')
-#     for batch, meta, comm_batch_id in iterator:
-#         yield batch.to(device), meta, comm_batch_id
-
-
 def main(
     opt,
     vocabs_dict,
@@ -208,8 +199,6 @@ def main(
     # train_iter = iter_on_device(train_iter, device_context)
     logger.info("Device {} - Valid iter".format(device_context.id))
     valid_iter = _build_valid_iter(opt, vocabs_dict, transforms_cls, task_queue_manager)
-    # if valid_iter is not None:
-    #    valid_iter = iter_on_device(valid_iter, device_context)
 
     if len(opt.gpu_ranks):
         if device_context.is_master():

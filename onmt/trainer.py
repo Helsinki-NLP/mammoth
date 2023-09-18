@@ -362,7 +362,7 @@ class Trainer(object):
             )
 
             if step % valid_steps == 0 and valid_iter is not None:
-                if True or self.gpu_verbose_level > 0:
+                if self.gpu_verbose_level > 0:
                     logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
                 valid_stats = self.validate(
                     iter_on_device(valid_iter, device_context),

@@ -12,42 +12,42 @@ def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True):
+def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True):
     """Convert an onmt.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
-        return iter(InferenceBatcher(dataset, batch_size))
+        loader = InferenceBatcher(dataset, batch_size)
+    else:
+        examples_stream = infinite_iterator(dataset)
+        if batch_type == 'sents':
+            n_buckets = 1
 
-    examples_stream = infinite_iterator(dataset)
-    if batch_type == 'sents':
-        n_buckets = 1
+            def bucket_fn(_):
+                return 0
 
-        def bucket_fn(_):
-            return 0
+            def numel_fn(_):
+                return 1
 
-        def numel_fn(_):
-            return 1
+        elif batch_type == 'tokens':
 
-    elif batch_type == 'tokens':
+            def bucket_fn(example_dict):
+                if 'tgt' in example_dict:
+                    # subtract four for bos/eos on both sides
+                    true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
+                else:
+                    true_size = len(example_dict['src']) + 2
+                # maybe dump it in the last bucket if it's just too long
+                return min(n_buckets - 1, true_size)
 
-        def bucket_fn(example_dict):
-            if 'tgt' in example_dict:
-                # subtract four for bos/eos on both sides
-                true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
-            else:
-                true_size = len(example_dict['src']) + 2
-            # maybe dump it in the last bucket if it's just too long
-            return min(n_buckets - 1, true_size)
+            def numel_fn(example_dict):
+                if 'tgt' in example_dict:
+                    true_size = len(example_dict['src']) + len(example_dict['tgt'])
+                else:
+                    true_size = len(example_dict['src'])
+                return true_size
 
-        def numel_fn(example_dict):
-            if 'tgt' in example_dict:
-                true_size = len(example_dict['src']) + len(example_dict['tgt'])
-            else:
-                true_size = len(example_dict['src'])
-            return true_size
-
-    collate_fn = dataset.collate_fn
-    lab = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn)
-    return iter(lab)
+        collate_fn = dataset.collate_fn
+        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn)
+    return iter(loader) if as_iter else loader
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
@@ -55,14 +55,14 @@ DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang e
 
 class InferenceBatcher():
     """Iterator for inference"""
-    def __init__(self, dataset, batch_size):
-        self.examples_stream = iter(dataset)
+    def __init__(self, dataset, batch_size, as_iter=False):
+        self.examples_stream = dataset
         self.collate_fn = dataset.collate_fn
         self.batch_size = batch_size
 
     def __iter__(self):
         accum = []
-        for example in self.examples_stream:
+        for example in iter(self.examples_stream):
             accum.append(example)
             if len(accum) >= self.batch_size:
                 yield self.collate_fn(accum)
@@ -288,6 +288,7 @@ class DynamicDatasetIter(object):
                     self.bucket_size,
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
+                    as_iter=self.is_train,
                 )
 
                 self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
@@ -299,8 +300,12 @@ class DynamicDatasetIter(object):
             self._init_datasets()
 
         if not self.is_train:
-            for ordered_iter, metadata in self.dataset_iterators.values():
-                yield from zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
+            # to be absolutely clear: all the validation data is read per validation loop
+            all_val_data = [
+                zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
+                for ordered_iter, metadata in self.dataset_iterators.values()
+            ]
+            yield from itertools.chain.from_iterable(all_val_data)
 
         else:
             # All minibatches with the same communication_batch_id should be trained on

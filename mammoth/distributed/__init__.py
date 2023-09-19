@@ -18,7 +18,6 @@ from mammoth.distributed.tasks import (
 
 __all__ = [
     "all_gather_list",
-    "all_gather_stats",
     "batch_producer",
     "broadcast_tensors",
     "consummer",

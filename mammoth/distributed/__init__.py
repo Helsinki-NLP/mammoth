@@ -2,6 +2,7 @@
 from mammoth.distributed.communication import (
     all_gather_list,
     batch_producer,
+    consumer,
     broadcast_tensors,
     only_ready_reduce_and_rescale_grads,
     ErrorHandler,
@@ -18,6 +19,7 @@ __all__ = [
     "all_gather_list",
     "batch_producer",
     "broadcast_tensors",
+    "consumer",
     "only_ready_reduce_and_rescale_grads",
     "ErrorHandler",
     "DeviceContext",

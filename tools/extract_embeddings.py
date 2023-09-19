@@ -2,14 +2,14 @@ import argparse
 
 import torch
 
-import onmt
-import onmt.model_builder
+import mammoth
+import mammoth.model_builder
 
-from onmt.utils.parse import ArgumentParser
-import onmt.opts
+from mammoth.utils.parse import ArgumentParser
+import mammoth.opts
 
-from onmt.utils.misc import use_gpu
-from onmt.utils.logging import init_logger, logger
+from mammoth.utils.misc import use_gpu
+from mammoth.utils.logging import init_logger, logger
 
 parser = argparse.ArgumentParser(description='translate.py')
 
@@ -29,7 +29,7 @@ def write_embeddings(filename, dict, embeddings):
 
 def main():
     dummy_parser = argparse.ArgumentParser(description='train.py')
-    onmt.opts.model_opts(dummy_parser)
+    mammoth.opts.model_opts(dummy_parser)
     dummy_opt = dummy_parser.parse_known_args([])[0]
     opt = parser.parse_args()
     opt.cuda = opt.gpu > -1
@@ -53,7 +53,7 @@ def main():
     ArgumentParser.update_model_opts(model_opt)
     ArgumentParser.validate_model_opts(model_opt)
 
-    model = onmt.model_builder.build_base_model(model_opt, fields, use_gpu(opt), checkpoint)
+    model = mammoth.model_builder.build_base_model(model_opt, fields, use_gpu(opt), checkpoint)
     encoder = model.encoder  # no encoder for LM task
     decoder = model.decoder
 

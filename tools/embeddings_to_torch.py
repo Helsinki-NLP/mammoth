@@ -4,7 +4,7 @@ from __future__ import division
 import six
 import argparse
 import torch
-from onmt.utils.logging import init_logger, logger
+from mammoth.utils.logging import init_logger, logger
 
 
 # FIXME haven't touched that file yet...

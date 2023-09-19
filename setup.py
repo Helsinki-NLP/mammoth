@@ -35,12 +35,12 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "onmt_server=onmt.bin.server:main",
-            "onmt_train=onmt.bin.train:main",
-            "onmt_translate=onmt.bin.translate:main",
-            "onmt_release_model=onmt.bin.release_model:main",
-            "onmt_average_models=onmt.bin.average_models:main",
-            "onmt_build_vocab=onmt.bin.build_vocab:main",
+            # "onmt_server=mammoth.bin.server:main",
+            "mammoth_train=mammoth.bin.train:main",
+            "mammoth_translate=mammoth.bin.translate:main",
+            # "onmt_release_model=mammoth.bin.release_model:main",
+            # "onmt_average_models=mammoth.bin.average_models:main",
+            # "onmt_build_vocab=mammoth.bin.build_vocab:main",
         ],
     },
 )

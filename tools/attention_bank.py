@@ -7,12 +7,12 @@ import numpy as np
 import torch
 import tqdm
 
-from onmt.inputters.dataset import ParallelCorpus
-from onmt.inputters.dataloader import build_dataloader
-from onmt.model_builder import load_test_multitask_model
-from onmt.opts import build_bilingual_model, _add_dynamic_transform_opts
-from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe
-from onmt.utils.parse import ArgumentParser
+from mammoth.inputters.dataset import ParallelCorpus
+from mammoth.inputters.dataloader import build_dataloader
+from mammoth.model_builder import load_test_multitask_model
+from mammoth.opts import build_bilingual_model, _add_dynamic_transform_opts
+from mammoth.transforms import get_transforms_cls, make_transforms, TransformPipe
+from mammoth.utils.parse import ArgumentParser
 
 
 def get_opts():

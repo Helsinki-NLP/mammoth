@@ -7,9 +7,9 @@ from unittest import TestCase
 
 import timeout_decorator
 
-import onmt
-from onmt.bin.train import train
-from onmt.utils.parse import ArgumentParser
+import mammoth
+from mammoth.bin.train import train
+from mammoth.utils.parse import ArgumentParser
 
 import torch.multiprocessing as mp
 
@@ -20,7 +20,7 @@ class TestTraining(TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.parser = ArgumentParser(description="train.py")
-        onmt.opts.train_opts(cls.parser)
+        mammoth.opts.train_opts(cls.parser)
         # clear output folders
         for folder in ["models", "tensorboard"]:
             if os.path.exists(folder):
@@ -919,9 +919,9 @@ class TestTraining(TestCase):
 #     @classmethod
 #     def setUpClass(cls) -> None:
 #         cls.parser = ArgumentParser(description="translate.py")
-#         onmt.opts.config_opts(cls.parser)
-#         onmt.opts.translate_opts(cls.parser)
-#         onmt.opts.build_bilingual_model(cls.parser)
+#         mammoth.opts.config_opts(cls.parser)
+#         mammoth.opts.translate_opts(cls.parser)
+#         mammoth.opts.build_bilingual_model(cls.parser)
 #
 #     def test_translate(self):
 #         # TODO: train model instead of loading one the one used now,

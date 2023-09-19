@@ -165,17 +165,26 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
-    corpus_opts = opts.data[task.corpus_id]
-    transforms_cls = get_transforms_cls(corpus_opts.get('transforms', opts.transforms))
-
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
+    corpus_opts = opts.data[task.corpus_id]
+    transforms_to_apply = corpus_opts.get('transforms', None)
+    transforms_to_apply = transforms_to_apply or opts.get('transforms', None)
+    transforms_to_apply = transforms_to_apply or []
+    transforms_cls = make_transforms(
+        opts,
+        get_transforms_cls(transforms_to_apply),
+        vocabs,
+        task=task,
+    )
+    transforms_to_apply = [transforms_cls[trf_name] for trf_name in transforms_to_apply]
+
     # build Dataset proper
     dataset = ParallelCorpus(
         corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
         corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],
         src_vocab,
         tgt_vocab,
-        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs, task=task).values()),
+        TransformPipe(opts, transforms_to_apply),
         stride=corpus_opts.get('stride', None),
         offset=corpus_opts.get('offset', None),
         is_train=is_train,

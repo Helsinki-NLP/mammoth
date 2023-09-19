@@ -5,7 +5,7 @@ import warnings
 import torch
 import torch.nn as nn
 from mammoth.rmsnorm_torch import RMSNorm
-from mammoth.encoders.transformer import TransformerEncoderLayer
+from mammoth.encoders.transformer_encoder import TransformerEncoderLayer
 
 from mammoth.modules.multi_headed_attn import MultiHeadedAttention
 

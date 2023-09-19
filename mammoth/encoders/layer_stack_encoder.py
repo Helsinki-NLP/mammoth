@@ -4,7 +4,7 @@ from typing import Dict, List
 from mammoth.encoders.encoder import EncoderBase
 from mammoth.models.adapters import Adapter, AdaptedTransformerEncoder
 from mammoth.utils.misc import sequence_mask
-from mammoth.utils.distributed import DatasetMetadata
+from mammoth.distributed import DatasetMetadata
 
 
 class LayerStackEncoder(EncoderBase):

@@ -10,7 +10,7 @@
 """
 
 
-import mammoth.utils
+import mammoth.distributed
 import torch
 import torch.distributed
 import torch.nn as nn
@@ -289,7 +289,7 @@ class Trainer(object):
                     in self.model.encoder.get_submodule(layer_stack_index, encoder_id).named_parameters()
                     if 'embeddings' not in name and 'adapter' not in name
                 ]
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
             for (layer_stack_index, decoder_id), (_, group) in self.my_decoder_groups.items():
                 params = [
@@ -297,17 +297,17 @@ class Trainer(object):
                     in self.model.decoder.get_submodule(layer_stack_index, decoder_id).named_parameters()
                     if 'embeddings' not in name and 'adapter' not in name
                 ]
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
 
             for (src_lang,), (_, group) in self.my_src_emb_groups.items():
                 embs = self.model.encoder.embeddings[f'embeddings_{src_lang}']
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
             for (tgt_lang,), (_, group) in self.my_tgt_emb_groups.items():
                 embs = self.model.decoder.embeddings[f'embeddings_{tgt_lang}']
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
 
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(
                     self.model.generator[f'generator_{tgt_lang}'].named_parameters(), group=group
                 )
 
@@ -316,18 +316,18 @@ class Trainer(object):
                 adapter = self.model.encoder.get_submodule(layer_stack_index, encoder_id).get_adapter(
                     adapter_group, sub_id
                 )
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             for adapter_id, (_, group) in self.my_decoder_adapter_groups.items():
                 layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
                 adapter = self.model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(
                     adapter_group, sub_id
                 )
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
 
             # a group is not specified: reduce across all devices
             if device_context.is_distributed():
-                mammoth.utils.distributed.only_ready_reduce_and_rescale_grads(
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(
                     self.model.attention_bridge.named_parameters()
                 )
 

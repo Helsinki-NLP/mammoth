@@ -4,7 +4,7 @@ import torch
 from functools import partial
 import os
 
-from mammoth.utils.distributed import (
+from mammoth.distributed import (
     DeviceContext,
     DeviceContextEnum,
     ErrorHandler,

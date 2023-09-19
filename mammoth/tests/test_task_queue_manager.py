@@ -3,7 +3,7 @@ from argparse import Namespace
 from collections import OrderedDict
 from unittest.mock import MagicMock
 
-from mammoth.utils.distributed import TaskQueueManager, WorldContext
+from mammoth.distributed import TaskQueueManager, WorldContext
 
 
 def test_init_minimal():

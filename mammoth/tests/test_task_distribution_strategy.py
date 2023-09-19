@@ -1,7 +1,7 @@
 import pytest
 from argparse import Namespace
 
-from mammoth.utils.distributed import WeightedSamplingTaskDistributionStrategy, RoundRobinTaskDistributionStrategy
+from mammoth.distributed.tasks import WeightedSamplingTaskDistributionStrategy, RoundRobinTaskDistributionStrategy
 
 
 def test_weights_all_zero():

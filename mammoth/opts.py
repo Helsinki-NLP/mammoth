@@ -6,7 +6,7 @@ from mammoth.models.sru import CheckSRU
 from mammoth.modules.position_ffn import ACTIVATION_FUNCTIONS
 from mammoth.modules.position_ffn import ActivationFunction
 from mammoth.transforms import AVAILABLE_TRANSFORMS
-from mammoth.utils.distributed import TASK_DISTRIBUTION_STRATEGIES
+from mammoth.distributed import TASK_DISTRIBUTION_STRATEGIES
 
 
 def config_opts(parser):

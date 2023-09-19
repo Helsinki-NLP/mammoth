@@ -11,7 +11,7 @@ from mammoth.models import build_model_saver
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
-from mammoth.utils.distributed import broadcast_tensors
+from mammoth.distributed import broadcast_tensors
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 

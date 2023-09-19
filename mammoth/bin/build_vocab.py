@@ -7,7 +7,7 @@ from mammoth.utils.parse import ArgumentParser
 from mammoth.opts import dynamic_prepare_opts
 from mammoth.inputters import build_vocab_counts
 from mammoth.transforms import make_transforms, get_transforms_cls
-from mammoth.utils.distributed import TaskSpecs
+from mammoth.distributed import TaskSpecs
 
 
 def build_vocab_main(opts):

@@ -7,7 +7,7 @@ from mammoth.translate.translator import build_translator
 from mammoth.transforms import get_transforms_cls, make_transforms, TransformPipe
 
 import mammoth.opts as opts
-from mammoth.utils.distributed import TaskSpecs
+from mammoth.distributed import TaskSpecs
 from mammoth.utils.parse import ArgumentParser
 
 

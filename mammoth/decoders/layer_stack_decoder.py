@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from mammoth.decoders.decoder import DecoderBase
 from mammoth.models.adapters import Adapter, AdaptedTransformerDecoder
-from mammoth.utils.distributed import DatasetMetadata
+from mammoth.distributed import DatasetMetadata
 
 
 class LayerStackDecoder(DecoderBase):

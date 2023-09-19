@@ -236,7 +236,7 @@ Note: all the details about every flag and options for each transform can be fou
 
 Transform name: `filtertoolong`
 
-Class: `onmt.transforms.misc.FilterTooLongTransform`
+Class: `mammoth.transforms.misc.FilterTooLongTransform`
 
 The following options can be added to the configuration :
 - `src_seq_length`: maximum source sequence length;
@@ -246,7 +246,7 @@ The following options can be added to the configuration :
 
 Transform name: `prefix`
 
-Class: `onmt.transforms.misc.PrefixTransform`
+Class: `mammoth.transforms.misc.PrefixTransform`
 
 For each dataset that the `prefix` transform is applied to, you can set the additional `src_prefix` and `tgt_prefix` parameters in its data configuration:
 
@@ -276,7 +276,7 @@ Common options for the tokenization transforms are the following:
 
 Transform name: `onmt_tokenize`
 
-Class: `onmt.transforms.tokenize.ONMTTokenizerTransform`
+Class: `mammoth.transforms.tokenize.ONMTTokenizerTransform`
 
 Additional options are available:
 - `src_subword_type`: type of subword model for source side (from `["none", "sentencepiece", "bpe"]`);
@@ -288,7 +288,7 @@ Additional options are available:
 
 Transform name: `sentencepiece`
 
-Class: `onmt.transforms.tokenize.SentencePieceTransform`
+Class: `mammoth.transforms.tokenize.SentencePieceTransform`
 
 The `src_subword_model` and `tgt_subword_model` should be valid sentencepiece models.
 
@@ -296,7 +296,7 @@ The `src_subword_model` and `tgt_subword_model` should be valid sentencepiece mo
 
 Transform name: `bpe`
 
-Class: `onmt.transforms.tokenize.BPETransform`
+Class: `mammoth.transforms.tokenize.BPETransform`
 
 The `src_subword_model` and `tgt_subword_model` should be valid BPE models.
 
@@ -321,7 +321,7 @@ These different types of noise can be controlled with the following options:
 
 Transform name: `switchout`
 
-Class: `onmt.transforms.sampling.SwitchOutTransform`
+Class: `mammoth.transforms.sampling.SwitchOutTransform`
 
 Options:
 
@@ -331,7 +331,7 @@ Options:
 
 Transform name: `tokendrop`
 
-Class: `onmt.transforms.sampling.TokenDropTransform`
+Class: `mammoth.transforms.sampling.TokenDropTransform`
 
 Options:
 
@@ -341,7 +341,7 @@ Options:
 
 Transform name: `tokenmask`
 
-Class: `onmt.transforms.sampling.TokenMaskTransform`
+Class: `mammoth.transforms.sampling.TokenMaskTransform`
 
 Options:
 
@@ -427,7 +427,7 @@ The `example` argument of `apply` is a `dict` of the form:
 }
 ```
 
-This is defined in `onmt.inputters.corpus.ParallelCorpus.load`. This class is not easily extendable for now but it can be considered for future developments. For instance, we could create some `CustomParallelCorpus` class that would handle other kind of inputs.
+This is defined in `mammoth.inputters.corpus.ParallelCorpus.load`. This class is not easily extendable for now but it can be considered for future developments. For instance, we could create some `CustomParallelCorpus` class that would handle other kind of inputs.
 
 
 ## Can I get word alignments while translating?
@@ -649,7 +649,7 @@ A server configuration file (`./available_models/conf.json`) is required. It con
 ### II. How to start the server without Docker ?
 ---
 ##### 0. Get the code
-The translation server has been merged into onmt-py `master` branch.   
+The translation server has been merged into mammoth-py `master` branch.   
 Keep in line with master for last fix / improvements.
 ##### 1. Install `flask`
 ```bash
@@ -699,7 +699,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY server.py ./
 COPY tools ./tools
 COPY available_models ./available_models
-COPY onmt ./onmt
+COPY mammoth ./mammoth
 
 CMD ["python", "./server.py"]
 ```

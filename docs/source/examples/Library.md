@@ -1,7 +1,7 @@
 
 # Library
 
-The example notebook (available [here](https://github.com/OpenNMT/OpenNMT-py/blob/master/docs/source/examples/Library.ipynb)) should be able to run as a standalone execution, provided `onmt` is in the path (installed via `pip` for instance).
+The example notebook (available [here](https://github.com/OpenNMT/OpenNMT-py/blob/master/docs/source/examples/Library.ipynb)) should be able to run as a standalone execution, provided `mammoth` is in the path (installed via `pip` for instance).
 
 Some parts may not be 100% 'library-friendly' but it's mostly workable.
 
@@ -18,12 +18,12 @@ from collections import defaultdict, Counter
 
 
 ```python
-import onmt
-from onmt.inputters.inputter import _load_vocab, _build_fields_vocab, get_fields, IterOnDevice
-from onmt.inputters.corpus import ParallelCorpus
-from onmt.inputters.dynamic_iterator import DynamicDatasetIter
-from onmt.translate import GNMTGlobalScorer, Translator, TranslationBuilder
-from onmt.utils.misc import set_random_seed
+import mammoth
+from mammoth.inputters.inputter import _load_vocab, _build_fields_vocab, get_fields, IterOnDevice
+from mammoth.inputters.corpus import ParallelCorpus
+from mammoth.inputters.dynamic_iterator import DynamicDatasetIter
+from mammoth.translate import GNMTGlobalScorer, Translator, TranslationBuilder
+from mammoth.utils.misc import set_random_seed
 ```
 
 ### Enable logging
@@ -31,7 +31,7 @@ from onmt.utils.misc import set_random_seed
 
 ```python
 # enable logging
-from onmt.utils.logging import init_logger, logger
+from mammoth.utils.logging import init_logger, logger
 init_logger()
 ```
 
@@ -119,13 +119,13 @@ with open("toy-ende/config.yaml", "w") as f:
 
 
 ```python
-from onmt.utils.parse import ArgumentParser
+from mammoth.utils.parse import ArgumentParser
 parser = DynamicArgumentParser(description='build_vocab.py')
 ```
 
 
 ```python
-from onmt.opts import dynamic_prepare_opts
+from mammoth.opts import dynamic_prepare_opts
 dynamic_prepare_opts(parser, build_vocab_only=True)
 ```
 
@@ -149,7 +149,7 @@ opts
 
 
 ```python
-from onmt.bin.build_vocab import build_vocab_main
+from mammoth.bin.build_vocab import build_vocab_main
 build_vocab_main(opts)
 ```
 
@@ -221,8 +221,8 @@ fields
 
 
 
-    {'src': <onmt.inputters.text_dataset.TextMultiField at 0x7fca93802c50>,
-     'tgt': <onmt.inputters.text_dataset.TextMultiField at 0x7fca93802f60>,
+    {'src': <mammoth.inputters.text_dataset.TextMultiField at 0x7fca93802c50>,
+     'tgt': <mammoth.inputters.text_dataset.TextMultiField at 0x7fca93802f60>,
      'indices': <torchtext.data.field.Field at 0x7fca93802940>}
 
 
@@ -272,21 +272,21 @@ emb_size = 100
 rnn_size = 500
 # Specify the core model.
 
-encoder_embeddings = onmt.modules.Embeddings(emb_size, len(src_vocab),
+encoder_embeddings = mammoth.modules.Embeddings(emb_size, len(src_vocab),
                                              word_padding_idx=src_padding)
 
-encoder = onmt.encoders.RNNEncoder(hidden_size=rnn_size, num_layers=1,
+encoder = mammoth.encoders.RNNEncoder(hidden_size=rnn_size, num_layers=1,
                                    rnn_type="LSTM", bidirectional=True,
                                    embeddings=encoder_embeddings)
 
-decoder_embeddings = onmt.modules.Embeddings(emb_size, len(tgt_vocab),
+decoder_embeddings = mammoth.modules.Embeddings(emb_size, len(tgt_vocab),
                                              word_padding_idx=tgt_padding)
-decoder = onmt.decoders.decoder.InputFeedRNNDecoder(
+decoder = mammoth.decoders.decoder.InputFeedRNNDecoder(
     hidden_size=rnn_size, num_layers=1, bidirectional_encoder=True, 
     rnn_type="LSTM", embeddings=decoder_embeddings)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = onmt.models.model.NMTModel(encoder, decoder)
+model = mammoth.models.model.NMTModel(encoder, decoder)
 model.to(device)
 
 # Specify the tgt word generator and loss computation module
@@ -294,7 +294,7 @@ model.generator = nn.Sequential(
     nn.Linear(rnn_size, len(tgt_vocab)),
     nn.LogSoftmax(dim=-1)).to(device)
 
-loss = onmt.utils.loss.NMTLossCompute(
+loss = mammoth.utils.loss.NMTLossCompute(
     criterion=nn.NLLLoss(ignore_index=tgt_padding, reduction="sum"),
     generator=model.generator)
 ```
@@ -305,7 +305,7 @@ Now we set up the optimizer. This could be a core torch optim class, or our wrap
 ```python
 lr = 1
 torch_optimizer = torch.optim.SGD(model.parameters(), lr=lr)
-optim = onmt.utils.optimizers.Optimizer(
+optim = mammoth.utils.optimizers.Optimizer(
     torch_optimizer, learning_rate=lr, max_grad_norm=2)
 ```
 
@@ -374,10 +374,10 @@ Finally we train.
 
 
 ```python
-report_manager = onmt.utils.ReportMgr(
+report_manager = mammoth.utils.ReportMgr(
     report_every=50, start_time=None, tensorboard_writer=None)
 
-trainer = onmt.Trainer(model=model,
+trainer = mammoth.Trainer(model=model,
                        train_loss=loss,
                        valid_loss=loss,
                        optim=optim,
@@ -435,7 +435,7 @@ trainer.train(train_iter=train_iter,
 
 
 
-    <onmt.utils.statistics.Statistics at 0x7fca934e8e80>
+    <mammoth.utils.statistics.Statistics at 0x7fca934e8e80>
 
 
 
@@ -445,22 +445,22 @@ For translation, we can build a "traditional" (as opposed to dynamic) dataset fo
 
 
 ```python
-src_data = {"reader": onmt.inputters.str2reader["text"](), "data": src_val}
-tgt_data = {"reader": onmt.inputters.str2reader["text"](), "data": tgt_val}
-_readers, _data = onmt.inputters.Dataset.config(
+src_data = {"reader": mammoth.inputters.str2reader["text"](), "data": src_val}
+tgt_data = {"reader": mammoth.inputters.str2reader["text"](), "data": tgt_val}
+_readers, _data = mammoth.inputters.Dataset.config(
     [('src', src_data), ('tgt', tgt_data)])
 ```
 
 
 ```python
-dataset = onmt.inputters.Dataset(
+dataset = mammoth.inputters.Dataset(
     vocab_fields, readers=_readers, data=_data,
-    sort_key=onmt.inputters.str2sortkey["text"])
+    sort_key=mammoth.inputters.str2sortkey["text"])
 ```
 
 
 ```python
-data_iter = onmt.inputters.OrderedIterator(
+data_iter = mammoth.inputters.OrderedIterator(
             dataset=dataset,
             device="cuda",
             batch_size=10,
@@ -473,8 +473,8 @@ data_iter = onmt.inputters.OrderedIterator(
 
 
 ```python
-src_reader = onmt.inputters.str2reader["text"]
-tgt_reader = onmt.inputters.str2reader["text"]
+src_reader = mammoth.inputters.str2reader["text"]
+tgt_reader = mammoth.inputters.str2reader["text"]
 scorer = GNMTGlobalScorer(alpha=0.7, 
                           beta=0., 
                           length_penalty="avg", 
@@ -486,7 +486,7 @@ translator = Translator(model=model,
                         tgt_reader=tgt_reader, 
                         global_scorer=scorer,
                         gpu=gpu)
-builder = onmt.translate.TranslationBuilder(data=dataset, 
+builder = mammoth.translate.TranslationBuilder(data=dataset, 
                                             fields=vocab_fields)
 ```
 

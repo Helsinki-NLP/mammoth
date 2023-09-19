@@ -7,7 +7,6 @@ import torch.nn as nn
 from torch.nn.init import xavier_uniform_
 
 from collections import defaultdict
-# from torchtext.legacy.data import Field
 
 import mammoth.modules
 
@@ -404,7 +403,7 @@ def build_generator(model_opt, n_tgts, tgt_emb):
     else:
         gen_func = nn.LogSoftmax(dim=-1)
     generator = nn.Sequential(
-        nn.Linear(model_opt.dec_rnn_size, n_tgts), Cast(torch.float32), gen_func
+        nn.Linear(model_opt.rnn_size, n_tgts), Cast(torch.float32), gen_func
     )
 
     if model_opt.share_decoder_embeddings:

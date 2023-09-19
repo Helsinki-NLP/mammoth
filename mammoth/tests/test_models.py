@@ -63,8 +63,6 @@ class TestModel(unittest.TestCase):
             source_l: Length of generated input sentence
             bsize: Batchsize of generated input
         '''
-        if opt.rnn_size > 0:
-            opt.enc_rnn_size = opt.rnn_size
         word_field = self.get_field()
         embeddings = build_embeddings(opt, word_field)
         enc = build_encoder(opt, embeddings)
@@ -74,8 +72,8 @@ class TestModel(unittest.TestCase):
         hidden_t, outputs, test_length = enc(test_src, test_length)
 
         # Initialize vectors to compare size with
-        test_hid = torch.zeros(self.opt.enc_layers, bsize, opt.enc_rnn_size)
-        test_out = torch.zeros(source_l, bsize, opt.dec_rnn_size)
+        test_hid = torch.zeros(self.opt.enc_layers, bsize, opt.rnn_size)
+        test_out = torch.zeros(source_l, bsize, opt.rnn_size)
 
         # Ensure correct sizes and types
         self.assertEqual(test_hid.size(), hidden_t[0].size(), hidden_t[1].size())
@@ -92,9 +90,6 @@ class TestModel(unittest.TestCase):
             source_l: length of input sequence
             bsize: batchsize
         """
-        if opt.rnn_size > 0:
-            opt.enc_rnn_size = opt.rnn_size
-            opt.dec_rnn_size = opt.rnn_size
         word_field = self.get_field()
 
         embeddings = build_embeddings(opt, word_field)
@@ -107,7 +102,7 @@ class TestModel(unittest.TestCase):
 
         test_src, test_tgt, test_length = self.get_batch(source_l=source_l, bsize=bsize)
         outputs, attn = model(test_src, test_tgt, test_length)
-        outputsize = torch.zeros(source_l - 1, bsize, opt.dec_rnn_size)
+        outputsize = torch.zeros(source_l - 1, bsize, opt.rnn_size)
         # Make sure that output has the correct size and type
         self.assertEqual(outputs.size(), outputsize.size())
         self.assertEqual(type(outputs), torch.Tensor)

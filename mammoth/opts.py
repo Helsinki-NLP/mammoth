@@ -385,21 +385,21 @@ def model_opts(parser):
         '--encoder_type',
         '-encoder_type',
         type=str,
-        default='rnn',
-        choices=['rnn', 'brnn', 'ggnn', 'mean', 'transformer', 'cnn', 'transformer_lm'],
+        default='transformer',
+        choices=['mean', 'transformer'],
         help="Type of encoder layer to use. Non-RNN layers "
         "are experimental. Options are "
-        "[rnn|brnn|ggnn|mean|transformer|cnn|transformer_lm].",
+        "[mean|transformer].",
     )
     group.add(
         '--decoder_type',
         '-decoder_type',
         type=str,
-        default='rnn',
-        choices=['rnn', 'transformer', 'cnn', 'transformer_lm'],
+        default='transformer',
+        choices=['transformer'],
         help="Type of decoder layer to use. Non-RNN layers "
         "are experimental. Options are "
-        "[rnn|transformer|cnn|transformer].",
+        "[transformer].",
     )
 
     group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
@@ -410,10 +410,9 @@ def model_opts(parser):
         '-rnn_size',
         type=int,
         default=-1,
-        help="Size of rnn hidden states. Overwrites enc_rnn_size and dec_rnn_size",
+        help="Size of rnn hidden states.",
     )
-    group.add('--enc_rnn_size', '-enc_rnn_size', type=int, default=500, help="Size of encoder rnn hidden states.")
-    group.add('--dec_rnn_size', '-dec_rnn_size', type=int, default=500, help="Size of decoder rnn hidden states.")
+
     group.add(
         '--cnn_kernel_width',
         '-cnn_kernel_width',

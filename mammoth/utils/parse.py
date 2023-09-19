@@ -285,10 +285,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if model_opt.layers > 0:
             raise Exception('--layers is deprecated')
 
-        if model_opt.rnn_size > 0:
-            model_opt.enc_rnn_size = model_opt.rnn_size
-            model_opt.dec_rnn_size = model_opt.rnn_size
-
         model_opt.brnn = model_opt.encoder_type == "brnn"
 
         if model_opt.copy_attn_type is None:
@@ -304,8 +300,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         assert model_opt.model_type in ["text"], "Unsupported model type %s" % model_opt.model_type
 
         # encoder and decoder should be same sizes
-        same_size = model_opt.enc_rnn_size == model_opt.dec_rnn_size
-        assert same_size, "The encoder and decoder rnns must be the same size for now"
+        # assert same_size, "The encoder and decoder rnns must be the same size for now"
 
         assert model_opt.rnn_type != "SRU" or model_opt.gpu_ranks, "Using SRU requires -gpu_ranks set."
         if model_opt.share_embeddings:

@@ -29,7 +29,7 @@ class LayerStackDecoder(DecoderBase):
                     continue
                 stacks[module_id] = AdaptedTransformerDecoder(
                     n_layers,
-                    opt.dec_rnn_size,
+                    opt.rnn_size,
                     opt.heads,
                     opt.transformer_ff,
                     opt.copy_attn,
@@ -48,7 +48,7 @@ class LayerStackDecoder(DecoderBase):
                     alignment_heads=opt.alignment_heads,
                     pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
                     layer_norm_module=(
-                        nn.LayerNorm(opt.dec_rnn_size, eps=1e-6) if is_on_top
+                        nn.LayerNorm(opt.rnn_size, eps=1e-6) if is_on_top
                         else nn.Identity()
                     ),
                 )
@@ -66,7 +66,7 @@ class LayerStackDecoder(DecoderBase):
             module_id = module_opts['id']
             stacks[module_id] = AdaptedTransformerDecoder(
                 n_layers,
-                model_opt.dec_rnn_size,
+                model_opt.rnn_size,
                 model_opt.heads,
                 model_opt.transformer_ff,
                 model_opt.copy_attn,
@@ -85,7 +85,7 @@ class LayerStackDecoder(DecoderBase):
                 alignment_heads=model_opt.alignment_heads,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
                 layer_norm_module=(
-                    nn.LayerNorm(model_opt.dec_rnn_size, eps=1e-6) if is_on_top
+                    nn.LayerNorm(model_opt.rnn_size, eps=1e-6) if is_on_top
                     else nn.Identity()
                 ),
             )

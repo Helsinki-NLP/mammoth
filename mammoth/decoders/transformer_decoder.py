@@ -287,7 +287,7 @@ class TransformerDecoderBase(DecoderBase):
         """Alternate constructor."""
         return cls(
             opt.dec_layers,
-            opt.dec_rnn_size,
+            opt.rnn_size,
             opt.heads,
             opt.transformer_ff,
             opt.copy_attn,
@@ -302,7 +302,7 @@ class TransformerDecoderBase(DecoderBase):
             alignment_heads=opt.alignment_heads,
             pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
             layer_norm_module=(
-                nn.LayerNorm(opt.dec_rnn_size, eps=1e-6) if is_on_top
+                nn.LayerNorm(opt.rnn_size, eps=1e-6) if is_on_top
                 else nn.Identity()
             ),
         )

@@ -2,7 +2,6 @@
 import configargparse
 
 from mammoth.constants import ModelTask
-from mammoth.models.sru import CheckSRU
 from mammoth.modules.position_ffn import ACTIVATION_FUNCTIONS
 from mammoth.modules.position_ffn import ActivationFunction
 from mammoth.transforms import AVAILABLE_TRANSFORMS
@@ -450,19 +449,8 @@ def model_opts(parser):
         action="store_true",
         help="Have an additional layer between the last encoder state and the first decoder state",
     )
-    group.add(
-        '--rnn_type',
-        '-rnn_type',
-        type=str,
-        default='LSTM',
-        choices=['LSTM', 'GRU', 'SRU'],
-        action=CheckSRU,
-        help="The gate type to use in the RNNs",
-    )
     # group.add('--residual', '-residual',   action="store_true",
     #                     help="Add residual connections between RNN layers.")
-
-    group.add('--brnn', '-brnn', action=DeprecateAction, help="Deprecated, use `encoder_type`.")
 
     group.add(
         '--context_gate',

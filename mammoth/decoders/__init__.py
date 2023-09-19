@@ -1,21 +1,14 @@
 """Module defining decoders."""
-from mammoth.decoders.decoder import DecoderBase, InputFeedRNNDecoder, StdRNNDecoder
-from mammoth.decoders.transformer import TransformerDecoder
-from mammoth.decoders.cnn_decoder import CNNDecoder
+from mammoth.decoders.decoder import DecoderBase
+from mammoth.decoders.transformer_decoder import TransformerDecoder
 
 
 str2dec = {
-    "rnn": StdRNNDecoder,
-    "ifrnn": InputFeedRNNDecoder,
-    "cnn": CNNDecoder,
     "transformer": TransformerDecoder,
 }
 
 __all__ = [
     "DecoderBase",
     "TransformerDecoder",
-    "StdRNNDecoder",
-    "CNNDecoder",
-    "InputFeedRNNDecoder",
     "str2dec",
 ]

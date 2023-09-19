@@ -1,6 +1,5 @@
 """Module defining distributed communications utilities."""
 from mammoth.distributed.communication import (
-    all_gather,
     all_gather_list,
     all_gather_stats,
     batch_producer,
@@ -18,7 +17,6 @@ from mammoth.distributed.tasks import (
 )
 
 __all__ = [
-    "all_gather",
     "all_gather_list",
     "all_gather_stats",
     "batch_producer",

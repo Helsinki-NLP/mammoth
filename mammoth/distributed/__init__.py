@@ -1,10 +1,8 @@
 """Module defining distributed communications utilities."""
 from mammoth.distributed.communication import (
     all_gather_list,
-    all_gather_stats,
     batch_producer,
     broadcast_tensors,
-    consummer,
     only_ready_reduce_and_rescale_grads,
     ErrorHandler,
 )
@@ -20,7 +18,6 @@ __all__ = [
     "all_gather_list",
     "batch_producer",
     "broadcast_tensors",
-    "consummer",
     "only_ready_reduce_and_rescale_grads",
     "ErrorHandler",
     "DeviceContext",

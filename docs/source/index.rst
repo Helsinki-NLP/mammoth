@@ -14,18 +14,12 @@ Contents
       :caption: MAMMOTH features
       :maxdepth: 2
 
-      attention_bridge.md
+      attention_bridges.md
       config_config.md
-      QA.md
+      FAQ.md
 
 .. toctree::
       :caption: Tutorials
-      :maxdepth: 2
-
-      MT_marathon.md
-
-.. toctree::
-      :caption Examples
       :maxdepth: 2
 
       prepare_data.md

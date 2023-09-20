@@ -38,7 +38,6 @@ from recommonmark.transform import AutoStructify
 source_suffix = ['.rst', '.md']
 extensions = ['recommonmark',
               'sphinx.ext.autodoc',
-              'sphinx_math_dollar',
               'sphinx.ext.mathjax',
               'sphinx.ext.viewcode',
               'sphinx.ext.coverage',

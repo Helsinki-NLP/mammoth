@@ -111,13 +111,14 @@
 <li class="toctree-l2"><a class="reference internal" href="#Pruning">Pruning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Embeddings">Embeddings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/BART">Transform/BART</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Transform/Filter">Transform/Filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Transform/Filter_repeat1">Transform/Filter</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/InferFeats">Transform/InferFeats</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/SwitchOut">Transform/SwitchOut</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Token_Drop">Transform/Token_Drop</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Token_Mask">Transform/Token_Mask</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Subword/Common">Transform/Subword/Common</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Subword/ONMTTOK">Transform/Subword/ONMTTOK</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#Transform/Filter">Transform/Filter</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Model-Embeddings">Model-Embeddings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Model-Embedding Features">Model-Embedding Features</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Model- Task">Model- Task</a></li>
@@ -216,7 +217,7 @@
 </p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">train</span><span class="o">.</span><span class="n">py</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">config</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">save_config</span> <span class="n">SAVE_CONFIG</span><span class="p">]</span> <span class="o">-</span><span class="n">data</span> <span class="n">DATA</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">skip_empty_level</span> <span class="p">{</span><span class="n">silent</span><span class="p">,</span><span class="n">warning</span><span class="p">,</span><span class="n">error</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">-</span><span class="n">transforms</span> <span class="p">{</span><span class="n">bart</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">prefix</span><span class="p">}</span> <span class="p">[{</span><span class="n">bart</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">prefix</span><span class="p">}</span> <span class="o">...</span><span class="p">]]</span>
+                <span class="p">[</span><span class="o">-</span><span class="n">transforms</span> <span class="p">{</span><span class="n">bart</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">prefix</span><span class="p">}</span> <span class="p">[{</span><span class="n">bart</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">prefix</span><span class="p">}</span> <span class="o">...</span><span class="p">]]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">save_data</span> <span class="n">SAVE_DATA</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">overwrite</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">n_sample</span> <span class="n">N_SAMPLE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">dump_transforms</span><span class="p">]</span> <span class="o">-</span><span class="n">src_vocab</span> <span class="n">SRC_VOCAB</span> <span class="p">[</span><span class="o">-</span><span class="n">tgt_vocab</span> <span class="n">TGT_VOCAB</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">share_vocab</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">vocab_paths</span> <span class="n">VOCAB_PATHS</span><span class="p">]</span>
@@ -237,6 +238,9 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">random_ratio</span> <span class="n">RANDOM_RATIO</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">mask_ratio</span> <span class="n">MASK_RATIO</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">mask_length</span> <span class="p">{</span><span class="n">subword</span><span class="p">,</span><span class="n">word</span><span class="p">,</span><span class="n">span</span><span class="o">-</span><span class="n">poisson</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">poisson_lambda</span> <span class="n">POISSON_LAMBDA</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">replace_length</span> <span class="p">{</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">src_seq_length</span> <span class="n">SRC_SEQ_LENGTH</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">tgt_seq_length</span> <span class="n">TGT_SEQ_LENGTH</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">word_ratio_threshold</span> <span class="n">WORD_RATIO_THRESHOLD</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">reversible_tokenization</span> <span class="p">{</span><span class="n">joiner</span><span class="p">,</span><span class="n">spacer</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">prior_tokenization</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">switchout_temperature</span> <span class="n">SWITCHOUT_TEMPERATURE</span><span class="p">]</span>
@@ -256,8 +260,6 @@
                 <span class="p">[</span><span class="o">-</span><span class="n">tgt_subword_type</span> <span class="p">{</span><span class="n">none</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">src_onmttok_kwargs</span> <span class="n">SRC_ONMTTOK_KWARGS</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">tgt_onmttok_kwargs</span> <span class="n">TGT_ONMTTOK_KWARGS</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">src_seq_length</span> <span class="n">SRC_SEQ_LENGTH</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">tgt_seq_length</span> <span class="n">TGT_SEQ_LENGTH</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">src_word_vec_size</span> <span class="n">SRC_WORD_VEC_SIZE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">tgt_word_vec_size</span> <span class="n">TGT_WORD_VEC_SIZE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">word_vec_size</span> <span class="n">WORD_VEC_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">share_decoder_embeddings</span><span class="p">]</span>
@@ -376,7 +378,7 @@
 <p>Default: “warning”</p>
 </dd>
 <dt><kbd>-transforms, --transforms</kbd></dt>
-<dd><p>Possible choices: bart, filterfeats, inferfeats, switchout, tokendrop, tokenmask, sentencepiece, bpe, onmt_tokenize, filtertoolong, prefix</p>
+<dd><p>Possible choices: bart, filtertoolong, filterwordratio, filterfeats, inferfeats, switchout, tokendrop, tokenmask, sentencepiece, bpe, onmt_tokenize, prefix</p>
 <p>Default transform pipeline to apply to data. Can be specified in each corpus of data to override.</p>
 <p>Default: []</p>
 </dd>
@@ -506,6 +508,28 @@
 </dd>
 </dl>
 </div>
+<div class="section" id="Transform/Filter">
+<h2>Transform/Filter<a class="headerlink" href="#Transform/Filter" title="Permalink to this headline">¶</a></h2>
+<dl class="option-list">
+<dt><kbd>--src_seq_length, -src_seq_length</kbd></dt>
+<dd><p>Maximum source sequence length.</p>
+<p>Default: 200</p>
+</dd>
+<dt><kbd>--tgt_seq_length, -tgt_seq_length</kbd></dt>
+<dd><p>Maximum target sequence length.</p>
+<p>Default: 200</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="Transform/Filter_repeat1">
+<h2>Transform/Filter<a class="headerlink" href="#Transform/Filter_repeat1" title="Permalink to this headline">¶</a></h2>
+<dl class="option-list">
+<dt><kbd>--word_ratio_threshold, -word_ratio_threshold</kbd></dt>
+<dd><p>Threshold for discarding sentences based on word ratio.</p>
+<p>Default: 3</p>
+</dd>
+</dl>
+</div>
 <div class="section" id="Transform/InferFeats">
 <h2>Transform/InferFeats<a class="headerlink" href="#Transform/InferFeats" title="Permalink to this headline">¶</a></h2>
 <dl class="option-list">
@@ -614,19 +638,6 @@
 <dt><kbd>-tgt_onmttok_kwargs, --tgt_onmttok_kwargs</kbd></dt>
 <dd><p>Other pyonmttok options for tgt in dict string, except subword related options listed earlier.</p>
 <p>Default: “{‘mode’: ‘none’}”</p>
-</dd>
-</dl>
-</div>
-<div class="section" id="Transform/Filter">
-<h2>Transform/Filter<a class="headerlink" href="#Transform/Filter" title="Permalink to this headline">¶</a></h2>
-<dl class="option-list">
-<dt><kbd>--src_seq_length, -src_seq_length</kbd></dt>
-<dd><p>Maximum source sequence length.</p>
-<p>Default: 200</p>
-</dd>
-<dt><kbd>--tgt_seq_length, -tgt_seq_length</kbd></dt>
-<dd><p>Maximum target sequence length.</p>
-<p>Default: 200</p>
 </dd>
 </dl>
 </div>

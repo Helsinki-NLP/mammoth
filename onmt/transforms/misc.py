@@ -1,18 +1,6 @@
 from onmt.utils.logging import logger
 from onmt.transforms import register_transform
-from .transform import Transform, ObservableStats
-
-
-class FilterTooLongStats(ObservableStats):
-    """Runing statistics for FilterTooLongTransform."""
-
-    __slots__ = ["filtered"]
-
-    def __init__(self):
-        self.filtered = 1
-
-    def update(self, other: "FilterTooLongStats"):
-        self.filtered += other.filtered
+from .transform import Transform
 
 @register_transform(name='prefix')
 class PrefixTransform(Transform):

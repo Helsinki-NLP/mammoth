@@ -1,10 +1,14 @@
 
 # Prepare Data
 
+## Tatoeba Challenge
 
+TODO
+
+## OPUS 100 
 To get started, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/opus-100.php)
 
-## Step 1: Set relevant paths, variables and download
+### Step 1: Set relevant paths, variables and download
 
 ```
 SP_PATH=your/sentencepiece/path/build/src
@@ -27,7 +31,7 @@ cd $CUR_DIR
 language_pairs=( $( ls $DATA_PATH/opus-100-corpus/v1.0/supervised/ ) )
 ```
 
-## Step 2: Train SentencePiece models and get vocabs
+### Step 2: Train SentencePiece models and get vocabs
 
 Starting from here, original files are supposed to be in `$DATA_PATH`
 
@@ -82,7 +86,7 @@ cat $DATA_PATH/opus-100-corpus/v1.0/supervised/$lp/opus.$lp-train.en >> $DATA_PA
 fi
 ```
 
-## Step 3: Parse train, valid and test sets for supervised translation directions
+### Step 3: Parse train, valid and test sets for supervised translation directions
 ```
 mkdir -p $DATA_PATH/supervised
 for lp in "${language_pairs[@]}"
@@ -133,7 +137,7 @@ fi
 done
 ```
 
-## Step 4: Parse the test sets for zero-shot translation directions
+### Step 4: Parse the test sets for zero-shot translation directions
 ```
 mkdir -p $DATA_PATH/zero-shot
 for dir in $DATA_PATH/opus-100-corpus/v1.0/zero-shot/*

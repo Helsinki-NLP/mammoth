@@ -68,7 +68,7 @@ class WordRatioFilter(Transform):
         self.word_ratio_threshold = self.opts.word_ratio_threshold
 
     def apply(self, example, **kwargs):
-        """Return None if too long else return as is."""
+        """Return None if the word length ratio is smaller than the threshold."""
         src_len = len(example['src'].split())
         tgt_len = len(example['tgt'].split())
         lengths = sorted([src_len, tgt_len])

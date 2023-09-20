@@ -27,7 +27,7 @@ cd $CUR_DIR
 language_pairs=( $( ls $DATA_PATH/opus-100-corpus/v1.0/supervised/ ) )
 ```
 
-# Step 2: Train SentencePiece models and get vocabs
+## Step 2: Train SentencePiece models and get vocabs
 
 Starting from here, original files are supposed to be in `$DATA_PATH`
 

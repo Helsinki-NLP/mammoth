@@ -4,7 +4,7 @@
 
 To get started, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/opus-100.php)
 
-## Step 1: set relevant paths, variables and download
+## Step 1: Set relevant paths, variables and download
 
 ```
 SP_PATH=your/sentencepiece/path/build/src
@@ -32,7 +32,7 @@ language_pairs=( $( ls $DATA_PATH/opus-100-corpus/v1.0/supervised/ ) )
 Starting from here, original files are supposed to be in `$DATA_PATH`
 
 ```
-echo "$0: Training sentencepiece models"
+echo "$0: Training SentencePiece models"
 rm -f $DATA_PATH/train.txt
 rm -f $DATA_PATH/train.en.txt
 for lp in "${language_pairs[@]}"
@@ -44,11 +44,11 @@ other_lang=$tl
 else
 other_lang=$sl
 fi
-# train the sentencepiece model over the language other than english
+# train the SentencePiece model over the language other than english
 sort -u $DATA_PATH/opus-100-corpus/v1.0/supervised/$lp/opus.$lp-train.$other_lang | shuf > $DATA_PATH/train.txt
 for vocab_size in "${vocab_sizes[@]}"
 do
-echo "Training sentencepiece model for $other_lang with vocab size $vocab_size"
+echo "Training SentencePiece model for $other_lang with vocab size $vocab_size"
 cd $SP_PATH
 ./spm_train --input=$DATA_PATH/train.txt \
             --model_prefix=$DATA_PATH/opus.$other_lang \
@@ -66,8 +66,8 @@ rm $DATA_PATH/train.txt
 # append the english data to a file
 cat $DATA_PATH/opus-100-corpus/v1.0/supervised/$lp/opus.$lp-train.en >> $DATA_PATH/train.en.txt
 
- # train the sentencepiece model for english
- echo "Training sentencepiece model for en"
+ # train the SentencePiece model for english
+ echo "Training SentencePiece model for en"
  sort -u $DATA_PATH/train.en.txt | shuf -n $input_sentence_size > $DATA_PATH/train.txt
  rm $DATA_PATH/train.en.txt
  cd $SP_PATH

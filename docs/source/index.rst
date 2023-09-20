@@ -14,8 +14,8 @@ Contents
       :caption: MAMMOTH features
       :maxdepth: 2
 
-      attention_bridges.md
       config_config.md
+      attention_bridges.md
       FAQ.md
 
 .. toctree::

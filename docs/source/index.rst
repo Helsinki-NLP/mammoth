@@ -11,22 +11,24 @@ Contents
       ref.rst
 
 .. toctree::
-      :caption: FAQ
+      :caption: MAMMOTH features
       :maxdepth: 2
 
-      FAQ.md
-
+      attention_bridge.md
+      config_config.md
+      QA.md
 
 .. toctree::
-      :caption: Examples
+      :caption: Tutorials
       :maxdepth: 2
 
-      examples/Library.md
-      examples/Translation.md
-      examples/Summarization.md
-      examples/LanguageModelGeneration.md
-      examples/GGNN.md
+      MT_marathon.md
 
+.. toctree::
+      :caption Examples
+      :maxdepth: 2
+
+      prepare_data.md
 
 .. toctree::
       :caption: Scripts
@@ -47,13 +49,3 @@ Contents
       onmt.translation.rst
       onmt.translate.translation_server.rst
       onmt.inputters.rst
-
-
-.. toctree::
-      :caption: Legacy
-      :maxdepth: 2
-
-      legacy/FAQ.md
-      legacy/im2text.md
-      legacy/speech2text.md
-      legacy/vid2text.rst

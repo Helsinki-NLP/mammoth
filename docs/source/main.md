@@ -1,35 +1,27 @@
 # Overview
 
 
-This portal provides a detailed documentation of the OpenNMT-py toolkit. It describes how to use the PyTorch project and how it works.
+This portal provides a detailed documentation of the **MAMMOTH**: Modular Adaptable Massively Multilingual Open Translation @ Helsinki. 
 
 
 
 ## Installation
-Install `OpenNMT-py` from `pip`:
+
 ```bash
-pip install OpenNMT-py
+git clone https://github.com/Helsinki-NLP/mammoth.git
+cd mammoth
+pip3 install -e .
+pip3 install sentencepiece==0.1.97 sacrebleu==2.3.1
 ```
 
-or from the sources:
-```bash
-git clone https://github.com/OpenNMT/OpenNMT-py.git
-cd OpenNMT-py
-python setup.py install
-```
-
-*(Optional)* some advanced features (e.g. working pretrained models or specific transforms) requires extra packages, you can install it with:
-```bash
-pip install -r requirements.opt.txt
-```
-
-And you are ready to go!
+Check out the [installation guide](install) to install in specific clusters.
 
 Take a look at the [quickstart](quickstart) to familiarize yourself with the main training workflow.
 
 ## Citation
 
-When using OpenNMT-py for research please cite our
+This project is based on [OpenNMT V2](https://opennmt.net).
+When using OpenNMT-py for research please cite the
 [OpenNMT technical report](https://doi.org/10.18653/v1/P17-4012)
 
 ```
@@ -46,11 +38,3 @@ When using OpenNMT-py for research please cite our
   doi       = {10.18653/v1/P17-4012}
 }
 ```
-
-## Additional resources
-
-You can find additional help or tutorials in the following resources:
-
-* [Forum](http://forum.opennmt.net/)
-
-* [Gitter channel](https://gitter.im/OpenNMT/openmt-py)

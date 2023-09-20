@@ -11,44 +11,43 @@ from onmt.utils.logging import logger
 def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, buckets=None):
-    """Convert an onmt.inputters_mvp.ParallelCorpus into an infinite iterator of batches"""
+def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True, buckets=None):
+    """Convert an onmt.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
-        return iter(InferenceBatcher(dataset, batch_size))
+        loader = InferenceBatcher(dataset, batch_size)
+    else:
+        examples_stream = infinite_iterator(dataset)
+        if batch_type == 'sents':
+            n_buckets = 1
 
-    examples_stream = infinite_iterator(dataset)
-    if batch_type == 'sents':
-        n_buckets = 1
+            def bucket_fn(_):
+                return 0
 
-        def bucket_fn(_):
-            return 0
+            def numel_fn(_):
+                return 1
 
-        def numel_fn(_):
-            return 1
+        elif batch_type == 'tokens':
 
-    elif batch_type == 'tokens':
+            def bucket_fn(example_dict):
+                if 'tgt' in example_dict:
+                    # subtract four for bos/eos on both sides
+                    true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
+                else:
+                    true_size = len(example_dict['src']) + 2
+                # maybe dump it in the last bucket if it's just too long
+                return min(n_buckets - 1, true_size)
 
-        def bucket_fn(example_dict):
-            if 'tgt' in example_dict:
-                # subtract four for bos/eos on both sides
-                true_size = len(example_dict['src']) + len(example_dict['tgt']) - 4
-            else:
-                true_size = len(example_dict['src']) + 2
-            # maybe dump it in the last bucket if it's just too long
-            return min(n_buckets - 1, true_size)
+            def numel_fn(example_dict):
+                if 'tgt' in example_dict:
+                    true_size = len(example_dict['src']) + len(example_dict['tgt'])
+                else:
+                    true_size = len(example_dict['src'])
+                return true_size
 
-        def numel_fn(example_dict):
-            if 'tgt' in example_dict:
-                true_size = len(example_dict['src']) + len(example_dict['tgt'])
-            else:
-                true_size = len(example_dict['src'])
-            return true_size
+        collate_fn = dataset.collate_fn
+        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn)
+    return iter(loader) if as_iter else loader
 
-    collate_fn = dataset.collate_fn
-    lab = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, buckets)
-    # TODO: return both lab and iter(lab), 
-    # save lab state with every checkpoint
-    return iter(lab)
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
@@ -57,13 +56,13 @@ DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang e
 class InferenceBatcher():
     """Iterator for inference"""
     def __init__(self, dataset, batch_size):
-        self.examples_stream = iter(dataset)
+        self.examples_stream = dataset
         self.collate_fn = dataset.collate_fn
         self.batch_size = batch_size
 
     def __iter__(self):
         accum = []
-        for example in self.examples_stream:
+        for example in iter(self.examples_stream):
             accum.append(example)
             if len(accum) >= self.batch_size:
                 yield self.collate_fn(accum)
@@ -310,6 +309,7 @@ class DynamicDatasetIter(object):
                     self.bucket_size,
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
+                    as_iter=self.is_train,
                     buckets = thisfilebuckets,
                  )
                 
@@ -322,8 +322,12 @@ class DynamicDatasetIter(object):
             self._init_datasets()
 
         if not self.is_train:
-            for ordered_iter, metadata in self.dataset_iterators.values():
-                yield from zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
+            # to be absolutely clear: all the validation data is read per validation loop
+            all_val_data = [
+                zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
+                for ordered_iter, metadata in self.dataset_iterators.values()
+            ]
+            yield from itertools.chain.from_iterable(all_val_data)
 
         else:
             # All minibatches with the same communication_batch_id should be trained on
@@ -332,7 +336,22 @@ class DynamicDatasetIter(object):
             while True:
                 for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
                     ordered_iter, metadata = self.dataset_iterators[corpus_id]
-                    yield next(ordered_iter), metadata, communication_batch_id
+                    batch = next(ordered_iter)
+                    if communication_batch_id == 0:
+                        # De-numericalize a few sentences for debugging
+                        logger.warning(
+                                f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
+                                f'batch size: {batch.batch_size}'
+                        )
+                        src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
+                        tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]
+                        for sent_idx in range(3):
+                            toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src[0][:, sent_idx, 0]]
+                            logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
+                            toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
+                            logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
+                    yield batch, metadata, communication_batch_id
+
                 communication_batch_id += 1
                 if communication_batch_id % 1000 == 0:
                     total = sum(self.task_queue_manager.sampled_task_counts.values())

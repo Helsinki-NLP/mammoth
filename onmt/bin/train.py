@@ -173,6 +173,7 @@ def train(opt):
     else:
         logger.info('No transforms found')
         all_specials = tuple(sorted(DEFAULT_SPECIALS))  # get_vocab produces distinct lists
+    logger.info(f'Final all specials: {all_specials}')
 
     vocabs_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu

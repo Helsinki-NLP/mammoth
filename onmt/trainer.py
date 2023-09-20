@@ -20,6 +20,15 @@ from itertools import islice
 from onmt.utils.logging import logger
 
 
+def iter_on_device(iterator, device_context):
+    if device_context.is_gpu():
+        device = torch.device(f'cuda:{device_context.local_rank}')
+    else:
+        device = torch.device('cpu')
+    for batch, meta, comm_batch_id in iterator:
+        yield batch.to(device), meta, comm_batch_id
+
+
 def build_trainer(
     opt,
     device_context,
@@ -245,6 +254,7 @@ class Trainer(object):
         Returns:
             The gathered statistics.
         """
+        train_iter = iter_on_device(train_iter, device_context)
         if valid_iter is None:
             logger.info('Start training loop without validation...')
         else:
@@ -351,18 +361,25 @@ class Trainer(object):
                 report_stats,
             )
 
-            if valid_iter is not None and step % valid_steps == 0:
+            if step % valid_steps == 0 and valid_iter is not None:
                 if self.gpu_verbose_level > 0:
                     logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
                 valid_stats = self.validate(
-                    valid_iter, moving_average=self.moving_average)
+                    iter_on_device(valid_iter, device_context),
+                    moving_average=self.moving_average,
+                )
                 if self.gpu_verbose_level > 0:
                     logger.info(f'{device_context.node_rank}:{device_context.local_rank} gather valid stat step {step}')
                 valid_stats = self._maybe_gather_stats(valid_stats)
                 if self.gpu_verbose_level > 0:
                     logger.info(f'{device_context.node_rank}:{device_context.local_rank} report stat step {step}')
-                self._report_step(self.optim.learning_rate(),  # learning_rate_to_show, #self.optim.learning_rate(),
-                                  step, valid_stats=valid_stats)
+                if device_context.is_master():
+                    self._report_step(
+                        self.optim.learning_rate(),  # learning_rate_to_show, #self.optim.learning_rate(),
+                        step,
+                        valid_stats=valid_stats,
+                    )
+
             #     # Run patience mechanism
             #     if self.earlystopper is not None:
             #         self.earlystopper(valid_stats, step)
@@ -525,7 +542,7 @@ class Trainer(object):
         Returns:
             stat: the updated (or unchanged) stat object
         """
-        if stat is not None and self.device_context.is_distributed() > 1:
+        if stat is not None and self.device_context.is_distributed():
             return onmt.utils.Statistics.all_gather_stats(stat)
         return stat
 

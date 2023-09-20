@@ -33,8 +33,23 @@ The meta-parameters under the `config_config` key:
 
 Path templates for source and target corpora, respectively.
 The path templates can contain the following variables that will be substituted by `config_config`:
-`{src_lang}`, `{tgt_lang}`, and `{sorted_pair}`.
-The `{sorted_pair}` contains the source and target languages in alphabetical order, separated by a hyphen.
+
+- Directional corpus mode 
+  - `{src_lang}`: The source language of the task
+  - `{tgt_lang}`: The target language of the task
+  - `{lang_pair}`: `{src_lang}-{tgt_lang}` for convenience
+- Symmetric corpus mode
+  - `{lang_a}`: The alphabetically first language
+  - `{lang_b}`: The alphabetically second language
+  - `{side_a}`: 'src' if the language pair is used in the "forward" direction, otherwise 'trg'.  Tatoeba uses 'trg', not 'tgt'. Deal with it.
+  - `{side_b}`: 'trg' if the language pair is used in the "forward" direction, otherwise 'src'.
+  - `{sorted_pair}`: the source and target languages in alphabetical order, separated by a hyphen.
+
+So for example, let's say your corpus contains the files `eng-ben/train.src.gz` (English side) and `eng-ben/train.trg.gz` (Bengali side).
+You want to use the data symmetrically for both ben-to-eng and eng-to-ben directions.
+For the first, `{lang_pair}` and `{sorted_pair}` are the same.
+For the second, `{lang_pair}` is "eng-ben", but `{sorted_pair}` is "ben-eng".
+In order to use the files in the correct order, you should use the template `{sorted_pair}/train.{side_a}.gz` for the source template, and `{sorted_pair}/train.{side_b}.gz` for the target template.
 
 #### `ae_path`
 
@@ -90,11 +105,17 @@ Both of these may change the sequence length, necessitating a `filtertoolong` tr
 #### `enc_sharing_groups` and `dec_sharing_groups`
 
 A list of parameter sharing patterns, one for each LayerStack in the (enc|dec)oder.
-Each list element takes one of 3 values:
+Each list element takes one of 7 values:
 
   - `FULL`: fully shared parameters. Will be named using the constant "full".
-  - `GROUP`: groupwise shared paramters. Will be named according to the cluster id.
-  - `LANGUAGE`: language specific parameters. Will be named according to the language code.
+  - `SRC_GROUP`: groupwise shared parameters. Will be named according to the cluster id of the *source* language.
+  - `TGT_GROUP`: groupwise shared parameters. Will be named according to the cluster id of the *target* language.
+  - `GROUP`: groupwise shared parameters. Same as `SRC_GROUP` for encoder and `TGT_GROUP` for decoder.
+  - `SRC_LANGUAGE`: language specific parameters. Will be named according to the *source* language code.
+  - `TGT_LANGUAGE`: language specific parameters. Will be named according to the *target* language code.
+  - `LANGUAGE`: language specific parameters. Same as `SRC_LANGUAGE` for encoder and `TGT_LANGUAGE` for decoder.
+
+Note that it is possible to have target-language-dependent components in the encoder, by using `TGT_LANGUAGE` or `TGT_GROUP` in the `enc_sharing_groups`.
 
 #### `n_nodes` and `n_gpus_per_node`
 
@@ -108,8 +129,10 @@ Note that you also need to separately specify this information to slurm.
 The key `adapters.encoder.{adapter_name}.ids` takes one of 3 values:
 
   - `FULL`: fully shared parameters. Will be named using the constant "full".
-  - `GROUP`: groupwise shared paramters. Will be named according to the cluster id.
-  - `LANGUAGE`: language specific parameters. Will be named according to the langauge code.
+  - `GROUP`: groupwise shared parameters. Will be named according to the cluster id.
+  - `LANGUAGE`: language specific parameters. Will be named according to the language code.
+
+(Adapters do not currently support the SRC_ and TGT_ prefixes)
 
 ### Distance matrix
 

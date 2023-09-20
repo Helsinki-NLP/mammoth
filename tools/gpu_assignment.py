@@ -27,7 +27,102 @@ def make_get_components_func(group_mapping: Dict[str, str]):
     return get_components
 
 
+# avoid huge number of lambdas created
+def _lp_is_not_none(lp):
+    return lp is not None
+
+
 GpuSlot = namedtuple('GpuSlot', ['node', 'gpu', 'slot'])
+
+
+def copy_counters(original):
+    result = defaultdict(Counter)
+    for key, counter in original.items():
+        result[key] = Counter(counter)
+    return result
+
+
+class Assignment:
+    def __init__(self, assignment, component_to_gpus):
+        self.assignment: Dict[GpuSlot, Tuple[str, str]] = assignment
+        self.component_to_gpus: defaultdict = component_to_gpus
+        self._ready_to_start_cost = None
+        self._unassigned_cost = None
+
+    @classmethod
+    def new(cls, assignment, ao):
+        component_to_gpus = cls._compute_component_to_gpus(assignment, ao)
+        return cls(assignment, component_to_gpus)
+
+    def swap(self, slot_a, slot_b, ao):
+        lp_a = self.assignment.get(slot_a, None)
+        lp_b = self.assignment.get(slot_b, None)
+        result = dict(self.assignment)
+        result[slot_a] = lp_b
+        result[slot_b] = lp_a
+
+        component_to_gpus = copy_counters(self.component_to_gpus)
+        gpu_a = (slot_a.node, slot_a.gpu)
+        gpu_b = (slot_b.node, slot_b.gpu)
+        a_ready_to_start = None
+        b_ready_to_start = None
+        if lp_a is not None:
+            src_lang_a, tgt_lang_a = lp_a
+            components_a = ao.get_components(src_lang_a, tgt_lang_a)
+            for component in components_a:
+                # remove from a
+                component_to_gpus[component][gpu_a] -= 1
+                # add to b
+                component_to_gpus[component][gpu_b] += 1
+            a_ready_to_start = ao._is_ready_to_start(lp_a)
+        if lp_b is not None:
+            src_lang_b, tgt_lang_b = lp_b
+            components_b = ao.get_components(src_lang_b, tgt_lang_b)
+            for component in components_b:
+                # remove from b
+                component_to_gpus[component][gpu_b] -= 1
+                # add to a
+                component_to_gpus[component][gpu_a] += 1
+            b_ready_to_start = ao._is_ready_to_start(lp_b)
+        new_assignment = Assignment(result, component_to_gpus)
+        if a_ready_to_start == b_ready_to_start:
+            new_assignment._ready_to_start_cost = self._ready_to_start_cost
+        if lp_a is not None and lp_b is not None:
+            new_assignment._unassigned_cost = self._unassigned_cost
+        return new_assignment
+
+    @staticmethod
+    def _compute_component_to_gpus(assignment, ao):
+        component_to_gpus = defaultdict(Counter)
+        for gpu_slot, lp in assignment.items():
+            if lp is None:
+                continue
+            src_lang, tgt_lang = lp
+            gpu = (gpu_slot.node, gpu_slot.gpu)
+            components = ao.get_components(src_lang, tgt_lang)
+            for component in components:
+                component_to_gpus[component][gpu] += 1
+        return component_to_gpus
+
+    @property
+    @lru_cache(maxsize=1)
+    def gpus_to_components(self):
+        result = defaultdict(Counter)
+        for component, gpus in self.component_to_gpus.items():
+            for gpu, count in gpus.items():
+                if count > 0:
+                    result[gpu][component] += count
+        return result
+
+    def __getitem__(self, key):
+        return self.assignment[key]
+
+    def items(self):
+        return self.assignment.items()
+
+    @staticmethod
+    def get_gpus(gpus: Counter):
+        return tuple(key for key, val in gpus.items() if val > 0)
 
 
 class AssignmentOptimizer:
@@ -61,9 +156,10 @@ class AssignmentOptimizer:
         if len(self.gpu_slots) > len(lang_pairs):
             # Add empty slots
             lang_pairs.extend([None] * (len(self.gpu_slots) - len(lang_pairs)))
-        return {gpu_slot: lp for gpu_slot, lp in zip(self.gpu_slots, lang_pairs)}
+        assignment_dict = {gpu_slot: lp for gpu_slot, lp in zip(self.gpu_slots, lang_pairs)}
+        return Assignment.new(assignment_dict, self)
 
-    def cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
+    def cost(self, assignment: Assignment) -> float:
         # assignment is gpu_slot -> lp
         cost_communication = self._communication_cost(assignment)
         cost_homogeneity = self._homogeneity_cost(assignment)
@@ -78,69 +174,64 @@ class AssignmentOptimizer:
             + (SPLIT_LPS_WEIGHT * cost_split_lps)
         )
 
-    def _communication_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
-        """ amount of communication: on how many gpus is each component? """
-        component_to_gpus = defaultdict(set)
-        for gpu_slot, lp in assignment.items():
-            if lp is None:
-                continue
-            src_lang, tgt_lang = lp
-            gpu = (gpu_slot.node, gpu_slot.gpu)
-            components = self.get_components(src_lang, tgt_lang)
-            for component in components:
-                component_to_gpus[component].add(gpu)
+    @lru_cache(maxsize=100_000)
+    def _communication_cost_inner(self, gpus):
         cost = 0
-        for component, gpus in component_to_gpus.items():
-            nodes = set(node for (node, gpu) in gpus)
-            # inter-node communcation is expensive
-            cost += INTER_NODE_COST * (len(nodes) - 1)
-            # intra-node is cheaper than inter-node
-            cost += INTRA_NODE_COST * (len(gpus) - 1)
+        nodes = set(node for (node, gpu) in gpus)
+        # inter-node communcation is expensive
+        cost += INTER_NODE_COST * (len(nodes) - 1)
+        # intra-node is cheaper than inter-node
+        cost += INTRA_NODE_COST * (len(gpus) - 1)
         return cost
 
-    def _homogeneity_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
-        """ homogeneity of gpus: how many components are on the gpu? how many times? """
-        gpus_to_components = defaultdict(Counter)
-        for gpu_slot, lp in assignment.items():
-            if lp is None:
-                continue
-            src_lang, tgt_lang = lp
-            gpu = (gpu_slot.node, gpu_slot.gpu)
-            components = self.get_components(src_lang, tgt_lang)
-            for component in components:
-                gpus_to_components[gpu][component] += 1
+    def _communication_cost(self, assignment: Assignment) -> float:
+        """ amount of communication: on how many gpus is each component? """
         cost = 0
-        for gpu, component_counts in gpus_to_components.items():
+        for component, gpus in assignment.component_to_gpus.items():
+            cost += self._communication_cost_inner(assignment.get_gpus(gpus))
+        return cost
+
+    def _homogeneity_cost(self, assignment: Assignment) -> float:
+        """ homogeneity of gpus: how many components are on the gpu? how many times? """
+        cost = 0
+        for gpu, component_counts in assignment.gpus_to_components.items():
             # more components is worse
             # more copies of the same component is (slightly) better
             for count in component_counts.values():
                 cost += self.n_slots_per_gpu - count
         return cost
 
-    def _ready_to_start_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
+    def _is_ready_to_start(self, lp):
+        return lp in self.ready_to_start
+
+    def _ready_to_start_cost(self, assignment: Assignment) -> float:
         """
         When using a curriculum, all GPUs should contain at least one task that
         can start at timestep 0.
         """
         if self.ready_to_start:
             return 0
-        return self._spread_evenly(
-            assignment,
-            criterion=lambda lp: lp in self.ready_to_start,
-            extra_empty_penalty=NOT_READY_TO_START,
-        )
+        if assignment._ready_to_start_cost is None:
+            assignment._ready_to_start_cost = self._spread_evenly(
+                assignment,
+                criterion=self._is_ready_to_start,
+                extra_empty_penalty=NOT_READY_TO_START,
+            )
+        return assignment._ready_to_start_cost
 
-    def _unassigned_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
+    def _unassigned_cost(self, assignment: Assignment) -> float:
         """ Penalize gpus with many unassigned slots if other gpus are full """
-        return self._spread_evenly(
-            assignment,
-            criterion=lambda lp: lp is not None,
-            extra_empty_penalty=VERY_BAD,
-        )
+        if assignment._unassigned_cost is None:
+            assignment._unassigned_cost = self._spread_evenly(
+                assignment,
+                criterion=_lp_is_not_none,
+                extra_empty_penalty=VERY_BAD,
+            )
+        return assignment._unassigned_cost
 
     def _spread_evenly(
         self,
-        assignment: Dict[GpuSlot, Tuple[str, str]],
+        assignment: Assignment,
         criterion: Callable[[str, str], bool],
         extra_empty_penalty,
     ) -> float:
@@ -161,7 +252,7 @@ class AssignmentOptimizer:
             penalty += UNASSIGNED_PREFER_MASTER
         return max_filled - min_filled + penalty
 
-    def _split_lps_cost(self, assignment: Dict[GpuSlot, Tuple[str, str]]) -> float:
+    def _split_lps_cost(self, assignment: Assignment) -> float:
         """
         Penalize putting multiple copies of a split LP on a single device.
         This assignment is very homogenous, but the point of splitting LPs is
@@ -179,45 +270,41 @@ class AssignmentOptimizer:
                 result += VERY_BAD * count
         return result
 
-    def swap(self, slot_a: GpuSlot, slot_b: GpuSlot, assignment):
-        lp_a = assignment.get(slot_a, None)
-        lp_b = assignment.get(slot_b, None)
-        result = dict(assignment)
-        result[slot_a] = lp_b
-        result[slot_b] = lp_a
-        return result
-
     def best_swap_for(self, slot_a: GpuSlot, assignment, current_cost):
         costs = [(current_cost, slot_a)]
-        for slot_b in self.gpu_slots:
-            if slot_a == slot_b:
+        for i, slot_b in enumerate(self.gpu_slots):
+            if slot_a.node == slot_b.node and slot_a.gpu == slot_b.gpu:
+                # No point swapping pairs already on the same device
                 continue
-            proposal = self.swap(slot_a, slot_b, assignment)
+            proposal = assignment.swap(slot_a, slot_b, self)
             costs.append((self.cost(proposal), slot_b))
+            if i > 0 and i % 100 == 0:
+                print('.', end='', flush=True)
         costs = sorted(costs)
         best_cost, slot_b = costs[0]
-        best_assignment = self.swap(slot_a, slot_b, assignment)
+        best_assignment = assignment.swap(slot_a, slot_b, self)
         return best_cost, best_assignment
 
     def swap_all_slots_once(self, assignment, current_cost):
-        for slot_a in self.gpu_slots:
+        for i, slot_a in enumerate(self.gpu_slots):
             current_cost, assignment = self.best_swap_for(slot_a, assignment, current_cost)
+            print('o', end='', flush=True)
         return current_cost, assignment
 
     def optimize(self, assignment, current_cost, iterations=10, patience=1):
         prev_cost = None
         stalled = 0
-        print(f'initial cost: {current_cost}')
+        print(f'initial cost: {current_cost}', flush=True)
         for i in range(iterations):
             prev_cost = current_cost
             current_cost, assignment = self.swap_all_slots_once(assignment, current_cost)
-            print(f'iteration {i} cost: {current_cost}')
+            print(f'iteration {i} cost: {current_cost}', flush=True)
             if prev_cost == current_cost:
                 stalled += 1
             else:
                 stalled = 0
             if stalled > patience:
-                print('No improvement, finishing early')
+                print('No improvement, finishing early', flush=True)
                 break
         return current_cost, assignment
 
@@ -228,7 +315,7 @@ def print_assignment(assignment, group_mapping, ready_to_start=None):
         slot_str = f'gpu {gpu_slot.node}:{gpu_slot.gpu} slot {gpu_slot.slot}'
         if lp is None:
             print(
-                f'{slot_str}: UNASSIGNED'
+                f'{slot_str}: UNASSIGNED', flush=True
             )
             continue
         src_lang, tgt_lang = lp
@@ -236,7 +323,7 @@ def print_assignment(assignment, group_mapping, ready_to_start=None):
         tgt_group = group_mapping[tgt_lang]
         ready = 'ready to start' if lp in ready_to_start else ''
         print(
-            f'{slot_str}: {src_lang}-{tgt_lang}\t({src_group}, {tgt_group})\t{ready}'
+            f'{slot_str}: {src_lang}-{tgt_lang}\t({src_group}, {tgt_group})\t{ready}', flush=True
         )
 
 
@@ -260,7 +347,7 @@ def optimize_gpu_assignment(
     initial_cost = optimizer.cost(initial)
     best_cost, assignment = optimizer.optimize(initial, initial_cost)
     print_assignment(assignment, lang_to_group_mapping, ready_to_start=lps_ready_to_start)
-    print(f'assignment cost {best_cost}')
+    print(f'assignment cost {best_cost}', flush=True)
     return assignment
 
 

@@ -856,7 +856,7 @@ def _add_train_general_opts(parser):
         '--optim',
         '-optim',
         default='sgd',
-        choices=['sgd', 'adagrad', 'adadelta', 'adam', 'sparseadam', 'adafactor', 'fusedadam'],
+        choices=['sgd', 'adagrad', 'adadelta', 'adam', 'adamw', 'sparseadam', 'adafactor', 'fusedadam'],
         help="Optimization method.",
     )
     group.add(
@@ -996,7 +996,7 @@ def _add_train_general_opts(parser):
         '-decay_method',
         type=str,
         default="none",
-        choices=['noam', 'noamwd', 'rsqrt', 'none'],
+        choices=['noam', 'noamwd', 'rsqrt', 'linear_warmup', 'none'],
         help="Use a custom decay rate.",
     )
     group.add(

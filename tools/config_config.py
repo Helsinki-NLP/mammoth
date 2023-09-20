@@ -2,10 +2,11 @@
 # For an example config, see : OpenNMT-py-v2/examples/config_config.yaml
 import argparse
 import csv
-import gzip
+import logging
 import numpy as np
 import os
-import warnings
+import subprocess
+import time
 import yaml
 from collections import defaultdict
 from copy import deepcopy
@@ -13,6 +14,16 @@ from itertools import compress
 from sklearn.cluster import AgglomerativeClustering
 
 from gpu_assignment import optimize_gpu_assignment
+
+logger = logging.getLogger('config_config')
+
+
+def init_logging():
+    logger.setLevel(logging.INFO)
+    ch = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(funcName)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
 
 
 def load_yaml(fname):
@@ -44,6 +55,36 @@ def save_yaml(opts):
             print(serialized, file=ostr)
     else:
         print(serialized)
+
+
+def external_linecount(file_path):
+    """ Use external program wc to determine line count.
+
+    Faster than iterating over lines in python.
+    Transparently supports gzip files based on .gz ending.
+    """
+    if file_path.endswith('.gz'):
+        ext_lc = subprocess.check_output(
+            ['zcat {} | wc -l'.format(file_path)], shell=True).split()[0]
+    else:
+        ext_lc = subprocess.check_output(['wc', '-l', file_path]).split()[0]
+    ext_lc = int(ext_lc.decode('utf-8'))
+    return ext_lc
+
+
+def read_cached_linecounts(fname):
+    try:
+        line_counts = dict()
+        with open(fname, 'r') as fin:
+            for line in fin:
+                line = line.strip()
+                if len(line) == 0:
+                    continue
+                count, path = line.split('\t')
+                line_counts[path] = int(count)
+        return line_counts
+    except Exception:
+        return dict()
 
 
 def add_complete_language_pairs_args(parser):
@@ -101,11 +142,15 @@ def add_cluster_languages_args(parser):
 def add_sharing_groups_args(parser):
     parser.add_argument(
         '--enc_sharing_groups', type=str, action='append',
-        help='list of {LANGUAGE | GROUP | FULL}'
+        help='list of {LANGUAGE | GROUP | FULL}. '
+        'The first two may be prefixed, e.g. SRC_LANGUAGE or TGT_GROUP. '
+        'Default prefix for encoder is SRC.'
     )
     parser.add_argument(
         '--dec_sharing_groups', type=str, action='append',
-        help='list of {LANGUAGE | GROUP | FULL}'
+        help='list of {LANGUAGE | GROUP | FULL}.'
+        'The first two may be prefixed, e.g. SRC_LANGUAGE or TGT_GROUP. '
+        'Default prefix for decoder is TGT.'
     )
 
 
@@ -184,7 +229,7 @@ def _split_large_language_pairs(opts, corpora_weights, split_treshold):
         if weight > split_treshold:
             n_copies = int(np.ceil(weight / split_treshold))
             copy_weight = weight / n_copies
-            print(f'Splitting {cname} into {n_copies} copies')
+            logger.info(f'Splitting {cname} into {n_copies} copies')
             for i in range(n_copies):
                 cname_copy = f'{cname}_split{i}'
                 dict_copy = deepcopy(corpora_out[cname])
@@ -200,6 +245,7 @@ def _split_large_language_pairs(opts, corpora_weights, split_treshold):
 
 
 def corpora_schedule(opts):
+    start = time.time()
     cc_opts = opts.in_config[0]['config_config']
     temperature = opts.temperature if opts.temperature else cc_opts.get('temperature', 1.0)
     use_weight = opts.use_weight if opts.use_weight else cc_opts.get('use_weight', False)
@@ -209,18 +255,25 @@ def corpora_schedule(opts):
         else cc_opts.get('use_introduce_at_training_step', False)
     )
 
+    corpora_lens_cache_file = './corpora_length_cache'
+    corpora_lens_cache = read_cached_linecounts(corpora_lens_cache_file)
+    logger.info('cached corpora_lens:')
+    for path, len in corpora_lens_cache.items():
+        logger.info(f'{path}:\t{len}')
     corpora_lens = {}
     for cname, corpus in opts.in_config[0]['data'].items():
-        if corpus['path_src'].endswith('.gz'):
-            print('Detected gzip ending: {}'.format(corpus['path_src']))
-            open_fn = gzip.open
+        if corpus['path_src'] in corpora_lens_cache:
+            length = corpora_lens_cache[corpus['path_src']]
+            corpora_lens[cname] = length
         else:
-            open_fn = open
-        with open_fn(corpus['path_src'], 'rt') as istr:
-            corpora_lens[cname] = sum(1 for _ in istr)
-    print('corpora_lens:')
+            length = external_linecount(corpus['path_src'])
+            corpora_lens[cname] = length
+            with open(corpora_lens_cache_file, 'a') as cache_out:
+                print(f'{length}\t{corpus["path_src"]}', file=cache_out)
+                logger.info(f'{length}\t{corpus["path_src"]}')
+    logger.info('final corpora_lens:')
     for cname, len in corpora_lens.items():
-        print(f'{cname}:\t{len}')
+        logger.info(f'{cname}:\t{len}')
 
     tot_lines = sum(corpora_lens.values())
     corpora_weights = {
@@ -231,6 +284,7 @@ def corpora_schedule(opts):
     if split_treshold:
         corpora_weights = _split_large_language_pairs(opts, corpora_weights, split_treshold)
 
+    min_introduce_at_training_step = opts.in_config[0].get('train_steps', 100_000)
     for cname, corpus in opts.in_config[0]['data'].items():
         src_lang, tgt_lang = corpus['src_tgt'].split('-')
         weight = corpora_weights[cname]
@@ -250,9 +304,19 @@ def corpora_schedule(opts):
             else:
                 introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
+            min_introduce_at_training_step = min(min_introduce_at_training_step, introduce_at_training_step)
+    if use_introduce_at_training_step and min_introduce_at_training_step > 0:
+        # With a single very large task that gets split, it is possible that no task can start
+        for cname, corpus in opts.in_config[0]['data'].items():
+            if 'introduce_at_training_step' in corpus:
+                corpus['introduce_at_training_step'] -= min_introduce_at_training_step
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
 
 
 def cluster_languages(opts):
+    start = time.time()
+
     cc_opts = opts.in_config[0]['config_config']
     n_groups = opts.n_groups if opts.n_groups else cc_opts['n_groups']
     cutoff_threshold = opts.cutoff_threshold if opts.cutoff_threshold else cc_opts.get('cutoff_threshold', None)
@@ -262,7 +326,7 @@ def cluster_languages(opts):
         distance_matrix_path = cc_opts.get('distance_matrix', None)
         if not distance_matrix_path:
             if 'groups' in cc_opts:
-                print('Using groups specified in yaml, without clustering.')
+                logger.info('Using groups specified in yaml, without clustering.')
                 return
             else:
                 raise Exception(
@@ -279,7 +343,7 @@ def cluster_languages(opts):
             f'was not found in the distance matrix (supports {" ".join(sim_langs)})'
         corpus_langs = corpus_langs | set(corpus['src_tgt'].split('-'))
     if sim_langs != corpus_langs:
-        warnings.warn(
+        logger.warning(
             f"languages in the distance matrix are unused ({', ' .join(sim_langs - corpus_langs)})"
         )
         # Omit unused languages before clustering. Otherwise they might consume entire clusters.
@@ -310,8 +374,13 @@ def cluster_languages(opts):
     # -> group mapping could be specified as a mapping in the input yaml instead of a csv.
     cc_opts['groups'] = groups
 
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
+
 
 def sharing_groups(opts):
+    start = time.time()
+
     cc_opts = opts.in_config[0]['config_config']
     groups = cc_opts['groups']
     enc_sharing_groups = opts.enc_sharing_groups if opts.enc_sharing_groups else cc_opts['enc_sharing_groups']
@@ -328,11 +397,19 @@ def sharing_groups(opts):
             'LANGUAGE': src,
             'GROUP': groups[src],
             'FULL': 'full',
+            'SRC_LANGUAGE': src,
+            'SRC_GROUP': groups[src],
+            'TGT_LANGUAGE': tgt,
+            'TGT_GROUP': groups[tgt],
         }
         mapping_tgt = {
             'LANGUAGE': tgt,
             'GROUP': groups[tgt],
             'FULL': 'full',
+            'SRC_LANGUAGE': src,
+            'SRC_GROUP': groups[src],
+            'TGT_LANGUAGE': tgt,
+            'TGT_GROUP': groups[tgt],
         }
         corpus['enc_sharing_group'] = [
             mapping_src[sharing_group] for sharing_group in enc_sharing_groups
@@ -341,8 +418,13 @@ def sharing_groups(opts):
             mapping_tgt[sharing_group] for sharing_group in dec_sharing_groups
         ]
 
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
+
 
 def set_transforms(opts):
+    start = time.time()
+
     cc_opts = opts.in_config[0]['config_config']
     ae_transforms = opts.ae_transforms if opts.ae_transforms else cc_opts.get('ae_transforms', [])
     transforms = opts.transforms if opts.transforms else cc_opts.get('transforms', [])
@@ -354,10 +436,15 @@ def set_transforms(opts):
         else:
             corpus['transforms'] = list(transforms)
 
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
+
 
 def allocate_devices(opts):
+    start = time.time()
+
     cc_opts = opts.in_config[0]['config_config']
-    n_nodes = opts.n_nodes if opts.n_nodes else cc_opts['n_nodes']
+    n_nodes = opts.n_nodes if opts.n_nodes else cc_opts.get('n_nodes', None)
     n_gpus_per_node = opts.n_gpus_per_node if opts.n_gpus_per_node else cc_opts['n_gpus_per_node']
     n_slots_per_gpu = opts.n_slots_per_gpu if opts.n_slots_per_gpu else cc_opts.get('n_slots_per_gpu', None)
 
@@ -373,9 +460,19 @@ def allocate_devices(opts):
             lps_ready_to_start.append((src_lang, tgt_lang))
         lp_to_key[(src_lang, tgt_lang)].append(key)
 
+    if n_nodes is None and n_slots_per_gpu is None:
+        raise Exception('You must specify either n_nodes or n_slots_per_gpu')
+    if n_nodes is None:
+        n_slots_per_node = n_gpus_per_node * n_slots_per_gpu
+        n_nodes = int(np.ceil(len(lang_pairs) / n_slots_per_node))
+    n_gpus_tot = n_nodes * n_gpus_per_node
     if n_slots_per_gpu is None:
-        n_gpus_tot = n_nodes * n_gpus_per_node
         n_slots_per_gpu = int(np.ceil(len(lang_pairs) / n_gpus_tot))
+    logger.info(f'n_nodes:          {n_nodes}')
+    logger.info(f'n_gpus_per_node:  {n_gpus_per_node}')
+    logger.info(f'n_slots_per_gpu:  {n_slots_per_gpu}')
+    logger.info(f'total slots:      {n_nodes * n_gpus_per_node * n_slots_per_gpu}')
+    logger.info(f'lang_pairs:       {len(lang_pairs)}')
 
     assignment = optimize_gpu_assignment(
         n_nodes=n_nodes,
@@ -396,11 +493,34 @@ def allocate_devices(opts):
     opts.in_config[0]['world_size'] = n_gpus_tot
     opts.in_config[0]['gpu_ranks'] = list(range(n_gpus_per_node))
 
+    # Ensure that all devices can start training (will crash otherwise)
+    train_steps = opts.in_config[0].get('train_steps', 100_000)
+    min_introduce_at_training_step = defaultdict(lambda: train_steps)
+    for cname, corpus in opts.in_config[0]['data'].items():
+        if 'introduce_at_training_step' not in corpus:
+            continue
+        min_introduce_at_training_step[corpus['node_gpu']] = min(
+            corpus['introduce_at_training_step'],
+            min_introduce_at_training_step[corpus['node_gpu']]
+        )
+    for cname, corpus in opts.in_config[0]['data'].items():
+        if 'introduce_at_training_step' not in corpus:
+            continue
+        adjust = min_introduce_at_training_step[corpus['node_gpu']]
+        if adjust > 0:
+            logger.warning(f'Reducing introduce_at_training_step of {cname} by {adjust}')
+            corpus['introduce_at_training_step'] -= adjust
+
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
+
 
 def adapter_config(opts):
+    start = time.time()
+
     cc_opts = opts.in_config[0]['config_config']
     if 'adapters' not in opts.in_config[0]:
-        warnings.warn('No adapter configuration, skipping this step')
+        logger.warning('No adapter configuration, skipping this step')
         return
     src_langs, tgt_langs = _get_langs(opts)
     src_groups = list(sorted(set(cc_opts['groups'][src] for src in src_langs)))
@@ -410,6 +530,7 @@ def adapter_config(opts):
     for data_key, data_config in opts.in_config[0]['data'].items():
         if 'adapters' not in data_config:
             data_config['adapters'] = {'encoder': [], 'decoder': []}
+    # TODO: refactor and add support for {SRC|TGT}_{LANGUAGE|GROUP} also to adapters
     for adapter_name, adapter_config in sorted(encoder_adapters.items()):
         if adapter_config['ids'] == 'LANGUAGE':
             adapter_config['ids'] = list(src_langs)
@@ -443,6 +564,9 @@ def adapter_config(opts):
     opts.in_config[0]['adapters']['encoder'] = encoder_adapters
     opts.in_config[0]['adapters']['decoder'] = decoder_adapters
 
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
+
 
 def _adapters_to_stacks(task_adapters, opts, side):
     adapter_specs = opts.in_config[0]['adapters']
@@ -454,6 +578,8 @@ def _adapters_to_stacks(task_adapters, opts, side):
 
 
 def translation_configs(opts):
+    start = time.time()
+
     cc_opts = opts.in_config[0]['config_config']
     translation_config_dir = (
         opts.translation_config_dir if opts.translation_config_dir
@@ -547,6 +673,9 @@ def translation_configs(opts):
                     translation_config_dir,
                 )
 
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
+
 
 def _write_translation_config(
     src_lang,
@@ -587,37 +716,63 @@ def _get_langs(opts):
 
 
 def complete_language_pairs(opts):
+    start = time.time()
+
     cc_opts = opts.in_config[0]['config_config']
     src_path_template = opts.src_path if opts.src_path else cc_opts['src_path']
     tgt_path_template = opts.tgt_path if opts.tgt_path else cc_opts['tgt_path']
     autoencoder = opts.autoencoder if opts.autoencoder else cc_opts.get('autoencoder', False)
     if autoencoder:
         ae_path_template = opts.ae_path if opts.ae_path else cc_opts.get('ae_path', None)
-    if ae_path_template:
-        ae_src_path_template = ae_path_template
-        ae_tgt_path_template = ae_path_template
-    else:
-        ae_src_path_template = src_path_template
-        ae_tgt_path_template = tgt_path_template
+        if ae_path_template:
+            ae_src_path_template = ae_path_template
+            ae_tgt_path_template = ae_path_template
+        else:
+            ae_src_path_template = src_path_template
+            ae_tgt_path_template = tgt_path_template
 
     src_langs, tgt_langs = _get_langs(opts)
     for src_lang in src_langs:
         for tgt_lang in tgt_langs:
-            sorted_pair = '-'.join(sorted((src_lang, tgt_lang)))
+            lang_a, lang_b = sorted((src_lang, tgt_lang))
+            lang_pair = f'{src_lang}-{tgt_lang}'
+            sorted_pair = f'{lang_a}-{lang_b}'
+            if lang_pair == sorted_pair:
+                # parallel data is used in "forward" direction
+                side_a = 'src'
+                side_b = 'trg'  # Tatoeba uses 'trg', not 'tgt'. Deal with it.
+                lang_a = src_lang
+                lang_b = tgt_lang
+            else:
+                # parallel data is used in "backward" direction
+                side_a = 'trg'
+                side_b = 'src'
+                lang_a = tgt_lang
+                lang_b = src_lang
+            template_variables = {
+                'src_lang': src_lang,
+                'tgt_lang': tgt_lang,
+                'lang_a': lang_a,
+                'lang_b': lang_b,
+                'side_a': side_a,
+                'side_b': side_b,
+                'lang_pair': lang_pair,
+                'sorted_pair': sorted_pair
+            }
             if src_lang == tgt_lang:
                 # autoencoder task
                 if not autoencoder:
                     continue
-                src_path = ae_src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
-                tgt_path = ae_tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
+                src_path = ae_src_path_template.format(**template_variables)
+                tgt_path = ae_tgt_path_template.format(**template_variables)
             else:
                 # translation task
-                src_path = src_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
-                tgt_path = tgt_path_template.format(src_lang=src_lang, tgt_lang=tgt_lang, sorted_pair=sorted_pair)
+                src_path = src_path_template.format(**template_variables)
+                tgt_path = tgt_path_template.format(**template_variables)
             if os.path.exists(src_path) and os.path.exists(tgt_path):
                 _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path)
             else:
-                print(f'Paths do NOT exist, omitting language pair: {src_path} {tgt_path}')
+                logger.warning(f'Paths do NOT exist, omitting language pair: {src_path} {tgt_path}')
     if len(opts.in_config[0].get('data', [])) == 0:
         raise Exception('No language pairs were added. Check your path templates.')
     # Allow using language variables for vocabulary definitions
@@ -625,6 +780,9 @@ def complete_language_pairs(opts):
         opts.in_config[0]['src_vocab'][src_lang] = opts.in_config[0]['src_vocab'][src_lang].format(src_lang=src_lang)
     for tgt_lang in tgt_langs:
         opts.in_config[0]['tgt_vocab'][tgt_lang] = opts.in_config[0]['tgt_vocab'][tgt_lang].format(tgt_lang=tgt_lang)
+
+    duration = time.time() - start
+    logger.info(f'step took {duration} s')
 
 
 def _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path):
@@ -646,6 +804,8 @@ def remove_temporary_keys(opts):
 
 
 def config_all(opts):
+    start = time.time()
+
     complete_language_pairs(opts)
     corpora_schedule(opts)
     cluster_languages(opts)
@@ -656,8 +816,12 @@ def config_all(opts):
     translation_configs(opts)
     remove_temporary_keys(opts)
 
+    duration = time.time() - start
+    logger.info(f'total took {duration} s')
+
 
 if __name__ == '__main__':
+    init_logging()
     opts = get_opts()
     # if not opts.out_config:
     #     opts.out_config = opts.in_config[1]

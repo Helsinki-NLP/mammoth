@@ -104,6 +104,14 @@ def build_torch_optimizer(model, opt, task_queue_manager):
                 params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
             )
         )
+    elif opt.optim == 'adamw':
+        optimizer = attention_bridge_optimizer(
+            model,
+            task_queue_manager,
+            lambda params: optim.AdamW(
+                params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
+            )
+        )
     elif opt.optim == 'sparseadam':
         encs = []
         decs = []
@@ -152,6 +160,13 @@ def make_learning_rate_decay_fn(opt):
         )
     elif opt.decay_method == 'rsqrt':
         return functools.partial(rsqrt_decay, warmup_steps=opt.warmup_steps)
+    elif opt.decay_method == 'linear_warmup':
+        return functools.partial(
+            linear_warmup_decay,
+            warmup_steps=opt.warmup_steps,
+            rate=opt.learning_rate,
+            train_steps=opt.train_steps,
+        )
     elif opt.start_decay_steps is not None:
         return functools.partial(
             exponential_decay,
@@ -187,6 +202,14 @@ def exponential_decay(step, rate, decay_steps, start_step=0):
 def rsqrt_decay(step, warmup_steps):
     """Decay based on the reciprocal of the step square root."""
     return 1.0 / sqrt(max(step, warmup_steps))
+
+
+def linear_warmup_decay(step, warmup_steps, rate, train_steps):
+    end_rate = 0.001 * rate
+    if step <= warmup_steps:
+        return (step / warmup_steps)
+    else:
+        return max(end_rate, (train_steps - step) / (train_steps - warmup_steps))
 
 
 class MultipleOptimizer(object):

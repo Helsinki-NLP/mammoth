@@ -50,10 +50,10 @@ extensions = ['recommonmark',
 
 mathjax_config = {
     'tex2jax': {
-        'inlineMath': [ ["\\(","\\)"] ],
-        'displayMath': [["\\[","\\]"] ],
-    }  
-}   
+        'inlineMath': [["\\(", "\\)"]],
+        'displayMath': [["\\[", "\\]"]],
+    }
+}
 
 mathjax3_config = {
   "tex": {

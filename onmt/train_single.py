@@ -7,8 +7,10 @@ from onmt.utils.optimizers import Optimizer
 from onmt.utils.misc import set_random_seed
 from onmt.trainer import build_trainer
 from onmt.models import build_model_saver
+from onmt.models.model_saver import load_checkpoint
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
+from onmt.models.model_saver import load_checkpoint
 
 from onmt.utils.distributed import broadcast_tensors
 from onmt.inputters import DynamicDatasetIter
@@ -126,7 +128,10 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opt._all_transform)
-    checkpoint = None
+    checkpoint, data_state = None, dict()
+    if opt.train_from:
+        checkpoint = load_checkpoint(ckpt_path=opt.train_from)
+        data_state = checkpoint.get('data_state',dict())
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.
@@ -168,6 +173,7 @@ def main(
     )
     logger.info("{} - Trainer built".format(device_context.id))
 
+    # build dataset iterator
     if batch_queue is None:
         train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,
@@ -175,6 +181,7 @@ def main(
             vocabs_dict=vocabs_dict,
             opts=opt,
             is_train=True,
+            data_state=data_state,
         )
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():

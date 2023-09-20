@@ -1,5 +1,6 @@
 import os
-from collections import deque
+from glob import glob
+from collections import deque, defaultdict
 from onmt.utils.logging import logger
 
 import torch
@@ -23,6 +24,11 @@ def load_checkpoint(ckpt_path):
     """Load checkpoint from `ckpt_path` if any else return `None`."""
     checkpoint = None
     if ckpt_path:
+        if not ckpt_path.endswith('.pt'):
+            # find latest checkpoint to load it
+            frames=glob(os.path.join(ckpt_path+'*frame*pt'))
+            frames.sort( key=lambda s: int(s.split('step_')[-1].split('_frame')[0] ))
+            ckpt_path = frames[-1]
         logger.info('Loading checkpoint from %s' % ckpt_path)
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
     return checkpoint
@@ -59,6 +65,7 @@ class ModelSaverBase(object):
         assert device_context is not None
         self.device_context = device_context
         self.all_gpus = all_gpus
+        self.data_state = defaultdict(dict)
 
     def save(self, step, moving_average=None):
         """Main entry point for model saver
@@ -130,7 +137,7 @@ class ModelSaver(ModelSaverBase):
             # 'generator': generator_state_dict,
             "vocab": self.vocabs_dict,
             "opt": self.model_opt,
-            "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
+            "optim": self.optim.state_dict(),
             "whole_model": self.model,
         }
 
@@ -144,7 +151,7 @@ class ModelSaver(ModelSaverBase):
             tmp_checkpoint_paths.append(checkpoint_path)
 
         modules, model_frame = explode_model(checkpoint)
-
+        model_frame["data_state"] = self.data_state
         for key, module in modules.items():
             # All processes will try to save the modules present on that device
             # Not that a race condition is possible:

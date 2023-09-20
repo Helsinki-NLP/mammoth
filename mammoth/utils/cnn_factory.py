@@ -32,21 +32,3 @@ class GatedConv(nn.Module):
         out, gate = x_var.split(int(x_var.size(1) / 2), 1)
         out = out * torch.sigmoid(gate)
         return out
-
-
-class StackedCNN(nn.Module):
-    """Stacked CNN class"""
-
-    def __init__(self, num_layers, input_size, cnn_kernel_width=3, dropout=0.2):
-        super(StackedCNN, self).__init__()
-        self.dropout = dropout
-        self.num_layers = num_layers
-        self.layers = nn.ModuleList()
-        for _ in range(num_layers):
-            self.layers.append(GatedConv(input_size, cnn_kernel_width, dropout))
-
-    def forward(self, x):
-        for conv in self.layers:
-            x = x + conv(x)
-            x *= SCALE_WEIGHT
-        return x

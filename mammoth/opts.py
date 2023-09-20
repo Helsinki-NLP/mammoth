@@ -413,13 +413,13 @@ def model_opts(parser):
         help="Size of rnn hidden states.",
     )
 
-    group.add(
-        '--cnn_kernel_width',
-        '-cnn_kernel_width',
-        type=int,
-        default=3,
-        help="Size of windows in the cnn, the kernel_size is (cnn_kernel_width, 1) in conv layer",
-    )
+    # group.add(
+    #     '--cnn_kernel_width',
+    #     '-cnn_kernel_width',
+    #     type=int,
+    #     default=3,
+    #     help="Size of windows in the cnn, the kernel_size is (cnn_kernel_width, 1) in conv layer",
+    # )
 
     group.add(
         '--pos_ffn_activation_fn',
@@ -433,15 +433,15 @@ def model_opts(parser):
         f' {ActivationFunction.relu}.',
     )
 
-    group.add(
-        '--input_feed',
-        '-input_feed',
-        type=int,
-        default=1,
-        help="Feed the context vector at each time step as "
-        "additional input (via concatenation with the word "
-        "embeddings) to the decoder.",
-    )
+    # group.add(
+    #     '--input_feed',
+    #     '-input_feed',
+    #     type=int,
+    #     default=1,
+    #     help="Feed the context vector at each time step as "
+    #     "additional input (via concatenation with the word "
+    #     "embeddings) to the decoder.",
+    # )
     group.add(
         '--bridge',
         '-bridge',

@@ -128,7 +128,7 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opt._all_transform)
-    checkpoint, data_state = None, dict()
+    checkpoint, data_state = None, None
     if opt.train_from:
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
         data_state = checkpoint.get('data_state',dict())

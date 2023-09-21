@@ -354,6 +354,10 @@ def build_task_specific_model(
     if uses_adapters(model_opt):
         logger.info('Creating adapters...')
         create_all_adapters(nmt_model, model_opt, task_queue_manager)
+        if checkpoint:
+            # TODO: plug in properly
+            logger.warning(f"Adapters' parameters are NOT being loaded from the checkpoint.")
+
     print('built model:')
     print(nmt_model)
 

@@ -45,8 +45,8 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
                 return true_size
 
         collate_fn = dataset.collate_fn
-        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn)
-    return iter(loader) if as_iter else loader
+        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, buckets)
+    return (iter(loader),loader) if as_iter else loader
 
 
 
@@ -74,23 +74,20 @@ class InferenceBatcher():
 class LookAheadBucketing():
     def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, buckets=None):
         self.examples_stream = examples_stream
-        if buckets is None:
-            self._buckets = [[] for _ in range(n_buckets)]
-            self._lens = [0 for _ in range(n_buckets)]
-        else:
-            self._buckets = buckets
-            self._lens = list(map(len, buckets))
         self.look_ahead_size = look_ahead_size
         self.batch_size = batch_size
         self.bucket_fn = bucket_fn
         self.numel_fn = numel_fn
         self.collate_fn = collate_fn
         self.current_file_index = None
-        if buckets is not None:
-            logger.info('LookAheadBucketing: relying on pre-computed buckets, no initialization')
-        else:
+        if buckets is None:
+            self._buckets = [[] for _ in range(n_buckets)]
+            self._lens = [0 for _ in range(n_buckets)]
             self._init()
-    # TODO: save buckets, current index, and load accordingly
+        else:
+            logger.info('LookAheadBucketing: relying on pre-computed buckets, no initialization')
+            self._buckets = buckets
+            self._lens = list(map(len, buckets))
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
@@ -222,7 +219,7 @@ class DynamicDatasetIter(object):
         bucket_size=2048,
         n_buckets=1024,
         skip_empty_level='warning',
-        data_state=dict(),
+        data_state=None,
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -244,7 +241,7 @@ class DynamicDatasetIter(object):
         self.data_state = data_state
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, data_state=dict()):
+    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, data_state=None):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -270,8 +267,9 @@ class DynamicDatasetIter(object):
 
     def _init_datasets(self):
         self.dataset_iterators = dict()
-        idxs = self.data_state.get('indices',dict())  # either dependant on: src, task or trg
-        buckets = self.data_state.get('buckets',dict()) 
+        if self.data_state:
+            idxs = self.data_state.get('indices',dict())  # either dependant on: src, task or trg
+            buckets = self.data_state.get('buckets',dict()) 
 
         for task in self.task_queue_manager.get_tasks():
             src_vocab = self.vocabs_dict[('src', task.src_lang)]
@@ -287,9 +285,9 @@ class DynamicDatasetIter(object):
                 else 'cpu'
             )
             # Recover current file index from the data state
-            idx4thisfile = idxs.get(task.corpus_id,0)
+            idx4thisfile = 0 if not self.data_state else idxs.get(task.corpus_id,0)
             # TODO: plug the buckets properly.
-            thisfilebuckets = buckets.get(task.corpus_id,None)
+            thisfilebuckets = None if not self.data_state else buckets.get(task.corpus_id,None)
             if idx4thisfile > 0:
                 logger.info(f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {idx4thisfile} in corpus')
             # Case 1: we are training, and the task must contain some path to training data
@@ -302,7 +300,7 @@ class DynamicDatasetIter(object):
             ).to(device)
 
                 # iterator over minibatches
-                ordered_iter = build_dataloader(
+                ordered_iter, lab = build_dataloader(
                     corpus,
                     self.batch_size,
                     self.batch_type,
@@ -313,9 +311,17 @@ class DynamicDatasetIter(object):
                     buckets = thisfilebuckets,
                  )
                 
-                self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
+                self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)
 
         self.init_iterators = True
+
+    def update_data_state(self):
+        # initialize 
+        if self.data_state is None:
+            self.data_state = {'indices':dict(), 'buckets':dict()}         
+        for taskname, (_,lab,_) in self.dataset_iterators.items():
+            self.data_state['indices'][taskname] = lab.current_file_index
+            self.data_state['buckets'][taskname] = lab._buckets
 
     def __iter__(self):
         if self.init_iterators is False:
@@ -335,7 +341,7 @@ class DynamicDatasetIter(object):
             communication_batch_id = 0
             while True:
                 for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
-                    ordered_iter, metadata = self.dataset_iterators[corpus_id]
+                    ordered_iter, _ ,metadata = self.dataset_iterators[corpus_id]
                     batch = next(ordered_iter)
                     if communication_batch_id == 0:
                         # De-numericalize a few sentences for debugging

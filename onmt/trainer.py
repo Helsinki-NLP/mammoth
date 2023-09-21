@@ -52,7 +52,6 @@ def build_trainer(
         model_saver(:obj:`onmt.models.ModelSaverBase`): the utility object
             used to save the model
     """
-
     train_loss_md = nn.ModuleDict()
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
@@ -254,6 +253,7 @@ class Trainer(object):
         Returns:
             The gathered statistics.
         """
+        ddi = train_iter
         train_iter = iter_on_device(train_iter, device_context)
         if valid_iter is None:
             logger.info('Start training loop without validation...')
@@ -388,6 +388,8 @@ class Trainer(object):
             #             break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
+                ddi.update_data_state()
+                self.model_saver.data_state = ddi.data_state
                 self.model_saver.save(step, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
@@ -505,8 +507,6 @@ class Trainer(object):
                         trunc_size=trunc_size,
                     )
                     # logger.info(loss)
-
-                self.model_saver.data_state['indices'][f'{metadata.corpus_id}'] = batch.idx
                 try:
                     if loss is not None:
                         self.optim.backward(loss)

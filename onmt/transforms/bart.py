@@ -434,3 +434,131 @@ class BARTNoiseTransform(Transform):
     def _repr_args(self):
         """Return str represent key arguments for BART."""
         return repr(self.bart_noise)
+
+
+@register_transform(name='mass')
+class MASSNoiseTransform(Transform):
+    def __init__(self, opts):
+        super().__init__(opts)
+
+    @classmethod
+    def get_specials(cls, opts):
+        # FIXME: If a different mask token is used, then it is up to you to add it to specials
+        return ({DefaultTokens.MASK}, set())
+
+    def _set_seed(self, seed):
+        """set seed to ensure reproducibility."""
+        BARTNoising.set_random_seed(seed)
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to BART."""
+        group = parser.add_argument_group("Transform/MASS")
+        group.add(
+            "--permute_sent_ratio",
+            "-permute_sent_ratio",
+            type=float,
+            default=0.0,
+            help="Permute this proportion of sentences "
+            "(boundaries defined by {}) in all inputs.".format(DefaultTokens.SENT_FULL_STOPS),
+        )
+        group.add("--rotate_ratio", "-rotate_ratio", type=float, default=0.0, help="Rotate this proportion of inputs.")
+        group.add(
+            "--insert_ratio",
+            "-insert_ratio",
+            type=float,
+            default=0.0,
+            help="Insert this percentage of additional random tokens.",
+        )
+        group.add(
+            "--random_ratio",
+            "-random_ratio",
+            type=float,
+            default=0.0,
+            help="Instead of using {}, use random token this often.".format(DefaultTokens.MASK),
+        )
+
+        group.add(
+            "--mask_ratio",
+            "-mask_ratio",
+            type=float,
+            default=0.0,
+            help="Fraction of words/subwords that will be masked.",
+        )
+        group.add(
+            "--mask_length",
+            "-mask_length",
+            type=str,
+            default="subword",
+            choices=["subword", "word", "span-poisson"],
+            help="Length of masking window to apply.",
+        )
+        group.add(
+            "--poisson_lambda",
+            "-poisson_lambda",
+            type=float,
+            default=3.0,
+            help="Lambda for Poisson distribution to sample span length if `-mask_length` set to span-poisson.",
+        )
+        group.add(
+            "--replace_length",
+            "-replace_length",
+            type=int,
+            default=-1,
+            choices=[-1, 0, 1],
+            help="When masking N tokens, replace with 0, 1, or N tokens. (use -1 for N)",
+        )
+
+    @classmethod
+    def require_vocab(cls):
+        """Override this method to inform it need vocab to start."""
+        return True
+
+    def warm_up(self, vocabs):
+        super().warm_up(vocabs)
+
+        subword_type = self.opts.src_subword_type
+        if self.opts.mask_length == 'subword':
+            if subword_type == 'none':
+                raise ValueError(
+                    f'src_subword_type={subword_type} incompatible with ' f'mask_length={self.opts.mask_length}!'
+                )
+        is_joiner = (subword_type == 'bpe') if subword_type != 'none' else None
+        self.mass_noise = BARTNoising(
+            self.vocabs['src'].itos,
+            mask_tok=DefaultTokens.MASK,
+            mask_ratio=self.opts.mask_ratio,
+            insert_ratio=self.opts.insert_ratio,
+            permute_sent_ratio=self.opts.permute_sent_ratio,
+            poisson_lambda=self.opts.poisson_lambda,
+            replace_length=self.opts.replace_length,
+            rotate_ratio=self.opts.rotate_ratio,
+            mask_length=self.opts.mask_length,
+            random_ratio=self.opts.random_ratio,
+            is_joiner=is_joiner,
+        )
+
+    def apply(self, example, is_train=False, stats=None, **kwargs):
+        """Apply BART noise to src side tokens, then complete as MASS scheme."""
+        if is_train:
+            masked = self.mass_noise.apply(example['src'])
+            complement_masked = [
+                DefaultTokens.MASK if masked_item != DefaultTokens.MASK
+                else source_item
+                for masked_item, source_item in zip(masked, example['src'])
+            ]
+            labels = [
+                DefaultTokens.PAD if cmasked_item == DefaultTokens.MASK
+                else cmasked_item
+                for cmasked_item in complement_masked
+            ]
+            example = {
+                'src': masked,
+                'tgt': complement_masked,
+                'labels': labels,
+            }
+        return example
+
+    def _repr_args(self):
+        """Return str represent key arguments for BART."""
+        return repr(self.mass_noise)

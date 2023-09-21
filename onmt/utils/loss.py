@@ -262,12 +262,14 @@ class CommonLossCompute(LossComputeBase):
         )
         shard_state.update({"std_attn": attns.get("std"), "coverage_attn": coverage})
 
-    def _compute_loss(self, batch, output, target, std_attn=None, coverage_attn=None, align_head=None, ref_align=None):
+    def _compute_loss(
+        self, batch, output, target, labels, std_attn=None, coverage_attn=None, align_head=None, ref_align=None
+    ):
 
         bottled_output = self._bottle(output)
 
         scores = self.generator(bottled_output)
-        gtruth = target.view(-1)
+        gtruth = labels.view(-1)
 
         loss = self.criterion(scores, gtruth)
         if self.lambda_coverage != 0.0:
@@ -328,6 +330,7 @@ class CommonLossCompute(LossComputeBase):
         shard_state = {
             "output": output,
             "target": batch.tgt[range_start:range_end, :, 0],
+            "labels": batch.labels[range_start:range_end, :, 0],
         }
         if self.lambda_coverage != 0.0:
             self._add_coverage_shard_state(shard_state, attns)

@@ -461,7 +461,7 @@ class Trainer(object):
             seen_comm_batches.add(comm_batch)
             if self.norm_method == "tokens":
                 num_tokens = (
-                    batch.tgt[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
+                    batch.labels[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
                 )
                 normalization += num_tokens.item()
             else:

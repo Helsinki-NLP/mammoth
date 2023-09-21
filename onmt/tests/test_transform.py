@@ -11,7 +11,7 @@ from onmt.transforms import (
     make_transforms,
     TransformPipe,
 )
-from onmt.transforms.bart import BARTNoising
+from onmt.transforms.denoising import BARTNoising
 
 
 class TestTransform(unittest.TestCase):

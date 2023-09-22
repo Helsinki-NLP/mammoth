@@ -11,7 +11,7 @@ from onmt.utils.logging import logger
 def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True, buckets=None):
+def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True, data_state=None):
     """Convert an onmt.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         loader = InferenceBatcher(dataset, batch_size)
@@ -45,7 +45,7 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
                 return true_size
 
         collate_fn = dataset.collate_fn
-        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, buckets)
+        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, data_state)
     return (iter(loader),loader) if as_iter else loader
 
 
@@ -72,22 +72,23 @@ class InferenceBatcher():
 
 
 class LookAheadBucketing():
-    def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, buckets=None):
+    def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, data_state=None):
         self.examples_stream = examples_stream
         self.look_ahead_size = look_ahead_size
         self.batch_size = batch_size
         self.bucket_fn = bucket_fn
         self.numel_fn = numel_fn
         self.collate_fn = collate_fn
-        self.current_file_index = None
-        if buckets is None:
+        if data_state is None:
+            self.current_file_index = None
             self._buckets = [[] for _ in range(n_buckets)]
             self._lens = [0 for _ in range(n_buckets)]
             self._init()
         else:
+            self.current_file_index = data_state[0]
             logger.info('LookAheadBucketing: relying on pre-computed buckets, no initialization')
-            self._buckets = buckets
-            self._lens = list(map(len, buckets))
+            self._buckets = data_state[1]
+            self._lens = list(map(len, data_state[1]))
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
@@ -286,7 +287,6 @@ class DynamicDatasetIter(object):
             )
             # Recover current file index from the data state
             idx4thisfile = 0 if not self.data_state else idxs.get(task.corpus_id,0)
-            # TODO: plug the buckets properly.
             thisfilebuckets = None if not self.data_state else buckets.get(task.corpus_id,None)
             if idx4thisfile > 0:
                 logger.info(f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {idx4thisfile} in corpus')
@@ -308,7 +308,7 @@ class DynamicDatasetIter(object):
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
                     as_iter=self.is_train,
-                    buckets = thisfilebuckets,
+                    data_state = (idx4thisfile,thisfilebuckets),
                  )
                 
                 self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)

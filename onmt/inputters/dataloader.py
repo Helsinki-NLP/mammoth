@@ -361,7 +361,7 @@ class DynamicDatasetIter(object):
             # to be absolutely clear: all the validation data is read per validation loop
             all_val_data = [
                 zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
-                for ordered_iter, metadata in self.dataset_iterators.values()
+                for ordered_iter, lab, metadata in self.dataset_iterators.values()
             ]
             yield from itertools.chain.from_iterable(all_val_data)
 

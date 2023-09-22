@@ -18,15 +18,15 @@ from onmt.inputters.vocab import Vocab
 class Batch():
     src: tuple  # of torch Tensors
     tgt: torch.Tensor
-    label: torch.Tensor
+    labels: torch.Tensor
     batch_size: int
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
         if self.tgt is not None:
             self.tgt = self.tgt.to(device)
-        if self.label is not None:
-            self.label = self.label.to(device)
+        if self.labels is not None:
+            self.labels = self.labels.to(device)
         return self
 
 

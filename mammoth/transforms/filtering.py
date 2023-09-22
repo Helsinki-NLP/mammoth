@@ -63,12 +63,14 @@ class WordRatioFilter(Transform):
         """Avalilable options relate to this Transform."""
         group = parser.add_argument_group("Transform/Filter")
         group.add("--word_ratio_threshold", "-word_ratio_threshold", type=int, default=3, help="Threshold for discarding sentences based on word ratio.")
+        group.add("--word_ratio_unit", "-word_ratio_unit", type=str, default="word", choices=[('word', 'char', 'character')] help="Unit for discarding sentences based on char/character/word ratio.")
 
     def _parse_opts(self):
         self.word_ratio_threshold = self.opts.word_ratio_threshold
+        self.word_ratio_unit = self.opts.word_ratio_unit
 
     def apply(self, example, **kwargs):
-        ratiofilter = LengthRatioFilter(threshold=self.opts.word_ratio_threshold, unit='word')
+        ratiofilter = LengthRatioFilter(threshold=self.opts.word_ratio_threshold, unit=self.opts.word_ratio_unit)
         score = ratiofilter.score([example['src'],example['tgt']])
         accept = ratiofilter.accept(next(score))
         if accept:

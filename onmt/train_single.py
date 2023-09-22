@@ -113,6 +113,7 @@ def main(
     batch_queue=None,
     semaphore=None,
     task_queue_manager=None,
+    data_state=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opt`` has been validated and updated
@@ -181,6 +182,7 @@ def main(
             is_train=True,
             data_state=data_state,
         )
+        task_queue_manager.ddi = train_iter
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():
         #     train_iter = IterOnDevice(_train_iter, device_context.local_rank)

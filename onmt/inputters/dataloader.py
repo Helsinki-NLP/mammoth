@@ -316,6 +316,7 @@ class DynamicDatasetIter(object):
             # Recover current file index from the data state
             idx4thisfile = 0 if not self.data_state else idxs.get(task.corpus_id, 0)
             thisfilebuckets = None if not self.data_state else buckets.get(task.corpus_id, None)
+            data_state = (idx4thisfile, thisfilebuckets) if thisfilebuckets is not None else None
             if idx4thisfile > 0:
                 logger.info(
                     f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {idx4thisfile} in corpus'
@@ -338,7 +339,7 @@ class DynamicDatasetIter(object):
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
                     as_iter=self.is_train,
-                    data_state=(idx4thisfile, thisfilebuckets),
+                    data_state=data_state,
                 )
 
                 self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)

@@ -185,6 +185,9 @@ def train(opt):
             vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
             # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
             vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
+    # initialize data states
+    data_state = {'indices':dict(), 'buckets':dict()}        
+    data_state['indices'] = { task.corpus_id:0 for task in global_task_queue_manager.get_tasks() }
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
@@ -224,6 +227,17 @@ def train(opt):
             current_env["RANK"] = str(device_context.global_rank)
             current_env["LOCAL_RANK"] = str(device_context.local_rank)
 
+            # Get the iterator to generate from
+            train_iter = DynamicDatasetIter.from_opts(
+                task_queue_manager=task_queue_manager,
+                transforms_cls=transforms_cls,
+                vocabs_dict=vocabs_dict,
+                opts=opt,
+                is_train=True,
+                data_state=data_state,
+            )
+            task_queue_manager.ddi = train_iter
+            
             q = mp.Queue(opt.queue_size)
             semaphore = mp.Semaphore(opt.queue_size)
             queues.append(q)
@@ -238,15 +252,6 @@ def train(opt):
             procs[local_rank].start()
             logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
             error_handler.add_child(procs[local_rank].pid)
-
-            # Get the iterator to generate from
-            train_iter = DynamicDatasetIter.from_opts(
-                task_queue_manager=task_queue_manager,
-                transforms_cls=transforms_cls,
-                vocabs_dict=vocabs_dict,
-                opts=opt,
-                is_train=True,
-            )
 
             producer = mp.Process(
                 target=batch_producer, args=(train_iter, q, semaphore, opt, local_rank), daemon=True
@@ -274,7 +279,7 @@ def train(opt):
             local_rank=0,
             opt=opt
         )
-        train_process(opt, device_context=device_context, task_queue_manager=task_queue_manager)
+        train_process(opt, device_context=device_context, task_queue_manager=task_queue_manager, data_state=data_state)
 
 
 def _get_parser():

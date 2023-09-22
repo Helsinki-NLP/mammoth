@@ -253,7 +253,9 @@ class Trainer(object):
         Returns:
             The gathered statistics.
         """
-        ddi = train_iter
+        ddi = self.task_queue_manager.ddi
+        print('QUI:', id(ddi))
+        print('QUI:', id(train_iter))
         train_iter = iter_on_device(train_iter, device_context)
         if valid_iter is None:
             logger.info('Start training loop without validation...')
@@ -388,8 +390,14 @@ class Trainer(object):
             #             break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
+                print('QUI:', id(ddi))
+                print('QUI:', id(train_iter))
                 ddi.update_data_state()
                 self.model_saver.data_state = ddi.data_state
+                if device_context.is_distributed() and device_context.is_master():
+                    self.model_saver.data_state  = onmt.utils.distributed.all_gather_list(ddi.data_state)
+                    print(ddi.data_state, self.model_saver.data_state)
+
                 self.model_saver.save(step, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:

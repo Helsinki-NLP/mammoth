@@ -226,11 +226,11 @@ class RNNDecoderBase(DecoderBase):
         #       (in particular in case of SRU) it was not raising error in 0.3
         #       since stack(Variable) was allowed.
         #       In 0.4, SRU returns a tensor that shouldn't be stacke
-        if type(dec_outs) == list:
+        if isinstance(dec_outs, list):
             dec_outs = torch.stack(dec_outs)
 
             for k in attns:
-                if type(attns[k]) == list:
+                if isinstance(attns[k], list):
                     attns[k] = torch.stack(attns[k])
         return dec_outs, attns
 

@@ -19,7 +19,7 @@ class Batch():
     src: tuple  # of torch Tensors
     tgt: torch.Tensor
     batch_size: int
-    idx:torch.Tensor
+    idx: torch.Tensor
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
@@ -27,6 +27,7 @@ class Batch():
             self.tgt = self.tgt.to(device)
         self.idx = self.idx
         return self
+
 
 def read_examples_from_files(
     src_path,
@@ -38,7 +39,8 @@ def read_examples_from_files(
     start_index=0,
 ):
     """Helper function to read examples"""
-    idaux =  itertools.count(start_index)
+    idaux = itertools.count(start_index)
+
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
         src_str, tgt_str = packed
@@ -106,7 +108,7 @@ class ParallelCorpus(IterableDataset):
         self.offset = offset
         self.is_train = is_train
         self.corpus_id = task.corpus_id
-        self.current_file_index = current_file_index 
+        self.current_file_index = current_file_index
 
     # FIXME: most likely redundant with onmt.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -134,6 +136,7 @@ class ParallelCorpus(IterableDataset):
         """Read file, produce batches of examples"""
         start_index = self.current_file_index
         self.current_file_index = None
+
         def _cast(example_dict):
             return {
                 k: self._numericalize(v, side=k) if k != 'idx' else v

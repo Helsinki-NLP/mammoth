@@ -10,8 +10,6 @@ from onmt.models import build_model_saver
 from onmt.models.model_saver import load_checkpoint
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
-from onmt.models.model_saver import load_checkpoint
-
 from onmt.utils.distributed import broadcast_tensors
 from onmt.inputters import DynamicDatasetIter
 from onmt.transforms import get_transforms_cls
@@ -131,7 +129,7 @@ def main(
     checkpoint, data_state = None, None
     if opt.train_from:
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
-        data_state = checkpoint.get('data_state',dict())
+        data_state = checkpoint.get('data_state', dict())
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.

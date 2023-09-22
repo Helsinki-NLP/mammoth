@@ -26,8 +26,8 @@ def load_checkpoint(ckpt_path):
     if ckpt_path:
         if not ckpt_path.endswith('.pt'):
             # find latest checkpoint to load it
-            frames=glob(os.path.join(ckpt_path+'*frame*pt'))
-            frames.sort( key=lambda s: int(s.split('step_')[-1].split('_frame')[0] ))
+            frames = glob(os.path.join(ckpt_path+'*frame*pt'))
+            frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
             ckpt_path = frames[-1]
         logger.info('Loading checkpoint from %s' % ckpt_path)
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
@@ -139,6 +139,7 @@ class ModelSaver(ModelSaverBase):
             "opt": self.model_opt,
             "optim": self.optim.state_dict(),
             "whole_model": self.model,
+            "data_state": self.data_state
         }
 
         tmp_checkpoint_paths = []
@@ -151,7 +152,6 @@ class ModelSaver(ModelSaverBase):
             tmp_checkpoint_paths.append(checkpoint_path)
 
         modules, model_frame = explode_model(checkpoint)
-        model_frame["data_state"] = self.data_state
         for key, module in modules.items():
             # All processes will try to save the modules present on that device
             # Not that a race condition is possible:

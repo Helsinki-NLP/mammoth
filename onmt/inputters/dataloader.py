@@ -11,7 +11,17 @@ from onmt.utils.logging import logger
 def infinite_iterator(iterable):
     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True, data_state=None):
+
+def build_dataloader(
+    dataset,
+    batch_size,
+    batch_type,
+    pool_size=None,
+    n_buckets=None,
+    cycle=True,
+    as_iter=True,
+    data_state=None,
+):
     """Convert an onmt.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         loader = InferenceBatcher(dataset, batch_size)
@@ -27,7 +37,6 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
                 return 1
 
         elif batch_type == 'tokens':
-
             def bucket_fn(example_dict):
                 if 'tgt' in example_dict:
                     # subtract four for bos/eos on both sides
@@ -45,9 +54,10 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
                 return true_size
 
         collate_fn = dataset.collate_fn
-        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, data_state)
-    return (iter(loader),loader) if as_iter else loader
-
+        loader = LookAheadBucketing(
+            examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, data_state
+            )
+    return (iter(loader), loader) if as_iter else loader
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
@@ -72,7 +82,17 @@ class InferenceBatcher():
 
 
 class LookAheadBucketing():
-    def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn, data_state=None):
+    def __init__(
+        self,
+        examples_stream,
+        look_ahead_size,
+        n_buckets,
+        batch_size,
+        bucket_fn,
+        numel_fn,
+        collate_fn,
+        data_state=None,
+    ):
         self.examples_stream = examples_stream
         self.look_ahead_size = look_ahead_size
         self.batch_size = batch_size
@@ -242,7 +262,15 @@ class DynamicDatasetIter(object):
         self.data_state = data_state
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, data_state=None):
+    def from_opts(
+        cls,
+        task_queue_manager,
+        transforms_cls,
+        vocabs_dict,
+        opts,
+        is_train,
+        data_state=None,
+    ):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -269,8 +297,8 @@ class DynamicDatasetIter(object):
     def _init_datasets(self):
         self.dataset_iterators = dict()
         if self.data_state:
-            idxs = self.data_state.get('indices',dict())  # either dependant on: src, task or trg
-            buckets = self.data_state.get('buckets',dict()) 
+            idxs = self.data_state.get('indices', dict())
+            buckets = self.data_state.get('buckets', dict())
 
         for task in self.task_queue_manager.get_tasks():
             src_vocab = self.vocabs_dict[('src', task.src_lang)]
@@ -286,10 +314,12 @@ class DynamicDatasetIter(object):
                 else 'cpu'
             )
             # Recover current file index from the data state
-            idx4thisfile = 0 if not self.data_state else idxs.get(task.corpus_id,0)
-            thisfilebuckets = None if not self.data_state else buckets.get(task.corpus_id,None)
+            idx4thisfile = 0 if not self.data_state else idxs.get(task.corpus_id, 0)
+            thisfilebuckets = None if not self.data_state else buckets.get(task.corpus_id, None)
             if idx4thisfile > 0:
-                logger.info(f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {idx4thisfile} in corpus')
+                logger.info(
+                    f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {idx4thisfile} in corpus'
+                    )
             # Case 1: we are training, and the task must contain some path to training data
             # Case 2: we are validation (hence self.is_train := False), we need an iterator
             # if and only the task defines validation data, i.e. if the key `path_valid_src`
@@ -297,7 +327,7 @@ class DynamicDatasetIter(object):
             if self.is_train or self.opts.data[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
                     self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train, current_file_index=idx4thisfile
-            ).to(device)
+                ).to(device)
 
                 # iterator over minibatches
                 ordered_iter, lab = build_dataloader(
@@ -308,18 +338,18 @@ class DynamicDatasetIter(object):
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
                     as_iter=self.is_train,
-                    data_state = (idx4thisfile,thisfilebuckets),
-                 )
-                
+                    data_state=(idx4thisfile, thisfilebuckets),
+                )
+
                 self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)
 
         self.init_iterators = True
 
     def update_data_state(self):
-        # initialize 
+        # initialize
         if self.data_state is None:
-            self.data_state = {'indices':dict(), 'buckets':dict()}         
-        for taskname, (_,lab,_) in self.dataset_iterators.items():
+            self.data_state = {'indices': dict(), 'buckets': dict()}
+        for taskname, (_, lab, _) in self.dataset_iterators.items():
             self.data_state['indices'][taskname] = lab.current_file_index
             self.data_state['buckets'][taskname] = lab._buckets
 
@@ -341,7 +371,7 @@ class DynamicDatasetIter(object):
             communication_batch_id = 0
             while True:
                 for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
-                    ordered_iter, _ ,metadata = self.dataset_iterators[corpus_id]
+                    ordered_iter, _, metadata = self.dataset_iterators[corpus_id]
                     batch = next(ordered_iter)
                     if communication_batch_id == 0:
                         # De-numericalize a few sentences for debugging

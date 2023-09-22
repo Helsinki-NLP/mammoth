@@ -1,6 +1,6 @@
 from onmt.transforms import register_transform
 from .transform import Transform, ObservableStats
-
+from opusfilter.filters import LengthRatioFilter
 
 class FilterTooLongStats(ObservableStats):
     """Runing statistics for FilterTooLongTransform."""
@@ -68,18 +68,13 @@ class WordRatioFilter(Transform):
         self.word_ratio_threshold = self.opts.word_ratio_threshold
 
     def apply(self, example, **kwargs):
-        """Return None if the word length ratio is smaller than the threshold."""
-        src_len = len(example['src'].split())
-        tgt_len = len(example['tgt'].split())
-        lengths = sorted([src_len, tgt_len])
-        if lengths[0] == 0:
-            return None
+        ratiofilter = LengthRatioFilter(threshold=self.opts.word_ratio_threshold, unit='word')
+        score = ratiofilter.score([example['src'],example['tgt']])
+        accept = ratiofilter.accept(next(score))
+        if accept:
+            return example
         else:
-            ratio = lengths[-1] / lengths[0]
-            if ratio < self.word_ratio_threshold:
-                return example
-            else:
-                return None
+            return None
     
     def _repr_args(self):
         """Return str represent key arguments for class."""

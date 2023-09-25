@@ -380,12 +380,12 @@ class Trainer(object):
                         valid_stats=valid_stats,
                     )
 
-            #     # Run patience mechanism
-            #     if self.earlystopper is not None:
-            #         self.earlystopper(valid_stats, step)
-            #         # If the patience has reached the limit, stop training
-            #         if self.earlystopper.has_stopped():
-            #             break
+                # Run patience mechanism
+                if self.earlystopper is not None:
+                    self.earlystopper(valid_stats, step)
+                    # If the patience has reached the limit, stop training
+                    if self.earlystopper.has_stopped():
+                        break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
                 self.model_saver.save(step, moving_average=self.moving_average)

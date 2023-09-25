@@ -29,7 +29,7 @@ class LayerStackDecoder(DecoderBase):
                     continue
                 stacks[module_id] = AdaptedTransformerDecoder(
                     n_layers,
-                    opts.rnn_size,
+                    opts.model_dim,
                     opts.heads,
                     opts.transformer_ff,
                     opts.copy_attn,
@@ -48,7 +48,7 @@ class LayerStackDecoder(DecoderBase):
                     alignment_heads=opts.alignment_heads,
                     pos_ffn_activation_fn=opts.pos_ffn_activation_fn,
                     layer_norm_module=(
-                        nn.LayerNorm(opts.rnn_size, eps=1e-6) if is_on_top
+                        nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
                         else nn.Identity()
                     ),
                 )
@@ -56,36 +56,36 @@ class LayerStackDecoder(DecoderBase):
         return cls(embeddings, decoders)
 
     @classmethod
-    def from_trans_opt(cls, model_opt, embeddings, opt_stack):
+    def from_trans_opt(cls, model_opts, embeddings, opt_stack):
         """Alternate constructor for use during translation."""
         decoders = nn.ModuleList()
-        for layer_stack_index, n_layers in enumerate(model_opt.dec_layers):
+        for layer_stack_index, n_layers in enumerate(model_opts.dec_layers):
             stacks = nn.ModuleDict()
-            is_on_top = layer_stack_index == len(model_opt.dec_layers) - 1
+            is_on_top = layer_stack_index == len(model_opts.dec_layers) - 1
             module_opts = opt_stack['decoder'][layer_stack_index]
             module_id = module_opts['id']
             stacks[module_id] = AdaptedTransformerDecoder(
                 n_layers,
-                model_opt.rnn_size,
-                model_opt.heads,
-                model_opt.transformer_ff,
-                model_opt.copy_attn,
-                model_opt.self_attn_type,
-                model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
+                model_opts.model_dim,
+                model_opts.heads,
+                model_opts.transformer_ff,
+                model_opts.copy_attn,
+                model_opts.self_attn_type,
+                model_opts.dropout[0] if type(model_opts.dropout) is list else model_opts.dropout,
                 (
-                    model_opt.attention_dropout[0]
-                    if type(model_opt.attention_dropout) is list
-                    else model_opt.attention_dropout
+                    model_opts.attention_dropout[0]
+                    if type(model_opts.attention_dropout) is list
+                    else model_opts.attention_dropout
                 ),
                 None,  # embeddings,
-                model_opt.max_relative_positions,
-                model_opt.aan_useffn,
-                model_opt.full_context_alignment,
-                model_opt.alignment_layer,
-                alignment_heads=model_opt.alignment_heads,
-                pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+                model_opts.max_relative_positions,
+                model_opts.aan_useffn,
+                model_opts.full_context_alignment,
+                model_opts.alignment_layer,
+                alignment_heads=model_opts.alignment_heads,
+                pos_ffn_activation_fn=model_opts.pos_ffn_activation_fn,
                 layer_norm_module=(
-                    nn.LayerNorm(model_opt.rnn_size, eps=1e-6) if is_on_top
+                    nn.LayerNorm(model_opts.model_dim, eps=1e-6) if is_on_top
                     else nn.Identity()
                 ),
             )

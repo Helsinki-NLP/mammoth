@@ -36,14 +36,13 @@ def build_embeddings(opts, vocab, for_encoder=True):
         vocab: stoi-ish object.
         for_encoder(bool): build Embeddings for encoder or decoder?
     """
-    emb_dim = opts.src_word_vec_size if for_encoder else opts.tgt_word_vec_size
     word_padding_idx = vocab.stoi[DefaultTokens.PAD]
     opts.word_padding_idx = word_padding_idx
 
     freeze_word_vecs = opts.freeze_word_vecs_enc if for_encoder else opts.freeze_word_vecs_dec
 
     emb = Embeddings(
-        word_vec_size=emb_dim,
+        word_vec_size=opts.model_dim,
         position_encoding=opts.position_encoding,
         dropout=opts.dropout[0] if type(opts.dropout) is list else opts.dropout,
         word_padding_idx=word_padding_idx,
@@ -146,14 +145,14 @@ def load_test_multitask_model(opts, model_path=None):
         # FIXME
         # fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
 
-        model_opt = ArgumentParser.ckpt_model_opts(frame['opts'])
+        model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
         # Avoid functionality on inference
-        model_opt.update_vocab = False
+        model_opts.update_vocab = False
         model = create_bilingual_model(
             src_lang=opts.src_lang,
             tgt_lang=opts.tgt_lang,
             opt_stack=opts.stack,
-            model_opt=model_opt,
+            model_opts=model_opts,
             vocabs_dict=vocabs_dict
             )
         model_params = {name for name, p in model.named_parameters()}
@@ -171,7 +170,7 @@ def load_test_multitask_model(opts, model_path=None):
 
         model.eval()
 
-        return vocabs_dict, model, model_opt
+        return vocabs_dict, model, model_opts
 
 
 def load_test_model(opts, model_path=None):
@@ -191,9 +190,9 @@ def load_test_model(opts, model_path=None):
         checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
         model = checkpoint['whole_model']
 
-    model_opt = ArgumentParser.ckpt_model_opts(checkpoint['opts'])
-    ArgumentParser.update_model_opts(model_opt)
-    ArgumentParser.validate_model_opts(model_opt)
+    model_opts = ArgumentParser.ckpt_model_opts(checkpoint['opts'])
+    ArgumentParser.update_model_opts(model_opts)
+    ArgumentParser.validate_model_opts(model_opts)
     vocabs = checkpoint['vocab']
     print("VOCABS")
     print(vocabs)
@@ -211,7 +210,7 @@ def load_test_model(opts, model_path=None):
     # fields["indices"] = indices
 
     # Avoid functionality on inference
-    model_opt.update_vocab = False
+    model_opts.update_vocab = False
 
     if opts.fp32:
         model.float()
@@ -221,28 +220,28 @@ def load_test_model(opts, model_path=None):
         torch.quantization.quantize_dynamic(model, inplace=True)
     model.eval()
     model.generator.eval()
-    return vocabs_dict, model, model_opt
+    return vocabs_dict, model, model_opts
 
 
 def create_bilingual_model(
-    src_lang, tgt_lang, opt_stack, model_opt, vocabs_dict
+    src_lang, tgt_lang, opt_stack, model_opts, vocabs_dict
 ):
     """For translation."""
     generators_md = nn.ModuleDict()
 
-    src_emb = build_src_emb(model_opt, vocabs_dict['src'])
-    tgt_emb = build_tgt_emb(model_opt, vocabs_dict['tgt'])
+    src_emb = build_src_emb(model_opts, vocabs_dict['src'])
+    tgt_emb = build_tgt_emb(model_opts, vocabs_dict['tgt'])
     pluggable_src_emb = PluggableEmbeddings({src_lang: src_emb})
     pluggable_tgt_emb = PluggableEmbeddings({tgt_lang: tgt_emb})
 
     pluggable_src_emb.activate(src_lang)
     pluggable_tgt_emb.activate(tgt_lang)
-    encoder = LayerStackEncoder.from_trans_opt(model_opt, pluggable_src_emb, opt_stack)
-    decoder = LayerStackDecoder.from_trans_opt(model_opt, pluggable_tgt_emb, opt_stack)
-    generator = build_generator(model_opt, len(vocabs_dict['tgt']), tgt_emb)
+    encoder = LayerStackEncoder.from_trans_opt(model_opts, pluggable_src_emb, opt_stack)
+    decoder = LayerStackDecoder.from_trans_opt(model_opts, pluggable_tgt_emb, opt_stack)
+    generator = build_generator(model_opts, len(vocabs_dict['tgt']), tgt_emb)
     generators_md.add_module(f'generator_{tgt_lang}', generator)
 
-    attention_bridge = AttentionBridge.from_opts(model_opt)
+    attention_bridge = AttentionBridge.from_opts(model_opts)
 
     nmt_model = mammoth.models.NMTModel(
         encoder=encoder,
@@ -250,9 +249,9 @@ def create_bilingual_model(
         attention_bridge=attention_bridge
     )
 
-    if uses_adapters(model_opt):
+    if uses_adapters(model_opts):
         logger.info('Creating adapters...')
-        create_bilingual_adapters(nmt_model, model_opt, src_lang, tgt_lang, opt_stack)
+        create_bilingual_adapters(nmt_model, model_opts, src_lang, tgt_lang, opt_stack)
     else:
         logger.info('Does not use adapters...')
     print('built model:')
@@ -262,18 +261,18 @@ def create_bilingual_model(
     return nmt_model
 
 
-def build_src_emb(model_opt, src_vocab):
+def build_src_emb(model_opts, src_vocab):
     # Build embeddings.
-    if model_opt.model_type == "text":
-        src_emb = build_embeddings(model_opt, src_vocab)
+    if model_opts.model_type == "text":
+        src_emb = build_embeddings(model_opts, src_vocab)
     else:
         src_emb = None
     return src_emb
 
 
-def build_tgt_emb(model_opt, tgt_vocab):
+def build_tgt_emb(model_opts, tgt_vocab):
     # Build embeddings.
-    tgt_emb = build_embeddings(model_opt, tgt_vocab, for_encoder=False)
+    tgt_emb = build_embeddings(model_opts, tgt_vocab, for_encoder=False)
 
     # if share_embeddings:
     #     tgt_emb.word_lut.weight = src_emb.word_lut.weight
@@ -282,15 +281,15 @@ def build_tgt_emb(model_opt, tgt_vocab):
 
 
 def build_task_specific_model(
-    model_opt,
+    model_opts,
     vocabs_dict,
     device,
     task_queue_manager,
     checkpoint,
 ):
     logger.info(f'TaskQueueManager: {task_queue_manager}')
-    if not model_opt.model_task == ModelTask.SEQ2SEQ:
-        raise ValueError(f"Only ModelTask.SEQ2SEQ works - {model_opt.model_task} task")
+    if not model_opts.model_task == ModelTask.SEQ2SEQ:
+        raise ValueError(f"Only ModelTask.SEQ2SEQ works - {model_opts.model_task} task")
 
     src_embs = dict()
     tgt_embs = dict()
@@ -299,32 +298,32 @@ def build_task_specific_model(
 
     # FIXME: it's getting late and I just want this to compile
     for side, lang, _, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
-        src_emb = build_src_emb(model_opt, vocab)
+        src_emb = build_src_emb(model_opts, vocab)
         src_embs[lang] = src_emb
 
     pluggable_src_emb = PluggableEmbeddings(src_embs)
-    encoder = build_only_enc(model_opt, pluggable_src_emb, task_queue_manager)
+    encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager)
 
     for side, lang, _, vocab in task_queue_manager.get_vocabs(side='tgt', vocabs_dict=vocabs_dict):
-        tgt_emb = build_tgt_emb(model_opt, vocab)
+        tgt_emb = build_tgt_emb(model_opts, vocab)
         tgt_embs[lang] = tgt_emb
-        generator = build_generator(model_opt, len(vocab), tgt_emb)
+        generator = build_generator(model_opts, len(vocab), tgt_emb)
         generators_md.add_module(f'generator_{lang}', generator)
 
     pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
-    decoder = build_only_dec(model_opt, pluggable_tgt_emb, task_queue_manager)
+    decoder = build_only_dec(model_opts, pluggable_tgt_emb, task_queue_manager)
 
     # TODO: implement hierarchical approach to layer sharing
-    attention_bridge = AttentionBridge.from_opts(model_opt)
+    attention_bridge = AttentionBridge.from_opts(model_opts)
 
-    if model_opt.param_init != 0.0:
+    if model_opts.param_init != 0.0:
         for p in attention_bridge.parameters():
-            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-    if model_opt.param_init_glorot:
+            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+    if model_opts.param_init_glorot:
         for p in attention_bridge.parameters():
             if p.dim() > 1:
                 xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
-    if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
+    if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         attention_bridge.half()
 
     nmt_model = mammoth.models.NMTModel(
@@ -332,9 +331,9 @@ def build_task_specific_model(
         decoder=decoder,
         attention_bridge=attention_bridge
     )
-    if uses_adapters(model_opt):
+    if uses_adapters(model_opts):
         logger.info('Creating adapters...')
-        create_all_adapters(nmt_model, model_opt, task_queue_manager)
+        create_all_adapters(nmt_model, model_opts, task_queue_manager)
     print('built model:')
     print(nmt_model)
 
@@ -363,54 +362,54 @@ def build_task_specific_model(
     return nmt_model, generators_md
 
 
-def build_only_enc(model_opt, src_emb, task_queue_manager):
+def build_only_enc(model_opts, src_emb, task_queue_manager):
     """Truly only builds encoder: no embeddings"""
-    encoder = build_encoder(model_opt, src_emb, task_queue_manager)
-    if model_opt.param_init != 0.0:
+    encoder = build_encoder(model_opts, src_emb, task_queue_manager)
+    if model_opts.param_init != 0.0:
         for p in encoder.parameters():
-            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-    if model_opt.param_init_glorot:
+            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+    if model_opts.param_init_glorot:
         for p in encoder.parameters():
             if p.dim() > 1:
                 xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
-    if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
+    if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         encoder.half()
 
     return encoder
 
 
-def build_only_dec(model_opt, tgt_emb, task_queue_manager):
-    decoder = build_decoder(model_opt, tgt_emb, task_queue_manager)
+def build_only_dec(model_opts, tgt_emb, task_queue_manager):
+    decoder = build_decoder(model_opts, tgt_emb, task_queue_manager)
 
-    if model_opt.param_init != 0.0:
+    if model_opts.param_init != 0.0:
         for p in decoder.parameters():
-            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-    if model_opt.param_init_glorot:
+            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+    if model_opts.param_init_glorot:
         for p in decoder.parameters():
             if p.dim() > 1:
                 xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
 
-    if model_opt.model_dtype == 'fp16' and model_opt.optim == 'fusedadam':
+    if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         decoder.half()
 
     return decoder
 
 
-def build_generator(model_opt, n_tgts, tgt_emb):
+def build_generator(model_opts, n_tgts, tgt_emb):
     # Build Generator.
-    assert not model_opt.copy_attn, 'copy_attn not supported'
+    assert not model_opts.copy_attn, 'copy_attn not supported'
     gen_func = nn.LogSoftmax(dim=-1)
     generator = nn.Sequential(
-        nn.Linear(model_opt.rnn_size, n_tgts), Cast(torch.float32), gen_func
+        nn.Linear(model_opts.model_dim, n_tgts), Cast(torch.float32), gen_func
     )
 
-    if model_opt.share_decoder_embeddings:
+    if model_opts.share_decoder_embeddings:
         generator[0].weight = tgt_emb.word_lut.weight
 
-    if model_opt.param_init != 0.0:
+    if model_opts.param_init != 0.0:
         for p in generator.parameters():
-            p.data.uniform_(-model_opt.param_init, model_opt.param_init)
-    if model_opt.param_init_glorot:
+            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+    if model_opts.param_init_glorot:
         for p in generator.parameters():
             if p.dim() > 1:
                 xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
@@ -450,7 +449,7 @@ def build_generator(model_opt, n_tgts, tgt_emb):
 
 
 def build_base_model_langspec(
-    model_opt,
+    model_opts,
     vocabs_dict,
     gpu,
     task_queue_manager,
@@ -459,7 +458,7 @@ def build_base_model_langspec(
     """Build a model from opts.
 
     Args:
-        model_opt: the option loaded from checkpoint. It's important that
+        model_opts: the option loaded from checkpoint. It's important that
             the opts have been updated and validated. See
             :class:`mammoth.utils.parse.ArgumentParser`.
         vocabs_dict (dict[str, mammoth.inputters.Vocab]):
@@ -475,9 +474,9 @@ def build_base_model_langspec(
 
     # for back compat when attention_dropout was not defined
     try:
-        model_opt.attention_dropout
+        model_opts.attention_dropout
     except AttributeError:
-        model_opt.attention_dropout = model_opt.dropout
+        model_opts.attention_dropout = model_opts.dropout
 
     # Build Model
     logger.info("MODEL BUILDER")
@@ -487,7 +486,7 @@ def build_base_model_langspec(
         device = torch.device("cpu")
     logger.info(device)
     model, generators_md = build_task_specific_model(
-        model_opt=model_opt,
+        model_opts=model_opts,
         vocabs_dict=vocabs_dict,
         device=device,
         task_queue_manager=task_queue_manager,
@@ -576,7 +575,7 @@ def _create_adapters(
             if adapter_id_long not in my_enc_adapter_ids:
                 continue
             adapter = Adapter(adapter_group, sub_id)
-            input_dim = opts.rnn_size
+            input_dim = opts.model_dim
             hidden_dim = adapter_opts['hidden_size']
 
             # all stacks to which this adapter should be added
@@ -604,7 +603,7 @@ def _create_adapters(
             if adapter_id_long not in my_dec_adapter_ids:
                 continue
             adapter = Adapter(adapter_group, sub_id)
-            input_dim = opts.rnn_size
+            input_dim = opts.model_dim
             hidden_dim = adapter_opts['hidden_size']
 
             adapted_stacks = set(
@@ -626,10 +625,10 @@ def _create_adapters(
             )
 
 
-def build_model(model_opt, opts, vocabs_dict, task_queue_manager, checkpoint):
+def build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint):
     logger.info('Building model...')
     model, generators_md = build_base_model_langspec(
-        model_opt=model_opt,
+        model_opts=model_opts,
         vocabs_dict=vocabs_dict,
         gpu=use_gpu(opts),
         task_queue_manager=task_queue_manager,

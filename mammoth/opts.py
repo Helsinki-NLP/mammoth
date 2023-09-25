@@ -304,9 +304,6 @@ def model_opts(parser):
 
     # Embedding Options
     group = parser.add_argument_group('Model-Embeddings')
-    group.add('--src_word_vec_size', '-src_word_vec_size', type=int, default=500, help='Word embedding size for src.')
-    group.add('--tgt_word_vec_size', '-tgt_word_vec_size', type=int, default=500, help='Word embedding size for tgt.')
-    group.add('--word_vec_size', '-word_vec_size', type=int, default=-1, help='Word embedding size for src and tgt.')
 
     group.add(
         '--share_decoder_embeddings',
@@ -406,8 +403,8 @@ def model_opts(parser):
     group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder')
     group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder')
     group.add(
-        '--rnn_size',
-        '-rnn_size',
+        '--model_dim',
+        '-model_dim',
         type=int,
         default=-1,
         help="Size of rnn hidden states.",

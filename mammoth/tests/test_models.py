@@ -14,7 +14,7 @@ mammoth.opts.model_opts(parser)
 mammoth.opts._add_train_general_opts(parser)
 
 # -data option is required, but not used in this test, so dummy.
-opts = parser.parse_known_args(['-tasks', 'dummy', '-node_rank', '0'])[0]
+opts = parser.parse_known_args(['-tasks', 'dummy', '-node_rank', '0', '-model_dim', '500'])[0]
 
 
 class TestModel(unittest.TestCase):
@@ -47,10 +47,10 @@ class TestModel(unittest.TestCase):
         if opts.decoder_type == 'transformer':
             input = torch.cat([test_src, test_src], 0)
             res = emb(input)
-            compare_to = torch.zeros(source_l * 2, bsize, opts.src_word_vec_size)
+            compare_to = torch.zeros(source_l * 2, bsize, opts.model_dim)
         else:
             res = emb(test_src)
-            compare_to = torch.zeros(source_l, bsize, opts.src_word_vec_size)
+            compare_to = torch.zeros(source_l, bsize, opts.model_dim)
 
         self.assertEqual(res.size(), compare_to.size())
 
@@ -72,8 +72,8 @@ class TestModel(unittest.TestCase):
         hidden_t, outputs, test_length = enc(test_src, test_length)
 
         # Initialize vectors to compare size with
-        test_hid = torch.zeros(self.opts.enc_layers, bsize, opts.rnn_size)
-        test_out = torch.zeros(source_l, bsize, opts.rnn_size)
+        test_hid = torch.zeros(self.opts.enc_layers, bsize, opts.model_dim)
+        test_out = torch.zeros(source_l, bsize, opts.model_dim)
 
         # Ensure correct sizes and types
         self.assertEqual(test_hid.size(), hidden_t[0].size(), hidden_t[1].size())
@@ -102,7 +102,7 @@ class TestModel(unittest.TestCase):
 
         test_src, test_tgt, test_length = self.get_batch(source_l=source_l, bsize=bsize)
         outputs, attn = model(test_src, test_tgt, test_length)
-        outputsize = torch.zeros(source_l - 1, bsize, opts.rnn_size)
+        outputsize = torch.zeros(source_l - 1, bsize, opts.model_dim)
         # Make sure that output has the correct size and type
         self.assertEqual(outputs.size(), outputsize.size())
         self.assertEqual(type(outputs), torch.Tensor)
@@ -151,7 +151,7 @@ for p in test_embeddings:
 tests_encoder = [
     # [],
     # [('encoder_type', 'mean')],
-    # [('encoder_type', 'transformer'), ('word_vec_size', 16), ('rnn_size', 16)],
+    # [('encoder_type', 'transformer'), ('word_vec_size', 16), ('model_dim', 16)],
     # [],
 ]
 
@@ -168,14 +168,14 @@ tests_nmtmodel = [
         ('encoder_type', 'transformer'),
         ('src_word_vec_size', 16),
         ('tgt_word_vec_size', 16),
-        ('rnn_size', 16),
+        ('model_dim', 16),
     ],
     [
         ('decoder_type', 'transformer'),
         ('encoder_type', 'transformer'),
         ('src_word_vec_size', 16),
         ('tgt_word_vec_size', 16),
-        ('rnn_size', 16),
+        ('model_dim', 16),
         ('position_encoding', True),
     ],
     # [('coverage_attn', True)],

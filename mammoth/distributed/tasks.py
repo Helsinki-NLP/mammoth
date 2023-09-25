@@ -133,7 +133,7 @@ class TaskSpecs():
     decoder_id: List[str]
     corpus_id: str
     weight: int
-    corpus_opt: dict
+    corpus_opts: dict
     src_vocab: Any  # FIXME: type
     tgt_vocab: Any
     encoder_adapter_ids: List[str]
@@ -156,11 +156,11 @@ class TaskSpecs():
         )
 
 
-def get_adapter_ids(opts, corpus_opt, side):
-    if 'adapters' not in opts or 'adapters' not in corpus_opt:
+def get_adapter_ids(opts, corpus_opts, side):
+    if 'adapters' not in opts or 'adapters' not in corpus_opts:
         return []
     global_adapters_opt = opts.adapters.get(side, None)
-    corpus_adapter_opt = corpus_opt['adapters'].get(side, None)
+    corpus_adapter_opt = corpus_opts['adapters'].get(side, None)
     if not global_adapters_opt or not corpus_adapter_opt:
         return []
     result = []
@@ -277,14 +277,14 @@ class TaskQueueManager:
             node_gpu,
             corpus_ids
         ):
-            corpus_opt = opts.tasks[corpus_id]
-            src_lang, tgt_lang = corpus_opt['src_tgt'].split('-', 1)
-            encoder_id = corpus_opt.get('enc_sharing_group', [src_lang])
-            decoder_id = corpus_opt.get('dec_sharing_group', [tgt_lang])
-            weight = corpus_opt.get('weight', 1.0)
-            if 'adapters' in corpus_opt:
-                encoder_adapter_ids = get_adapter_ids(opts, corpus_opt, 'encoder')
-                decoder_adapter_ids = get_adapter_ids(opts, corpus_opt, 'decoder')
+            corpus_opts = opts.tasks[corpus_id]
+            src_lang, tgt_lang = corpus_opts['src_tgt'].split('-', 1)
+            encoder_id = corpus_opts.get('enc_sharing_group', [src_lang])
+            decoder_id = corpus_opts.get('dec_sharing_group', [tgt_lang])
+            weight = corpus_opts.get('weight', 1.0)
+            if 'adapters' in corpus_opts:
+                encoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'encoder')
+                decoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'decoder')
                 uses_adapters = True
             else:
                 encoder_adapter_ids = None
@@ -298,7 +298,7 @@ class TaskQueueManager:
                 decoder_id=decoder_id,
                 corpus_id=corpus_id,
                 weight=weight,
-                corpus_opt=corpus_opt,
+                corpus_opts=corpus_opts,
                 src_vocab=None,
                 tgt_vocab=None,
                 encoder_adapter_ids=encoder_adapter_ids,

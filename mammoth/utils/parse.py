@@ -270,50 +270,51 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         return defaults
 
     @classmethod
-    def update_model_opts(cls, model_opt):
-        cls._validate_adapters(model_opt)
-        if model_opt.word_vec_size > 0:
-            model_opt.src_word_vec_size = model_opt.word_vec_size
-            model_opt.tgt_word_vec_size = model_opt.word_vec_size
+    def update_model_opts(cls, model_opts):
+        cls._validate_adapters(model_opts)
+        if model_opts.model_dim > 0:
+            model_opts.model_dim = model_opts.model_dim
+            model_opts.model_dim = model_opts.model_dim
 
         # Backward compatibility with "fix_word_vecs_*" opts
-        if hasattr(model_opt, 'fix_word_vecs_enc'):
-            model_opt.freeze_word_vecs_enc = model_opt.fix_word_vecs_enc
-        if hasattr(model_opt, 'fix_word_vecs_dec'):
-            model_opt.freeze_word_vecs_dec = model_opt.fix_word_vecs_dec
+        if hasattr(model_opts, 'fix_word_vecs_enc'):
+            model_opts.freeze_word_vecs_enc = model_opts.fix_word_vecs_enc
+        if hasattr(model_opts, 'fix_word_vecs_dec'):
+            model_opts.freeze_word_vecs_dec = model_opts.fix_word_vecs_dec
 
-        if model_opt.layers > 0:
+        if model_opts.layers > 0:
             raise Exception('--layers is deprecated')
 
-        model_opt.brnn = model_opt.encoder_type == "brnn"
+        model_opts.brnn = model_opts.encoder_type == "brnn"
 
-        if model_opt.copy_attn_type is None:
-            model_opt.copy_attn_type = model_opt.global_attention
+        if model_opts.copy_attn_type is None:
+            model_opts.copy_attn_type = model_opts.global_attention
 
-        if model_opt.alignment_layer is None:
-            model_opt.alignment_layer = -2
-            model_opt.lambda_align = 0.0
-            model_opt.full_context_alignment = False
+        if model_opts.alignment_layer is None:
+            model_opts.alignment_layer = -2
+            model_opts.lambda_align = 0.0
+            model_opts.full_context_alignment = False
 
     @classmethod
-    def validate_model_opts(cls, model_opt):
-        assert model_opt.model_type in ["text"], "Unsupported model type %s" % model_opt.model_type
+    def validate_model_opts(cls, model_opts):
+        assert model_opts.model_type in ["text"], "Unsupported model type %s" % model_opts.model_type
 
         # encoder and decoder should be same sizes
         # assert same_size, "The encoder and decoder rnns must be the same size for now"
 
-        if model_opt.share_embeddings:
-            if model_opt.model_type != "text":
+        if model_opts.share_embeddings:
+            if model_opts.model_type != "text":
                 raise AssertionError("--share_embeddings requires --model_type text.")
-        if model_opt.lambda_align > 0.0:
-            assert model_opt.decoder_type == 'transformer', "Only transformer is supported to joint learn alignment."
+        if model_opts.lambda_align > 0.0:
+            assert model_opts.decoder_type == 'transformer', "Only transformer is supported to joint learn alignment."
             assert (
-                model_opt.alignment_layer < model_opt.dec_layers and model_opt.alignment_layer >= -model_opt.dec_layers
+                model_opts.alignment_layer < model_opts.dec_layers
+                and model_opts.alignment_layer >= -model_opts.dec_layers
             ), "N° alignment_layer should be smaller than number of layers."
             logger.info(
                 "Joint learn alignment at layer [{}] "
                 "with {} heads in full_context '{}'.".format(
-                    model_opt.alignment_layer, model_opt.alignment_heads, model_opt.full_context_alignment
+                    model_opts.alignment_layer, model_opts.alignment_heads, model_opts.full_context_alignment
                 )
             )
 

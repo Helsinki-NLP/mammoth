@@ -29,7 +29,7 @@ class LayerStackEncoder(EncoderBase):
                     continue
                 stacks[module_id] = AdaptedTransformerEncoder(
                     n_layers,
-                    opts.rnn_size,
+                    opts.model_dim,
                     opts.heads,
                     opts.transformer_ff,
                     opts.dropout[0] if type(opts.dropout) is list else opts.dropout,
@@ -42,7 +42,7 @@ class LayerStackEncoder(EncoderBase):
                     opts.max_relative_positions,
                     pos_ffn_activation_fn=opts.pos_ffn_activation_fn,
                     layer_norm_module=(
-                        nn.LayerNorm(opts.rnn_size, eps=1e-6) if is_on_top
+                        nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
                         else nn.Identity()
                     )
                 )
@@ -50,30 +50,30 @@ class LayerStackEncoder(EncoderBase):
         return cls(embeddings, encoders)
 
     @classmethod
-    def from_trans_opt(cls, model_opt, embeddings, opt_stack):
+    def from_trans_opt(cls, model_opts, embeddings, opt_stack):
         """Alternate constructor for use during translation."""
         encoders = nn.ModuleList()
-        for layer_stack_index, n_layers in enumerate(model_opt.enc_layers):
+        for layer_stack_index, n_layers in enumerate(model_opts.enc_layers):
             stacks = nn.ModuleDict()
             module_opts = opt_stack['encoder'][layer_stack_index]
             module_id = module_opts['id']
-            is_on_top = layer_stack_index == len(model_opt.enc_layers) - 1
+            is_on_top = layer_stack_index == len(model_opts.enc_layers) - 1
             stacks[module_id] = AdaptedTransformerEncoder(
                 n_layers,
-                model_opt.rnn_size,
-                model_opt.heads,
-                model_opt.transformer_ff,
-                model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
+                model_opts.model_dim,
+                model_opts.heads,
+                model_opts.transformer_ff,
+                model_opts.dropout[0] if type(model_opts.dropout) is list else model_opts.dropout,
                 (
-                    model_opt.attention_dropout[0]
-                    if type(model_opt.attention_dropout) is list
-                    else model_opt.attention_dropout
+                    model_opts.attention_dropout[0]
+                    if type(model_opts.attention_dropout) is list
+                    else model_opts.attention_dropout
                 ),
                 None,  # embeddings,
-                model_opt.max_relative_positions,
-                pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
+                model_opts.max_relative_positions,
+                pos_ffn_activation_fn=model_opts.pos_ffn_activation_fn,
                 layer_norm_module=(
-                    nn.LayerNorm(model_opt.rnn_size, eps=1e-6) if is_on_top
+                    nn.LayerNorm(model_opts.model_dim, eps=1e-6) if is_on_top
                     else nn.Identity()
                 )
             )

@@ -44,7 +44,7 @@ def build_vocab_main(opts):
             decoder_id=tgt_lang,
             corpus_id=f'{src_lang}-{tgt_lang}',
             weight=1,
-            corpus_opt=dict(),
+            corpus_opts=dict(),
             src_vocab=None,
             tgt_vocab=None,
             encoder_adapter_ids=None,

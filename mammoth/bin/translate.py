@@ -42,7 +42,7 @@ def translate(opts):
         decoder_id=[stack['id'] for stack in opts.stack['decoder']],
         corpus_id='trans',
         weight=1,
-        corpus_opt=dict(),
+        corpus_opts=dict(),
         src_vocab=None,
         tgt_vocab=None,
         encoder_adapter_ids=encoder_adapter_ids,

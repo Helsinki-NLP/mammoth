@@ -8,13 +8,13 @@ import torch.nn as nn
 from mammoth.utils.module_splitter import explode_model
 
 
-def build_model_saver(model_opt, opts, model, vocabs_dict, optim, device_context):
+def build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context):
     # _check_save_model_path
     save_model_path = os.path.abspath(opts.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opts.save_model, model, model_opt, vocabs_dict, optim, opts.keep_checkpoint, device_context, opts.save_all_gpus
+        opts.save_model, model, model_opts, vocabs_dict, optim, opts.keep_checkpoint, device_context, opts.save_all_gpus
     )
     return model_saver
 
@@ -40,7 +40,7 @@ class ModelSaverBase(object):
         self,
         base_path,
         model,
-        model_opt,
+        model_opts,
         vocabs_dict,
         optim,
         keep_checkpoint=-1,
@@ -49,7 +49,7 @@ class ModelSaverBase(object):
     ):
         self.base_path = base_path
         self.model = model
-        self.model_opt = model_opt
+        self.model_opts = model_opts
         self.vocabs_dict = vocabs_dict
         self.optim = optim
         self.last_saved_step = None
@@ -129,7 +129,7 @@ class ModelSaver(ModelSaverBase):
             "model": model_state_dict,
             # 'generator': generator_state_dict,
             "vocab": self.vocabs_dict,
-            "opts": self.model_opt,
+            "opts": self.model_opts,
             "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
             "whole_model": self.model,
         }
@@ -159,7 +159,7 @@ class ModelSaver(ModelSaverBase):
                 tmp_checkpoint_paths.append(checkpoint_path)
 
         if device_context.is_master():
-            # TODO: not sure how to deal with model_state_dict, fields, model_opt and optim.state_dict() in a multi-gpu
+            # TODO: not sure how to deal with model_state_dict, fields, model_opts and optim.state_dict() in a multi-gpu
             #  setting. Is it OK to save only from master?
 
             # model frame

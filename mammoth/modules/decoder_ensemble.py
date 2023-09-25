@@ -126,7 +126,7 @@ def load_test_model(opts):
     shared_model_opt = None
     models = []
     for model_path in opts.models:
-        vocabs, model, model_opt = mammoth.model_builder.load_test_multitask_model(opts, model_path=model_path)
+        vocabs, model, model_opts = mammoth.model_builder.load_test_multitask_model(opts, model_path=model_path)
         if shared_vocabs is None:
             shared_vocabs = vocabs
         else:
@@ -137,6 +137,6 @@ def load_test_model(opts):
             #     assert vocab.stoi == sh_vocab.stoi, "Ensemble models must use the same preprocessed data"
         models.append(model)
         if shared_model_opt is None:
-            shared_model_opt = model_opt
+            shared_model_opt = model_opts
     ensemble_model = EnsembleModel(models, opts.avg_raw_probs)
     return shared_vocabs, ensemble_model, shared_model_opt

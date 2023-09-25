@@ -35,16 +35,16 @@ def build_translator(opts, task, report_score=True, logger=None, out_file=None):
     )
     if logger:
         logger.info(str(task))
-    vocabs, model, model_opt = load_test_model(opts)
+    vocabs, model, model_opts = load_test_model(opts)
 
     scorer = mammoth.translate.GNMTGlobalScorer.from_opts(opts)
 
-    if model_opt.model_task == ModelTask.LANGUAGE_MODEL:
+    if model_opts.model_task == ModelTask.LANGUAGE_MODEL:
         translator = GeneratorLM.from_opts(
             model,
             vocabs,
             opts,
-            model_opt,
+            model_opts,
             global_scorer=scorer,
             out_file=out_file,
             report_align=opts.report_align,
@@ -56,7 +56,7 @@ def build_translator(opts, task, report_score=True, logger=None, out_file=None):
             model,
             vocabs,
             opts,
-            model_opt,
+            model_opts,
             global_scorer=scorer,
             out_file=out_file,
             report_align=opts.report_align,
@@ -241,7 +241,7 @@ class Inference(object):
         model,
         vocabs,
         opts,
-        model_opt,
+        model_opts,
         global_scorer=None,
         out_file=None,
         report_align=False,
@@ -256,7 +256,7 @@ class Inference(object):
             vocabs (dict[str, mammoth.inputters.Vocab]): See
                 :func:`__init__()`.
             opts (argparse.Namespace): Command line options
-            model_opt (argparse.Namespace): Command line options saved with
+            model_opts (argparse.Namespace): Command line options saved with
                 the model checkpoint.
             global_scorer (mammoth.translate.GNMTGlobalScorer): See
                 :func:`__init__()`..
@@ -268,7 +268,7 @@ class Inference(object):
         """
         assert task is not None
         # TODO: maybe add dynamic part
-        cls.validate_task(model_opt.model_task)
+        cls.validate_task(model_opts.model_task)
 
         return cls(
             model,
@@ -295,7 +295,7 @@ class Inference(object):
             data_type=opts.data_type,
             verbose=opts.verbose,
             report_time=opts.report_time,
-            copy_attn=model_opt.copy_attn,
+            copy_attn=model_opts.copy_attn,
             global_scorer=global_scorer,
             out_file=out_file,
             report_align=report_align,

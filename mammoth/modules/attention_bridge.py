@@ -75,7 +75,7 @@ class PerceiverAttentionBridgeLayer(BaseAttentionBridgeLayer):
     @classmethod
     def from_opts(cls, opts):
         return cls(
-            opts.rnn_size,
+            opts.model_dim,
             opts.hidden_ab_size,
             opts.ab_fixed_length,
             opts.heads,
@@ -133,7 +133,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         attention_heads,
         hidden_ab_size,
         model_type,
-        rnn_size,
+        model_dim,
         ab_layer_norm=None,
     ):
         """Attention Heads Layer:"""
@@ -144,7 +144,7 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         self.dd = u
         self.model_type = model_type
         if self.model_type != "text":
-            d = rnn_size
+            d = model_dim
         self.ws1 = nn.Linear(d, u, bias=True)
         self.ws2 = nn.Linear(u, r, bias=True)
         self.relu = nn.ReLU()
@@ -157,11 +157,11 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
     def from_opts(cls, opts):
         """Alternate constructor."""
         return cls(
-            opts.rnn_size,
+            opts.model_dim,
             opts.ab_fixed_length,
             opts.hidden_ab_size,
             opts.model_type,
-            opts.rnn_size,
+            opts.model_dim,
             opts.ab_layer_norm,
         )
 
@@ -246,7 +246,7 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
     @classmethod
     def from_opts(cls, opts):
         return cls(
-            opts.rnn_size,
+            opts.model_dim,
             opts.hidden_ab_size,
             opts.ab_fixed_length,
             opts.ab_layer_norm,
@@ -278,7 +278,7 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
     @classmethod
     def from_opts(cls, opts):
         return cls(
-            opts.rnn_size,
+            opts.model_dim,
             opts.heads,
             opts.hidden_ab_size,  # d_ff
             # TODO: that list indexing things seems suspicious to me...
@@ -315,7 +315,7 @@ class FeedForwardAttentionBridgeLayer(BaseAttentionBridgeLayer):
     @classmethod
     def from_opts(cls, opts):
         return cls(
-            opts.rnn_size,
+            opts.model_dim,
             opts.hidden_ab_size,
             opts.ab_layer_norm,
         )

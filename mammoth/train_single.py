@@ -24,21 +24,21 @@ def configure_process(opts, device_id):
 
 
 def _get_model_opts(opts, checkpoint=None):
-    """Get `model_opt` to build model, may load from `checkpoint` if any."""
+    """Get `model_opts` to build model, may load from `checkpoint` if any."""
     if checkpoint is not None:
-        model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opts"])
-        ArgumentParser.update_model_opts(model_opt)
-        ArgumentParser.validate_model_opts(model_opt)
-        if opts.tensorboard_log_dir == model_opt.tensorboard_log_dir and \
-                hasattr(model_opt, 'tensorboard_log_dir_dated'):
+        model_opts = ArgumentParser.ckpt_model_opts(checkpoint["opts"])
+        ArgumentParser.update_model_opts(model_opts)
+        ArgumentParser.validate_model_opts(model_opts)
+        if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
+                hasattr(model_opts, 'tensorboard_log_dir_dated'):
             # ensure tensorboard output is written in the directory
             # of previous checkpoints
-            opts.tensorboard_log_dir_dated = model_opt.tensorboard_log_dir_dated
+            opts.tensorboard_log_dir_dated = model_opts.tensorboard_log_dir_dated
         # Override checkpoint's update_embeddings as it defaults to false
-        model_opt.update_vocab = opts.update_vocab
+        model_opts.update_vocab = opts.update_vocab
     else:
-        model_opt = opts
-    return model_opt
+        model_opts = opts
+    return model_opts
 
 
 def _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager):
@@ -132,11 +132,11 @@ def main(
 
     transforms_cls = get_transforms_cls(opts._all_transform)
     checkpoint = None
-    model_opt = _get_model_opts(opts, checkpoint=checkpoint)
+    model_opts = _get_model_opts(opts, checkpoint=checkpoint)
 
     # Build model.
 
-    model, generators_md = build_model(model_opt, opts, vocabs_dict, task_queue_manager, checkpoint)
+    model, generators_md = build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint)
 
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
@@ -158,7 +158,7 @@ def main(
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opt, opts, model, vocabs_dict, optim, device_context)
+    model_saver = build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context)
 
     logger.info("{} - Build trainer".format(device_context.id))
     trainer = build_trainer(

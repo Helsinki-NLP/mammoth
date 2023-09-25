@@ -136,12 +136,12 @@ def build_torch_optimizer(model, opts, task_queue_manager):
 def make_learning_rate_decay_fn(opts):
     """Returns the learning decay function from options."""
     if opts.decay_method == 'noam':
-        return functools.partial(noam_decay, warmup_steps=opts.warmup_steps, model_size=opts.rnn_size)
+        return functools.partial(noam_decay, warmup_steps=opts.warmup_steps, model_dim=opts.model_dim)
     elif opts.decay_method == 'noamwd':
         return functools.partial(
             noamwd_decay,
             warmup_steps=opts.warmup_steps,
-            model_size=opts.rnn_size,
+            model_dim=opts.model_dim,
             rate=opts.learning_rate_decay,
             decay_steps=opts.decay_steps,
             start_step=opts.start_decay_steps,
@@ -164,17 +164,17 @@ def make_learning_rate_decay_fn(opts):
         )
 
 
-def noam_decay(step, warmup_steps, model_size):
+def noam_decay(step, warmup_steps, model_dim):
     """Learning rate schedule described in
     https://arxiv.org/pdf/1706.03762.pdf.
     """
-    return model_size ** (-0.5) * min(step ** (-0.5), step * warmup_steps ** (-1.5))
+    return model_dim ** (-0.5) * min(step ** (-0.5), step * warmup_steps ** (-1.5))
 
 
-def noamwd_decay(step, warmup_steps, model_size, rate, decay_steps, start_step=0):
+def noamwd_decay(step, warmup_steps, model_dim, rate, decay_steps, start_step=0):
     """Learning rate schedule optimized for huge batches"""
     return (
-        model_size ** (-0.5)
+        model_dim ** (-0.5)
         * min(step ** (-0.5), step * warmup_steps ** (-1.5))
         * rate ** (max(step - start_step + decay_steps, 0) // decay_steps)
     )

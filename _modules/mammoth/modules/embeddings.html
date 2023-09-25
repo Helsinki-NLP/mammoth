@@ -186,7 +186,6 @@
 <span class="c1"># from mammoth.utils.logging import logger</span>
 
 <span class="c1"># import bitsandbytes as bnb</span>
-<span class="c1"># from mammoth.modules.stable_embeddings import StableEmbedding</span>
 
 
 <span class="k">class</span> <span class="nc">SequenceTooLongError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
@@ -243,7 +242,7 @@
 <div class="viewcode-block" id="Embeddings"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.Embeddings">[docs]</a><span class="k">class</span> <span class="nc">Embeddings</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Words embeddings for encoder/decoder.</span>
 
-<span class="sd">    Additionally includes ability to add sparse input features</span>
+<span class="sd">    Additionally includes ability to add input features</span>
 <span class="sd">    based on &quot;Linguistic Input Features Improve Neural Machine Translation&quot;</span>
 <span class="sd">    :cite:`sennrich2016linguistic`.</span>
 
@@ -293,7 +292,6 @@
         <span class="n">feat_padding_idx</span><span class="o">=</span><span class="p">[],</span>
         <span class="n">feat_vocab_sizes</span><span class="o">=</span><span class="p">[],</span>
         <span class="n">dropout</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
-        <span class="n">sparse</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
         <span class="n">freeze_word_vecs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_args</span><span class="p">(</span><span class="n">feat_merge</span><span class="p">,</span> <span class="n">feat_vocab_sizes</span><span class="p">,</span> <span class="n">feat_vec_exponent</span><span class="p">,</span> <span class="n">feat_vec_size</span><span class="p">,</span> <span class="n">feat_padding_idx</span><span class="p">)</span>
@@ -324,7 +322,7 @@
         <span class="c1"># The embedding matrix look-up tables. The first look-up table</span>
         <span class="c1"># is for words. Subsequent ones are for features, if any exist.</span>
         <span class="n">emb_params</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">vocab_sizes</span><span class="p">,</span> <span class="n">emb_dims</span><span class="p">,</span> <span class="n">pad_indices</span><span class="p">)</span>
-        <span class="n">embeddings</span> <span class="o">=</span> <span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">padding_idx</span><span class="o">=</span><span class="n">pad</span><span class="p">,</span> <span class="n">sparse</span><span class="o">=</span><span class="n">sparse</span><span class="p">)</span> <span class="k">for</span> <span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">pad</span> <span class="ow">in</span> <span class="n">emb_params</span><span class="p">]</span>
+        <span class="n">embeddings</span> <span class="o">=</span> <span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">padding_idx</span><span class="o">=</span><span class="n">pad</span><span class="p">)</span> <span class="k">for</span> <span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">pad</span> <span class="ow">in</span> <span class="n">emb_params</span><span class="p">]</span>
         <span class="n">emb_luts</span> <span class="o">=</span> <span class="n">Elementwise</span><span class="p">(</span><span class="n">feat_merge</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">)</span>
 
         <span class="c1"># The final output size of word + feature vectors. This can vary</span>

@@ -184,8 +184,6 @@
 <span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
 
 <span class="kn">import</span> <span class="nn">mammoth</span>
-<span class="kn">from</span> <span class="nn">mammoth.modules.sparse_losses</span> <span class="kn">import</span> <span class="n">SparsemaxLoss</span>
-<span class="kn">from</span> <span class="nn">mammoth.modules.sparse_activations</span> <span class="kn">import</span> <span class="n">LogSparsemax</span>
 <span class="kn">from</span> <span class="nn">mammoth.constants</span> <span class="kn">import</span> <span class="n">ModelTask</span><span class="p">,</span> <span class="n">DefaultTokens</span>
 
 
@@ -212,16 +210,14 @@
         <span class="p">)</span>
     <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">label_smoothing</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">train</span><span class="p">:</span>
         <span class="n">criterion</span> <span class="o">=</span> <span class="n">LabelSmoothingLoss</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">label_smoothing</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">tgt_vocab</span><span class="p">),</span> <span class="n">ignore_index</span><span class="o">=</span><span class="n">padding_idx</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">generator</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">LogSparsemax</span><span class="p">):</span>  <span class="c1"># elif isinstance(model.generator[-1], LogSparsemax):</span>
-        <span class="n">criterion</span> <span class="o">=</span> <span class="n">SparsemaxLoss</span><span class="p">(</span><span class="n">ignore_index</span><span class="o">=</span><span class="n">padding_idx</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">criterion</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">NLLLoss</span><span class="p">(</span><span class="n">ignore_index</span><span class="o">=</span><span class="n">padding_idx</span><span class="p">,</span> <span class="n">reduction</span><span class="o">=</span><span class="s1">&#39;sum&#39;</span><span class="p">)</span>
 
     <span class="c1"># if the loss function operates on vectors of raw logits instead of</span>
     <span class="c1"># probabilities, only the first part of the generator needs to be</span>
-    <span class="c1"># passed to the NMTLossCompute. At the moment, the only supported</span>
-    <span class="c1"># loss function of this kind is the sparsemax loss.</span>
-    <span class="n">use_raw_logits</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">criterion</span><span class="p">,</span> <span class="n">SparsemaxLoss</span><span class="p">)</span>
+    <span class="c1"># passed to the NMTLossCompute. At the moment, there is no supported</span>
+    <span class="c1"># loss function of this kind.</span>
+    <span class="n">use_raw_logits</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="n">loss_gen</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">generator</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">use_raw_logits</span> <span class="k">else</span> <span class="n">generator</span>
     <span class="p">)</span>  <span class="c1"># loss_gen = model.generator[0] if use_raw_logits else model.generator</span>

@@ -272,13 +272,12 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">enc_layers</span> <span class="n">ENC_LAYERS</span> <span class="p">[</span><span class="n">ENC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">dec_layers</span> <span class="n">DEC_LAYERS</span> <span class="p">[</span><span class="n">DEC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">rnn_size</span> <span class="n">RNN_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">pos_ffn_activation_fn</span> <span class="p">{</span><span class="n">relu</span><span class="p">,</span><span class="n">gelu</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">bridge</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">context_gate</span> <span class="p">{</span><span class="n">source</span><span class="p">,</span><span class="n">target</span><span class="p">,</span><span class="n">both</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">bridge_extra_node</span> <span class="n">BRIDGE_EXTRA_NODE</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">bridge</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">bridge_extra_node</span> <span class="n">BRIDGE_EXTRA_NODE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">bidir_edges</span> <span class="n">BIDIR_EDGES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">state_dim</span> <span class="n">STATE_DIM</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">n_edge_types</span> <span class="n">N_EDGE_TYPES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">n_node</span> <span class="n">N_NODE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">n_steps</span> <span class="n">N_STEPS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">src_ggnn_size</span> <span class="n">SRC_GGNN_SIZE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">global_attention</span> <span class="p">{</span><span class="n">dot</span><span class="p">,</span><span class="n">general</span><span class="p">,</span><span class="n">mlp</span><span class="p">,</span><span class="n">none</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">global_attention_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">,</span><span class="n">sparsemax</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">global_attention_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">self_attn_type</span> <span class="n">SELF_ATTN_TYPE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">max_relative_positions</span> <span class="n">MAX_RELATIVE_POSITIONS</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">heads</span> <span class="n">HEADS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">transformer_ff</span> <span class="n">TRANSFORMER_FF</span><span class="p">]</span>
@@ -286,7 +285,7 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">alignment_layer</span> <span class="n">ALIGNMENT_LAYER</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">alignment_heads</span> <span class="n">ALIGNMENT_HEADS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">full_context_alignment</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">copy_attn</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_attn_type</span> <span class="p">{</span><span class="n">dot</span><span class="p">,</span><span class="n">general</span><span class="p">,</span><span class="n">mlp</span><span class="p">,</span><span class="n">none</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">generator_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">,</span><span class="n">sparsemax</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_attn_force</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">generator_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_attn_force</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">reuse_copy_attn</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_loss_by_seqlength</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">coverage_attn</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">lambda_coverage</span> <span class="n">LAMBDA_COVERAGE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">loss_scale</span> <span class="n">LOSS_SCALE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">apex_opt_level</span> <span class="p">{</span><span class="n">O0</span><span class="p">,</span><span class="n">O1</span><span class="p">,</span><span class="n">O2</span><span class="p">,</span><span class="n">O3</span><span class="p">}]</span>
@@ -323,7 +322,7 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">train_steps</span> <span class="n">TRAIN_STEPS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">single_pass</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">epochs</span> <span class="n">EPOCHS</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">early_stopping</span> <span class="n">EARLY_STOPPING</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">early_stopping_criteria</span> <span class="p">[</span><span class="n">EARLY_STOPPING_CRITERIA</span> <span class="p">[</span><span class="n">EARLY_STOPPING_CRITERIA</span> <span class="o">...</span><span class="p">]]]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">optim</span> <span class="p">{</span><span class="n">sgd</span><span class="p">,</span><span class="n">adagrad</span><span class="p">,</span><span class="n">adadelta</span><span class="p">,</span><span class="n">adam</span><span class="p">,</span><span class="n">adamw</span><span class="p">,</span><span class="n">sparseadam</span><span class="p">,</span><span class="n">adafactor</span><span class="p">,</span><span class="n">fusedadam</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">optim</span> <span class="p">{</span><span class="n">sgd</span><span class="p">,</span><span class="n">adagrad</span><span class="p">,</span><span class="n">adadelta</span><span class="p">,</span><span class="n">adam</span><span class="p">,</span><span class="n">adamw</span><span class="p">,</span><span class="n">adafactor</span><span class="p">,</span><span class="n">fusedadam</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">adagrad_accumulator_init</span> <span class="n">ADAGRAD_ACCUMULATOR_INIT</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">max_grad_norm</span> <span class="n">MAX_GRAD_NORM</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">weight_decay</span> <span class="n">WEIGHT_DECAY</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">dropout</span> <span class="n">DROPOUT</span> <span class="p">[</span><span class="n">DROPOUT</span> <span class="o">...</span><span class="p">]]</span>
@@ -737,10 +736,6 @@
 <dd><p>Have an additional layer between the last encoder state and the first decoder state</p>
 <p>Default: False</p>
 </dd>
-<dt><kbd>--context_gate, -context_gate</kbd></dt>
-<dd><p>Possible choices: source, target, both</p>
-<p>Type of context gate to use. Do not select for no context gate.</p>
-</dd>
 <dt><kbd>--bridge_extra_node, -bridge_extra_node</kbd></dt>
 <dd><p>Graph encoder bridges only extra node to decoder as input</p>
 <p>Default: True</p>
@@ -780,7 +775,7 @@
 <p>Default: “general”</p>
 </dd>
 <dt><kbd>--global_attention_function, -global_attention_function</kbd></dt>
-<dd><p>Possible choices: softmax, sparsemax</p>
+<dd><p>Possible choices: softmax</p>
 <p>Default: “softmax”</p>
 </dd>
 <dt><kbd>--self_attn_type, -self_attn_type</kbd></dt>
@@ -840,8 +835,8 @@
 <p>The copy attention type to use. Leave as None to use the same as -global_attention.</p>
 </dd>
 <dt><kbd>--generator_function, -generator_function</kbd></dt>
-<dd><p>Possible choices: softmax, sparsemax</p>
-<p>Which function to use for generating probabilities over the target vocabulary (choices: softmax, sparsemax)</p>
+<dd><p>Possible choices: softmax</p>
+<p>Which function to use for generating probabilities over the target vocabulary (choices: softmax)</p>
 <p>Default: “softmax”</p>
 </dd>
 <dt><kbd>--copy_attn_force, -copy_attn_force</kbd></dt>
@@ -1080,7 +1075,7 @@
 <dd><p>Criteria to use for early stopping.</p>
 </dd>
 <dt><kbd>--optim, -optim</kbd></dt>
-<dd><p>Possible choices: sgd, adagrad, adadelta, adam, adamw, sparseadam, adafactor, fusedadam</p>
+<dd><p>Possible choices: sgd, adagrad, adadelta, adam, adamw, adafactor, fusedadam</p>
 <p>Optimization method.</p>
 <p>Default: “sgd”</p>
 </dd>

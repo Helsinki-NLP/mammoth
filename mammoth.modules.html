@@ -195,10 +195,10 @@
 <h2>Core Modules<a class="headerlink" href="#core-modules" title="Permalink to this headline">¶</a></h2>
 <dl class="class">
 <dt id="mammoth.modules.Embeddings">
-<em class="property">class </em><code class="sig-prename descclassname">mammoth.modules.</code><code class="sig-name descname">Embeddings</code><span class="sig-paren">(</span><em class="sig-param">word_vec_size</em>, <em class="sig-param">word_vocab_size</em>, <em class="sig-param">word_padding_idx</em>, <em class="sig-param">position_encoding=False</em>, <em class="sig-param">feat_merge='concat'</em>, <em class="sig-param">feat_vec_exponent=0.7</em>, <em class="sig-param">feat_vec_size=-1</em>, <em class="sig-param">feat_padding_idx=[]</em>, <em class="sig-param">feat_vocab_sizes=[]</em>, <em class="sig-param">dropout=0</em>, <em class="sig-param">sparse=False</em>, <em class="sig-param">freeze_word_vecs=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/embeddings.html#Embeddings"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.Embeddings" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">mammoth.modules.</code><code class="sig-name descname">Embeddings</code><span class="sig-paren">(</span><em class="sig-param">word_vec_size</em>, <em class="sig-param">word_vocab_size</em>, <em class="sig-param">word_padding_idx</em>, <em class="sig-param">position_encoding=False</em>, <em class="sig-param">feat_merge='concat'</em>, <em class="sig-param">feat_vec_exponent=0.7</em>, <em class="sig-param">feat_vec_size=-1</em>, <em class="sig-param">feat_padding_idx=[]</em>, <em class="sig-param">feat_vocab_sizes=[]</em>, <em class="sig-param">dropout=0</em>, <em class="sig-param">freeze_word_vecs=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/embeddings.html#Embeddings"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.Embeddings" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
 <p>Words embeddings for encoder/decoder.</p>
-<p>Additionally includes ability to add sparse input features
+<p>Additionally includes ability to add input features
 based on “Linguistic Input Features Improve Neural Machine Translation”
 <a class="bibtex reference internal" href="ref.html#sennrich2016linguistic" id="id1">[SH16]</a>.</p>
 <script>mermaid.initialize({startOnLoad:true});</script><div class="mermaid">
@@ -377,118 +377,6 @@ of the previous step.</p></li>
 
 </dd></dl>
 
-<dl class="class">
-<dt id="mammoth.modules.GlobalAttention">
-<em class="property">class </em><code class="sig-prename descclassname">mammoth.modules.</code><code class="sig-name descname">GlobalAttention</code><span class="sig-paren">(</span><em class="sig-param">dim</em>, <em class="sig-param">coverage=False</em>, <em class="sig-param">attn_type='dot'</em>, <em class="sig-param">attn_func='softmax'</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/global_attention.html#GlobalAttention"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.GlobalAttention" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
-<p>Global attention takes a matrix and a query vector. It
-then computes a parameterized convex combination of the matrix
-based on the input query.</p>
-<p>Constructs a unit mapping a query <cite>q</cite> of size <cite>dim</cite>
-and a source matrix <cite>H</cite> of size <cite>n x dim</cite>, to an output
-of size <cite>dim</cite>.</p>
-<div class="mermaid">
-            graph BT
-   A[Query]
-   subgraph RNN
-     C[H 1]
-     D[H 2]
-     E[H N]
-   end
-   F[Attn]
-   G[Output]
-   A --&gt; F
-   C --&gt; F
-   D --&gt; F
-   E --&gt; F
-   C -.-&gt; G
-   D -.-&gt; G
-   E -.-&gt; G
-   F --&gt; G
-        </div><p>All models compute the output as
-<span class="math notranslate nohighlight">\(c = \sum_{j=1}^{\text{SeqLength}} a_j H_j\)</span> where
-<span class="math notranslate nohighlight">\(a_j\)</span> is the softmax of a score function.
-Then then apply a projection layer to [q, c].</p>
-<p>However they
-differ on how they compute the attention score.</p>
-<ul class="simple">
-<li><dl class="simple">
-<dt>Luong Attention (dot, general):</dt><dd><ul>
-<li><p>dot: <span class="math notranslate nohighlight">\(\text{score}(H_j,q) = H_j^T q\)</span></p></li>
-<li><p>general: <span class="math notranslate nohighlight">\(\text{score}(H_j, q) = H_j^T W_a q\)</span></p></li>
-</ul>
-</dd>
-</dl>
-</li>
-<li><dl class="simple">
-<dt>Bahdanau Attention (mlp):</dt><dd><ul>
-<li><p><span class="math notranslate nohighlight">\(\text{score}(H_j, q) = v_a^T \text{tanh}(W_a q + U_a h_j)\)</span></p></li>
-</ul>
-</dd>
-</dl>
-</li>
-</ul>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>dim</strong> (<em>int</em>) – dimensionality of query and key</p></li>
-<li><p><strong>coverage</strong> (<em>bool</em>) – use coverage term</p></li>
-<li><p><strong>attn_type</strong> (<em>str</em>) – type of attention to use, options [dot,general,mlp]</p></li>
-<li><p><strong>attn_func</strong> (<em>str</em>) – attention function to use, options [softmax,sparsemax]</p></li>
-</ul>
-</dd>
-</dl>
-<dl class="method">
-<dt id="mammoth.modules.GlobalAttention.forward">
-<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">source</em>, <em class="sig-param">memory_bank</em>, <em class="sig-param">memory_lengths=None</em>, <em class="sig-param">coverage=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/global_attention.html#GlobalAttention.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.GlobalAttention.forward" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>source</strong> (<em>FloatTensor</em>) – query vectors <code class="docutils literal notranslate"><span class="pre">(batch,</span> <span class="pre">tgt_len,</span> <span class="pre">dim)</span></code></p></li>
-<li><p><strong>memory_bank</strong> (<em>FloatTensor</em>) – source vectors <code class="docutils literal notranslate"><span class="pre">(batch,</span> <span class="pre">src_len,</span> <span class="pre">dim)</span></code></p></li>
-<li><p><strong>memory_lengths</strong> (<em>LongTensor</em>) – the source context lengths <code class="docutils literal notranslate"><span class="pre">(batch,)</span></code></p></li>
-<li><p><strong>coverage</strong> (<em>FloatTensor</em>) – None (not supported yet)</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p><ul class="simple">
-<li><p>Computed vector <code class="docutils literal notranslate"><span class="pre">(tgt_len,</span> <span class="pre">batch,</span> <span class="pre">dim)</span></code></p></li>
-<li><p>Attention distribtutions for each query
-<code class="docutils literal notranslate"><span class="pre">(tgt_len,</span> <span class="pre">batch,</span> <span class="pre">src_len)</span></code></p></li>
-</ul>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>(FloatTensor, FloatTensor)</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="method">
-<dt id="mammoth.modules.GlobalAttention.score">
-<code class="sig-name descname">score</code><span class="sig-paren">(</span><em class="sig-param">h_t</em>, <em class="sig-param">h_s</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/global_attention.html#GlobalAttention.score"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.GlobalAttention.score" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>h_t</strong> (<em>FloatTensor</em>) – sequence of queries <code class="docutils literal notranslate"><span class="pre">(batch,</span> <span class="pre">tgt_len,</span> <span class="pre">dim)</span></code></p></li>
-<li><p><strong>h_s</strong> (<em>FloatTensor</em>) – sequence of sources <code class="docutils literal notranslate"><span class="pre">(batch,</span> <span class="pre">src_len,</span> <span class="pre">dim</span></code></p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>raw attention scores (unnormalized) for each src index</dt><dd><p><code class="docutils literal notranslate"><span class="pre">(batch,</span> <span class="pre">tgt_len,</span> <span class="pre">src_len)</span></code></p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>FloatTensor</p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
 </div>
 <div class="section" id="architecture-transformer">
 <h2>Architecture: Transformer<a class="headerlink" href="#architecture-transformer" title="Permalink to this headline">¶</a></h2>
@@ -648,158 +536,15 @@ zero / non-zero attention <code class="docutils literal notranslate"><span class
 <h2>Architecture: Conv2Conv<a class="headerlink" href="#architecture-conv2conv" title="Permalink to this headline">¶</a></h2>
 <p>(These methods are from a user contribution
 and have not been thoroughly tested.)</p>
-<dl class="class">
-<dt id="mammoth.modules.ConvMultiStepAttention">
-<em class="property">class </em><code class="sig-prename descclassname">mammoth.modules.</code><code class="sig-name descname">ConvMultiStepAttention</code><span class="sig-paren">(</span><em class="sig-param">input_size</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/conv_multi_step_attention.html#ConvMultiStepAttention"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.ConvMultiStepAttention" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
-<p>Conv attention takes a key matrix, a value matrix and a query vector.
-Attention weight is calculated by key matrix with the query vector
-and sum on the value matrix. And the same operation is applied
-in each decode conv layer.</p>
-<dl class="method">
-<dt id="mammoth.modules.ConvMultiStepAttention.apply_mask">
-<code class="sig-name descname">apply_mask</code><span class="sig-paren">(</span><em class="sig-param">mask</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/conv_multi_step_attention.html#ConvMultiStepAttention.apply_mask"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.ConvMultiStepAttention.apply_mask" title="Permalink to this definition">¶</a></dt>
-<dd><p>Apply mask</p>
-</dd></dl>
-
-<dl class="method">
-<dt id="mammoth.modules.ConvMultiStepAttention.forward">
-<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">base_target_emb</em>, <em class="sig-param">input_from_dec</em>, <em class="sig-param">encoder_out_top</em>, <em class="sig-param">encoder_out_combine</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/conv_multi_step_attention.html#ConvMultiStepAttention.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.ConvMultiStepAttention.forward" title="Permalink to this definition">¶</a></dt>
-<dd><dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>base_target_emb</strong> – target emb tensor</p></li>
-<li><p><strong>input_from_dec</strong> – output of decode conv</p></li>
-<li><p><strong>encoder_out_top</strong> – the key matrix for calculation of attetion weight,
-which is the top output of encode conv</p></li>
-<li><p><strong>encoder_out_combine</strong> – the value matrix for the attention-weighted sum,
-which is the combination of base emb and top output of encode</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="class">
-<dt id="mammoth.modules.WeightNormConv2d">
-<em class="property">class </em><code class="sig-prename descclassname">mammoth.modules.</code><code class="sig-name descname">WeightNormConv2d</code><span class="sig-paren">(</span><em class="sig-param">in_channels</em>, <em class="sig-param">out_channels</em>, <em class="sig-param">kernel_size</em>, <em class="sig-param">stride=1</em>, <em class="sig-param">padding=0</em>, <em class="sig-param">dilation=1</em>, <em class="sig-param">groups=1</em>, <em class="sig-param">init_scale=1.0</em>, <em class="sig-param">polyak_decay=0.9995</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/weight_norm.html#WeightNormConv2d"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.WeightNormConv2d" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.conv.Conv2d</span></code></p>
-<dl class="method">
-<dt id="mammoth.modules.WeightNormConv2d.forward">
-<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">init=False</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/weight_norm.html#WeightNormConv2d.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.WeightNormConv2d.forward" title="Permalink to this definition">¶</a></dt>
-<dd><p>Defines the computation performed at every call.</p>
-<p>Should be overridden by all subclasses.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Although the recipe for forward pass needs to be defined within
-this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
-instead of this since the former takes care of running the
-registered hooks while the latter silently ignores them.</p>
-</div>
-</dd></dl>
-
-</dd></dl>
-
 </div>
 <div class="section" id="architecture-sru">
 <h2>Architecture: SRU<a class="headerlink" href="#architecture-sru" title="Permalink to this headline">¶</a></h2>
 </div>
 <div class="section" id="copy-attention">
 <h2>Copy Attention<a class="headerlink" href="#copy-attention" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="mammoth.modules.CopyGenerator">
-<em class="property">class </em><code class="sig-prename descclassname">mammoth.modules.</code><code class="sig-name descname">CopyGenerator</code><span class="sig-paren">(</span><em class="sig-param">input_size</em>, <em class="sig-param">output_size</em>, <em class="sig-param">pad_idx</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/copy_generator.html#CopyGenerator"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.CopyGenerator" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
-<p>An implementation of pointer-generator networks
-<a class="bibtex reference internal" href="ref.html#dblp-journals-corr-seelm17" id="id7">[SLM17]</a>.</p>
-<p>These networks consider copying words
-directly from the source sequence.</p>
-<p>The copy generator is an extended version of the standard
-generator that computes three values.</p>
-<ul class="simple">
-<li><p><span class="math notranslate nohighlight">\(p_{softmax}\)</span> the standard softmax over <cite>tgt_dict</cite></p></li>
-<li><p><span class="math notranslate nohighlight">\(p(z)\)</span> the probability of copying a word from
-the source</p></li>
-<li><p><span class="math notranslate nohighlight">\(p_{copy}\)</span> the probility of copying a particular word.
-taken from the attention distribution directly.</p></li>
-</ul>
-<p>The model returns a distribution over the extend dictionary,
-computed as</p>
-<p><span class="math notranslate nohighlight">\(p(w) = p(z=1)  p_{copy}(w)  +  p(z=0)  p_{softmax}(w)\)</span></p>
-<div class="mermaid">
-            graph BT
-   A[input]
-   S[src_map]
-   B[softmax]
-   BB[switch]
-   C[attn]
-   D[copy]
-   O[output]
-   A --&gt; B
-   A --&gt; BB
-   S --&gt; D
-   C --&gt; D
-   D --&gt; O
-   B --&gt; O
-   BB --&gt; O
-        </div><dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>input_size</strong> (<em>int</em>) – size of input representation</p></li>
-<li><p><strong>output_size</strong> (<em>int</em>) – size of output vocabulary</p></li>
-<li><p><strong>pad_idx</strong> (<em>int</em>) – </p></li>
-</ul>
-</dd>
-</dl>
-<dl class="method">
-<dt id="mammoth.modules.CopyGenerator.forward">
-<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">hidden</em>, <em class="sig-param">attn</em>, <em class="sig-param">src_map</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/copy_generator.html#CopyGenerator.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.CopyGenerator.forward" title="Permalink to this definition">¶</a></dt>
-<dd><p>Compute a distribution over the target dictionary
-extended by the dynamic dictionary implied by copying
-source words.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>hidden</strong> (<em>FloatTensor</em>) – hidden outputs <code class="docutils literal notranslate"><span class="pre">(batch</span> <span class="pre">x</span> <span class="pre">tlen,</span> <span class="pre">input_size)</span></code></p></li>
-<li><p><strong>attn</strong> (<em>FloatTensor</em>) – attn for each <code class="docutils literal notranslate"><span class="pre">(batch</span> <span class="pre">x</span> <span class="pre">tlen,</span> <span class="pre">slen)</span></code></p></li>
-<li><p><strong>src_map</strong> (<em>FloatTensor</em>) – A sparse indicator matrix mapping each source word to
-its index in the “extended” vocab containing.
-<code class="docutils literal notranslate"><span class="pre">(src_len,</span> <span class="pre">batch,</span> <span class="pre">extra_words)</span></code></p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
 </div>
 <div class="section" id="structured-attention">
 <h2>Structured Attention<a class="headerlink" href="#structured-attention" title="Permalink to this headline">¶</a></h2>
-<dl class="class">
-<dt id="mammoth.modules.structured_attention.MatrixTree">
-<em class="property">class </em><code class="sig-prename descclassname">mammoth.modules.structured_attention.</code><code class="sig-name descname">MatrixTree</code><span class="sig-paren">(</span><em class="sig-param">eps=1e-05</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/structured_attention.html#MatrixTree"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.structured_attention.MatrixTree" title="Permalink to this definition">¶</a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">torch.nn.modules.module.Module</span></code></p>
-<p>Implementation of the matrix-tree theorem for computing marginals
-of non-projective dependency parsing. This attention layer is used
-in the paper “Learning Structured Text Representations”
-<a class="bibtex reference internal" href="ref.html#dblp-journals-corr-liul17d" id="id8">[LL17]</a>.</p>
-<dl class="method">
-<dt id="mammoth.modules.structured_attention.MatrixTree.forward">
-<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">input</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/modules/structured_attention.html#MatrixTree.forward"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.modules.structured_attention.MatrixTree.forward" title="Permalink to this definition">¶</a></dt>
-<dd><p>Defines the computation performed at every call.</p>
-<p>Should be overridden by all subclasses.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>Although the recipe for forward pass needs to be defined within
-this function, one should call the <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code> instance afterwards
-instead of this since the former takes care of running the
-registered hooks while the latter silently ignores them.</p>
-</div>
-</dd></dl>
-
-</dd></dl>
-
 </div>
 </div>
 

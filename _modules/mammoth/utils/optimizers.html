@@ -288,21 +288,6 @@
                 <span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">weight_decay</span>
             <span class="p">)</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;sparseadam&#39;</span><span class="p">:</span>
-        <span class="n">encs</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="n">decs</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">param</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_parameters</span><span class="p">():</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="n">param</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">:</span>
-                <span class="k">continue</span>
-            <span class="c1"># TODO: Find a better way to check for sparse gradients.</span>
-            <span class="k">if</span> <span class="s1">&#39;decoder&#39;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
-                <span class="c1"># print(name)</span>
-                <span class="n">decs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">param</span><span class="p">)</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">encs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">param</span><span class="p">)</span>
-        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">MultipleOptimizer</span><span class="p">(</span>
-            <span class="p">[</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">encs</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">),</span> <span class="n">AdaFactorFairSeq</span><span class="p">(</span><span class="n">decs</span><span class="p">,</span> <span class="n">warmup_init</span><span class="o">=</span><span class="kc">True</span><span class="p">)]</span>
-        <span class="p">)</span>
     <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;fusedadam&#39;</span><span class="p">:</span>
         <span class="c1"># we use here a FusedAdam() copy of an old Apex repo</span>
         <span class="n">optimizer</span> <span class="o">=</span> <span class="n">FusedAdam</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">)</span>
@@ -389,7 +374,7 @@
 
 
 <span class="k">class</span> <span class="nc">MultipleOptimizer</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implement multiple optimizers needed for sparse adam&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Implement multiple optimizers&quot;&quot;&quot;</span>
 
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">,</span> <span class="n">multiOptims_Langs</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">optimizers</span> <span class="o">=</span> <span class="n">op</span>
@@ -911,11 +896,7 @@
                 <span class="k">if</span> <span class="n">grad</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="n">grad</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">grad</span><span class="o">.</span><span class="n">data</span>
                 <span class="k">if</span> <span class="n">grad</span><span class="o">.</span><span class="n">is_sparse</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                        <span class="s1">&#39;FusedAdam does not support sparse </span><span class="se">\</span>
-<span class="s1">                                       gradients, please consider </span><span class="se">\</span>
-<span class="s1">                                       SparseAdam instead&#39;</span>
-                    <span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s1">&#39;sparse gradient not supported&#39;</span><span class="p">)</span>
 
                 <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">state</span><span class="p">[</span><span class="n">p</span><span class="p">]</span>
 

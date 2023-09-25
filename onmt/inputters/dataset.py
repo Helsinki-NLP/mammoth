@@ -18,12 +18,15 @@ from onmt.inputters.vocab import Vocab
 class Batch():
     src: tuple  # of torch Tensors
     tgt: torch.Tensor
+    labels: torch.Tensor
     batch_size: int
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
         if self.tgt is not None:
             self.tgt = self.tgt.to(device)
+        if self.labels is not None:
+            self.labels = self.labels.to(device)
         return self
 
 
@@ -156,8 +159,16 @@ class ParallelCorpus(IterableDataset):
         tgt_padidx = self.vocabs['tgt'][DefaultTokens.PAD]
         src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
         src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx).unsqueeze(-1), src_lengths)
-        tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1) if has_tgt else None
-        batch = Batch(src, tgt, len(examples))
+        if has_tgt:
+            tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1)
+            if 'labels' not in examples[0].keys():
+                labels = tgt
+            else:
+                labels = pad_sequence([ex['labels'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1)
+        else:
+            tgt = None
+            labels = None
+        batch = Batch(src, tgt, labels, len(examples))
         return batch
 
 

@@ -465,7 +465,7 @@ class Trainer(object):
             seen_comm_batches.add(comm_batch)
             if self.norm_method == "tokens":
                 num_tokens = (
-                    batch.tgt[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
+                    batch.labels[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
                 )
                 normalization += num_tokens.item()
             else:
@@ -485,6 +485,9 @@ class Trainer(object):
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
 
+            # tgt_outer corresponds to the target-side input. The expected
+            # decoder output will be read directly from the batch:
+            # cf. `onmt.utils.loss.CommonLossCompute._make_shard_state`
             tgt_outer = batch.tgt
 
             bptt = False

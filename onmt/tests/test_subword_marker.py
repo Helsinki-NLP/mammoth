@@ -1,6 +1,6 @@
 import unittest
 
-from onmt.transforms.bart import word_start_finder
+from onmt.transforms.denoising import word_start_finder
 from onmt.utils.alignment import subword_map_by_joiner, subword_map_by_spacer
 from onmt.constants import SubwordMarker
 

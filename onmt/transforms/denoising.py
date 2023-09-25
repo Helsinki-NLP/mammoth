@@ -322,10 +322,13 @@ class BARTNoising(object):
         return '{}({})'.format(cls_name, cls_args)
 
 
-@register_transform(name='bart')
-class BARTNoiseTransform(Transform):
+@register_transform(name='denoising')
+class NoiseTransform(Transform):
     def __init__(self, opts):
+        if opts.random_ratio > 0 and opts.denoising_objective == 'mass':
+            raise ValueError('Random word replacement is incompatible with MASS')
         super().__init__(opts)
+        self.denoising_objective = opts.denoising_objective
 
     @classmethod
     def get_specials(cls, opts):
@@ -338,8 +341,8 @@ class BARTNoiseTransform(Transform):
 
     @classmethod
     def add_options(cls, parser):
-        """Avalilable options relate to BART."""
-        group = parser.add_argument_group("Transform/BART")
+        """Avalilable options relate to BART/MASS denoising."""
+        group = parser.add_argument_group("Transform/Denoising AE")
         group.add(
             "--permute_sent_ratio",
             "-permute_sent_ratio",
@@ -361,7 +364,7 @@ class BARTNoiseTransform(Transform):
             "-random_ratio",
             type=float,
             default=0.0,
-            help="Instead of using {}, use random token this often.".format(DefaultTokens.MASK),
+            help=f"Instead of using {DefaultTokens.MASK}, use random token this often. Incompatible with MASS",
         )
 
         group.add(
@@ -394,6 +397,13 @@ class BARTNoiseTransform(Transform):
             choices=[-1, 0, 1],
             help="When masking N tokens, replace with 0, 1, or N tokens. (use -1 for N)",
         )
+        group.add(
+            "--denoising_objective",
+            type=str,
+            default='bart',
+            choices=['bart', 'mass'],
+            help='choose between BART-style or MASS-style denoising objectives'
+        )
 
     @classmethod
     def require_vocab(cls):
@@ -424,12 +434,41 @@ class BARTNoiseTransform(Transform):
             is_joiner=is_joiner,
         )
 
-    def apply(self, example, is_train=False, stats=None, **kwargs):
+    def apply_bart(self, example, is_train=False, stats=None, **kwargs):
         """Apply BART noise to src side tokens."""
         if is_train:
             src = self.bart_noise.apply(example['src'])
             example['src'] = src
         return example
+
+    def apply_mass(self, example, is_train=False, stats=None, **kwargs):
+        """Apply BART noise to src side tokens, then complete as MASS scheme."""
+        if is_train:
+            masked = self.bart_noise.apply(example['src'])
+            complement_masked = [
+                DefaultTokens.MASK if masked_item != DefaultTokens.MASK
+                else source_item
+                for masked_item, source_item in zip(masked, example['src'])
+            ]
+            labels = [
+                DefaultTokens.PAD if cmasked_item == DefaultTokens.MASK
+                else cmasked_item
+                for cmasked_item in complement_masked
+            ]
+            example = {
+                'src': masked,
+                'tgt': complement_masked,
+                'labels': labels,
+            }
+        return example
+
+    def apply(self, example, is_train=False, stats=None, **kwargs):
+        if self.denoising_objective == 'bart':
+            return self.apply_bart(example, is_train=False, stats=None, **kwargs)
+        elif self.denoising_objective == 'mass':
+            return self.apply_mass(example, is_train=False, stats=None, **kwargs)
+        else:
+            raise NotImplementedError('Unknown denoising objective.')
 
     def _repr_args(self):
         """Return str represent key arguments for BART."""

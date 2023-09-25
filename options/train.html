@@ -258,10 +258,8 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">mask_length</span> <span class="p">{</span><span class="n">subword</span><span class="p">,</span><span class="n">word</span><span class="p">,</span><span class="n">span</span><span class="o">-</span><span class="n">poisson</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">poisson_lambda</span> <span class="n">POISSON_LAMBDA</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">replace_length</span> <span class="p">{</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">denoising_objective</span> <span class="p">{</span><span class="n">bart</span><span class="p">,</span><span class="n">mass</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">src_word_vec_size</span> <span class="n">SRC_WORD_VEC_SIZE</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">tgt_word_vec_size</span> <span class="n">TGT_WORD_VEC_SIZE</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">word_vec_size</span> <span class="n">WORD_VEC_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">share_decoder_embeddings</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">share_embeddings</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">position_encoding</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">update_vocab</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">share_decoder_embeddings</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">share_embeddings</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">position_encoding</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">update_vocab</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">feat_merge</span> <span class="p">{</span><span class="n">concat</span><span class="p">,</span><span class="nb">sum</span><span class="p">,</span><span class="n">mlp</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">feat_vec_size</span> <span class="n">FEAT_VEC_SIZE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">feat_vec_exponent</span> <span class="n">FEAT_VEC_EXPONENT</span><span class="p">]</span>
@@ -271,7 +269,7 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">decoder_type</span> <span class="p">{</span><span class="n">transformer</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">layers</span> <span class="n">LAYERS</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">enc_layers</span> <span class="n">ENC_LAYERS</span> <span class="p">[</span><span class="n">ENC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">dec_layers</span> <span class="n">DEC_LAYERS</span> <span class="p">[</span><span class="n">DEC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">rnn_size</span> <span class="n">RNN_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">pos_ffn_activation_fn</span> <span class="p">{</span><span class="n">relu</span><span class="p">,</span><span class="n">gelu</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">model_dim</span> <span class="n">MODEL_DIM</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">pos_ffn_activation_fn</span> <span class="p">{</span><span class="n">relu</span><span class="p">,</span><span class="n">gelu</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">bridge</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">bridge_extra_node</span> <span class="n">BRIDGE_EXTRA_NODE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">bidir_edges</span> <span class="n">BIDIR_EDGES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">state_dim</span> <span class="n">STATE_DIM</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">n_edge_types</span> <span class="n">N_EDGE_TYPES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">n_node</span> <span class="n">N_NODE</span><span class="p">]</span>
@@ -632,18 +630,6 @@
 <div class="section" id="Model-Embeddings">
 <h2>Model-Embeddings<a class="headerlink" href="#Model-Embeddings" title="Permalink to this headline">¶</a></h2>
 <dl class="option-list">
-<dt><kbd>--src_word_vec_size, -src_word_vec_size</kbd></dt>
-<dd><p>Word embedding size for src.</p>
-<p>Default: 500</p>
-</dd>
-<dt><kbd>--tgt_word_vec_size, -tgt_word_vec_size</kbd></dt>
-<dd><p>Word embedding size for tgt.</p>
-<p>Default: 500</p>
-</dd>
-<dt><kbd>--word_vec_size, -word_vec_size</kbd></dt>
-<dd><p>Word embedding size for src and tgt.</p>
-<p>Default: -1</p>
-</dd>
 <dt><kbd>--share_decoder_embeddings, -share_decoder_embeddings</kbd></dt>
 <dd><p>Use a shared weight matrix for the input and output word  embeddings in the decoder.</p>
 <p>Default: False</p>
@@ -723,7 +709,7 @@
 <dt><kbd>--dec_layers, -dec_layers</kbd></dt>
 <dd><p>Number of layers in each decoder</p>
 </dd>
-<dt><kbd>--rnn_size, -rnn_size</kbd></dt>
+<dt><kbd>--model_dim, -model_dim</kbd></dt>
 <dd><p>Size of rnn hidden states.</p>
 <p>Default: -1</p>
 </dd>

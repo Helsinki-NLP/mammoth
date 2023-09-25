@@ -451,14 +451,14 @@ def model_opts(parser):
     # group.add('--residual', '-residual',   action="store_true",
     #                     help="Add residual connections between RNN layers.")
 
-    group.add(
-        '--context_gate',
-        '-context_gate',
-        type=str,
-        default=None,
-        choices=['source', 'target', 'both'],
-        help="Type of context gate to use. Do not select for no context gate.",
-    )
+    # group.add(
+    #     '--context_gate',
+    #     '-context_gate',
+    #     type=str,
+    #     default=None,
+    #     choices=['source', 'target', 'both'],
+    #     help="Type of context gate to use. Do not select for no context gate.",
+    # )
 
     # The following options (bridge_extra_node to n_steps) are used
     # for training with --encoder_type ggnn (Gated Graph Neural Network).
@@ -501,7 +501,7 @@ def model_opts(parser):
         '-global_attention_function',
         type=str,
         default="softmax",
-        choices=["softmax", "sparsemax"],
+        choices=["softmax"],
     )
     group.add(
         '--self_attn_type',
@@ -569,10 +569,10 @@ def model_opts(parser):
         '--generator_function',
         '-generator_function',
         default="softmax",
-        choices=["softmax", "sparsemax"],
+        choices=["softmax"],
         help="Which function to use for generating "
         "probabilities over the target vocabulary (choices: "
-        "softmax, sparsemax)",
+        "softmax)",
     )
     group.add('--copy_attn_force', '-copy_attn_force', action="store_true", help='When available, train to copy.')
     group.add('--reuse_copy_attn', '-reuse_copy_attn', action="store_true", help="Reuse standard attention for copy")
@@ -844,7 +844,7 @@ def _add_train_general_opts(parser):
         '--optim',
         '-optim',
         default='sgd',
-        choices=['sgd', 'adagrad', 'adadelta', 'adam', 'adamw', 'sparseadam', 'adafactor', 'fusedadam'],
+        choices=['sgd', 'adagrad', 'adadelta', 'adam', 'adamw', 'adafactor', 'fusedadam'],
         help="Optimization method.",
     )
     group.add(

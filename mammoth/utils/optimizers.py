@@ -111,21 +111,6 @@ def build_torch_optimizer(model, opt, task_queue_manager):
                 params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
             )
         )
-    elif opt.optim == 'sparseadam':
-        encs = []
-        decs = []
-        for name, param in model.named_parameters():
-            if not param.requires_grad:
-                continue
-            # TODO: Find a better way to check for sparse gradients.
-            if 'decoder' in name:
-                # print(name)
-                decs.append(param)
-            else:
-                encs.append(param)
-        optimizer = MultipleOptimizer(
-            [optim.Adam(encs, lr=opt.learning_rate, betas=betas, eps=1e-9), AdaFactorFairSeq(decs, warmup_init=True)]
-        )
     elif opt.optim == 'fusedadam':
         # we use here a FusedAdam() copy of an old Apex repo
         optimizer = FusedAdam(params, lr=opt.learning_rate, betas=betas)
@@ -212,7 +197,7 @@ def linear_warmup_decay(step, warmup_steps, rate, train_steps):
 
 
 class MultipleOptimizer(object):
-    """Implement multiple optimizers needed for sparse adam"""
+    """Implement multiple optimizers"""
 
     def __init__(self, op, multiOptims_Langs=None):
         self.optimizers = op
@@ -734,11 +719,7 @@ class FusedAdam(torch.optim.Optimizer):
                 if grad is None:
                     grad = p.grad.data
                 if grad.is_sparse:
-                    raise RuntimeError(
-                        'FusedAdam does not support sparse \
-                                       gradients, please consider \
-                                       SparseAdam instead'
-                    )
+                    raise RuntimeError('sparse gradient not supported')
 
                 state = self.state[p]
 

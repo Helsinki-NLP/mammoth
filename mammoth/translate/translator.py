@@ -15,7 +15,6 @@ from mammoth.translate.beam_search import BeamSearch, BeamSearchLM
 from mammoth.translate.greedy_search import GreedySearch, GreedySearchLM
 from mammoth.utils.misc import tile, set_random_seed, report_matrix
 from mammoth.utils.alignment import extract_alignment, build_align_pharaoh
-from mammoth.modules.copy_generator import collapse_copy_scores
 from mammoth.constants import ModelTask, DefaultTokens
 from mammoth.inputters.dataset import ParallelCorpus
 from mammoth.inputters.dataloader import build_dataloader
@@ -670,39 +669,14 @@ class Inference(object):
         )
 
         # Generator forward.
-        if not self.copy_attn:
-            if "std" in dec_attn:
-                attn = dec_attn["std"]
-            else:
-                attn = None
-            log_probs = self.model.generator[f"generator_{self.task.tgt_lang}"](dec_out.squeeze(0))
-            # returns [(batch_size x beam_size) , vocab ] when 1 step
-            # or [ tgt_len, batch_size, vocab ] when full sentence
+        if "std" in dec_attn:
+            attn = dec_attn["std"]
         else:
-            attn = dec_attn["copy"]
-            scores = self.model.generator[f"generator_{self.task.tgt_lang}"](
-                dec_out.view(-1, dec_out.size(2)),
-                attn.view(-1, attn.size(2)),
-                src_map,
-            )
-            # here we have scores [tgt_lenxbatch, vocab] or [beamxbatch, vocab]
-            if batch_offset is None:
-                scores = scores.view(-1, batch.batch_size, scores.size(-1))
-                scores = scores.transpose(0, 1).contiguous()
-            else:
-                scores = scores.view(-1, self.beam_size, scores.size(-1))
-            scores = collapse_copy_scores(
-                scores,
-                batch,
-                self._tgt_vocab,
-                src_vocabs,
-                batch_dim=0,
-                batch_offset=batch_offset,
-            )
-            scores = scores.view(decoder_in.size(0), -1, scores.size(-1))
-            log_probs = scores.squeeze(0).log()
-            # returns [(batch_size x beam_size) , vocab ] when 1 step
-            # or [ tgt_len, batch_size, vocab ] when full sentence
+            attn = None
+        log_probs = self.model.generator[f"generator_{self.task.tgt_lang}"](dec_out.squeeze(0))
+        # returns [(batch_size x beam_size) , vocab ] when 1 step
+        # or [ tgt_len, batch_size, vocab ] when full sentence
+
         return log_probs, attn
 
     def translate_batch(self, batch, src_vocabs, attn_debug):

@@ -9,7 +9,6 @@ from mammoth.modules.util_class import Elementwise
 # from mammoth.utils.logging import logger
 
 # import bitsandbytes as bnb
-# from mammoth.modules.stable_embeddings import StableEmbedding
 
 
 class SequenceTooLongError(Exception):
@@ -66,7 +65,7 @@ class PositionalEncoding(nn.Module):
 class Embeddings(nn.Module):
     """Words embeddings for encoder/decoder.
 
-    Additionally includes ability to add sparse input features
+    Additionally includes ability to add input features
     based on "Linguistic Input Features Improve Neural Machine Translation"
     :cite:`sennrich2016linguistic`.
 
@@ -116,7 +115,6 @@ class Embeddings(nn.Module):
         feat_padding_idx=[],
         feat_vocab_sizes=[],
         dropout=0,
-        sparse=False,
         freeze_word_vecs=False,
     ):
         self._validate_args(feat_merge, feat_vocab_sizes, feat_vec_exponent, feat_vec_size, feat_padding_idx)
@@ -147,7 +145,7 @@ class Embeddings(nn.Module):
         # The embedding matrix look-up tables. The first look-up table
         # is for words. Subsequent ones are for features, if any exist.
         emb_params = zip(vocab_sizes, emb_dims, pad_indices)
-        embeddings = [nn.Embedding(vocab, dim, padding_idx=pad, sparse=sparse) for vocab, dim, pad in emb_params]
+        embeddings = [nn.Embedding(vocab, dim, padding_idx=pad) for vocab, dim, pad in emb_params]
         emb_luts = Elementwise(feat_merge, embeddings)
 
         # The final output size of word + feature vectors. This can vary

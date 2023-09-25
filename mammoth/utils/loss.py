@@ -7,8 +7,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import mammoth
-from mammoth.modules.sparse_losses import SparsemaxLoss
-from mammoth.modules.sparse_activations import LogSparsemax
 from mammoth.constants import ModelTask, DefaultTokens
 
 
@@ -35,16 +33,14 @@ def build_loss_compute(model, tgt_vocab, opt, train=True, generator=None):
         )
     elif opt.label_smoothing > 0 and train:
         criterion = LabelSmoothingLoss(opt.label_smoothing, len(tgt_vocab), ignore_index=padding_idx)
-    elif isinstance(generator[-1], LogSparsemax):  # elif isinstance(model.generator[-1], LogSparsemax):
-        criterion = SparsemaxLoss(ignore_index=padding_idx, reduction='sum')
     else:
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
 
     # if the loss function operates on vectors of raw logits instead of
     # probabilities, only the first part of the generator needs to be
-    # passed to the NMTLossCompute. At the moment, the only supported
-    # loss function of this kind is the sparsemax loss.
-    use_raw_logits = isinstance(criterion, SparsemaxLoss)
+    # passed to the NMTLossCompute. At the moment, there is no supported
+    # loss function of this kind.
+    use_raw_logits = False
     loss_gen = (
         generator[0] if use_raw_logits else generator
     )  # loss_gen = model.generator[0] if use_raw_logits else model.generator

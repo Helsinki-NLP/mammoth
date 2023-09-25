@@ -48,7 +48,6 @@ def build_embeddings(opt, vocab, for_encoder=True):
         dropout=opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
         word_padding_idx=word_padding_idx,
         word_vocab_size=len(vocab),
-        sparse=opt.optim == "sparseadam",
         freeze_word_vecs=freeze_word_vecs,
     )
     return emb
@@ -400,10 +399,7 @@ def build_only_dec(model_opt, tgt_emb, task_queue_manager):
 def build_generator(model_opt, n_tgts, tgt_emb):
     # Build Generator.
     assert not model_opt.copy_attn, 'copy_attn not supported'
-    if model_opt.generator_function == "sparsemax":
-        gen_func = mammoth.modules.sparse_activations.LogSparsemax(dim=-1)
-    else:
-        gen_func = nn.LogSoftmax(dim=-1)
+    gen_func = nn.LogSoftmax(dim=-1)
     generator = nn.Sequential(
         nn.Linear(model_opt.rnn_size, n_tgts), Cast(torch.float32), gen_func
     )

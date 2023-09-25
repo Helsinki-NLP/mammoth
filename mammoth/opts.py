@@ -1201,9 +1201,6 @@ def translate_opts(parser, dynamic=False):
     )  # noqa: E501
     group.add('--tgt', '-tgt', help='True target sequence (optional)')
     group.add(
-        '--tgt_prefix', '-tgt_prefix', action='store_true', help='Generate predictions using provided `-tgt` as prefix.'
-    )
-    group.add(
         '--shard_size',
         '-shard_size',
         type=int,
@@ -1254,6 +1251,19 @@ def translate_opts(parser, dynamic=False):
 
         # Adding options related to Transforms
         _add_dynamic_transform_opts(parser)
+
+        group.add(
+            "--src_prefix",
+            "-src_prefix",
+            default="",
+            help="The encoder prefix, i.e. language selector token",
+        )
+        group.add(
+            "--tgt_prefix",
+            "-tgt_prefix",
+            default="",
+            help="The decoder prefix (FIXME: does not work, but must be set nevertheless)",
+        )
 
 
 def build_bilingual_model(parser):

@@ -350,8 +350,6 @@ class Inference(object):
         if batch_size is None:
             raise ValueError("batch_size must be set")
 
-        if self.tgt_prefix and tgt is None:
-            raise ValueError("Prefix should be feed to tgt if -tgt_prefix.")
         #
         # data_iter = InferenceDataIterator(src, tgt, src_feats, transform)
         #
@@ -474,6 +472,7 @@ class Inference(object):
             transforms=transforms,  # I suppose you might want *some* transforms
             # batch_size=batch_size,
             # batch_type=batch_type,
+            task=self.task,
         ).to(self._dev)
 
         batches = build_dataloader(

@@ -20,9 +20,9 @@ def test_init_minimal():
             'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy', 'src_tgt': 'c-d'},
         }
     }
-    opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt)
-    task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
+    opts = Namespace(**opt_dict)
+    world_context = WorldContext.from_opts(opts)
+    task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
     assert world_context.is_gpu()
     assert world_context.is_distributed()
     assert len(task_queue_manager.tasks) == 2
@@ -95,15 +95,15 @@ def create_basic_task_queue_manager():
             },
         }
     }
-    opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt)
-    task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
-    return task_queue_manager, opt
+    opts = Namespace(**opt_dict)
+    world_context = WorldContext.from_opts(opts)
+    task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
+    return task_queue_manager, opts
 
 
 def test_init_basic():
-    global_task_queue_manager, opt = create_basic_task_queue_manager()
-    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opt=opt)
+    global_task_queue_manager, opts = create_basic_task_queue_manager()
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opts=opts)
     world_context = task_queue_manager.world_context
     assert world_context.is_gpu()
     assert world_context.is_distributed()
@@ -129,7 +129,7 @@ def test_create_all_distributed_groups():
             self.group_idx += 1
             return result
 
-    global_task_queue_manager, opt = create_basic_task_queue_manager()
+    global_task_queue_manager, opts = create_basic_task_queue_manager()
     all_groups = global_task_queue_manager.create_all_distributed_groups(new_group_func=MockGroup())
     assert all_groups == {
         'src_emb': OrderedDict({
@@ -157,8 +157,8 @@ def test_get_distributed_groups():
             self.group_idx += 1
             return result
 
-    global_task_queue_manager, opt = create_basic_task_queue_manager()
-    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opt=opt)
+    global_task_queue_manager, opts = create_basic_task_queue_manager()
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opts=opts)
     my_groups = task_queue_manager.get_distributed_groups(new_group_func=MockGroup())
     assert my_groups == {
         'encoder': OrderedDict({
@@ -196,10 +196,10 @@ def test_cpu_distributed_groups():
             },
         }
     }
-    opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt)
-    global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
-    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
+    opts = Namespace(**opt_dict)
+    world_context = WorldContext.from_opts(opts)
+    global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
     new_group_func = MagicMock().new_group_func
     my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)
     # No groups should be created when running on CPU
@@ -248,10 +248,10 @@ def test_distributed_groups_no_encoder_group():
             },
         }
     }
-    opt = Namespace(**opt_dict)
-    world_context = WorldContext.from_opt(opt)
-    global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
-    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
+    opts = Namespace(**opt_dict)
+    world_context = WorldContext.from_opts(opts)
+    global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
     new_group_func = MagicMock().new_group_func
     my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)
     # No groups should be created:
@@ -269,20 +269,20 @@ def test_distributed_groups_no_encoder_group():
 #         (side, lang): f'{side} {lang}' for (side, lang) in
 #         [('src', 'a'), ('src', 'c'), ('src', 'e'), ('tgt', 'b'), ('tgt', 'd')]
 #     }
-#     global_task_queue_manager, opt = create_basic_task_queue_manager()
-#     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
+#     global_task_queue_manager, opts = create_basic_task_queue_manager()
+#     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
 #     fields = task_queue_manager.get_fields('src', mock_fields)
 #     assert fields == [('src', 'a', None, 'src a')]
 #     fields = task_queue_manager.get_fields('tgt', mock_fields)
 #     assert fields == [('tgt', 'b', None, 'tgt b')]
 #
-#     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opt=opt)
+#     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opts=opts)
 #     fields = task_queue_manager.get_fields('src', mock_fields)
 #     assert fields == [('src', 'c', None, 'src c'), ('src', 'a', 'x', 'src a')]
 #     fields = task_queue_manager.get_fields('tgt', mock_fields)
 #     assert fields == [('tgt', 'd', None, 'tgt d')]
 #
-#     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=1, local_rank=0, opt=opt)
+#     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=1, local_rank=0, opts=opts)
 #     fields = task_queue_manager.get_fields('src', mock_fields)
 #     assert fields == [('src', 'e', None, 'src e')]
 #     fields = task_queue_manager.get_fields('tgt', mock_fields)
@@ -290,8 +290,8 @@ def test_distributed_groups_no_encoder_group():
 
 
 def test_basic_getters():
-    global_task_queue_manager, opt = create_basic_task_queue_manager()
-    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opt=opt)
+    global_task_queue_manager, opts = create_basic_task_queue_manager()
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
     encoders = list(task_queue_manager.get_encoders(0))
     assert encoders == ['x']
     decoders = list(task_queue_manager.get_decoders(0))
@@ -303,7 +303,7 @@ def test_basic_getters():
     generators = list(task_queue_manager.get_generators())
     assert generators == ['b']
 
-    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opt=opt)
+    task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opts=opts)
     encoders = list(task_queue_manager.get_encoders(0))
     assert encoders == ['xx', 'x']
     decoders = list(task_queue_manager.get_decoders(0))

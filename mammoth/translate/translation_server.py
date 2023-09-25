@@ -95,7 +95,7 @@ class CTranslate2Translator(object):
             self.translator.unload_model(to_cpu=True)
 
     @staticmethod
-    def convert_onmt_to_ct2_opts(ct2_translator_args, ct2_translate_batch_args, opt):
+    def convert_onmt_to_ct2_opts(ct2_translator_args, ct2_translate_batch_args, opts):
         def setdefault_if_exists_must_match(obj, name, value):
             if name in obj:
                 assert value == obj[name], (
@@ -115,18 +115,18 @@ class CTranslate2Translator(object):
             ct2_translator_args.setdefault(name, value)
 
         onmt_for_translator = {
-            "device": "cuda" if opt.cuda else "cpu",
-            "device_index": opt.gpu if opt.cuda else 0,
+            "device": "cuda" if opts.cuda else "cpu",
+            "device_index": opts.gpu if opts.cuda else 0,
         }
         for name, value in onmt_for_translator.items():
             setdefault_if_exists_must_match(ct2_translator_args, name, value)
 
         onmt_for_translate_batch_enforce = {
-            "beam_size": opt.beam_size,
-            "max_batch_size": opt.batch_size,
-            "num_hypotheses": opt.n_best,
-            "max_decoding_length": opt.max_length,
-            "min_decoding_length": opt.min_length,
+            "beam_size": opts.beam_size,
+            "max_batch_size": opts.batch_size,
+            "num_hypotheses": opts.n_best,
+            "max_decoding_length": opts.max_length,
+            "min_decoding_length": opts.min_length,
         }
         for name, value in onmt_for_translate_batch_enforce.items():
             setdefault_if_exists_must_match(ct2_translate_batch_args, name, value)
@@ -191,32 +191,32 @@ class TranslationServer(object):
             }
             kwargs = {k: v for (k, v) in kwargs.items() if v is not None}
             model_id = conf.get("id", None)
-            opt = conf["opt"]
-            opt["models"] = conf["models"]
-            self.preload_model(opt, model_id=model_id, **kwargs)
+            opts = conf["opts"]
+            opts["models"] = conf["models"]
+            self.preload_model(opts, model_id=model_id, **kwargs)
 
-    def clone_model(self, model_id, opt, timeout=-1):
+    def clone_model(self, model_id, opts, timeout=-1):
         """Clone a model `model_id`.
 
-        Different options may be passed. If `opt` is None, it will use the
+        Different options may be passed. If `opts` is None, it will use the
         same set of options
         """
         if model_id in self.models:
-            if opt is None:
-                opt = self.models[model_id].user_opt
-            opt["models"] = self.models[model_id].opt.models
-            return self.load_model(opt, timeout)
+            if opts is None:
+                opts = self.models[model_id].user_opt
+            opts["models"] = self.models[model_id].opts.models
+            return self.load_model(opts, timeout)
         else:
             raise ServerModelError("No such model '%s'" % str(model_id))
 
-    def load_model(self, opt, model_id=None, **model_kwargs):
+    def load_model(self, opts, model_id=None, **model_kwargs):
         """Load a model given a set of options"""
-        model_id = self.preload_model(opt, model_id=model_id, **model_kwargs)
+        model_id = self.preload_model(opts, model_id=model_id, **model_kwargs)
         load_time = self.models[model_id].load_time
 
         return model_id, load_time
 
-    def preload_model(self, opt, model_id=None, **model_kwargs):
+    def preload_model(self, opts, model_id=None, **model_kwargs):
         """Preloading the model: updating internal datastructure
 
         It will effectively load the model if `load` is set
@@ -230,7 +230,7 @@ class TranslationServer(object):
                 model_id += 1
             self.next_id = model_id + 1
         print("Pre-loading model %d" % model_id)
-        model = ServerModel(opt, model_id, **model_kwargs)
+        model = ServerModel(opts, model_id, **model_kwargs)
         self.models[model_id] = model
 
         return model_id
@@ -274,7 +274,7 @@ class ServerModel(object):
     """Wrap a model with server functionality.
 
     Args:
-        opt (dict): Options for the Translator
+        opts (dict): Options for the Translator
         model_id (int): Model ID
         preprocess_opt (list): Options for preprocess processus or None
         tokenizer_opt (dict): Options for the tokenizer or None
@@ -292,7 +292,7 @@ class ServerModel(object):
 
     def __init__(
         self,
-        opt,
+        opts,
         model_id,
         preprocess_opt=None,
         tokenizer_opt=None,
@@ -307,7 +307,7 @@ class ServerModel(object):
         ct2_translate_batch_args=None,
     ):
         self.model_root = model_root
-        self.opt = self.parse_opt(opt)
+        self.opts = self.parse_opt(opts)
         self.custom_opt = custom_opt
 
         self.model_id = model_id
@@ -322,20 +322,20 @@ class ServerModel(object):
         self.ct2_translate_batch_args = ct2_translate_batch_args
 
         self.unload_timer = None
-        self.user_opt = opt
+        self.user_opt = opts
         self.tokenizers = None
 
-        if len(self.opt.log_file) > 0:
-            log_file = os.path.join(model_root, self.opt.log_file)
+        if len(self.opts.log_file) > 0:
+            log_file = os.path.join(model_root, self.opts.log_file)
         else:
             log_file = None
-        self.logger = init_logger(log_file=log_file, log_file_level=self.opt.log_file_level, rotate=True)
+        self.logger = init_logger(log_file=log_file, log_file_level=self.opts.log_file_level, rotate=True)
 
         self.loading_lock = threading.Event()
         self.loading_lock.set()
         self.running_lock = threading.Semaphore(value=1)
 
-        set_random_seed(self.opt.seed, self.opt.cuda)
+        set_random_seed(self.opts.seed, self.opts.cuda)
 
         if self.preprocess_opt is not None:
             self.logger.info("Loading preprocessor")
@@ -370,14 +370,14 @@ class ServerModel(object):
             self.load(preload=True)
             self.stop_unload_timer()
 
-    def parse_opt(self, opt):
+    def parse_opt(self, opts):
         """Parse the option set passed by the user using `mammoth.opts`
 
         Args:
-            opt (dict): Options passed by the user
+            opts (dict): Options passed by the user
 
         Returns:
-            opt (argparse.Namespace): full set of options for the Translator
+            opts (argparse.Namespace): full set of options for the Translator
         """
 
         prec_argv = sys.argv
@@ -385,13 +385,13 @@ class ServerModel(object):
         parser = ArgumentParser()
         mammoth.opts.translate_opts(parser)
 
-        models = opt['models']
+        models = opts['models']
         if not isinstance(models, (list, tuple)):
             models = [models]
-        opt['models'] = [os.path.join(self.model_root, model) for model in models]
-        opt['src'] = "dummy_src"
+        opts['models'] = [os.path.join(self.model_root, model) for model in models]
+        opts['src'] = "dummy_src"
 
-        for (k, v) in opt.items():
+        for (k, v) in opts.items():
             if k == 'models':
                 sys.argv += ['-model']
                 sys.argv += [str(model) for model in v]
@@ -400,12 +400,12 @@ class ServerModel(object):
             else:
                 sys.argv += ['-%s' % k, str(v)]
 
-        opt = parser.parse_args()
-        ArgumentParser.validate_translate_opts(opt)
-        opt.cuda = opt.gpu > -1
+        opts = parser.parse_args()
+        ArgumentParser.validate_translate_opts(opts)
+        opts.cuda = opts.gpu > -1
 
         sys.argv = prec_argv
-        return opt
+        return opts
 
     @property
     def loaded(self):
@@ -421,18 +421,18 @@ class ServerModel(object):
         try:
             if self.ct2_model is not None:
                 CTranslate2Translator.convert_onmt_to_ct2_opts(
-                    self.ct2_translator_args, self.ct2_translate_batch_args, self.opt
+                    self.ct2_translator_args, self.ct2_translate_batch_args, self.opts
                 )
                 self.translator = CTranslate2Translator(
                     self.ct2_model,
                     ct2_translator_args=self.ct2_translator_args,
                     ct2_translate_batch_args=self.ct2_translate_batch_args,
-                    target_prefix=self.opt.tgt_prefix,
+                    target_prefix=self.opts.tgt_prefix,
                     preload=preload,
                 )
             else:
                 self.translator = build_translator(
-                    self.opt, report_score=False, out_file=codecs.open(os.devnull, "w", "utf-8")
+                    self.opts, report_score=False, out_file=codecs.open(os.devnull, "w", "utf-8")
                 )
         except RuntimeError as e:
             raise ServerModelError("Runtime Error: %s" % str(e))
@@ -470,7 +470,7 @@ class ServerModel(object):
             if not self.loaded:
                 self.load()
                 timer.tick(name="load")
-            elif self.opt.cuda:
+            elif self.opts.cuda:
                 self.to_gpu()
                 timer.tick(name="to_gpu")
 
@@ -517,14 +517,14 @@ class ServerModel(object):
                 scores, predictions = self.translator.translate(
                     texts_to_translate,
                     tgt=texts_ref,
-                    batch_size=len(texts_to_translate) if self.opt.batch_size == 0 else self.opt.batch_size,
+                    batch_size=len(texts_to_translate) if self.opts.batch_size == 0 else self.opts.batch_size,
                 )
             except (RuntimeError, Exception) as e:
                 err = "Error: %s" % str(e)
                 self.logger.error(err)
                 self.logger.error("repr(text_to_translate): " + repr(texts_to_translate))
                 self.logger.error("model: #%s" % self.model_id)
-                self.logger.error("model opt: " + str(self.opt.__dict__))
+                self.logger.error("model opts: " + str(self.opts.__dict__))
                 self.logger.error(traceback.format_exc())
 
                 raise ServerModelError(err)
@@ -541,7 +541,7 @@ class ServerModel(object):
         def flatten_list(_list):
             return sum(_list, [])
 
-        tiled_texts = [t for t in texts_to_translate for _ in range(self.opt.n_best)]
+        tiled_texts = [t for t in texts_to_translate for _ in range(self.opts.n_best)]
         results = flatten_list(predictions)
 
         def maybe_item(x):
@@ -556,24 +556,24 @@ class ServerModel(object):
 
         # build back results with empty texts
         for i in empty_indices:
-            j = i * self.opt.n_best
-            results = results[:j] + [""] * self.opt.n_best + results[j:]
-            aligns = aligns[:j] + [None] * self.opt.n_best + aligns[j:]
-            scores = scores[:j] + [0] * self.opt.n_best + scores[j:]
+            j = i * self.opts.n_best
+            results = results[:j] + [""] * self.opts.n_best + results[j:]
+            aligns = aligns[:j] + [None] * self.opts.n_best + aligns[j:]
+            scores = scores[:j] + [0] * self.opts.n_best + scores[j:]
 
         rebuilt_segs, scores, aligns = self.rebuild_seg_packages(
-            all_preprocessed, results, scores, aligns, self.opt.n_best
+            all_preprocessed, results, scores, aligns, self.opts.n_best
         )
 
         results = [self.maybe_postprocess(seg) for seg in rebuilt_segs]
 
-        head_spaces = [h for h in head_spaces for i in range(self.opt.n_best)]
-        tail_spaces = [h for h in tail_spaces for i in range(self.opt.n_best)]
+        head_spaces = [h for h in head_spaces for i in range(self.opts.n_best)]
+        tail_spaces = [h for h in tail_spaces for i in range(self.opts.n_best)]
         results = ["".join(items) for items in zip(head_spaces, results, tail_spaces)]
 
         self.logger.info("Translation Results: %d", len(results))
 
-        return results, scores, self.opt.n_best, timer.times, aligns
+        return results, scores, self.opts.n_best, timer.times, aligns
 
     def rebuild_seg_packages(self, all_preprocessed, results, scores, aligns, n_best):
         """
@@ -618,7 +618,7 @@ class ServerModel(object):
     def unload(self):
         self.logger.info("Unloading model %d" % self.model_id)
         del self.translator
-        if self.opt.cuda:
+        if self.opts.cuda:
             torch.cuda.empty_cache()
         self.stop_unload_timer()
         self.unload_timer = None
@@ -639,7 +639,7 @@ class ServerModel(object):
         hide_opt = ["models", "src"]
         d = {
             "model_id": self.model_id,
-            "opt": {k: self.user_opt[k] for k in self.user_opt.keys() if k not in hide_opt},
+            "opts": {k: self.user_opt[k] for k in self.user_opt.keys() if k not in hide_opt},
             "models": self.user_opt["models"],
             "loaded": self.loaded,
             "timeout": self.timeout,
@@ -655,7 +655,7 @@ class ServerModel(object):
             self.translator.to_cpu()
         else:
             self.translator.model.cpu()
-            if self.opt.cuda:
+            if self.opts.cuda:
                 torch.cuda.empty_cache()
 
     def to_gpu(self):
@@ -663,7 +663,7 @@ class ServerModel(object):
         if type(self.translator) == CTranslate2Translator:
             self.translator.to_gpu()
         else:
-            torch.cuda.set_device(self.opt.gpu)
+            torch.cuda.set_device(self.opts.gpu)
             self.translator.model.cuda()
 
     def maybe_preprocess(self, sequence):
@@ -785,7 +785,7 @@ class ServerModel(object):
                 sorted or None if no alignment in output.
         """
         align = None
-        if self.opt.report_align:
+        if self.opts.report_align:
             # output contain alignment
             sequence, align = sequence.split(DefaultTokens.ALIGNMENT_SEPARATOR)
             if align != '':

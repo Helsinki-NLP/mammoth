@@ -133,20 +133,20 @@ class TransformerEncoder(EncoderBase):
         self.layer_norm = layer_norm_module
 
     @classmethod
-    def from_opt(cls, opt, embeddings, is_on_top=False):
+    def from_opts(cls, opts, embeddings, is_on_top=False):
         """Alternate constructor."""
         return cls(
-            opt.enc_layers,
-            opt.rnn_size,
-            opt.heads,
-            opt.transformer_ff,
-            opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
-            opt.attention_dropout[0] if type(opt.attention_dropout) is list else opt.attention_dropout,
+            opts.enc_layers,
+            opts.rnn_size,
+            opts.heads,
+            opts.transformer_ff,
+            opts.dropout[0] if type(opts.dropout) is list else opts.dropout,
+            opts.attention_dropout[0] if type(opts.attention_dropout) is list else opts.attention_dropout,
             embeddings,
-            opt.max_relative_positions,
-            pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
+            opts.max_relative_positions,
+            pos_ffn_activation_fn=opts.pos_ffn_activation_fn,
             layer_norm_module=(
-                nn.LayerNorm(opt.rnn_size, eps=1e-6) if is_on_top
+                nn.LayerNorm(opts.rnn_size, eps=1e-6) if is_on_top
                 else nn.Identity()
             )
         )

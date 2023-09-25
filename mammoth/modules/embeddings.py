@@ -338,12 +338,12 @@ def convert_to_torch_tensor(word_to_float_list_dict, vocab):
     return tensor
 
 # FIXME: seems it got nuked during the great refactoring of data
-# def prepare_pretrained_embeddings(opt, fields):
-#     if all([opt.both_embeddings is None, opt.src_embeddings is None, opt.tgt_embeddings is None]):
+# def prepare_pretrained_embeddings(opts, fields):
+#     if all([opts.both_embeddings is None, opts.src_embeddings is None, opts.tgt_embeddings is None]):
 #         return
 #
 #     assert (
-#         opt.save_data
+#         opts.save_data
 #     ), "-save_data is required when using \
 #         pretrained embeddings."
 #
@@ -356,42 +356,42 @@ def convert_to_torch_tensor(word_to_float_list_dict, vocab):
 #         vocs.append(vocab)
 #     enc_vocab, dec_vocab = vocs
 #
-#     skip_lines = 1 if opt.embeddings_type == "word2vec" else 0
-#     if opt.both_embeddings is not None:
+#     skip_lines = 1 if opts.embeddings_type == "word2vec" else 0
+#     if opts.both_embeddings is not None:
 #         set_of_src_and_tgt_vocab = set(enc_vocab.stoi.keys()) | set(dec_vocab.stoi.keys())
-#         logger.info("Reading encoder and decoder embeddings from {}".format(opt.both_embeddings))
-#         src_vectors, total_vec_count = read_embeddings(opt.both_embeddings, skip_lines, set_of_src_and_tgt_vocab)
+#         logger.info("Reading encoder and decoder embeddings from {}".format(opts.both_embeddings))
+#         src_vectors, total_vec_count = read_embeddings(opts.both_embeddings, skip_lines, set_of_src_and_tgt_vocab)
 #         tgt_vectors = src_vectors
 #         logger.info("\tFound {} total vectors in file".format(total_vec_count))
 #     else:
-#         if opt.src_embeddings is not None:
-#             logger.info("Reading encoder embeddings from {}".format(opt.src_embeddings))
-#             src_vectors, total_vec_count = read_embeddings(opt.src_embeddings, skip_lines, filter_set=enc_vocab.stoi)
+#         if opts.src_embeddings is not None:
+#             logger.info("Reading encoder embeddings from {}".format(opts.src_embeddings))
+#             src_vectors, total_vec_count = read_embeddings(opts.src_embeddings, skip_lines, filter_set=enc_vocab.stoi)
 #             logger.info("\tFound {} total vectors in file.".format(total_vec_count))
 #         else:
 #             src_vectors = None
-#         if opt.tgt_embeddings is not None:
-#             logger.info("Reading decoder embeddings from {}".format(opt.tgt_embeddings))
-#             tgt_vectors, total_vec_count = read_embeddings(opt.tgt_embeddings, skip_lines, filter_set=dec_vocab.stoi)
+#         if opts.tgt_embeddings is not None:
+#             logger.info("Reading decoder embeddings from {}".format(opts.tgt_embeddings))
+#             tgt_vectors, total_vec_count = read_embeddings(opts.tgt_embeddings, skip_lines, filter_set=dec_vocab.stoi)
 #             logger.info("\tFound {} total vectors in file".format(total_vec_count))
 #         else:
 #             tgt_vectors = None
 #     logger.info("After filtering to vectors in vocab:")
-#     if opt.src_embeddings is not None or opt.both_embeddings is not None:
+#     if opts.src_embeddings is not None or opts.both_embeddings is not None:
 #         logger.info("\t* enc: %d match, %d missing, (%.2f%%)" % calc_vocab_load_stats(enc_vocab, src_vectors))
-#     if opt.tgt_embeddings is not None or opt.both_embeddings is not None:
+#     if opts.tgt_embeddings is not None or opts.both_embeddings is not None:
 #         logger.info("\t* dec: %d match, %d missing, (%.2f%%)" % calc_vocab_load_stats(dec_vocab, tgt_vectors))
 #
 #     # Write to file
-#     enc_output_file = opt.save_data + ".enc_embeddings.pt"
-#     dec_output_file = opt.save_data + ".dec_embeddings.pt"
-#     if opt.src_embeddings is not None or opt.both_embeddings is not None:
+#     enc_output_file = opts.save_data + ".enc_embeddings.pt"
+#     dec_output_file = opts.save_data + ".dec_embeddings.pt"
+#     if opts.src_embeddings is not None or opts.both_embeddings is not None:
 #         logger.info("\nSaving encoder embeddings as:\n\t* enc: %s" % enc_output_file)
 #         torch.save(convert_to_torch_tensor(src_vectors, enc_vocab), enc_output_file)
-#         # set the opt in place
-#         opt.pre_word_vecs_enc = enc_output_file
-#     if opt.tgt_embeddings is not None or opt.both_embeddings is not None:
+#         # set the opts in place
+#         opts.pre_word_vecs_enc = enc_output_file
+#     if opts.tgt_embeddings is not None or opts.both_embeddings is not None:
 #         logger.info("\nSaving decoder embeddings as:\n\t* dec: %s" % dec_output_file)
 #         torch.save(convert_to_torch_tensor(tgt_vectors, dec_vocab), dec_output_file)
-#         # set the opt in place
-#         opt.pre_word_vecs_dec = dec_output_file
+#         # set the opts in place
+#         opts.pre_word_vecs_dec = dec_output_file

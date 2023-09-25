@@ -72,7 +72,7 @@ class PrefixTransform(Transform):
     def get_prefix_dict(cls, opts):
         """Get all needed prefix correspond to corpus in `opts`."""
         prefix_dict = {}
-        for c_name, corpus in opts.data.items():
+        for c_name, corpus in opts.tasks.items():
             prefix = cls._get_prefix(corpus)
             if prefix is not None:
                 logger.info(f"Get prefix for {c_name}: {prefix}")

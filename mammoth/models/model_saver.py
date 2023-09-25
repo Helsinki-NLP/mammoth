@@ -8,13 +8,13 @@ import torch.nn as nn
 from mammoth.utils.module_splitter import explode_model
 
 
-def build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context):
+def build_model_saver(model_opt, opts, model, vocabs_dict, optim, device_context):
     # _check_save_model_path
-    save_model_path = os.path.abspath(opt.save_model)
+    save_model_path = os.path.abspath(opts.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opt.save_model, model, model_opt, vocabs_dict, optim, opt.keep_checkpoint, device_context, opt.save_all_gpus
+        opts.save_model, model, model_opt, vocabs_dict, optim, opts.keep_checkpoint, device_context, opts.save_all_gpus
     )
     return model_saver
 
@@ -129,7 +129,7 @@ class ModelSaver(ModelSaverBase):
             "model": model_state_dict,
             # 'generator': generator_state_dict,
             "vocab": self.vocabs_dict,
-            "opt": self.model_opt,
+            "opts": self.model_opt,
             "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
             "whole_model": self.model,
         }

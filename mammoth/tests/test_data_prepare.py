@@ -27,11 +27,11 @@
 #         '-tgt_vocab', 'data/vocab-train.tgt'
 #     ]
 #
-#     opt = parser.parse_known_args(default_opts)[0]
+#     opts = parser.parse_known_args(default_opts)[0]
 #     # Inject some dummy training options that may needed when build fields
-#     opt.copy_attn = False
-#     ArgumentParser.validate_prepare_opts(opt)
-#     return opt
+#     opts.copy_attn = False
+#     ArgumentParser.validate_prepare_opts(opts)
+#     return opts
 #
 #
 # default_opts = get_default_opts()
@@ -40,15 +40,15 @@
 # class TestData(unittest.TestCase):
 #     def __init__(self, *args, **kwargs):
 #         super(TestData, self).__init__(*args, **kwargs)
-#         self.opt = default_opts
+#         self.opts = default_opts
 #
-#     def dataset_build(self, opt):
+#     def dataset_build(self, opts):
 #         try:
-#             prepare_fields_transforms(opt)
+#             prepare_fields_transforms(opts)
 #         except SystemExit as err:
 #             print(err)
 #         except IOError as err:
-#             if opt.skip_empty_level != 'error':
+#             if opts.skip_empty_level != 'error':
 #                 raise err
 #             else:
 #                 print(f"Catched IOError: {err}")
@@ -56,10 +56,10 @@
 #             # Remove the generated *pt files.
 #             for pt in glob.glob(SAVE_DATA_PREFIX + '*.pt'):
 #                 os.remove(pt)
-#             if self.opt.save_data:
+#             if self.opts.save_data:
 #                 # Remove the generated data samples
 #                 sample_path = os.path.join(
-#                     os.path.dirname(self.opt.save_data),
+#                     os.path.dirname(self.opts.save_data),
 #                     CorpusName.SAMPLE)
 #                 if os.path.exists(sample_path):
 #                     for f in glob.glob(sample_path + '/*'):
@@ -78,12 +78,12 @@
 #
 #     def test_method(self):
 #         if param_setting:
-#             opt = copy.deepcopy(self.opt)
+#             opts = copy.deepcopy(self.opts)
 #             for param, setting in param_setting:
-#                 setattr(opt, param, setting)
+#                 setattr(opts, param, setting)
 #         else:
-#             opt = self.opt
-#         getattr(self, methodname)(opt)
+#             opts = self.opts
+#         getattr(self, methodname)(opts)
 #     if param_setting:
 #         name = 'test_' + methodname + "_" + "_".join(
 #             str(param_setting).split())

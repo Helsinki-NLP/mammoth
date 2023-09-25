@@ -16,9 +16,9 @@ class TestServerModel(unittest.TestCase):
     @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_deferred_loading_model_and_unload(self):
         model_id = 0
-        opt = {"models": ["test_model.pt"]}
+        opts = {"models": ["test_model.pt"]}
         model_root = TEST_DIR
-        sm = ServerModel(opt, model_id, model_root=model_root, load=False)
+        sm = ServerModel(opts, model_id, model_root=model_root, load=False)
         self.assertFalse(sm.loaded)
         sm.load()
         self.assertTrue(sm.loaded)
@@ -29,9 +29,9 @@ class TestServerModel(unittest.TestCase):
     @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_load_model_on_init_and_unload(self):
         model_id = 0
-        opt = {"models": ["test_model.pt"]}
+        opts = {"models": ["test_model.pt"]}
         model_root = TEST_DIR
-        sm = ServerModel(opt, model_id, model_root=model_root, load=True)
+        sm = ServerModel(opts, model_id, model_root=model_root, load=True)
         self.assertTrue(sm.loaded)
         self.assertIsInstance(sm.translator, Translator)
         sm.unload()
@@ -40,18 +40,18 @@ class TestServerModel(unittest.TestCase):
     @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_tokenizing_with_no_tokenizer_fails(self):
         model_id = 0
-        opt = {"models": ["test_model.pt"]}
+        opts = {"models": ["test_model.pt"]}
         model_root = TEST_DIR
-        sm = ServerModel(opt, model_id, model_root=model_root, load=True)
+        sm = ServerModel(opts, model_id, model_root=model_root, load=True)
         with self.assertRaises(ValueError):
             sm.tokenize("hello world")
 
     @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_detokenizing_with_no_tokenizer_fails(self):
         model_id = 0
-        opt = {"models": ["test_model.pt"]}
+        opts = {"models": ["test_model.pt"]}
         model_root = TEST_DIR
-        sm = ServerModel(opt, model_id, model_root=model_root, load=True)
+        sm = ServerModel(opts, model_id, model_root=model_root, load=True)
         with self.assertRaises(ValueError):
             sm.detokenize("hello world")
 
@@ -60,9 +60,9 @@ class TestServerModel(unittest.TestCase):
         def test_moving_to_gpu_and_back(self):
             torch.cuda.set_device(torch.device("cuda", 0))
             model_id = 0
-            opt = {"models": ["test_model.pt"]}
+            opts = {"models": ["test_model.pt"]}
             model_root = TEST_DIR
-            sm = ServerModel(opt, model_id, model_root=model_root, load=True)
+            sm = ServerModel(opts, model_id, model_root=model_root, load=True)
             for p in sm.translator.model.parameters():
                 self.assertEqual(p.device.type, "cpu")
             sm.to_gpu()
@@ -76,9 +76,9 @@ class TestServerModel(unittest.TestCase):
         def test_initialize_on_gpu_and_move_back(self):
             torch.cuda.set_device(torch.device("cuda", 0))
             model_id = 0
-            opt = {"models": ["test_model.pt"], "gpu": 0}
+            opts = {"models": ["test_model.pt"], "gpu": 0}
             model_root = TEST_DIR
-            sm = ServerModel(opt, model_id, model_root=model_root, load=True)
+            sm = ServerModel(opts, model_id, model_root=model_root, load=True)
             for p in sm.translator.model.parameters():
                 self.assertEqual(p.device.type, "cuda")
                 self.assertEqual(p.device.index, 0)
@@ -95,9 +95,9 @@ class TestServerModel(unittest.TestCase):
             def test_initialize_on_nonzero_gpu_and_back(self):
                 torch.cuda.set_device(torch.device("cuda", 1))
                 model_id = 0
-                opt = {"models": ["test_model.pt"], "gpu": 1}
+                opts = {"models": ["test_model.pt"], "gpu": 1}
                 model_root = TEST_DIR
-                sm = ServerModel(opt, model_id, model_root=model_root, load=True)
+                sm = ServerModel(opts, model_id, model_root=model_root, load=True)
                 for p in sm.translator.model.parameters():
                     self.assertEqual(p.device.type, "cuda")
                     self.assertEqual(p.device.index, 1)
@@ -112,9 +112,9 @@ class TestServerModel(unittest.TestCase):
     @unittest.skip('Broken in FoTraNMT')  # FIXME
     def test_run(self):
         model_id = 0
-        opt = {"models": ["test_model.pt"]}
+        opts = {"models": ["test_model.pt"]}
         model_root = TEST_DIR
-        sm = ServerModel(opt, model_id, model_root=model_root, load=True)
+        sm = ServerModel(opts, model_id, model_root=model_root, load=True)
         inp = [{"src": "hello how are you today"}, {"src": "good morning to you ."}]
         results, scores, n_best, time, aligns = sm.run(inp)
         self.assertIsInstance(results, list)
@@ -160,7 +160,7 @@ class TestTranslationServer(unittest.TestCase):
                     "timeout": -1,
                     "on_timeout": "to_cpu",
                     "load": false,
-                    "opt": {
+                    "opts": {
                         "beam_size": 5
                     }
                 }
@@ -188,7 +188,7 @@ class TestTranslationServer(unittest.TestCase):
                     "timeout": -1,
                     "on_timeout": "to_cpu",
                     "load": true,
-                    "opt": {
+                    "opts": {
                         "beam_size": 5
                     }
                 }
@@ -217,7 +217,7 @@ class TestTranslationServer(unittest.TestCase):
                     "timeout": -1,
                     "on_timeout": "to_cpu",
                     "load": true,
-                    "opt": {
+                    "opts": {
                         "beam_size": 5
                     }
                 },
@@ -227,7 +227,7 @@ class TestTranslationServer(unittest.TestCase):
                     "timeout": -1,
                     "on_timeout": "to_cpu",
                     "load": false,
-                    "opt": {
+                    "opts": {
                         "beam_size": 5
                     }
                 }

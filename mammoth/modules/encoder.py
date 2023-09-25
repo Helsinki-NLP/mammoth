@@ -31,7 +31,7 @@ class EncoderBase(nn.Module):
     """
 
     @classmethod
-    def from_opt(cls, opt, embeddings=None):
+    def from_opts(cls, opts, embeddings=None):
         raise NotImplementedError
 
     def _check_args(self, src, lengths=None, hidden=None):

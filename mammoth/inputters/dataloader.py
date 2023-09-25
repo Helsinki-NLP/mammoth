@@ -242,7 +242,7 @@ class DynamicDatasetIter(object):
         return cls(
             task_queue_manager,
             opts,
-            opts.data,
+            opts.tasks,
             transforms_cls,
             vocabs_dict,
             is_train,
@@ -275,7 +275,7 @@ class DynamicDatasetIter(object):
             # Case 2: we are validation (hence self.is_train := False), we need an iterator
             # if and only the task defines validation data, i.e. if the key `path_valid_src`
             # is defined
-            if self.is_train or self.opts.data[task.corpus_id].get('path_valid_src', None) is not None:
+            if self.is_train or self.opts.tasks[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
                     self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
                 ).to(device)

@@ -120,13 +120,13 @@ class EnsembleModel(NMTModel):
         self.models = nn.ModuleList(models)
 
 
-def load_test_model(opt):
+def load_test_model(opts):
     """Read in multiple models for ensemble."""
     shared_vocabs = None
     shared_model_opt = None
     models = []
-    for model_path in opt.models:
-        vocabs, model, model_opt = mammoth.model_builder.load_test_multitask_model(opt, model_path=model_path)
+    for model_path in opts.models:
+        vocabs, model, model_opt = mammoth.model_builder.load_test_multitask_model(opts, model_path=model_path)
         if shared_vocabs is None:
             shared_vocabs = vocabs
         else:
@@ -138,5 +138,5 @@ def load_test_model(opt):
         models.append(model)
         if shared_model_opt is None:
             shared_model_opt = model_opt
-    ensemble_model = EnsembleModel(models, opt.avg_raw_probs)
+    ensemble_model = EnsembleModel(models, opts.avg_raw_probs)
     return shared_vocabs, ensemble_model, shared_model_opt

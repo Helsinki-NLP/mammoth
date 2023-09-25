@@ -25,7 +25,7 @@ class TaskDistributionStrategy(ABC):
 
     @classmethod
     @abstractmethod
-    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
+    def from_opts(cls, my_corpus_ids: List[str], opts: dict):
         pass
 
     @abstractmethod
@@ -64,10 +64,10 @@ class WeightedSamplingTaskDistributionStrategy(TaskDistributionStrategy):
             raise ValueError('Invalid curriculum: no corpus is ready to start in the first step')
 
     @classmethod
-    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
-        my_weights = [opt.data[corpus_id]['weight'] for corpus_id in my_corpus_ids]
+    def from_opts(cls, my_corpus_ids: List[str], opts: dict):
+        my_weights = [opts.tasks[corpus_id]['weight'] for corpus_id in my_corpus_ids]
         my_introduce_at_training_step = [
-            opt.data[corpus_id]['introduce_at_training_step'] for corpus_id in my_corpus_ids
+            opts.tasks[corpus_id]['introduce_at_training_step'] for corpus_id in my_corpus_ids
         ]
         return cls(my_corpus_ids, my_weights, my_introduce_at_training_step)
 
@@ -101,7 +101,7 @@ class RoundRobinTaskDistributionStrategy(TaskDistributionStrategy):
         self.infinite_corpus_ids = cycle(my_corpus_ids)
 
     @classmethod
-    def from_opt(cls, my_corpus_ids: List[str], opt: dict):
+    def from_opts(cls, my_corpus_ids: List[str], opts: dict):
         return cls(my_corpus_ids)
 
     def sample_corpus_ids(
@@ -156,10 +156,10 @@ class TaskSpecs():
         )
 
 
-def get_adapter_ids(opt, corpus_opt, side):
-    if 'adapters' not in opt or 'adapters' not in corpus_opt:
+def get_adapter_ids(opts, corpus_opt, side):
+    if 'adapters' not in opts or 'adapters' not in corpus_opt:
         return []
-    global_adapters_opt = opt.adapters.get(side, None)
+    global_adapters_opt = opts.adapters.get(side, None)
     corpus_adapter_opt = corpus_opt['adapters'].get(side, None)
     if not global_adapters_opt or not corpus_adapter_opt:
         return []
@@ -229,17 +229,17 @@ class TaskQueueManager:
         return self.device_context.local_rank
 
     @classmethod
-    def from_opt(cls, opt: Namespace, world_context: WorldContext):
-        n_tasks = len(opt.data)
+    def from_opts(cls, opts: Namespace, world_context: WorldContext):
+        n_tasks = len(opts.tasks)
 
         # Sorting the keys, to ensure that tasks have a consistent order across devices.
         # This in turn ensures the order in which components are created from those tasks.
-        corpus_ids = sorted(opt.data.keys())
+        corpus_ids = sorted(opts.tasks.keys())
 
         if world_context.is_distributed():
-            if any(task.get('node_gpu', None) is not None for task in opt.data.values()):
+            if any(task.get('node_gpu', None) is not None for task in opts.tasks.values()):
                 node_gpu = [
-                    tuple(int(y) for y in opt.data[corpus_id]['node_gpu'].split(':', 1))
+                    tuple(int(y) for y in opts.tasks[corpus_id]['node_gpu'].split(':', 1))
                     for corpus_id in corpus_ids]
             else:
                 # When --node_gpu is not set, assume an assigment that fills gpus in rank order
@@ -248,24 +248,24 @@ class TaskQueueManager:
             node_gpu = [(0, 0)] * n_tasks
 
         enc_sharing_group = [
-            opt.data[corpus_id].get('enc_sharing_group', None) for corpus_id in corpus_ids
+            opts.tasks[corpus_id].get('enc_sharing_group', None) for corpus_id in corpus_ids
         ]
         dec_sharing_group = [
-            opt.data[corpus_id].get('dec_sharing_group', None) for corpus_id in corpus_ids
+            opts.tasks[corpus_id].get('dec_sharing_group', None) for corpus_id in corpus_ids
         ]
         if any(x is not None for x in enc_sharing_group):
-            assert all(len(enc_ids) == len(opt.enc_layers) for enc_ids in enc_sharing_group)
+            assert all(len(enc_ids) == len(opts.enc_layers) for enc_ids in enc_sharing_group)
         else:
             # if no encoder sharing groups are defined,
             # it is assumed that there is only one encoder stack and it is language specific
-            if not len(opt.enc_layers) == 1:
+            if not len(opts.enc_layers) == 1:
                 raise Exception('With more than one encoder stack, you must explictly define enc_sharing_group')
         if any(x is not None for x in dec_sharing_group):
-            assert all(len(dec_ids) == len(opt.dec_layers) for dec_ids in dec_sharing_group)
+            assert all(len(dec_ids) == len(opts.dec_layers) for dec_ids in dec_sharing_group)
         else:
             # if no decoder sharing groups are defined,
             # it is assumed that there is only one decoder stack and it is language specific
-            if not len(opt.dec_layers) == 1:
+            if not len(opts.dec_layers) == 1:
                 raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
 
         tasks = []
@@ -277,14 +277,14 @@ class TaskQueueManager:
             node_gpu,
             corpus_ids
         ):
-            corpus_opt = opt.data[corpus_id]
+            corpus_opt = opts.tasks[corpus_id]
             src_lang, tgt_lang = corpus_opt['src_tgt'].split('-', 1)
             encoder_id = corpus_opt.get('enc_sharing_group', [src_lang])
             decoder_id = corpus_opt.get('dec_sharing_group', [tgt_lang])
             weight = corpus_opt.get('weight', 1.0)
             if 'adapters' in corpus_opt:
-                encoder_adapter_ids = get_adapter_ids(opt, corpus_opt, 'encoder')
-                decoder_adapter_ids = get_adapter_ids(opt, corpus_opt, 'decoder')
+                encoder_adapter_ids = get_adapter_ids(opts, corpus_opt, 'encoder')
+                decoder_adapter_ids = get_adapter_ids(opts, corpus_opt, 'decoder')
                 uses_adapters = True
             else:
                 encoder_adapter_ids = None
@@ -308,14 +308,14 @@ class TaskQueueManager:
         return cls(
             tasks,
             world_context=world_context,
-            tasks_per_communication_batch=opt.accum_count,
+            tasks_per_communication_batch=opts.accum_count,
             uses_adapters=uses_adapters,
         )
 
-    def global_to_local(self, node_rank, local_rank, opt):
+    def global_to_local(self, node_rank, local_rank, opts):
         assert node_rank is not None
         assert local_rank is not None
-        task_distribution_strategy = self._get_strategy(node_rank=node_rank, local_rank=local_rank, opt=opt)
+        task_distribution_strategy = self._get_strategy(node_rank=node_rank, local_rank=local_rank, opts=opts)
         device_context = self.world_context.global_to_local(node_rank, local_rank)
         return self.__class__(
             self.tasks,
@@ -328,15 +328,15 @@ class TaskQueueManager:
             uses_adapters=self.uses_adapters,
         )
 
-    def _get_strategy(self, node_rank, local_rank, opt):
+    def _get_strategy(self, node_rank, local_rank, opts):
         assert node_rank is not None
         assert local_rank is not None
         # Global TQM does not have a task distribution strategy, but the local ones do
         my_corpus_ids = [task.corpus_id for task in self._tasks_on_device(node_rank, local_rank)]
         try:
-            strategy = TASK_DISTRIBUTION_STRATEGIES[opt.task_distribution_strategy].from_opt(
+            strategy = TASK_DISTRIBUTION_STRATEGIES[opts.task_distribution_strategy].from_opts(
                 my_corpus_ids=my_corpus_ids,
-                opt=opt,
+                opts=opts,
             )
             return strategy
         except Exception as e:
@@ -558,11 +558,11 @@ class TaskQueueManager:
         raise RuntimeError
 
     # FIXME: merge with below
-    def get_vocabularies(self, opt: Namespace, side: str):
+    def get_vocabularies(self, opts: Namespace, side: str):
         result = []
         for task in self.get_tasks():
             lang = self.src_lang if side == 'src' else self.tgt_lang
-            vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
+            vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
             result.append((lang, vocab_path))
         return result
 

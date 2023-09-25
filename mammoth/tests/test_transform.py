@@ -31,13 +31,13 @@ class TestTransform(unittest.TestCase):
 
     def test_vocab_required_transform(self):
         transforms_cls = get_transforms_cls(["denoising", "switchout"])
-        opt = Namespace(seed=-1, switchout_temperature=1.0)
+        opts = Namespace(seed=-1, switchout_temperature=1.0)
         # transforms that require vocab will not create if not provide vocab
-        transforms = make_transforms(opt, transforms_cls, vocabs=None, task=None)
+        transforms = make_transforms(opts, transforms_cls, vocabs=None, task=None)
         self.assertEqual(len(transforms), 0)
         with self.assertRaises(ValueError):
-            transforms_cls["switchout"](opt).warm_up(vocabs=None)
-            transforms_cls["denoising"](opt).warm_up(vocabs=None)
+            transforms_cls["switchout"](opts).warm_up(vocabs=None)
+            transforms_cls["denoising"](opts).warm_up(vocabs=None)
 
     def test_transform_specials(self):
         transforms_cls = get_transforms_cls(["prefix"])
@@ -52,8 +52,8 @@ class TestTransform(unittest.TestCase):
                 tgt_prefix: "｟_pf_tgt｠"
         """
         )
-        opt = Namespace(data=corpora)
-        specials = get_specials(opt, transforms_cls)
+        opts = Namespace(tasks=corpora)
+        specials = get_specials(opts, transforms_cls)
         specials_expected = {"src": {"｟_pf_src｠"}, "tgt": {"｟_pf_tgt｠"}}
         self.assertEqual(specials, specials_expected)
 
@@ -71,13 +71,13 @@ class TestTransform(unittest.TestCase):
                 tgt_prefix: "｟_pf_tgt｠"
         """
         )
-        opt = Namespace(data=corpora, seed=-1)
-        prefix_transform = prefix_cls(opt)
+        opts = Namespace(tasks=corpora, seed=-1)
+        prefix_transform = prefix_cls(opts)
         prefix_transform.warm_up()
         # 2. Init second transform in the pipe
         filter_cls = get_transforms_cls(["filtertoolong"])["filtertoolong"]
-        opt = Namespace(src_seq_length=4, tgt_seq_length=4)
-        filter_transform = filter_cls(opt)
+        opts = Namespace(src_seq_length=4, tgt_seq_length=4)
+        filter_transform = filter_cls(opts)
         # 3. Sequential combine them into a transform pipe
         transform_pipe = TransformPipe.build_from([prefix_transform, filter_transform])
         ex = {
@@ -110,8 +110,8 @@ class TestMiscTransform(unittest.TestCase):
                 tgt_prefix: "｟_pf_tgt｠"
         """
         )
-        opt = Namespace(data=corpora, seed=-1)
-        prefix_transform = prefix_cls(opt)
+        opts = Namespace(tasks=corpora, seed=-1)
+        prefix_transform = prefix_cls(opts)
         prefix_transform.warm_up()
         self.assertIn("trainset", prefix_transform.prefix_dict)
 
@@ -128,8 +128,8 @@ class TestMiscTransform(unittest.TestCase):
 
     def test_filter_too_long(self):
         filter_cls = get_transforms_cls(["filtertoolong"])["filtertoolong"]
-        opt = Namespace(src_seq_length=100, tgt_seq_length=100)
-        filter_transform = filter_cls(opt)
+        opts = Namespace(src_seq_length=100, tgt_seq_length=100)
+        filter_transform = filter_cls(opts)
         # filter_transform.warm_up()
         ex_in = {
             "src": ["Hello", "world", "."],
@@ -162,9 +162,9 @@ class TestSubwordTransform(unittest.TestCase):
 
     def test_bpe(self):
         bpe_cls = get_transforms_cls(["bpe"])["bpe"]
-        opt = Namespace(**self.base_opts)
-        bpe_cls._validate_options(opt)
-        bpe_transform = bpe_cls(opt)
+        opts = Namespace(**self.base_opts)
+        bpe_cls._validate_options(opts)
+        bpe_transform = bpe_cls(opts)
         bpe_transform.warm_up()
         ex = {
             "src": ["Hello", "world", "."],
@@ -212,9 +212,9 @@ class TestSubwordTransform(unittest.TestCase):
         base_opt = copy.copy(self.base_opts)
         base_opt["src_subword_model"] = "data/sample.sp.model"
         base_opt["tgt_subword_model"] = "data/sample.sp.model"
-        opt = Namespace(**base_opt)
-        sp_cls._validate_options(opt)
-        sp_transform = sp_cls(opt)
+        opts = Namespace(**base_opt)
+        sp_cls._validate_options(opts)
+        sp_transform = sp_cls(opts)
         sp_transform.warm_up()
         ex = {
             "src": ["Hello", "world", "."],
@@ -245,9 +245,9 @@ class TestSubwordTransform(unittest.TestCase):
         onmt_args = "{'mode': 'space', 'joiner_annotate': True}"
         base_opt["src_onmttok_kwargs"] = onmt_args
         base_opt["tgt_onmttok_kwargs"] = onmt_args
-        opt = Namespace(**base_opt)
-        onmttok_cls._validate_options(opt)
-        onmttok_transform = onmttok_cls(opt)
+        opts = Namespace(**base_opt)
+        onmttok_cls._validate_options(opts)
+        onmttok_transform = onmttok_cls(opts)
         onmttok_transform.warm_up()
         ex = {
             "src": ["Hello", "world", "."],
@@ -270,9 +270,9 @@ class TestSubwordTransform(unittest.TestCase):
         onmt_args = "{'mode': 'none', 'spacer_annotate': True}"
         base_opt["src_onmttok_kwargs"] = onmt_args
         base_opt["tgt_onmttok_kwargs"] = onmt_args
-        opt = Namespace(**base_opt)
-        onmttok_cls._validate_options(opt)
-        onmttok_transform = onmttok_cls(opt)
+        opts = Namespace(**base_opt)
+        onmttok_cls._validate_options(opts)
+        onmttok_transform = onmttok_cls(opts)
         onmttok_transform.warm_up()
         ex = {
             "src": ["Hello", "world", "."],
@@ -289,8 +289,8 @@ class TestSubwordTransform(unittest.TestCase):
 class TestSamplingTransform(unittest.TestCase):
     def test_tokendrop(self):
         tokendrop_cls = get_transforms_cls(["tokendrop"])["tokendrop"]
-        opt = Namespace(seed=3434, tokendrop_temperature=0.1)
-        tokendrop_transform = tokendrop_cls(opt)
+        opts = Namespace(seed=3434, tokendrop_temperature=0.1)
+        tokendrop_transform = tokendrop_cls(opts)
         tokendrop_transform.warm_up()
         ex = {
             "src": ["Hello", ",", "world", "."],
@@ -305,8 +305,8 @@ class TestSamplingTransform(unittest.TestCase):
 
     def test_tokenmask(self):
         tokenmask_cls = get_transforms_cls(["tokenmask"])["tokenmask"]
-        opt = Namespace(seed=3434, tokenmask_temperature=0.1)
-        tokenmask_transform = tokenmask_cls(opt)
+        opts = Namespace(seed=3434, tokenmask_temperature=0.1)
+        tokenmask_transform = tokenmask_cls(opts)
         tokenmask_transform.warm_up()
         ex = {
             "src": ["Hello", ",", "world", "."],
@@ -321,8 +321,8 @@ class TestSamplingTransform(unittest.TestCase):
 
     def test_switchout(self):
         switchout_cls = get_transforms_cls(["switchout"])["switchout"]
-        opt = Namespace(seed=3434, switchout_temperature=0.1)
-        switchout_transform = switchout_cls(opt)
+        opts = Namespace(seed=3434, switchout_temperature=0.1)
+        switchout_transform = switchout_cls(opts)
         with self.assertRaises(ValueError):
             # require vocabs to warm_up
             switchout_transform.warm_up(vocabs=None)
@@ -518,16 +518,16 @@ class TestBARTNoising(unittest.TestCase):
 
         def test_vocab_required_transform(self):
             transforms_cls = get_transforms_cls(["denoising"])
-            opt = Namespace(random_ratio=1, denoising_objective='mass')
+            opts = Namespace(random_ratio=1, denoising_objective='mass')
             with self.assertRaises(ValueError):
-                make_transforms(opt, transforms_cls, vocabs=None, task=None)
+                make_transforms(opts, transforms_cls, vocabs=None, task=None)
 
 
 class TestFeaturesTransform(unittest.TestCase):
     def test_inferfeats(self):
         inferfeats_cls = get_transforms_cls(["inferfeats"])["inferfeats"]
-        opt = Namespace(reversible_tokenization="joiner", prior_tokenization=False)
-        inferfeats_transform = inferfeats_cls(opt)
+        opts = Namespace(reversible_tokenization="joiner", prior_tokenization=False)
+        inferfeats_transform = inferfeats_cls(opts)
 
         ex_in = {
             "src": [

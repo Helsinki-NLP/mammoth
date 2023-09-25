@@ -62,7 +62,7 @@ def explode_model(full_ab_model):
     # stuff necessary to build bilingual models combining modules
     model_frame = {
         "vocab": full_ab_model["vocab"],
-        "opt": full_ab_model["opt"],
+        "opts": full_ab_model["opts"],
         "optim": full_ab_model["optim"],
     }
 

@@ -11,12 +11,12 @@ from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
 
 
-def multi_init(opt, global_rank):
-    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(master_ip=opt.master_ip, master_port=opt.master_port)
+def multi_init(opts, global_rank):
+    dist_init_method = 'tcp://{master_ip}:{master_port}'.format(master_ip=opts.master_ip, master_port=opts.master_port)
 
-    dist_world_size = opt.world_size
+    dist_world_size = opts.world_size
     torch.distributed.init_process_group(
-        backend=opt.gpu_backend,
+        backend=opts.gpu_backend,
         init_method=dist_init_method,
         rank=global_rank,
         world_size=dist_world_size,
@@ -238,11 +238,11 @@ class ErrorHandler(object):
         raise Exception(msg)
 
 
-def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
+def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     """Produce batches to `queues` from `generator_to_serve`."""
-    log_level = "INFO" if opt.verbose or device_id == 0 else "WARNING"
-    init_logger(opt.log_file, log_level=log_level)
-    set_random_seed(opt.seed, False)
+    log_level = "INFO" if opts.verbose or device_id == 0 else "WARNING"
+    init_logger(opts.log_file, log_level=log_level)
+    set_random_seed(opts.seed, False)
     logger.info("BATCH PRODUCER")
     logger.info(generator_to_serve)
 
@@ -254,7 +254,7 @@ def batch_producer(generator_to_serve, queue, semaphore, opt, device_id):
         queue.put((batch, metadata, communication_batch_id))
 
 
-def consumer(process_fn, opt, device_context, error_queue, batch_queue, semaphore, task_queue_manager):
+def consumer(process_fn, opts, device_context, error_queue, batch_queue, semaphore, task_queue_manager):
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
         logger.info(
@@ -262,11 +262,11 @@ def consumer(process_fn, opt, device_context, error_queue, batch_queue, semaphor
             f'node_rank {device_context.node_rank} '
             f'local_rank {device_context.local_rank}'
         )
-        logger.info(f'opt.gpu_ranks {opt.gpu_ranks}')
-        multi_init(opt, device_context.global_rank)
+        logger.info(f'opts.gpu_ranks {opts.gpu_ranks}')
+        multi_init(opts, device_context.global_rank)
         # error_queue not passed (is this intentional?)
         process_fn(
-            opt,
+            opts,
             device_context=device_context,
             batch_queue=batch_queue,
             semaphore=semaphore,
@@ -279,4 +279,4 @@ def consumer(process_fn, opt, device_context, error_queue, batch_queue, semaphor
         # propagate exception to parent process, keeping original traceback
         import traceback
 
-        error_queue.put((opt.gpu_ranks[device_context.node_rank], traceback.format_exc()))
+        error_queue.put((opts.gpu_ranks[device_context.node_rank], traceback.format_exc()))

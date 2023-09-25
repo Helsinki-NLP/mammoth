@@ -11,20 +11,20 @@ from mammoth.distributed import TaskSpecs
 from mammoth.utils.parse import ArgumentParser
 
 
-def translate(opt):
-    ArgumentParser.validate_translate_opts(opt)
-    ArgumentParser._get_all_transform_translate(opt)
-    ArgumentParser._validate_transforms_opts(opt)
-    ArgumentParser.validate_translate_opts_dynamic(opt)
-    logger = init_logger(opt.log_file)
+def translate(opts):
+    ArgumentParser.validate_translate_opts(opts)
+    ArgumentParser._get_all_transform_translate(opts)
+    ArgumentParser._validate_transforms_opts(opts)
+    ArgumentParser.validate_translate_opts_dynamic(opts)
+    logger = init_logger(opts.log_file)
 
     encoder_adapter_ids = set()
-    for layer_stack_idx, stack in enumerate(opt.stack['encoder']):
+    for layer_stack_idx, stack in enumerate(opts.stack['encoder']):
         if 'adapters' in stack:
             for group_id, sub_id in stack['adapters']:
                 encoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
     decoder_adapter_ids = set()
-    for layer_stack_idx, stack in enumerate(opt.stack['decoder']):
+    for layer_stack_idx, stack in enumerate(opts.stack['decoder']):
         if 'adapters' in stack:
             for group_id, sub_id in stack['adapters']:
                 decoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
@@ -36,10 +36,10 @@ def translate(opt):
     task = TaskSpecs(
         node_rank=None,
         local_rank=None,
-        src_lang=opt.src_lang,
-        tgt_lang=opt.tgt_lang,
-        encoder_id=[stack['id'] for stack in opt.stack['encoder']],
-        decoder_id=[stack['id'] for stack in opt.stack['decoder']],
+        src_lang=opts.src_lang,
+        tgt_lang=opts.tgt_lang,
+        encoder_id=[stack['id'] for stack in opts.stack['encoder']],
+        decoder_id=[stack['id'] for stack in opts.stack['decoder']],
         corpus_id='trans',
         weight=1,
         corpus_opt=dict(),
@@ -49,23 +49,23 @@ def translate(opt):
         decoder_adapter_ids=decoder_adapter_ids,
     )
 
-    translator = build_translator(opt, task, logger=logger, report_score=True)
+    translator = build_translator(opts, task, logger=logger, report_score=True)
 
-    # data_reader = InferenceDataReader(opt.src, opt.tgt, opt.src_feats)
-    src_shards = split_corpus(opt.src, opt.shard_size)
-    tgt_shards = split_corpus(opt.tgt, opt.shard_size)
+    # data_reader = InferenceDataReader(opts.src, opts.tgt, opts.src_feats)
+    src_shards = split_corpus(opts.src, opts.shard_size)
+    tgt_shards = split_corpus(opts.tgt, opts.shard_size)
     features_shards = []
     features_names = []
-    for feat_name, feat_path in opt.src_feats.items():
-        features_shards.append(split_corpus(feat_path, opt.shard_size))
+    for feat_name, feat_path in opts.src_feats.items():
+        features_shards.append(split_corpus(feat_path, opts.shard_size))
         features_names.append(feat_name)
     shard_pairs = zip(src_shards, tgt_shards, *features_shards)
 
     # Build transforms
-    transforms_cls = get_transforms_cls(opt._all_transform)
-    transforms = make_transforms(opt, transforms_cls, translator.vocabs, task=task)
+    transforms_cls = get_transforms_cls(opts._all_transform)
+    transforms = make_transforms(opts, transforms_cls, translator.vocabs, task=task)
     data_transform = [
-        transforms[name] for name in opt.transforms if name in transforms
+        transforms[name] for name in opts.transforms if name in transforms
     ]
     transform = TransformPipe.build_from(data_transform)
 
@@ -76,10 +76,10 @@ def translate(opt):
             transform=transform,
             # src_feats=feats_shard,  # TODO: put me back in
             tgt=tgt_shard,
-            batch_size=opt.batch_size,
-            batch_type=opt.batch_type,
-            attn_debug=opt.attn_debug,
-            align_debug=opt.align_debug
+            batch_size=opts.batch_size,
+            batch_type=opts.batch_type,
+            attn_debug=opts.attn_debug,
+            align_debug=opts.align_debug
         )
 
 
@@ -95,8 +95,8 @@ def _get_parser():
 def main():
     parser = _get_parser()
 
-    opt = parser.parse_args()
-    translate(opt)
+    opts = parser.parse_args()
+    translate(opts)
 
 
 if __name__ == "__main__":

@@ -410,8 +410,8 @@ class GNMTGlobalScorer(object):
     """
 
     @classmethod
-    def from_opt(cls, opt):
-        return cls(opt.alpha, opt.beta, opt.length_penalty, opt.coverage_penalty)
+    def from_opts(cls, opts):
+        return cls(opts.alpha, opts.beta, opts.length_penalty, opts.coverage_penalty)
 
     def __init__(self, alpha, beta, length_penalty, coverage_penalty):
         self._validate(alpha, beta, length_penalty, coverage_penalty)

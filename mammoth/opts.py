@@ -93,10 +93,10 @@ def _add_reproducibility_opts(parser):
 
 def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
     """Options related to training corpus, type: a list of dictionary."""
-    group = parser.add_argument_group('Data')
+    group = parser.add_argument_group('Data/Tasks')
     group.add(
-        "-data",
-        "--data",
+        "-tasks",
+        "--tasks",
         required=True,
         help="List of datasets and their specifications. See examples/*.yaml for further details.",
     )
@@ -603,7 +603,7 @@ def model_opts(parser):
         type=str,
         default="O1",
         choices=["O0", "O1", "O2", "O3"],
-        help="For FP16 training, the opt_level to use. See https://nvidia.github.io/apex/amp.html#opt-levels.",
+        help="For FP16 training, the opt_level to use. See https://nvidia.github.io/apex/amp.html#opts-levels.",
     )
 
     # attention bridge options
@@ -1207,7 +1207,7 @@ def translate_opts(parser, dynamic=False):
         help="Divide src and tgt (if applicable) into "
         "smaller multiple src and tgt files, then "
         "build shards, each shard will have "
-        "opt.shard_size samples except last shard. "
+        "opts.shard_size samples except last shard. "
         "shard_size=0 means no segmentation "
         "shard_size>0 means segment dataset into multiple shards, "
         "each shard has shard_size samples",

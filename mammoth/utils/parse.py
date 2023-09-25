@@ -23,21 +23,21 @@ class DataOptsCheckerMixin(object):
             raise IOError(f"Please check path of your {info} file! {file_path}")
 
     @classmethod
-    def _validate_adapters(cls, opt):
+    def _validate_adapters(cls, opts):
         """Parse corpora specified in data field of YAML file."""
-        if not opt.adapters:
+        if not opts.adapters:
             return
-        adapter_opts = yaml.safe_load(opt.adapters)
+        adapter_opts = yaml.safe_load(opts.adapters)
         # TODO: validate adapter opts
-        opt.adapters = adapter_opts
+        opts.adapters = adapter_opts
 
     @classmethod
-    def _validate_data(cls, opt):
+    def _validate_data(cls, opts):
         """Parse tasks/language-pairs/corpora specified in data field of YAML file."""
-        default_transforms = opt.transforms
+        default_transforms = opts.transforms
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
-        corpora = yaml.safe_load(opt.data)
+        corpora = yaml.safe_load(opts.tasks)
         logger.info("Parsing corpora")
         n_without_node_gpu = 0
         for cname, corpus in corpora.items():
@@ -47,7 +47,7 @@ class DataOptsCheckerMixin(object):
             if _transforms is None:
                 logger.info(f"Missing transforms field for {cname} data, set to default: {default_transforms}.")
                 corpus['transforms'] = default_transforms
-            opt.data_task = ModelTask.SEQ2SEQ
+            opts.data_task = ModelTask.SEQ2SEQ
             """
             # Check path
             path_src = corpus.get('path_src', None)
@@ -57,13 +57,13 @@ class DataOptsCheckerMixin(object):
                                  'tgt path is also required for non language'
                                  ' modeling tasks.')
             else:
-                opt.data_task = ModelTask.SEQ2SEQ
+                opts.data_task = ModelTask.SEQ2SEQ
                 if path_tgt is None:
                     logger.warning(
                         "path_tgt is None, it should be set unless the task"
                         " is language modeling"
                     )
-                    opt.data_task = ModelTask.LANGUAGE_MODEL
+                    opts.data_task = ModelTask.LANGUAGE_MODEL
                     # tgt is src for LM task
                     corpus["path_tgt"] = path_src
                     corpora[cname] = corpus
@@ -73,7 +73,7 @@ class DataOptsCheckerMixin(object):
             """
             path_align = corpus.get('path_align', None)
             if path_align is None:
-                if hasattr(opt, 'lambda_align') and opt.lambda_align > 0.0:
+                if hasattr(opts, 'lambda_align') and opts.lambda_align > 0.0:
                     raise ValueError(f'Corpus {cname} alignment file path are required when lambda_align > 0.0')
                 corpus['path_align'] = None
             else:
@@ -140,111 +140,111 @@ class DataOptsCheckerMixin(object):
         assert n_without_node_gpu == 0 or n_without_node_gpu == len(corpora)
 
         logger.info(f"Parsed {len(corpora)} corpora from -data.")
-        opt.data = corpora
+        opts.tasks = corpora
 
-        src_vocab = yaml.safe_load(opt.src_vocab)
+        src_vocab = yaml.safe_load(opts.src_vocab)
         logger.info(f"Parsed {len(src_vocab)} vocabs from -src_vocab.")
-        opt.src_vocab = src_vocab
+        opts.src_vocab = src_vocab
 
-        tgt_vocab = yaml.safe_load(opt.tgt_vocab)
+        tgt_vocab = yaml.safe_load(opts.tgt_vocab)
         logger.info(f"Parsed {len(tgt_vocab)} vocabs from -tgt_vocab.")
-        opt.tgt_vocab = tgt_vocab
+        opts.tgt_vocab = tgt_vocab
 
     @classmethod
-    def _validate_transforms_opts(cls, opt):
+    def _validate_transforms_opts(cls, opts):
         """Check options used by transforms."""
         for name, transform_cls in AVAILABLE_TRANSFORMS.items():
-            if name in opt._all_transform:
-                transform_cls._validate_options(opt)
+            if name in opts._all_transform:
+                transform_cls._validate_options(opts)
 
     @classmethod
-    def _get_all_transform(cls, opt):
+    def _get_all_transform(cls, opts):
         """Should only called after `_validate_data`."""
-        all_transforms = set(opt.transforms)
-        for cname, corpus in opt.data.items():
+        all_transforms = set(opts.transforms)
+        for cname, corpus in opts.tasks.items():
             _transforms = set(corpus['transforms'])
             if len(_transforms) != 0:
                 all_transforms.update(_transforms)
-        if hasattr(opt, 'lambda_align') and opt.lambda_align > 0.0:
+        if hasattr(opts, 'lambda_align') and opts.lambda_align > 0.0:
             if not all_transforms.isdisjoint({'sentencepiece', 'bpe', 'onmt_tokenize'}):
                 raise ValueError('lambda_align is not compatible with on-the-fly tokenization.')
             if not all_transforms.isdisjoint({'tokendrop', 'prefix', 'denoising'}):
                 raise ValueError('lambda_align is not compatible yet with potential token deletion/addition.')
-        opt._all_transform = all_transforms
+        opts._all_transform = all_transforms
 
     @classmethod
-    def _get_all_transform_translate(cls, opt):
-        opt._all_transform = opt.transforms
+    def _get_all_transform_translate(cls, opts):
+        opts._all_transform = opts.transforms
 
     @classmethod
-    def _validate_fields_opts(cls, opt, build_vocab_only=False):
+    def _validate_fields_opts(cls, opts, build_vocab_only=False):
         """Check options relate to vocab and fields."""
 
-        for cname, corpus in opt.data.items():
+        for cname, corpus in opts.tasks.items():
             if cname != CorpusName.VALID and corpus["src_feats"] is not None:
-                assert opt.src_feats_vocab, "-src_feats_vocab is required if using source features."
-                if isinstance(opt.src_feats_vocab, str):
-                    opt.src_feats_vocab = yaml.safe_load(opt.src_feats_vocab)
+                assert opts.src_feats_vocab, "-src_feats_vocab is required if using source features."
+                if isinstance(opts.src_feats_vocab, str):
+                    opts.src_feats_vocab = yaml.safe_load(opts.src_feats_vocab)
 
                 for feature in corpus["src_feats"].keys():
-                    assert feature in opt.src_feats_vocab, f"No vocab file set for feature {feature}"
+                    assert feature in opts.src_feats_vocab, f"No vocab file set for feature {feature}"
 
         if build_vocab_only:
-            if not opt.share_vocab:
-                assert opt.tgt_vocab, "-tgt_vocab is required if not -share_vocab."
+            if not opts.share_vocab:
+                assert opts.tgt_vocab, "-tgt_vocab is required if not -share_vocab."
             return
         # validation when train:
-        for key, vocab in opt.src_vocab.items():
+        for key, vocab in opts.src_vocab.items():
             cls._validate_file(vocab, info=f'src vocab ({key})')
-        if not opt.share_vocab:
-            for key, vocab in opt.tgt_vocab.items():
+        if not opts.share_vocab:
+            for key, vocab in opts.tgt_vocab.items():
                 cls._validate_file(vocab, info=f'tgt vocab ({key})')
 
-        # if opt.dump_fields or opt.dump_transforms:
-        if opt.dump_transforms:
+        # if opts.dump_fields or opts.dump_transforms:
+        if opts.dump_transforms:
             assert (
-                opt.save_data
+                opts.save_data
             ), "-save_data should be set if set -dump_transforms."
         # Check embeddings stuff
-        if opt.both_embeddings is not None:
+        if opts.both_embeddings is not None:
             assert (
-                opt.src_embeddings is None and opt.tgt_embeddings is None
+                opts.src_embeddings is None and opts.tgt_embeddings is None
             ), "You don't need -src_embeddings or -tgt_embeddings \
                 if -both_embeddings is set."
 
-        if any([opt.both_embeddings is not None, opt.src_embeddings is not None, opt.tgt_embeddings is not None]):
-            assert opt.embeddings_type is not None, "You need to specify an -embedding_type!"
+        if any([opts.both_embeddings is not None, opts.src_embeddings is not None, opts.tgt_embeddings is not None]):
+            assert opts.embeddings_type is not None, "You need to specify an -embedding_type!"
             assert (
-                opt.save_data
+                opts.save_data
             ), "-save_data should be set if use pretrained embeddings."
 
     @classmethod
-    def _validate_language_model_compatibilities_opts(cls, opt):
-        if opt.model_task != ModelTask.LANGUAGE_MODEL:
+    def _validate_language_model_compatibilities_opts(cls, opts):
+        if opts.model_task != ModelTask.LANGUAGE_MODEL:
             return
 
         logger.info("encoder is not used for LM task")
 
-        assert opt.share_vocab and (opt.tgt_vocab is None), "vocab must be shared for LM task"
+        assert opts.share_vocab and (opts.tgt_vocab is None), "vocab must be shared for LM task"
 
-        assert opt.decoder_type == "transformer", "Only transformer decoder is supported for LM task"
+        assert opts.decoder_type == "transformer", "Only transformer decoder is supported for LM task"
 
     @classmethod
-    def validate_prepare_opts(cls, opt, build_vocab_only=False):
+    def validate_prepare_opts(cls, opts, build_vocab_only=False):
         """Validate all options relate to prepare (data/transform/vocab)."""
-        if opt.n_sample != 0:
+        if opts.n_sample != 0:
             assert (
-                opt.save_data
+                opts.save_data
             ), "-save_data should be set if \
                 want save samples."
-        cls._validate_data(opt)
-        cls._get_all_transform(opt)
-        cls._validate_transforms_opts(opt)
-        cls._validate_fields_opts(opt, build_vocab_only=build_vocab_only)
+        cls._validate_data(opts)
+        cls._get_all_transform(opts)
+        cls._validate_transforms_opts(opts)
+        cls._validate_fields_opts(opts, build_vocab_only=build_vocab_only)
 
     @classmethod
-    def validate_model_opts(cls, opt):
-        cls._validate_language_model_compatibilities_opts(opt)
+    def validate_model_opts(cls, opts):
+        cls._validate_language_model_compatibilities_opts(opts)
 
 
 class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
@@ -319,53 +319,53 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
     @classmethod
     def ckpt_model_opts(cls, ckpt_opt):
-        # Load default opt values, then overwrite with the opts in
+        # Load default opts values, then overwrite with the opts in
         # the checkpoint. That way, if there are new options added,
         # the defaults are used.
-        opt = cls.defaults(opts.model_opts)
-        opt.__dict__.update(ckpt_opt.__dict__)
-        return opt
+        the_opts = cls.defaults(opts.model_opts)
+        the_opts.__dict__.update(ckpt_opt.__dict__)
+        return the_opts
 
     @classmethod
-    def validate_train_opts(cls, opt):
-        if opt.epochs:
+    def validate_train_opts(cls, opts):
+        if opts.epochs:
             raise AssertionError("-epochs is deprecated please use -train_steps.")
-        if opt.truncated_decoder > 0 and max(opt.accum_count) > 1:
+        if opts.truncated_decoder > 0 and max(opts.accum_count) > 1:
             raise AssertionError("BPTT is not compatible with -accum > 1")
 
-        if opt.gpuid:
+        if opts.gpuid:
             raise AssertionError("gpuid is deprecated see world_size and gpu_ranks")
-        if torch.cuda.is_available() and not opt.gpu_ranks:
+        if torch.cuda.is_available() and not opts.gpu_ranks:
             logger.warn("You have a CUDA device, should run with -gpu_ranks")
-        if opt.world_size < len(opt.gpu_ranks):
+        if opts.world_size < len(opts.gpu_ranks):
             raise AssertionError("parameter counts of -gpu_ranks must be less or equal than -world_size.")
-        if len(opt.gpu_ranks) > 0 and opt.world_size == len(opt.gpu_ranks) and min(opt.gpu_ranks) > 0:
+        if len(opts.gpu_ranks) > 0 and opts.world_size == len(opts.gpu_ranks) and min(opts.gpu_ranks) > 0:
             raise AssertionError(
                 "-gpu_ranks should have master(=0) rank unless -world_size is greater than len(gpu_ranks)."
             )
 
-        assert len(opt.dropout) == len(opt.dropout_steps), "Number of dropout values must match accum_steps values"
+        assert len(opts.dropout) == len(opts.dropout_steps), "Number of dropout values must match accum_steps values"
 
-        assert len(opt.attention_dropout) == len(
-            opt.dropout_steps
+        assert len(opts.attention_dropout) == len(
+            opts.dropout_steps
         ), "Number of attention_dropout values must match accum_steps values"
 
-        assert len(opt.accum_count) == len(
-            opt.accum_steps
+        assert len(opts.accum_count) == len(
+            opts.accum_steps
         ), 'Number of accum_count values must match number of accum_steps'
 
-        if opt.update_vocab:
-            assert opt.train_from, "-update_vocab needs -train_from option"
-            assert opt.reset_optim in ['states', 'all'], '-update_vocab needs -reset_optim "states" or "all"'
+        if opts.update_vocab:
+            assert opts.train_from, "-update_vocab needs -train_from option"
+            assert opts.reset_optim in ['states', 'all'], '-update_vocab needs -reset_optim "states" or "all"'
 
     @classmethod
-    def validate_translate_opts(cls, opt):
-        opt.src_feats = eval(opt.src_feats) if opt.src_feats else {}
+    def validate_translate_opts(cls, opts):
+        opts.src_feats = eval(opts.src_feats) if opts.src_feats else {}
 
     @classmethod
-    def validate_translate_opts_dynamic(cls, opt):
+    def validate_translate_opts_dynamic(cls, opts):
         # It comes from training
-        # TODO: needs to be added as inference opt
-        opt.share_vocab = False
+        # TODO: needs to be added as inference opts
+        opts.share_vocab = False
 
-        opt.stack = yaml.safe_load(opt.stack)
+        opts.stack = yaml.safe_load(opts.stack)

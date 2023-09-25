@@ -5,7 +5,7 @@ from mammoth.distributed.tasks import WeightedSamplingTaskDistributionStrategy, 
 
 
 def test_weights_all_zero():
-    opt = Namespace(data={
+    opts = Namespace(data={
         'a': {
             'weight': 0,
             'introduce_at_training_step': 0,
@@ -20,12 +20,12 @@ def test_weights_all_zero():
         },
     })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b'], opt)
+        WeightedSamplingTaskDistributionStrategy.from_opts(['a', 'b'], opts)
     assert 'Can not set "weight" of all corpora on a device to zero' in str(exc_info.value)
 
 
 def test_weights_all_postponed():
-    opt = Namespace(data={
+    opts = Namespace(data={
         'a': {
             'weight': 1,
             'introduce_at_training_step': 1,
@@ -40,12 +40,12 @@ def test_weights_all_postponed():
         },
     })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b'], opt)
+        WeightedSamplingTaskDistributionStrategy.from_opts(['a', 'b'], opts)
     assert 'Can not set "introduce_at_training_step" of all corpora on a device to nonzero' in str(exc_info.value)
 
 
 def test_invalid_curriculum():
-    opt = Namespace(data={
+    opts = Namespace(data={
         # 'a' disabled by weight
         'a': {
             'weight': 0,
@@ -62,12 +62,12 @@ def test_invalid_curriculum():
         },
     })
     with pytest.raises(ValueError) as exc_info:
-        WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b'], opt)
+        WeightedSamplingTaskDistributionStrategy.from_opts(['a', 'b'], opts)
     assert 'Invalid curriculum' in str(exc_info.value)
 
 
 def test_sampling_task_distribution_strategy():
-    opt = Namespace(data={
+    opts = Namespace(data={
         # 'a' disabled by weight
         'a': {
             'weight': 0,
@@ -89,7 +89,7 @@ def test_sampling_task_distribution_strategy():
             'introduce_at_training_step': 0,
         },
     })
-    strategy = WeightedSamplingTaskDistributionStrategy.from_opt(['a', 'b', 'c'], opt)
+    strategy = WeightedSamplingTaskDistributionStrategy.from_opts(['a', 'b', 'c'], opts)
     all_samples = []
     n_samples = 10
     n_batches = 1000

@@ -73,15 +73,15 @@ class PerceiverAttentionBridgeLayer(BaseAttentionBridgeLayer):
         self.self_ff_norm = AttentionBridgeNorm(latent_size, norm_type)
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opts(cls, opts):
         return cls(
-            opt.rnn_size,
-            opt.hidden_ab_size,
-            opt.ab_fixed_length,
-            opt.heads,
-            opt.attention_dropout[0],
-            opt.max_relative_positions,
-            opt.ab_layer_norm,
+            opts.rnn_size,
+            opts.hidden_ab_size,
+            opts.ab_fixed_length,
+            opts.heads,
+            opts.attention_dropout[0],
+            opts.max_relative_positions,
+            opts.ab_layer_norm,
         )
 
     @property
@@ -154,15 +154,15 @@ class LinAttentionBridgeLayer(BaseAttentionBridgeLayer):
         self.norm = AttentionBridgeNorm(d, ab_layer_norm)
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opts(cls, opts):
         """Alternate constructor."""
         return cls(
-            opt.rnn_size,
-            opt.ab_fixed_length,
-            opt.hidden_ab_size,
-            opt.model_type,
-            opt.rnn_size,
-            opt.ab_layer_norm,
+            opts.rnn_size,
+            opts.ab_fixed_length,
+            opts.hidden_ab_size,
+            opts.model_type,
+            opts.rnn_size,
+            opts.ab_layer_norm,
         )
 
     def forward(self, intermediate_output, encoder_output, mask=None):
@@ -244,12 +244,12 @@ class SimpleAttentionBridgeLayer(BaseAttentionBridgeLayer):
         return attention_weights, output
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opts(cls, opts):
         return cls(
-            opt.rnn_size,
-            opt.hidden_ab_size,
-            opt.ab_fixed_length,
-            opt.ab_layer_norm,
+            opts.rnn_size,
+            opts.hidden_ab_size,
+            opts.ab_fixed_length,
+            opts.ab_layer_norm,
         )
 
 
@@ -276,15 +276,15 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
         return None, outp
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opts(cls, opts):
         return cls(
-            opt.rnn_size,
-            opt.heads,
-            opt.hidden_ab_size,  # d_ff
+            opts.rnn_size,
+            opts.heads,
+            opts.hidden_ab_size,  # d_ff
             # TODO: that list indexing things seems suspicious to me...
-            opt.dropout[0],
-            opt.attention_dropout[0],
-            max_relative_positions=opt.max_relative_positions,
+            opts.dropout[0],
+            opts.attention_dropout[0],
+            max_relative_positions=opts.max_relative_positions,
         )
 
 
@@ -313,11 +313,11 @@ class FeedForwardAttentionBridgeLayer(BaseAttentionBridgeLayer):
         return None, self.module(intermediate_output)
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opts(cls, opts):
         return cls(
-            opt.rnn_size,
-            opt.hidden_ab_size,
-            opt.ab_layer_norm,
+            opts.rnn_size,
+            opts.hidden_ab_size,
+            opts.ab_layer_norm,
         )
 
 
@@ -333,7 +333,7 @@ class AttentionBridge(nn.Module):
         self.is_fixed_length = any(x.is_fixed_length for x in layers)
 
     @classmethod
-    def from_opt(cls, opt):
+    def from_opts(cls, opts):
         """Alternate constructor."""
         # convert opts specifications to architectures
         layer_type_to_cls = {
@@ -344,16 +344,16 @@ class AttentionBridge(nn.Module):
             'feedforward': FeedForwardAttentionBridgeLayer,
         }
 
-        # preconstruct layers using .from_opt(...)
-        layers = [layer_type_to_cls[layer_type].from_opt(opt) for layer_type in opt.ab_layers]
+        # preconstruct layers using .from_opts(...)
+        layers = [layer_type_to_cls[layer_type].from_opts(opts) for layer_type in opts.ab_layers]
 
         # FIXME: locking-in edge case behavior
-        if any(layer == 'perceiver' for layer in opt.ab_layers):
-            first_perceiver_index = next(idx for idx, layer in enumerate(opt.ab_layers) if layer == 'perceiver')
+        if any(layer == 'perceiver' for layer in opts.ab_layers):
+            first_perceiver_index = next(idx for idx, layer in enumerate(opts.ab_layers) if layer == 'perceiver')
             if first_perceiver_index != 0:
                 assert any(layer.is_fixed_length for layer in layers[:first_perceiver_index]), \
                     'Unsupported bridge configuration: at least one layer must be fixed-size before perceiver'
-            if not all(layer == 'perceiver' for layer in opt.ab_layers):
+            if not all(layer == 'perceiver' for layer in opts.ab_layers):
                 warnings.warn('Architecture-mixing not fully supported with perceiver.')
             # FIXME: deleting unused params manually
             for perceiver_layer in layers[1:]:

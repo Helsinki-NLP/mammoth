@@ -7,23 +7,23 @@ import mammoth
 from mammoth.utils.logging import logger
 
 
-def build_report_manager(opt, node_rank, local_rank):
+def build_report_manager(opts, node_rank, local_rank):
     # Vanilla mammoth has here an additional gpu_rank <= 0
     # which would cause only the first GPU of each node to log.
     # This change allows all GPUs to log.
     # Because tensorboard does not allow multiple processes writing into the same directory,
     # each device is treated as a separate run.
-    if opt.tensorboard:
+    if opts.tensorboard:
         from torch.utils.tensorboard import SummaryWriter
 
-        if not hasattr(opt, 'tensorboard_log_dir_dated'):
-            opt.tensorboard_log_dir_dated = opt.tensorboard_log_dir + datetime.now().strftime("/%b-%d_%H-%M-%S")
+        if not hasattr(opts, 'tensorboard_log_dir_dated'):
+            opts.tensorboard_log_dir_dated = opts.tensorboard_log_dir + datetime.now().strftime("/%b-%d_%H-%M-%S")
 
-        writer = SummaryWriter(f'{opt.tensorboard_log_dir_dated}-rank{node_rank}:{local_rank}', comment="Unmt")
+        writer = SummaryWriter(f'{opts.tensorboard_log_dir_dated}-rank{node_rank}:{local_rank}', comment="Unmt")
     else:
         writer = None
 
-    report_mgr = ReportMgr(opt.report_every, start_time=-1, tensorboard_writer=writer)
+    report_mgr = ReportMgr(opts.report_every, start_time=-1, tensorboard_writer=writer)
     return report_mgr
 
 

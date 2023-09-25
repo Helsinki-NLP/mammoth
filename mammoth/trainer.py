@@ -30,7 +30,7 @@ def iter_on_device(iterator, device_context):
 
 
 def build_trainer(
-    opt,
+    opts,
     device_context,
     model,
     vocabs_dict,
@@ -40,10 +40,10 @@ def build_trainer(
     generators_md=None,
 ):
     """
-    Simplify `Trainer` creation based on user `opt`s*
+    Simplify `Trainer` creation based on user `opts`s*
 
     Args:
-        opt (:obj:`Namespace`): user options (usually from argument parsing)
+        opts (:obj:`Namespace`): user options (usually from argument parsing)
         model (:obj:`mammoth.models.NMTModel`): the model to train
         vocabs_dict (dict): dict of vocabs
         optim (:obj:`mammoth.utils.Optimizer`): optimizer used during training
@@ -61,31 +61,31 @@ def build_trainer(
         generator = generators_md[f'generator_{lang}']
         train_loss_md.add_module(
             f'trainloss{lang}',
-            mammoth.utils.loss.build_loss_compute(model, tgt_vocab, opt, train=True, generator=generator),
+            mammoth.utils.loss.build_loss_compute(model, tgt_vocab, opts, train=True, generator=generator),
         )
         valid_loss_md.add_module(
             f'valloss{lang}',
-            mammoth.utils.loss.build_loss_compute(model, tgt_vocab, opt, train=False, generator=generator),
+            mammoth.utils.loss.build_loss_compute(model, tgt_vocab, opts, train=False, generator=generator),
         )
 
-    trunc_size = opt.truncated_decoder  # Badly named...
-    shard_size = opt.max_generator_batches if opt.model_dtype == 'fp32' else 0
-    norm_method = opt.normalization
-    accum_count = opt.accum_count
-    accum_steps = opt.accum_steps
-    average_decay = opt.average_decay
-    average_every = opt.average_every
-    dropout = opt.dropout
-    dropout_steps = opt.dropout_steps
-    gpu_verbose_level = opt.gpu_verbose_level
+    trunc_size = opts.truncated_decoder  # Badly named...
+    shard_size = opts.max_generator_batches if opts.model_dtype == 'fp32' else 0
+    norm_method = opts.normalization
+    accum_count = opts.accum_count
+    accum_steps = opts.accum_steps
+    average_decay = opts.average_decay
+    average_every = opts.average_every
+    dropout = opts.dropout
+    dropout_steps = opts.dropout_steps
+    gpu_verbose_level = opts.gpu_verbose_level
 
     earlystopper = (
-        mammoth.utils.EarlyStopping(opt.early_stopping, scorers=mammoth.utils.scorers_from_opts(opt))
-        if opt.early_stopping > 0
+        mammoth.utils.EarlyStopping(opts.early_stopping, scorers=mammoth.utils.scorers_from_opts(opts))
+        if opts.early_stopping > 0
         else None
     )
 
-    report_manager = mammoth.utils.build_report_manager(opt, device_context.node_rank, device_context.local_rank)
+    report_manager = mammoth.utils.build_report_manager(opts, device_context.node_rank, device_context.local_rank)
     trainer = mammoth.Trainer(
         model,
         train_loss_md,
@@ -99,16 +99,16 @@ def build_trainer(
         device_context=device_context,
         gpu_verbose_level=gpu_verbose_level,
         report_manager=report_manager,
-        with_align=True if opt.lambda_align > 0 else False,
+        with_align=True if opts.lambda_align > 0 else False,
         model_saver=model_saver,
         average_decay=average_decay,
         average_every=average_every,
-        model_dtype=opt.model_dtype,
+        model_dtype=opts.model_dtype,
         earlystopper=earlystopper,
         dropout=dropout,
         dropout_steps=dropout_steps,
         task_queue_manager=task_queue_manager,
-        report_stats_from_parameters=opt.report_stats_from_parameters,
+        report_stats_from_parameters=opts.report_stats_from_parameters,
     )
     return trainer
 

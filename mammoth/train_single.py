@@ -16,40 +16,41 @@ from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
 
-def configure_process(opt, device_id):
+def configure_process(opts, device_id):
     logger.info("logger set device {} ".format(device_id))
     if device_id >= 0:
         torch.cuda.set_device(device_id)
-    set_random_seed(opt.seed, device_id >= 0)
+    set_random_seed(opts.seed, device_id >= 0)
 
 
-def _get_model_opts(opt, checkpoint=None):
+def _get_model_opts(opts, checkpoint=None):
     """Get `model_opt` to build model, may load from `checkpoint` if any."""
     if checkpoint is not None:
-        model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opt"])
+        model_opt = ArgumentParser.ckpt_model_opts(checkpoint["opts"])
         ArgumentParser.update_model_opts(model_opt)
         ArgumentParser.validate_model_opts(model_opt)
-        if opt.tensorboard_log_dir == model_opt.tensorboard_log_dir and hasattr(model_opt, 'tensorboard_log_dir_dated'):
+        if opts.tensorboard_log_dir == model_opt.tensorboard_log_dir and \
+                hasattr(model_opt, 'tensorboard_log_dir_dated'):
             # ensure tensorboard output is written in the directory
             # of previous checkpoints
-            opt.tensorboard_log_dir_dated = model_opt.tensorboard_log_dir_dated
+            opts.tensorboard_log_dir_dated = model_opt.tensorboard_log_dir_dated
         # Override checkpoint's update_embeddings as it defaults to false
-        model_opt.update_vocab = opt.update_vocab
+        model_opt.update_vocab = opts.update_vocab
     else:
-        model_opt = opt
+        model_opt = opts
     return model_opt
 
 
-def _build_valid_iter(opt, vocabs_dict, transforms_cls, task_queue_manager):
+def _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager):
     """Build iterator used for validation."""
-    if not any(opt.data[corpus_id].get('path_valid_src', False) for corpus_id in opt.data.keys()):
+    if not any(opts.tasks[corpus_id].get('path_valid_src', False) for corpus_id in opts.tasks.keys()):
         return None
     logger.info("creating validation iterator")
     valid_iter = DynamicDatasetIter.from_opts(
         task_queue_manager=task_queue_manager,
         transforms_cls=transforms_cls,
         vocabs_dict=vocabs_dict,
-        opts=opt,
+        opts=opts,
         is_train=False,
     )
     return valid_iter
@@ -107,7 +108,7 @@ def init_distributed(model, task_queue_manager):
 
 
 def main(
-    opt,
+    opts,
     vocabs_dict,
     device_context,
     error_queue=None,
@@ -116,26 +117,26 @@ def main(
     task_queue_manager=None,
 ):
     """Start training on `device_id`."""
-    # NOTE: It's important that ``opt`` has been validated and updated
+    # NOTE: It's important that ``opts`` has been validated and updated
     # at this point.
     # N.B: task_queue_manager is already local
 
-    init_logger(opt.log_file, gpu_id=device_context.id)
+    init_logger(opts.log_file, gpu_id=device_context.id)
     if device_context.is_distributed():
         sleep_s = device_context.local_rank * 3
         logger.warning(f'sleeping {sleep_s}s to alleviate ROCm deadlock')
         time.sleep(sleep_s)
-        configure_process(opt, device_context.local_rank)
+        configure_process(opts, device_context.local_rank)
         gpu_rank_t = torch.distributed.get_rank()
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
-    transforms_cls = get_transforms_cls(opt._all_transform)
+    transforms_cls = get_transforms_cls(opts._all_transform)
     checkpoint = None
-    model_opt = _get_model_opts(opt, checkpoint=checkpoint)
+    model_opt = _get_model_opts(opts, checkpoint=checkpoint)
 
     # Build model.
 
-    model, generators_md = build_model(model_opt, opt, vocabs_dict, task_queue_manager, checkpoint)
+    model, generators_md = build_model(model_opt, opts, vocabs_dict, task_queue_manager, checkpoint)
 
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
@@ -149,19 +150,19 @@ def main(
 
     # Build optimizer.
     logger.info("{} - Build optimizer".format(device_context.id))
-    optim = Optimizer.from_opt(
+    optim = Optimizer.from_opts(
         model,
-        opt,
+        opts,
         task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context)
+    model_saver = build_model_saver(model_opt, opts, model, vocabs_dict, optim, device_context)
 
     logger.info("{} - Build trainer".format(device_context.id))
     trainer = build_trainer(
-        opt,
+        opts,
         device_context,
         model,
         vocabs_dict,
@@ -177,7 +178,7 @@ def main(
             task_queue_manager=task_queue_manager,
             transforms_cls=transforms_cls,
             vocabs_dict=vocabs_dict,
-            opts=opt,
+            opts=opts,
             is_train=True,
         )
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
@@ -198,15 +199,15 @@ def main(
         train_iter = _train_iter()
     # train_iter = iter_on_device(train_iter, device_context)
     logger.info("Device {} - Valid iter".format(device_context.id))
-    valid_iter = _build_valid_iter(opt, vocabs_dict, transforms_cls, task_queue_manager)
+    valid_iter = _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager)
 
-    if len(opt.gpu_ranks):
+    if len(opts.gpu_ranks):
         if device_context.is_master():
-            logger.info('Starting training on GPU: %s' % opt.gpu_ranks)
+            logger.info('Starting training on GPU: %s' % opts.gpu_ranks)
     else:
         logger.info('Starting training on CPU, could be very slow')
-    train_steps = opt.train_steps
-    if opt.single_pass and train_steps > 0:
+    train_steps = opts.train_steps
+    if opts.single_pass and train_steps > 0:
         if device_context.is_master():
             logger.warning("Option single_pass is enabled, ignoring train_steps.")
         train_steps = 0
@@ -214,9 +215,9 @@ def main(
     trainer.train(
         train_iter,
         train_steps,
-        save_checkpoint_steps=opt.save_checkpoint_steps,
+        save_checkpoint_steps=opts.save_checkpoint_steps,
         valid_iter=valid_iter,
-        valid_steps=opt.valid_steps,
+        valid_steps=opts.valid_steps,
         device_context=device_context,
     )
 

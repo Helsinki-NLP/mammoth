@@ -63,12 +63,12 @@ DEFAULT_SCORERS = [PPLScorer(), AccuracyScorer()]
 SCORER_BUILDER = {"ppl": PPLScorer, "accuracy": AccuracyScorer}
 
 
-def scorers_from_opts(opt):
-    if opt.early_stopping_criteria is None:
+def scorers_from_opts(opts):
+    if opts.early_stopping_criteria is None:
         return DEFAULT_SCORERS
     else:
         scorers = []
-        for criterion in set(opt.early_stopping_criteria):
+        for criterion in set(opts.early_stopping_criteria):
             assert criterion in SCORER_BUILDER.keys(), "Criterion {} not found".format(criterion)
             scorers.append(SCORER_BUILDER[criterion]())
         return scorers

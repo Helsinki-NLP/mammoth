@@ -48,32 +48,32 @@ class WorldContext:
         )
 
     @classmethod
-    def from_opt(cls, opt):
-        gpus_per_node = len(opt.gpu_ranks)
-        world_size = int(opt.world_size) if gpus_per_node > 0 else 0
+    def from_opts(cls, opts):
+        gpus_per_node = len(opts.gpu_ranks)
+        world_size = int(opts.world_size) if gpus_per_node > 0 else 0
         multinode = gpus_per_node != world_size
         if world_size <= 0:
             # setting a non-positive world size means use CPU
             device_context_enum = DeviceContextEnum.CPU
-            if opt.n_nodes != 1:
+            if opts.n_nodes != 1:
                 raise ValueError('CPU training is only possible on a single node')
         elif world_size == 1:
             # world size 1 uses GPU, but is not distributed
             device_context_enum = DeviceContextEnum.SINGLE_GPU
-            if opt.n_nodes != 1:
+            if opts.n_nodes != 1:
                 raise ValueError(
                     f'Invalid single-gpu node configuration: '
-                    f'n_nodes {opt.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
+                    f'n_nodes {opts.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
                 )
         else:
             # world size > 1
-            if multinode and opt.n_nodes == 1:
+            if multinode and opts.n_nodes == 1:
                 raise ValueError(
                     f'Invalid multi-node configuration: '
-                    f'n_nodes {opt.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
+                    f'n_nodes {opts.n_nodes} gpus_per_node {gpus_per_node} world_size {world_size}'
                 )
             device_context_enum = DeviceContextEnum.MULTI_GPU
-        world_context = WorldContext(context=device_context_enum, n_nodes=opt.n_nodes, gpus_per_node=gpus_per_node)
+        world_context = WorldContext(context=device_context_enum, n_nodes=opts.n_nodes, gpus_per_node=gpus_per_node)
         return world_context
 
 

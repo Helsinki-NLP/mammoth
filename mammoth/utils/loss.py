@@ -10,7 +10,7 @@ import mammoth
 from mammoth.constants import ModelTask, DefaultTokens
 
 
-def build_loss_compute(model, tgt_vocab, opt, train=True, generator=None):
+def build_loss_compute(model, tgt_vocab, opts, train=True, generator=None):
     """
     Returns a LossCompute subclass which wraps around an nn.Module subclass
     (such as nn.NLLLoss) which defines the loss criterion. The LossCompute
@@ -19,20 +19,20 @@ def build_loss_compute(model, tgt_vocab, opt, train=True, generator=None):
     Currently, the NMTLossCompute class handles all loss computation except
     for when using a copy mechanism.
     """
-    device = torch.device("cuda" if mammoth.utils.misc.use_gpu(opt) else "cpu")
+    device = torch.device("cuda" if mammoth.utils.misc.use_gpu(opts) else "cpu")
 
     padding_idx = tgt_vocab.stoi[DefaultTokens.PAD]
     unk_idx = tgt_vocab.stoi[DefaultTokens.UNK]
 
-    if opt.lambda_coverage != 0:
-        assert opt.coverage_attn, "--coverage_attn needs to be set in order to use --lambda_coverage != 0"
+    if opts.lambda_coverage != 0:
+        assert opts.coverage_attn, "--coverage_attn needs to be set in order to use --lambda_coverage != 0"
 
-    if opt.copy_attn:
+    if opts.copy_attn:
         criterion = mammoth.modules.CopyGeneratorLoss(
-            len(tgt_vocab), opt.copy_attn_force, unk_index=unk_idx, ignore_index=padding_idx
+            len(tgt_vocab), opts.copy_attn_force, unk_index=unk_idx, ignore_index=padding_idx
         )
-    elif opt.label_smoothing > 0 and train:
-        criterion = LabelSmoothingLoss(opt.label_smoothing, len(tgt_vocab), ignore_index=padding_idx)
+    elif opts.label_smoothing > 0 and train:
+        criterion = LabelSmoothingLoss(opts.label_smoothing, len(tgt_vocab), ignore_index=padding_idx)
     else:
         criterion = nn.NLLLoss(ignore_index=padding_idx, reduction='sum')
 
@@ -44,35 +44,35 @@ def build_loss_compute(model, tgt_vocab, opt, train=True, generator=None):
     loss_gen = (
         generator[0] if use_raw_logits else generator
     )  # loss_gen = model.generator[0] if use_raw_logits else model.generator
-    if opt.copy_attn:
-        if opt.model_task == ModelTask.SEQ2SEQ:
+    if opts.copy_attn:
+        if opts.model_task == ModelTask.SEQ2SEQ:
             compute = mammoth.modules.CopyGeneratorLossCompute(
-                criterion, loss_gen, tgt_vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
+                criterion, loss_gen, tgt_vocab, opts.copy_loss_by_seqlength, lambda_coverage=opts.lambda_coverage
             )
-        elif opt.model_task == ModelTask.LANGUAGE_MODEL:
+        elif opts.model_task == ModelTask.LANGUAGE_MODEL:
             compute = mammoth.modules.CopyGeneratorLMLossCompute(
-                criterion, loss_gen, tgt_vocab, opt.copy_loss_by_seqlength, lambda_coverage=opt.lambda_coverage
+                criterion, loss_gen, tgt_vocab, opts.copy_loss_by_seqlength, lambda_coverage=opts.lambda_coverage
             )
         else:
-            raise ValueError(f"No copy generator loss defined for task {opt.model_task}")
+            raise ValueError(f"No copy generator loss defined for task {opts.model_task}")
     else:
-        if opt.model_task == ModelTask.SEQ2SEQ:
+        if opts.model_task == ModelTask.SEQ2SEQ:
             compute = NMTLossCompute(
                 criterion,
                 loss_gen,
-                lambda_coverage=opt.lambda_coverage,
-                lambda_align=opt.lambda_align,
+                lambda_coverage=opts.lambda_coverage,
+                lambda_align=opts.lambda_align,
             )
-        elif opt.model_task == ModelTask.LANGUAGE_MODEL:
-            assert opt.lambda_align == 0.0, "lamdba_align not supported in LM loss"
+        elif opts.model_task == ModelTask.LANGUAGE_MODEL:
+            assert opts.lambda_align == 0.0, "lamdba_align not supported in LM loss"
             compute = LMLossCompute(
                 criterion,
                 loss_gen,
-                lambda_coverage=opt.lambda_coverage,
-                lambda_align=opt.lambda_align,
+                lambda_coverage=opts.lambda_coverage,
+                lambda_align=opts.lambda_align,
             )
         else:
-            raise ValueError(f"No compute loss defined for task {opt.model_task}")
+            raise ValueError(f"No compute loss defined for task {opts.model_task}")
     compute.to(device)
 
     return compute

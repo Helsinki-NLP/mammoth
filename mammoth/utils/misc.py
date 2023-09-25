@@ -79,11 +79,11 @@ def tile(x, count, dim=0):
     return x
 
 
-def use_gpu(opt):
+def use_gpu(opts):
     """
     Creates a boolean if gpu used
     """
-    return (hasattr(opt, 'gpu_ranks') and len(opt.gpu_ranks) > 0) or (hasattr(opt, 'gpu') and opt.gpu > -1)
+    return (hasattr(opts, 'gpu_ranks') and len(opts.gpu_ranks) > 0) or (hasattr(opts, 'gpu') and opts.gpu > -1)
 
 
 def set_random_seed(seed, is_cuda):

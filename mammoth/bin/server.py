@@ -50,9 +50,9 @@ def start(config_file, url_root="./translator", host="0.0.0.0", port=5000, debug
             timeout = data['timeout']
             del data['timeout']
 
-        opt = data.get('opt', None)
+        opts = data.get('opts', None)
         try:
-            model_id, load_time = translation_server.clone_model(model_id, opt, timeout)
+            model_id, load_time = translation_server.clone_model(model_id, opts, timeout)
         except ServerModelError as e:
             out['status'] = STATUS_ERROR
             out['error'] = str(e)

@@ -20,46 +20,46 @@ from mammoth.inputters.dataset import ParallelCorpus
 from mammoth.inputters.dataloader import build_dataloader
 
 
-def build_translator(opt, task, report_score=True, logger=None, out_file=None):
+def build_translator(opts, task, report_score=True, logger=None, out_file=None):
     if out_file is None:
-        outdir = os.path.dirname(opt.output)
+        outdir = os.path.dirname(opts.output)
         if outdir and not os.path.isdir(outdir):
             # FIXME use warnings instead
             logger.info('WARNING: output file directory does not exist... creating it.')
-            os.makedirs(os.path.dirname(opt.output), exist_ok=True)
-        out_file = codecs.open(opt.output, "w+", "utf-8")
+            os.makedirs(os.path.dirname(opts.output), exist_ok=True)
+        out_file = codecs.open(opts.output, "w+", "utf-8")
 
     load_test_model = (
-        mammoth.modules.decoder_ensemble.load_test_model if len(opt.models) > 3
+        mammoth.modules.decoder_ensemble.load_test_model if len(opts.models) > 3
         else mammoth.model_builder.load_test_multitask_model
     )
     if logger:
         logger.info(str(task))
-    vocabs, model, model_opt = load_test_model(opt)
+    vocabs, model, model_opt = load_test_model(opts)
 
-    scorer = mammoth.translate.GNMTGlobalScorer.from_opt(opt)
+    scorer = mammoth.translate.GNMTGlobalScorer.from_opts(opts)
 
     if model_opt.model_task == ModelTask.LANGUAGE_MODEL:
-        translator = GeneratorLM.from_opt(
+        translator = GeneratorLM.from_opts(
             model,
             vocabs,
-            opt,
+            opts,
             model_opt,
             global_scorer=scorer,
             out_file=out_file,
-            report_align=opt.report_align,
+            report_align=opts.report_align,
             report_score=report_score,
             logger=logger,
         )
     else:
-        translator = Translator.from_opt(
+        translator = Translator.from_opts(
             model,
             vocabs,
-            opt,
+            opts,
             model_opt,
             global_scorer=scorer,
             out_file=out_file,
-            report_align=opt.report_align,
+            report_align=opts.report_align,
             report_score=report_score,
             logger=logger,
             task=task,
@@ -236,11 +236,11 @@ class Inference(object):
         set_random_seed(seed, self._use_cuda)
 
     @classmethod
-    def from_opt(
+    def from_opts(
         cls,
         model,
         vocabs,
-        opt,
+        opts,
         model_opt,
         global_scorer=None,
         out_file=None,
@@ -255,7 +255,7 @@ class Inference(object):
             model (mammoth.modules.NMTModel): See :func:`__init__()`.
             vocabs (dict[str, mammoth.inputters.Vocab]): See
                 :func:`__init__()`.
-            opt (argparse.Namespace): Command line options
+            opts (argparse.Namespace): Command line options
             model_opt (argparse.Namespace): Command line options saved with
                 the model checkpoint.
             global_scorer (mammoth.translate.GNMTGlobalScorer): See
@@ -273,35 +273,35 @@ class Inference(object):
         return cls(
             model,
             vocabs,
-            opt.src,
-            tgt_file_path=opt.tgt,
-            gpu=opt.gpu,
-            n_best=opt.n_best,
-            min_length=opt.min_length,
-            max_length=opt.max_length,
-            ratio=opt.ratio,
-            beam_size=opt.beam_size,
-            random_sampling_topk=opt.random_sampling_topk,
-            random_sampling_topp=opt.random_sampling_topp,
-            random_sampling_temp=opt.random_sampling_temp,
-            stepwise_penalty=opt.stepwise_penalty,
-            dump_beam=opt.dump_beam,
-            block_ngram_repeat=opt.block_ngram_repeat,
-            ignore_when_blocking=set(opt.ignore_when_blocking),
-            replace_unk=opt.replace_unk,
-            ban_unk_token=opt.ban_unk_token,
-            tgt_prefix=opt.tgt_prefix,
-            phrase_table=opt.phrase_table,
-            data_type=opt.data_type,
-            verbose=opt.verbose,
-            report_time=opt.report_time,
+            opts.src,
+            tgt_file_path=opts.tgt,
+            gpu=opts.gpu,
+            n_best=opts.n_best,
+            min_length=opts.min_length,
+            max_length=opts.max_length,
+            ratio=opts.ratio,
+            beam_size=opts.beam_size,
+            random_sampling_topk=opts.random_sampling_topk,
+            random_sampling_topp=opts.random_sampling_topp,
+            random_sampling_temp=opts.random_sampling_temp,
+            stepwise_penalty=opts.stepwise_penalty,
+            dump_beam=opts.dump_beam,
+            block_ngram_repeat=opts.block_ngram_repeat,
+            ignore_when_blocking=set(opts.ignore_when_blocking),
+            replace_unk=opts.replace_unk,
+            ban_unk_token=opts.ban_unk_token,
+            tgt_prefix=opts.tgt_prefix,
+            phrase_table=opts.phrase_table,
+            data_type=opts.data_type,
+            verbose=opts.verbose,
+            report_time=opts.report_time,
             copy_attn=model_opt.copy_attn,
             global_scorer=global_scorer,
             out_file=out_file,
             report_align=report_align,
             report_score=report_score,
             logger=logger,
-            seed=opt.seed,
+            seed=opts.seed,
             task=task,
         )
 

@@ -17,32 +17,32 @@ class LayerStackEncoder(EncoderBase):
         self._active: List[str] = []
 
     @classmethod
-    def from_opt(cls, opt, embeddings, task_queue_manager):
+    def from_opts(cls, opts, embeddings, task_queue_manager):
         """Alternate constructor for use during training."""
         encoders = nn.ModuleList()
-        for layer_stack_index, n_layers in enumerate(opt.enc_layers):
+        for layer_stack_index, n_layers in enumerate(opts.enc_layers):
             stacks = nn.ModuleDict()
-            is_on_top = layer_stack_index == len(opt.enc_layers) - 1
+            is_on_top = layer_stack_index == len(opts.enc_layers) - 1
             for module_id in task_queue_manager.get_encoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
                     continue
                 stacks[module_id] = AdaptedTransformerEncoder(
                     n_layers,
-                    opt.rnn_size,
-                    opt.heads,
-                    opt.transformer_ff,
-                    opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
+                    opts.rnn_size,
+                    opts.heads,
+                    opts.transformer_ff,
+                    opts.dropout[0] if type(opts.dropout) is list else opts.dropout,
                     (
-                        opt.attention_dropout[0]
-                        if type(opt.attention_dropout) is list
-                        else opt.attention_dropout
+                        opts.attention_dropout[0]
+                        if type(opts.attention_dropout) is list
+                        else opts.attention_dropout
                     ),
                     None,  # embeddings,
-                    opt.max_relative_positions,
-                    pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
+                    opts.max_relative_positions,
+                    pos_ffn_activation_fn=opts.pos_ffn_activation_fn,
                     layer_norm_module=(
-                        nn.LayerNorm(opt.rnn_size, eps=1e-6) if is_on_top
+                        nn.LayerNorm(opts.rnn_size, eps=1e-6) if is_on_top
                         else nn.Identity()
                     )
                 )

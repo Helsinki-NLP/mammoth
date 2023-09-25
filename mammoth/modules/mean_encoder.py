@@ -18,9 +18,9 @@ class MeanEncoder(EncoderBase):
         self.embeddings = embeddings
 
     @classmethod
-    def from_opt(cls, opt, embeddings):
+    def from_opts(cls, opts, embeddings):
         """Alternate constructor."""
-        return cls(opt.enc_layers, embeddings)
+        return cls(opts.enc_layers, embeddings)
 
     def forward(self, src, lengths=None):
         """See :func:`EncoderBase.forward()`"""

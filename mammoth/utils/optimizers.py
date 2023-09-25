@@ -60,7 +60,7 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     return optimizer
 
 
-def build_torch_optimizer(model, opt, task_queue_manager):
+def build_torch_optimizer(model, opts, task_queue_manager):
     """Builds the PyTorch optimizer.
 
     We use the default parameters for Adam that are suggested by
@@ -76,87 +76,91 @@ def build_torch_optimizer(model, opt, task_queue_manager):
 
     Args:
       model: The model to optimize.
-      opt. The dictionary of options.
+      opts. The dictionary of options.
 
     Returns:
       A ``torch.optim.Optimizer`` instance.
     """
     params = [p for p in model.parameters() if p.requires_grad]
-    betas = [opt.adam_beta1, opt.adam_beta2]
-    if opt.optim == 'sgd':
-        optimizer = optim.SGD(params, lr=opt.learning_rate)
-    elif opt.optim == 'adagrad':
-        optimizer = optim.Adagrad(params, lr=opt.learning_rate, initial_accumulator_value=opt.adagrad_accumulator_init)
-    elif opt.optim == 'adadelta':
-        optimizer = optim.Adadelta(params, lr=opt.learning_rate)
-    elif opt.optim == 'adafactor':
+    betas = [opts.adam_beta1, opts.adam_beta2]
+    if opts.optim == 'sgd':
+        optimizer = optim.SGD(params, lr=opts.learning_rate)
+    elif opts.optim == 'adagrad':
+        optimizer = optim.Adagrad(
+            params,
+            lr=opts.learning_rate,
+            initial_accumulator_value=opts.adagrad_accumulator_init,
+        )
+    elif opts.optim == 'adadelta':
+        optimizer = optim.Adadelta(params, lr=opts.learning_rate)
+    elif opts.optim == 'adafactor':
         optimizer = attention_bridge_optimizer(
             model,
             task_queue_manager,
-            lambda params: AdaFactorFairSeq(params, weight_decay=opt.weight_decay),
+            lambda params: AdaFactorFairSeq(params, weight_decay=opts.weight_decay),
         )
-    elif opt.optim == 'adam':
+    elif opts.optim == 'adam':
         optimizer = attention_bridge_optimizer(
             model,
             task_queue_manager,
             lambda params: optim.Adam(
-                params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
+                params, lr=opts.learning_rate, betas=betas, eps=1e-9, weight_decay=opts.weight_decay
             )
         )
-    elif opt.optim == 'adamw':
+    elif opts.optim == 'adamw':
         optimizer = attention_bridge_optimizer(
             model,
             task_queue_manager,
             lambda params: optim.AdamW(
-                params, lr=opt.learning_rate, betas=betas, eps=1e-9, weight_decay=opt.weight_decay
+                params, lr=opts.learning_rate, betas=betas, eps=1e-9, weight_decay=opts.weight_decay
             )
         )
-    elif opt.optim == 'fusedadam':
+    elif opts.optim == 'fusedadam':
         # we use here a FusedAdam() copy of an old Apex repo
-        optimizer = FusedAdam(params, lr=opt.learning_rate, betas=betas)
-        if opt.model_dtype == 'fp16':
+        optimizer = FusedAdam(params, lr=opts.learning_rate, betas=betas)
+        if opts.model_dtype == 'fp16':
             import apex
 
             # In this case use the old FusedAdam with FP16_optimizer wrapper
-            static_loss_scale = opt.loss_scale
-            dynamic_loss_scale = opt.loss_scale == 0
+            static_loss_scale = opts.loss_scale
+            dynamic_loss_scale = opts.loss_scale == 0
             optimizer = apex.contrib.optimizers.FP16_Optimizer(
                 optimizer, static_loss_scale=static_loss_scale, dynamic_loss_scale=dynamic_loss_scale
             )
     else:
-        raise ValueError('Invalid optimizer type: ' + opt.optim)
+        raise ValueError('Invalid optimizer type: ' + opts.optim)
 
     return optimizer
 
 
-def make_learning_rate_decay_fn(opt):
+def make_learning_rate_decay_fn(opts):
     """Returns the learning decay function from options."""
-    if opt.decay_method == 'noam':
-        return functools.partial(noam_decay, warmup_steps=opt.warmup_steps, model_size=opt.rnn_size)
-    elif opt.decay_method == 'noamwd':
+    if opts.decay_method == 'noam':
+        return functools.partial(noam_decay, warmup_steps=opts.warmup_steps, model_size=opts.rnn_size)
+    elif opts.decay_method == 'noamwd':
         return functools.partial(
             noamwd_decay,
-            warmup_steps=opt.warmup_steps,
-            model_size=opt.rnn_size,
-            rate=opt.learning_rate_decay,
-            decay_steps=opt.decay_steps,
-            start_step=opt.start_decay_steps,
+            warmup_steps=opts.warmup_steps,
+            model_size=opts.rnn_size,
+            rate=opts.learning_rate_decay,
+            decay_steps=opts.decay_steps,
+            start_step=opts.start_decay_steps,
         )
-    elif opt.decay_method == 'rsqrt':
-        return functools.partial(rsqrt_decay, warmup_steps=opt.warmup_steps)
-    elif opt.decay_method == 'linear_warmup':
+    elif opts.decay_method == 'rsqrt':
+        return functools.partial(rsqrt_decay, warmup_steps=opts.warmup_steps)
+    elif opts.decay_method == 'linear_warmup':
         return functools.partial(
             linear_warmup_decay,
-            warmup_steps=opt.warmup_steps,
-            rate=opt.learning_rate,
-            train_steps=opt.train_steps,
+            warmup_steps=opts.warmup_steps,
+            rate=opts.learning_rate,
+            train_steps=opts.train_steps,
         )
-    elif opt.start_decay_steps is not None:
+    elif opts.start_decay_steps is not None:
         return functools.partial(
             exponential_decay,
-            rate=opt.learning_rate_decay,
-            decay_steps=opt.decay_steps,
-            start_step=opt.start_decay_steps,
+            rate=opts.learning_rate_decay,
+            decay_steps=opts.decay_steps,
+            start_step=opts.start_decay_steps,
         )
 
 
@@ -275,24 +279,24 @@ class Optimizer(object):
         self._scaler = None
 
     @classmethod
-    def from_opt(cls, model, opt, task_queue_manager, checkpoint=None):
+    def from_opts(cls, model, opts, task_queue_manager, checkpoint=None):
         """Builds the optimizer from options.
 
         Args:
           cls: The ``Optimizer`` class to instantiate.
           model: The model to optimize.
-          opt: The dict of user options.
+          opts: The dict of user options.
           checkpoint: An optional checkpoint to load states from.
 
         Returns:
           An ``Optimizer`` instance.
         """
-        optim_opt = opt
+        optim_opt = opts
         optim_state_dict = None
 
-        if opt.train_from and checkpoint is not None:
+        if opts.train_from and checkpoint is not None:
             optim = checkpoint['optim']
-            ckpt_opt = checkpoint['opt']
+            ckpt_opt = checkpoint['opts']
             ckpt_state_dict = {}
             if isinstance(optim, Optimizer):  # Backward compatibility.
                 ckpt_state_dict['training_step'] = optim._step + 1
@@ -301,19 +305,19 @@ class Optimizer(object):
             else:
                 ckpt_state_dict = optim
 
-            if opt.reset_optim == 'none':
+            if opts.reset_optim == 'none':
                 # Load everything from the checkpoint.
                 optim_opt = ckpt_opt
                 optim_state_dict = ckpt_state_dict
-            elif opt.reset_optim == 'all':
+            elif opts.reset_optim == 'all':
                 # Build everything from scratch.
                 pass
-            elif opt.reset_optim == 'states':
+            elif opts.reset_optim == 'states':
                 # Reset optimizer, keep options.
                 optim_opt = ckpt_opt
                 optim_state_dict = ckpt_state_dict
                 del optim_state_dict['optimizer']
-            elif opt.reset_optim == 'keep_states':
+            elif opts.reset_optim == 'keep_states':
                 # Reset options, keep optimizer.
                 optim_state_dict = ckpt_state_dict
 
@@ -324,8 +328,8 @@ class Optimizer(object):
             max_grad_norm=optim_opt.max_grad_norm,
         )
 
-        if opt.model_dtype == "fp16":
-            if opt.optim == "fusedadam":
+        if opts.model_dtype == "fp16":
+            if opts.optim == "fusedadam":
                 optimizer._fp16 = "legacy"
             else:
                 optimizer._fp16 = "amp"

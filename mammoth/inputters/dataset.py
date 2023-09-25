@@ -177,7 +177,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
-    corpus_opts = opts.data[task.corpus_id]
+    corpus_opts = opts.tasks[task.corpus_id]
     transforms_to_apply = corpus_opts.get('transforms', None)
     transforms_to_apply = transforms_to_apply or opts.get('transforms', None)
     transforms_to_apply = transforms_to_apply or []
@@ -245,8 +245,8 @@ def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
 
     corpora = {
         corpus_id: read_examples_from_files(
-                opts.data[corpus_id]["path_src"],
-                opts.data[corpus_id]["path_tgt"],
+                opts.tasks[corpus_id]["path_src"],
+                opts.tasks[corpus_id]["path_tgt"],
                 # FIXME this is likely not working
                 transforms_fn=TransformPipe(transforms).apply if transforms else lambda x: x,
             )

@@ -13,7 +13,7 @@ class DecoderBase(nn.Module):
         self.attentional = attentional
 
     @classmethod
-    def from_opt(cls, opt, embeddings):
+    def from_opts(cls, opts, embeddings):
         """Alternate constructor.
 
         Subclasses should override this method.

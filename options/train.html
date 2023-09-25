@@ -95,7 +95,6 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../config_config.html">Config-config tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attention_bridges.html">Attention Bridge</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../FAQ.html">Questions</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -141,11 +140,11 @@
 </ul>
 <p class="caption"><span class="caption-text">API</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.html">Framework</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.modules.html">Modules</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.translation.html">Translation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.translate.translation_server.html">Server</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.inputters.html">Data Loaders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.inputters.html">Data Loaders</a></li>
 </ul>
 
             
@@ -268,17 +267,12 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">feat_vec_exponent</span> <span class="n">FEAT_VEC_EXPONENT</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">model_task</span> <span class="p">{</span><span class="n">seq2seq</span><span class="p">,</span><span class="n">lm</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">model_type</span> <span class="p">{</span><span class="n">text</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">model_dtype</span> <span class="p">{</span><span class="n">fp32</span><span class="p">,</span><span class="n">fp16</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">encoder_type</span> <span class="p">{</span><span class="n">rnn</span><span class="p">,</span><span class="n">brnn</span><span class="p">,</span><span class="n">ggnn</span><span class="p">,</span><span class="n">mean</span><span class="p">,</span><span class="n">transformer</span><span class="p">,</span><span class="n">cnn</span><span class="p">,</span><span class="n">transformer_lm</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">decoder_type</span> <span class="p">{</span><span class="n">rnn</span><span class="p">,</span><span class="n">transformer</span><span class="p">,</span><span class="n">cnn</span><span class="p">,</span><span class="n">transformer_lm</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">layers</span> <span class="n">LAYERS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">enc_layers</span> <span class="n">ENC_LAYERS</span> <span class="p">[</span><span class="n">ENC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">encoder_type</span> <span class="p">{</span><span class="n">mean</span><span class="p">,</span><span class="n">transformer</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">decoder_type</span> <span class="p">{</span><span class="n">transformer</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">layers</span> <span class="n">LAYERS</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">enc_layers</span> <span class="n">ENC_LAYERS</span> <span class="p">[</span><span class="n">ENC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">dec_layers</span> <span class="n">DEC_LAYERS</span> <span class="p">[</span><span class="n">DEC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">rnn_size</span> <span class="n">RNN_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">enc_rnn_size</span> <span class="n">ENC_RNN_SIZE</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">dec_rnn_size</span> <span class="n">DEC_RNN_SIZE</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">cnn_kernel_width</span> <span class="n">CNN_KERNEL_WIDTH</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">pos_ffn_activation_fn</span> <span class="p">{</span><span class="n">relu</span><span class="p">,</span><span class="n">gelu</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">input_feed</span> <span class="n">INPUT_FEED</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">bridge</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">rnn_type</span> <span class="p">{</span><span class="n">LSTM</span><span class="p">,</span><span class="n">GRU</span><span class="p">,</span><span class="n">SRU</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">brnn</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">context_gate</span> <span class="p">{</span><span class="n">source</span><span class="p">,</span><span class="n">target</span><span class="p">,</span><span class="n">both</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">rnn_size</span> <span class="n">RNN_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">pos_ffn_activation_fn</span> <span class="p">{</span><span class="n">relu</span><span class="p">,</span><span class="n">gelu</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">bridge</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">context_gate</span> <span class="p">{</span><span class="n">source</span><span class="p">,</span><span class="n">target</span><span class="p">,</span><span class="n">both</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">bridge_extra_node</span> <span class="n">BRIDGE_EXTRA_NODE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">bidir_edges</span> <span class="n">BIDIR_EDGES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">state_dim</span> <span class="n">STATE_DIM</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">n_edge_types</span> <span class="n">N_EDGE_TYPES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">n_node</span> <span class="n">N_NODE</span><span class="p">]</span>
@@ -711,14 +705,14 @@
 <p>Default: “fp32”</p>
 </dd>
 <dt><kbd>--encoder_type, -encoder_type</kbd></dt>
-<dd><p>Possible choices: rnn, brnn, ggnn, mean, transformer, cnn, transformer_lm</p>
-<p>Type of encoder layer to use. Non-RNN layers are experimental. Options are [rnn|brnn|ggnn|mean|transformer|cnn|transformer_lm].</p>
-<p>Default: “rnn”</p>
+<dd><p>Possible choices: mean, transformer</p>
+<p>Type of encoder layer to use. Non-RNN layers are experimental. Options are [mean|transformer].</p>
+<p>Default: “transformer”</p>
 </dd>
 <dt><kbd>--decoder_type, -decoder_type</kbd></dt>
-<dd><p>Possible choices: rnn, transformer, cnn, transformer_lm</p>
-<p>Type of decoder layer to use. Non-RNN layers are experimental. Options are [rnn|transformer|cnn|transformer].</p>
-<p>Default: “rnn”</p>
+<dd><p>Possible choices: transformer</p>
+<p>Type of decoder layer to use. Non-RNN layers are experimental. Options are [transformer].</p>
+<p>Default: “transformer”</p>
 </dd>
 <dt><kbd>--layers, -layers</kbd></dt>
 <dd><p>Deprecated</p>
@@ -731,41 +725,17 @@
 <dd><p>Number of layers in each decoder</p>
 </dd>
 <dt><kbd>--rnn_size, -rnn_size</kbd></dt>
-<dd><p>Size of rnn hidden states. Overwrites enc_rnn_size and dec_rnn_size</p>
+<dd><p>Size of rnn hidden states.</p>
 <p>Default: -1</p>
-</dd>
-<dt><kbd>--enc_rnn_size, -enc_rnn_size</kbd></dt>
-<dd><p>Size of encoder rnn hidden states.</p>
-<p>Default: 500</p>
-</dd>
-<dt><kbd>--dec_rnn_size, -dec_rnn_size</kbd></dt>
-<dd><p>Size of decoder rnn hidden states.</p>
-<p>Default: 500</p>
-</dd>
-<dt><kbd>--cnn_kernel_width, -cnn_kernel_width</kbd></dt>
-<dd><p>Size of windows in the cnn, the kernel_size is (cnn_kernel_width, 1) in conv layer</p>
-<p>Default: 3</p>
 </dd>
 <dt><kbd>--pos_ffn_activation_fn, -pos_ffn_activation_fn</kbd></dt>
 <dd><p>Possible choices: relu, gelu</p>
 <p>The activation function to use in PositionwiseFeedForward layer. Choices are dict_keys([‘relu’, ‘gelu’]). Default to relu.</p>
 <p>Default: “relu”</p>
 </dd>
-<dt><kbd>--input_feed, -input_feed</kbd></dt>
-<dd><p>Feed the context vector at each time step as additional input (via concatenation with the word embeddings) to the decoder.</p>
-<p>Default: 1</p>
-</dd>
 <dt><kbd>--bridge, -bridge</kbd></dt>
 <dd><p>Have an additional layer between the last encoder state and the first decoder state</p>
 <p>Default: False</p>
-</dd>
-<dt><kbd>--rnn_type, -rnn_type</kbd></dt>
-<dd><p>Possible choices: LSTM, GRU, SRU</p>
-<p>The gate type to use in the RNNs</p>
-<p>Default: “LSTM”</p>
-</dd>
-<dt><kbd>--brnn, -brnn</kbd></dt>
-<dd><p>Deprecated, use <cite>encoder_type</cite>.</p>
 </dd>
 <dt><kbd>--context_gate, -context_gate</kbd></dt>
 <dd><p>Possible choices: source, target, both</p>
@@ -1227,7 +1197,7 @@
 </dd>
 <dt><kbd>--tensorboard_log_dir, -tensorboard_log_dir</kbd></dt>
 <dd><p>Log directory for Tensorboard. This is also the name of the run.</p>
-<p>Default: “runs/onmt”</p>
+<p>Default: “runs/mammoth”</p>
 </dd>
 <dt><kbd>--report_stats_from_parameters, -report_stats_from_parameters=</kbd></dt>
 <dd><p>Report parameter-level statistics in tensorboard. This has a huge impact on performance: only use for debugging.</p>

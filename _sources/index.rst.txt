@@ -38,8 +38,8 @@ Contents
       :caption: API
       :maxdepth: 2
 
-      onmt.rst
-      onmt.modules.rst
-      onmt.translation.rst
-      onmt.translate.translation_server.rst
-      onmt.inputters.rst
+      mammoth.rst
+      mammoth.modules.rst
+      mammoth.translation.rst
+      mammoth.translate.translation_server.rst
+      mammoth.inputters.rst

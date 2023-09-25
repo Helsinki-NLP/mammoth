@@ -38,22 +38,22 @@ def main():
 
     # Add in default model arguments, possibly added since training.
     checkpoint = torch.load(opts.model, map_location=lambda storage, loc: storage)
-    model_opt = checkpoint['opts']
+    model_opts = checkpoint['opts']
 
     fields = checkpoint['vocab']
     src_dict = fields['src'].base_field.vocab  # assumes src is text
     tgt_dict = fields['tgt'].base_field.vocab
 
-    model_opt = checkpoint['opts']
+    model_opts = checkpoint['opts']
     for arg in dummy_opt.__dict__:
-        if arg not in model_opt:
-            model_opt.__dict__[arg] = dummy_opt.__dict__[arg]
+        if arg not in model_opts:
+            model_opts.__dict__[arg] = dummy_opt.__dict__[arg]
 
     # build_base_model expects updated and validated opts
-    ArgumentParser.update_model_opts(model_opt)
-    ArgumentParser.validate_model_opts(model_opt)
+    ArgumentParser.update_model_opts(model_opts)
+    ArgumentParser.validate_model_opts(model_opts)
 
-    model = mammoth.model_builder.build_base_model(model_opt, fields, use_gpu(opts), checkpoint)
+    model = mammoth.model_builder.build_base_model(model_opts, fields, use_gpu(opts), checkpoint)
     encoder = model.encoder  # no encoder for LM task
     decoder = model.decoder
 

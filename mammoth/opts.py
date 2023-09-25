@@ -993,8 +993,8 @@ def _add_train_general_opts(parser):
 def _add_train_dynamic_data(parser):
     group = parser.add_argument_group("Dynamic data")
     group.add(
-        "-bucket_size",
-        "--bucket_size",
+        "-pool_size",
+        "--pool_size",
         type=int,
         default=2048,
         help="Number of examples to dynamically pool before batching.",

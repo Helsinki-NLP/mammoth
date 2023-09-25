@@ -187,7 +187,7 @@ class DynamicDatasetIter(object):
         batch_size (int): numbers of examples in a batch;
         batch_size_multiple (int): make batch size multiply of this;
         data_type (str): input data type, currently only text;
-        bucket_size (int): accum this number of examples in a dynamic dataset;
+        pool_size (int): accum this number of examples in a dynamic dataset;
         skip_empty_level (str): security level when encouter empty line;
         stride (int): iterate data files with this stride;
         offset (int): iterate data files with this offset.
@@ -209,7 +209,7 @@ class DynamicDatasetIter(object):
         batch_size,
         batch_size_multiple,
         data_type="text",
-        bucket_size=2048,
+        pool_size=2048,
         n_buckets=1024,
         skip_empty_level='warning',
     ):
@@ -225,7 +225,7 @@ class DynamicDatasetIter(object):
         self.batch_size = batch_size
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
-        self.bucket_size = bucket_size
+        self.pool_size = pool_size
         self.n_buckets = n_buckets
         if skip_empty_level not in ['silent', 'warning', 'error']:
             raise ValueError(f"Invalid argument skip_empty_level={skip_empty_level}")
@@ -250,7 +250,7 @@ class DynamicDatasetIter(object):
             batch_size,
             batch_size_multiple,
             data_type=opts.data_type,
-            bucket_size=opts.bucket_size,
+            pool_size=opts.pool_size,
             n_buckets=opts.n_buckets,
             skip_empty_level=opts.skip_empty_level,
         )
@@ -285,7 +285,7 @@ class DynamicDatasetIter(object):
                     corpus,
                     self.batch_size,
                     self.batch_type,
-                    self.bucket_size,
+                    self.pool_size,
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
                     as_iter=self.is_train,

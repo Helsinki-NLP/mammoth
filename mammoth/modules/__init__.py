@@ -1,4 +1,4 @@
-"""  Attention and normalization modules  """
+"""Components libary"""
 from mammoth.modules.util_class import Elementwise
 from mammoth.modules.multi_headed_attn import MultiHeadedAttention
 from mammoth.modules.embeddings import Embeddings, PositionalEncoding
@@ -18,7 +18,6 @@ str2enc = {
     "transformer": TransformerEncoder,
     "mean": MeanEncoder,
 }
-
 
 str2dec = {
     "transformer": TransformerDecoder,

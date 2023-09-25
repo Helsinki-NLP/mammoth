@@ -1,4 +1,4 @@
-""" Main entry point of the ONMT library """
+""" Main entry point of the Mammoth library """
 import mammoth.inputters
 import mammoth.models
 import mammoth.utils

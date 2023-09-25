@@ -1,4 +1,4 @@
-"""The point of this package is to provide a minimal viable product with:
+"""The point of this package is to provide:
     - vocab loading (cf. vocab.py)
     - token-counts based batch sampler (cf. dataloader.py)
     - on the fly pad, bos, eos, unk handling (cf. dataset.py)

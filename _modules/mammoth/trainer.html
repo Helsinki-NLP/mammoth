@@ -207,7 +207,7 @@
 
 
 <span class="k">def</span> <span class="nf">build_trainer</span><span class="p">(</span>
-    <span class="n">opt</span><span class="p">,</span>
+    <span class="n">opts</span><span class="p">,</span>
     <span class="n">device_context</span><span class="p">,</span>
     <span class="n">model</span><span class="p">,</span>
     <span class="n">vocabs_dict</span><span class="p">,</span>
@@ -217,10 +217,10 @@
     <span class="n">generators_md</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Simplify `Trainer` creation based on user `opt`s*</span>
+<span class="sd">    Simplify `Trainer` creation based on user `opts`s*</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        opt (:obj:`Namespace`): user options (usually from argument parsing)</span>
+<span class="sd">        opts (:obj:`Namespace`): user options (usually from argument parsing)</span>
 <span class="sd">        model (:obj:`mammoth.models.NMTModel`): the model to train</span>
 <span class="sd">        vocabs_dict (dict): dict of vocabs</span>
 <span class="sd">        optim (:obj:`mammoth.utils.Optimizer`): optimizer used during training</span>
@@ -238,31 +238,31 @@
         <span class="n">generator</span> <span class="o">=</span> <span class="n">generators_md</span><span class="p">[</span><span class="sa">f</span><span class="s1">&#39;generator_</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">]</span>
         <span class="n">train_loss_md</span><span class="o">.</span><span class="n">add_module</span><span class="p">(</span>
             <span class="sa">f</span><span class="s1">&#39;trainloss</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
-            <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">loss</span><span class="o">.</span><span class="n">build_loss_compute</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tgt_vocab</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">),</span>
+            <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">loss</span><span class="o">.</span><span class="n">build_loss_compute</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tgt_vocab</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">),</span>
         <span class="p">)</span>
         <span class="n">valid_loss_md</span><span class="o">.</span><span class="n">add_module</span><span class="p">(</span>
             <span class="sa">f</span><span class="s1">&#39;valloss</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span>
-            <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">loss</span><span class="o">.</span><span class="n">build_loss_compute</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tgt_vocab</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">),</span>
+            <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">loss</span><span class="o">.</span><span class="n">build_loss_compute</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">tgt_vocab</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">generator</span><span class="o">=</span><span class="n">generator</span><span class="p">),</span>
         <span class="p">)</span>
 
-    <span class="n">trunc_size</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">truncated_decoder</span>  <span class="c1"># Badly named...</span>
-    <span class="n">shard_size</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">max_generator_batches</span> <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">model_dtype</span> <span class="o">==</span> <span class="s1">&#39;fp32&#39;</span> <span class="k">else</span> <span class="mi">0</span>
-    <span class="n">norm_method</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">normalization</span>
-    <span class="n">accum_count</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">accum_count</span>
-    <span class="n">accum_steps</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">accum_steps</span>
-    <span class="n">average_decay</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">average_decay</span>
-    <span class="n">average_every</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">average_every</span>
-    <span class="n">dropout</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">dropout</span>
-    <span class="n">dropout_steps</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">dropout_steps</span>
-    <span class="n">gpu_verbose_level</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">gpu_verbose_level</span>
+    <span class="n">trunc_size</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">truncated_decoder</span>  <span class="c1"># Badly named...</span>
+    <span class="n">shard_size</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">max_generator_batches</span> <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">model_dtype</span> <span class="o">==</span> <span class="s1">&#39;fp32&#39;</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">norm_method</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">normalization</span>
+    <span class="n">accum_count</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">accum_count</span>
+    <span class="n">accum_steps</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">accum_steps</span>
+    <span class="n">average_decay</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">average_decay</span>
+    <span class="n">average_every</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">average_every</span>
+    <span class="n">dropout</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span>
+    <span class="n">dropout_steps</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">dropout_steps</span>
+    <span class="n">gpu_verbose_level</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">gpu_verbose_level</span>
 
     <span class="n">earlystopper</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">EarlyStopping</span><span class="p">(</span><span class="n">opt</span><span class="o">.</span><span class="n">early_stopping</span><span class="p">,</span> <span class="n">scorers</span><span class="o">=</span><span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">scorers_from_opts</span><span class="p">(</span><span class="n">opt</span><span class="p">))</span>
-        <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">early_stopping</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">EarlyStopping</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">early_stopping</span><span class="p">,</span> <span class="n">scorers</span><span class="o">=</span><span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">scorers_from_opts</span><span class="p">(</span><span class="n">opts</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">early_stopping</span> <span class="o">&gt;</span> <span class="mi">0</span>
         <span class="k">else</span> <span class="kc">None</span>
     <span class="p">)</span>
 
-    <span class="n">report_manager</span> <span class="o">=</span> <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">build_report_manager</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">device_context</span><span class="o">.</span><span class="n">node_rank</span><span class="p">,</span> <span class="n">device_context</span><span class="o">.</span><span class="n">local_rank</span><span class="p">)</span>
+    <span class="n">report_manager</span> <span class="o">=</span> <span class="n">mammoth</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">build_report_manager</span><span class="p">(</span><span class="n">opts</span><span class="p">,</span> <span class="n">device_context</span><span class="o">.</span><span class="n">node_rank</span><span class="p">,</span> <span class="n">device_context</span><span class="o">.</span><span class="n">local_rank</span><span class="p">)</span>
     <span class="n">trainer</span> <span class="o">=</span> <span class="n">mammoth</span><span class="o">.</span><span class="n">Trainer</span><span class="p">(</span>
         <span class="n">model</span><span class="p">,</span>
         <span class="n">train_loss_md</span><span class="p">,</span>
@@ -276,16 +276,16 @@
         <span class="n">device_context</span><span class="o">=</span><span class="n">device_context</span><span class="p">,</span>
         <span class="n">gpu_verbose_level</span><span class="o">=</span><span class="n">gpu_verbose_level</span><span class="p">,</span>
         <span class="n">report_manager</span><span class="o">=</span><span class="n">report_manager</span><span class="p">,</span>
-        <span class="n">with_align</span><span class="o">=</span><span class="kc">True</span> <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">lambda_align</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">with_align</span><span class="o">=</span><span class="kc">True</span> <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">lambda_align</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">model_saver</span><span class="o">=</span><span class="n">model_saver</span><span class="p">,</span>
         <span class="n">average_decay</span><span class="o">=</span><span class="n">average_decay</span><span class="p">,</span>
         <span class="n">average_every</span><span class="o">=</span><span class="n">average_every</span><span class="p">,</span>
-        <span class="n">model_dtype</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">model_dtype</span><span class="p">,</span>
+        <span class="n">model_dtype</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">model_dtype</span><span class="p">,</span>
         <span class="n">earlystopper</span><span class="o">=</span><span class="n">earlystopper</span><span class="p">,</span>
         <span class="n">dropout</span><span class="o">=</span><span class="n">dropout</span><span class="p">,</span>
         <span class="n">dropout_steps</span><span class="o">=</span><span class="n">dropout_steps</span><span class="p">,</span>
         <span class="n">task_queue_manager</span><span class="o">=</span><span class="n">task_queue_manager</span><span class="p">,</span>
-        <span class="n">report_stats_from_parameters</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">report_stats_from_parameters</span><span class="p">,</span>
+        <span class="n">report_stats_from_parameters</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">report_stats_from_parameters</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">trainer</span>
 

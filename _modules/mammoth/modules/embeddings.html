@@ -515,12 +515,12 @@
     <span class="k">return</span> <span class="n">tensor</span>
 
 <span class="c1"># FIXME: seems it got nuked during the great refactoring of data</span>
-<span class="c1"># def prepare_pretrained_embeddings(opt, fields):</span>
-<span class="c1">#     if all([opt.both_embeddings is None, opt.src_embeddings is None, opt.tgt_embeddings is None]):</span>
+<span class="c1"># def prepare_pretrained_embeddings(opts, fields):</span>
+<span class="c1">#     if all([opts.both_embeddings is None, opts.src_embeddings is None, opts.tgt_embeddings is None]):</span>
 <span class="c1">#         return</span>
 <span class="c1">#</span>
 <span class="c1">#     assert (</span>
-<span class="c1">#         opt.save_data</span>
+<span class="c1">#         opts.save_data</span>
 <span class="c1">#     ), &quot;-save_data is required when using \</span>
 <span class="c1">#         pretrained embeddings.&quot;</span>
 <span class="c1">#</span>
@@ -533,45 +533,45 @@
 <span class="c1">#         vocs.append(vocab)</span>
 <span class="c1">#     enc_vocab, dec_vocab = vocs</span>
 <span class="c1">#</span>
-<span class="c1">#     skip_lines = 1 if opt.embeddings_type == &quot;word2vec&quot; else 0</span>
-<span class="c1">#     if opt.both_embeddings is not None:</span>
+<span class="c1">#     skip_lines = 1 if opts.embeddings_type == &quot;word2vec&quot; else 0</span>
+<span class="c1">#     if opts.both_embeddings is not None:</span>
 <span class="c1">#         set_of_src_and_tgt_vocab = set(enc_vocab.stoi.keys()) | set(dec_vocab.stoi.keys())</span>
-<span class="c1">#         logger.info(&quot;Reading encoder and decoder embeddings from {}&quot;.format(opt.both_embeddings))</span>
-<span class="c1">#         src_vectors, total_vec_count = read_embeddings(opt.both_embeddings, skip_lines, set_of_src_and_tgt_vocab)</span>
+<span class="c1">#         logger.info(&quot;Reading encoder and decoder embeddings from {}&quot;.format(opts.both_embeddings))</span>
+<span class="c1">#         src_vectors, total_vec_count = read_embeddings(opts.both_embeddings, skip_lines, set_of_src_and_tgt_vocab)</span>
 <span class="c1">#         tgt_vectors = src_vectors</span>
 <span class="c1">#         logger.info(&quot;\tFound {} total vectors in file&quot;.format(total_vec_count))</span>
 <span class="c1">#     else:</span>
-<span class="c1">#         if opt.src_embeddings is not None:</span>
-<span class="c1">#             logger.info(&quot;Reading encoder embeddings from {}&quot;.format(opt.src_embeddings))</span>
-<span class="c1">#             src_vectors, total_vec_count = read_embeddings(opt.src_embeddings, skip_lines, filter_set=enc_vocab.stoi)</span>
+<span class="c1">#         if opts.src_embeddings is not None:</span>
+<span class="c1">#             logger.info(&quot;Reading encoder embeddings from {}&quot;.format(opts.src_embeddings))</span>
+<span class="c1">#             src_vectors, total_vec_count = read_embeddings(opts.src_embeddings, skip_lines, filter_set=enc_vocab.stoi)</span>
 <span class="c1">#             logger.info(&quot;\tFound {} total vectors in file.&quot;.format(total_vec_count))</span>
 <span class="c1">#         else:</span>
 <span class="c1">#             src_vectors = None</span>
-<span class="c1">#         if opt.tgt_embeddings is not None:</span>
-<span class="c1">#             logger.info(&quot;Reading decoder embeddings from {}&quot;.format(opt.tgt_embeddings))</span>
-<span class="c1">#             tgt_vectors, total_vec_count = read_embeddings(opt.tgt_embeddings, skip_lines, filter_set=dec_vocab.stoi)</span>
+<span class="c1">#         if opts.tgt_embeddings is not None:</span>
+<span class="c1">#             logger.info(&quot;Reading decoder embeddings from {}&quot;.format(opts.tgt_embeddings))</span>
+<span class="c1">#             tgt_vectors, total_vec_count = read_embeddings(opts.tgt_embeddings, skip_lines, filter_set=dec_vocab.stoi)</span>
 <span class="c1">#             logger.info(&quot;\tFound {} total vectors in file&quot;.format(total_vec_count))</span>
 <span class="c1">#         else:</span>
 <span class="c1">#             tgt_vectors = None</span>
 <span class="c1">#     logger.info(&quot;After filtering to vectors in vocab:&quot;)</span>
-<span class="c1">#     if opt.src_embeddings is not None or opt.both_embeddings is not None:</span>
+<span class="c1">#     if opts.src_embeddings is not None or opts.both_embeddings is not None:</span>
 <span class="c1">#         logger.info(&quot;\t* enc: %d match, %d missing, (%.2f%%)&quot; % calc_vocab_load_stats(enc_vocab, src_vectors))</span>
-<span class="c1">#     if opt.tgt_embeddings is not None or opt.both_embeddings is not None:</span>
+<span class="c1">#     if opts.tgt_embeddings is not None or opts.both_embeddings is not None:</span>
 <span class="c1">#         logger.info(&quot;\t* dec: %d match, %d missing, (%.2f%%)&quot; % calc_vocab_load_stats(dec_vocab, tgt_vectors))</span>
 <span class="c1">#</span>
 <span class="c1">#     # Write to file</span>
-<span class="c1">#     enc_output_file = opt.save_data + &quot;.enc_embeddings.pt&quot;</span>
-<span class="c1">#     dec_output_file = opt.save_data + &quot;.dec_embeddings.pt&quot;</span>
-<span class="c1">#     if opt.src_embeddings is not None or opt.both_embeddings is not None:</span>
+<span class="c1">#     enc_output_file = opts.save_data + &quot;.enc_embeddings.pt&quot;</span>
+<span class="c1">#     dec_output_file = opts.save_data + &quot;.dec_embeddings.pt&quot;</span>
+<span class="c1">#     if opts.src_embeddings is not None or opts.both_embeddings is not None:</span>
 <span class="c1">#         logger.info(&quot;\nSaving encoder embeddings as:\n\t* enc: %s&quot; % enc_output_file)</span>
 <span class="c1">#         torch.save(convert_to_torch_tensor(src_vectors, enc_vocab), enc_output_file)</span>
-<span class="c1">#         # set the opt in place</span>
-<span class="c1">#         opt.pre_word_vecs_enc = enc_output_file</span>
-<span class="c1">#     if opt.tgt_embeddings is not None or opt.both_embeddings is not None:</span>
+<span class="c1">#         # set the opts in place</span>
+<span class="c1">#         opts.pre_word_vecs_enc = enc_output_file</span>
+<span class="c1">#     if opts.tgt_embeddings is not None or opts.both_embeddings is not None:</span>
 <span class="c1">#         logger.info(&quot;\nSaving decoder embeddings as:\n\t* dec: %s&quot; % dec_output_file)</span>
 <span class="c1">#         torch.save(convert_to_torch_tensor(tgt_vectors, dec_vocab), dec_output_file)</span>
-<span class="c1">#         # set the opt in place</span>
-<span class="c1">#         opt.pre_word_vecs_dec = dec_output_file</span>
+<span class="c1">#         # set the opts in place</span>
+<span class="c1">#         opts.pre_word_vecs_dec = dec_output_file</span>
 </pre></div>
 
            </div>

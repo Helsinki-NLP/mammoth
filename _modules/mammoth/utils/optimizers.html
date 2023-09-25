@@ -237,7 +237,7 @@
     <span class="k">return</span> <span class="n">optimizer</span>
 
 
-<span class="k">def</span> <span class="nf">build_torch_optimizer</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">task_queue_manager</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">build_torch_optimizer</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">task_queue_manager</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Builds the PyTorch optimizer.</span>
 
 <span class="sd">    We use the default parameters for Adam that are suggested by</span>
@@ -253,87 +253,91 @@
 
 <span class="sd">    Args:</span>
 <span class="sd">      model: The model to optimize.</span>
-<span class="sd">      opt. The dictionary of options.</span>
+<span class="sd">      opts. The dictionary of options.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">      A ``torch.optim.Optimizer`` instance.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">params</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span> <span class="k">if</span> <span class="n">p</span><span class="o">.</span><span class="n">requires_grad</span><span class="p">]</span>
-    <span class="n">betas</span> <span class="o">=</span> <span class="p">[</span><span class="n">opt</span><span class="o">.</span><span class="n">adam_beta1</span><span class="p">,</span> <span class="n">opt</span><span class="o">.</span><span class="n">adam_beta2</span><span class="p">]</span>
-    <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;sgd&#39;</span><span class="p">:</span>
-        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adagrad&#39;</span><span class="p">:</span>
-        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">Adagrad</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">initial_accumulator_value</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">adagrad_accumulator_init</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adadelta&#39;</span><span class="p">:</span>
-        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">Adadelta</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adafactor&#39;</span><span class="p">:</span>
+    <span class="n">betas</span> <span class="o">=</span> <span class="p">[</span><span class="n">opts</span><span class="o">.</span><span class="n">adam_beta1</span><span class="p">,</span> <span class="n">opts</span><span class="o">.</span><span class="n">adam_beta2</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;sgd&#39;</span><span class="p">:</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adagrad&#39;</span><span class="p">:</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">Adagrad</span><span class="p">(</span>
+            <span class="n">params</span><span class="p">,</span>
+            <span class="n">lr</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span>
+            <span class="n">initial_accumulator_value</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">adagrad_accumulator_init</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adadelta&#39;</span><span class="p">:</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">Adadelta</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adafactor&#39;</span><span class="p">:</span>
         <span class="n">optimizer</span> <span class="o">=</span> <span class="n">attention_bridge_optimizer</span><span class="p">(</span>
             <span class="n">model</span><span class="p">,</span>
             <span class="n">task_queue_manager</span><span class="p">,</span>
-            <span class="k">lambda</span> <span class="n">params</span><span class="p">:</span> <span class="n">AdaFactorFairSeq</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">weight_decay</span><span class="p">),</span>
+            <span class="k">lambda</span> <span class="n">params</span><span class="p">:</span> <span class="n">AdaFactorFairSeq</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">weight_decay</span><span class="p">),</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adam&#39;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adam&#39;</span><span class="p">:</span>
         <span class="n">optimizer</span> <span class="o">=</span> <span class="n">attention_bridge_optimizer</span><span class="p">(</span>
             <span class="n">model</span><span class="p">,</span>
             <span class="n">task_queue_manager</span><span class="p">,</span>
             <span class="k">lambda</span> <span class="n">params</span><span class="p">:</span> <span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span>
-                <span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">weight_decay</span>
+                <span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">weight_decay</span>
             <span class="p">)</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adamw&#39;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;adamw&#39;</span><span class="p">:</span>
         <span class="n">optimizer</span> <span class="o">=</span> <span class="n">attention_bridge_optimizer</span><span class="p">(</span>
             <span class="n">model</span><span class="p">,</span>
             <span class="n">task_queue_manager</span><span class="p">,</span>
             <span class="k">lambda</span> <span class="n">params</span><span class="p">:</span> <span class="n">optim</span><span class="o">.</span><span class="n">AdamW</span><span class="p">(</span>
-                <span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">weight_decay</span>
+                <span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-9</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">weight_decay</span>
             <span class="p">)</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;fusedadam&#39;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s1">&#39;fusedadam&#39;</span><span class="p">:</span>
         <span class="c1"># we use here a FusedAdam() copy of an old Apex repo</span>
-        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">FusedAdam</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">model_dtype</span> <span class="o">==</span> <span class="s1">&#39;fp16&#39;</span><span class="p">:</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">FusedAdam</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">lr</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span> <span class="n">betas</span><span class="o">=</span><span class="n">betas</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">model_dtype</span> <span class="o">==</span> <span class="s1">&#39;fp16&#39;</span><span class="p">:</span>
             <span class="kn">import</span> <span class="nn">apex</span>
 
             <span class="c1"># In this case use the old FusedAdam with FP16_optimizer wrapper</span>
-            <span class="n">static_loss_scale</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">loss_scale</span>
-            <span class="n">dynamic_loss_scale</span> <span class="o">=</span> <span class="n">opt</span><span class="o">.</span><span class="n">loss_scale</span> <span class="o">==</span> <span class="mi">0</span>
+            <span class="n">static_loss_scale</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">loss_scale</span>
+            <span class="n">dynamic_loss_scale</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">loss_scale</span> <span class="o">==</span> <span class="mi">0</span>
             <span class="n">optimizer</span> <span class="o">=</span> <span class="n">apex</span><span class="o">.</span><span class="n">contrib</span><span class="o">.</span><span class="n">optimizers</span><span class="o">.</span><span class="n">FP16_Optimizer</span><span class="p">(</span>
                 <span class="n">optimizer</span><span class="p">,</span> <span class="n">static_loss_scale</span><span class="o">=</span><span class="n">static_loss_scale</span><span class="p">,</span> <span class="n">dynamic_loss_scale</span><span class="o">=</span><span class="n">dynamic_loss_scale</span>
             <span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Invalid optimizer type: &#39;</span> <span class="o">+</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Invalid optimizer type: &#39;</span> <span class="o">+</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">optimizer</span>
 
 
-<span class="k">def</span> <span class="nf">make_learning_rate_decay_fn</span><span class="p">(</span><span class="n">opt</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">make_learning_rate_decay_fn</span><span class="p">(</span><span class="n">opts</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Returns the learning decay function from options.&quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;noam&#39;</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">noam_decay</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">,</span> <span class="n">model_size</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">rnn_size</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;noamwd&#39;</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;noam&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">noam_decay</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">,</span> <span class="n">model_size</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">rnn_size</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;noamwd&#39;</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
             <span class="n">noamwd_decay</span><span class="p">,</span>
-            <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">,</span>
-            <span class="n">model_size</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">rnn_size</span><span class="p">,</span>
-            <span class="n">rate</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate_decay</span><span class="p">,</span>
-            <span class="n">decay_steps</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">decay_steps</span><span class="p">,</span>
-            <span class="n">start_step</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">start_decay_steps</span><span class="p">,</span>
+            <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">,</span>
+            <span class="n">model_size</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">rnn_size</span><span class="p">,</span>
+            <span class="n">rate</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate_decay</span><span class="p">,</span>
+            <span class="n">decay_steps</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">decay_steps</span><span class="p">,</span>
+            <span class="n">start_step</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">start_decay_steps</span><span class="p">,</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;rsqrt&#39;</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">rsqrt_decay</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;linear_warmup&#39;</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;rsqrt&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">rsqrt_decay</span><span class="p">,</span> <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">decay_method</span> <span class="o">==</span> <span class="s1">&#39;linear_warmup&#39;</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
             <span class="n">linear_warmup_decay</span><span class="p">,</span>
-            <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">,</span>
-            <span class="n">rate</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span>
-            <span class="n">train_steps</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">train_steps</span><span class="p">,</span>
+            <span class="n">warmup_steps</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">warmup_steps</span><span class="p">,</span>
+            <span class="n">rate</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate</span><span class="p">,</span>
+            <span class="n">train_steps</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">train_steps</span><span class="p">,</span>
         <span class="p">)</span>
-    <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">start_decay_steps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">start_decay_steps</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span>
             <span class="n">exponential_decay</span><span class="p">,</span>
-            <span class="n">rate</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">learning_rate_decay</span><span class="p">,</span>
-            <span class="n">decay_steps</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">decay_steps</span><span class="p">,</span>
-            <span class="n">start_step</span><span class="o">=</span><span class="n">opt</span><span class="o">.</span><span class="n">start_decay_steps</span><span class="p">,</span>
+            <span class="n">rate</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">learning_rate_decay</span><span class="p">,</span>
+            <span class="n">decay_steps</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">decay_steps</span><span class="p">,</span>
+            <span class="n">start_step</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">start_decay_steps</span><span class="p">,</span>
         <span class="p">)</span>
 
 
@@ -451,25 +455,25 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_fp16</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_scaler</span> <span class="o">=</span> <span class="kc">None</span>
 
-<div class="viewcode-block" id="Optimizer.from_opt"><a class="viewcode-back" href="../../../mammoth.html#mammoth.utils.Optimizer.from_opt">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_opt</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">task_queue_manager</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="Optimizer.from_opts"><a class="viewcode-back" href="../../../mammoth.html#mammoth.utils.Optimizer.from_opts">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">task_queue_manager</span><span class="p">,</span> <span class="n">checkpoint</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Builds the optimizer from options.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">          cls: The ``Optimizer`` class to instantiate.</span>
 <span class="sd">          model: The model to optimize.</span>
-<span class="sd">          opt: The dict of user options.</span>
+<span class="sd">          opts: The dict of user options.</span>
 <span class="sd">          checkpoint: An optional checkpoint to load states from.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">          An ``Optimizer`` instance.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">optim_opt</span> <span class="o">=</span> <span class="n">opt</span>
+        <span class="n">optim_opt</span> <span class="o">=</span> <span class="n">opts</span>
         <span class="n">optim_state_dict</span> <span class="o">=</span> <span class="kc">None</span>
 
-        <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">train_from</span> <span class="ow">and</span> <span class="n">checkpoint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">train_from</span> <span class="ow">and</span> <span class="n">checkpoint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">optim</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="p">[</span><span class="s1">&#39;optim&#39;</span><span class="p">]</span>
-            <span class="n">ckpt_opt</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="p">[</span><span class="s1">&#39;opt&#39;</span><span class="p">]</span>
+            <span class="n">ckpt_opt</span> <span class="o">=</span> <span class="n">checkpoint</span><span class="p">[</span><span class="s1">&#39;opts&#39;</span><span class="p">]</span>
             <span class="n">ckpt_state_dict</span> <span class="o">=</span> <span class="p">{}</span>
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">optim</span><span class="p">,</span> <span class="n">Optimizer</span><span class="p">):</span>  <span class="c1"># Backward compatibility.</span>
                 <span class="n">ckpt_state_dict</span><span class="p">[</span><span class="s1">&#39;training_step&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">_step</span> <span class="o">+</span> <span class="mi">1</span>
@@ -478,19 +482,19 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">ckpt_state_dict</span> <span class="o">=</span> <span class="n">optim</span>
 
-            <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;none&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;none&#39;</span><span class="p">:</span>
                 <span class="c1"># Load everything from the checkpoint.</span>
                 <span class="n">optim_opt</span> <span class="o">=</span> <span class="n">ckpt_opt</span>
                 <span class="n">optim_state_dict</span> <span class="o">=</span> <span class="n">ckpt_state_dict</span>
-            <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;all&#39;</span><span class="p">:</span>
+            <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;all&#39;</span><span class="p">:</span>
                 <span class="c1"># Build everything from scratch.</span>
                 <span class="k">pass</span>
-            <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;states&#39;</span><span class="p">:</span>
+            <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;states&#39;</span><span class="p">:</span>
                 <span class="c1"># Reset optimizer, keep options.</span>
                 <span class="n">optim_opt</span> <span class="o">=</span> <span class="n">ckpt_opt</span>
                 <span class="n">optim_state_dict</span> <span class="o">=</span> <span class="n">ckpt_state_dict</span>
                 <span class="k">del</span> <span class="n">optim_state_dict</span><span class="p">[</span><span class="s1">&#39;optimizer&#39;</span><span class="p">]</span>
-            <span class="k">elif</span> <span class="n">opt</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;keep_states&#39;</span><span class="p">:</span>
+            <span class="k">elif</span> <span class="n">opts</span><span class="o">.</span><span class="n">reset_optim</span> <span class="o">==</span> <span class="s1">&#39;keep_states&#39;</span><span class="p">:</span>
                 <span class="c1"># Reset options, keep optimizer.</span>
                 <span class="n">optim_state_dict</span> <span class="o">=</span> <span class="n">ckpt_state_dict</span>
 
@@ -501,8 +505,8 @@
             <span class="n">max_grad_norm</span><span class="o">=</span><span class="n">optim_opt</span><span class="o">.</span><span class="n">max_grad_norm</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">model_dtype</span> <span class="o">==</span> <span class="s2">&quot;fp16&quot;</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">opt</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s2">&quot;fusedadam&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">model_dtype</span> <span class="o">==</span> <span class="s2">&quot;fp16&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">opts</span><span class="o">.</span><span class="n">optim</span> <span class="o">==</span> <span class="s2">&quot;fusedadam&quot;</span><span class="p">:</span>
                 <span class="n">optimizer</span><span class="o">.</span><span class="n">_fp16</span> <span class="o">=</span> <span class="s2">&quot;legacy&quot;</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">optimizer</span><span class="o">.</span><span class="n">_fp16</span> <span class="o">=</span> <span class="s2">&quot;amp&quot;</span>

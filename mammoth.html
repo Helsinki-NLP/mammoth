@@ -484,15 +484,15 @@ backward pass.</p>
 </dd></dl>
 
 <dl class="method">
-<dt id="mammoth.utils.Optimizer.from_opt">
-<em class="property">classmethod </em><code class="sig-name descname">from_opt</code><span class="sig-paren">(</span><em class="sig-param">model</em>, <em class="sig-param">opt</em>, <em class="sig-param">task_queue_manager</em>, <em class="sig-param">checkpoint=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/utils/optimizers.html#Optimizer.from_opt"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.utils.Optimizer.from_opt" title="Permalink to this definition">¶</a></dt>
+<dt id="mammoth.utils.Optimizer.from_opts">
+<em class="property">classmethod </em><code class="sig-name descname">from_opts</code><span class="sig-paren">(</span><em class="sig-param">model</em>, <em class="sig-param">opts</em>, <em class="sig-param">task_queue_manager</em>, <em class="sig-param">checkpoint=None</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/utils/optimizers.html#Optimizer.from_opts"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.utils.Optimizer.from_opts" title="Permalink to this definition">¶</a></dt>
 <dd><p>Builds the optimizer from options.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>cls</strong> – The <code class="docutils literal notranslate"><span class="pre">Optimizer</span></code> class to instantiate.</p></li>
 <li><p><strong>model</strong> – The model to optimize.</p></li>
-<li><p><strong>opt</strong> – The dict of user options.</p></li>
+<li><p><strong>opts</strong> – The dict of user options.</p></li>
 <li><p><strong>checkpoint</strong> – An optional checkpoint to load states from.</p></li>
 </ul>
 </dd>

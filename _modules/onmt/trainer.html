@@ -558,12 +558,12 @@
                         <span class="n">valid_stats</span><span class="o">=</span><span class="n">valid_stats</span><span class="p">,</span>
                     <span class="p">)</span>
 
-                <span class="c1"># Run patience mechanism</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">earlystopper</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">earlystopper</span><span class="p">(</span><span class="n">valid_stats</span><span class="p">,</span> <span class="n">step</span><span class="p">)</span>
-                    <span class="c1"># If the patience has reached the limit, stop training</span>
-                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">earlystopper</span><span class="o">.</span><span class="n">has_stopped</span><span class="p">():</span>
-                        <span class="k">break</span>
+            <span class="c1">#     # Run patience mechanism</span>
+            <span class="c1">#     if self.earlystopper is not None:</span>
+            <span class="c1">#         self.earlystopper(valid_stats, step)</span>
+            <span class="c1">#         # If the patience has reached the limit, stop training</span>
+            <span class="c1">#         if self.earlystopper.has_stopped():</span>
+            <span class="c1">#             break</span>
 
             <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_saver</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="p">(</span><span class="n">save_checkpoint_steps</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">step</span> <span class="o">%</span> <span class="n">save_checkpoint_steps</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">model_saver</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">moving_average</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">moving_average</span><span class="p">)</span>
@@ -624,10 +624,6 @@
 
         <span class="c1"># Set model back to training mode.</span>
         <span class="n">valid_model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
-
-        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">():</span>
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="s1">&#39;has_grad&#39;</span><span class="p">):</span>
-                <span class="n">p</span><span class="o">.</span><span class="n">has_grad</span> <span class="o">=</span> <span class="kc">False</span>
 
         <span class="k">return</span> <span class="n">stats</span></div>
 

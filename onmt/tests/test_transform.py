@@ -520,7 +520,7 @@ class TestBARTNoising(unittest.TestCase):
             transforms_cls = get_transforms_cls(["denoising"])
             opt = Namespace(random_ratio=1, denoising_objective='mass')
             with self.assertRaises(ValueError):
-                transforms = make_transforms(opt, transforms_cls, vocabs=None, task=None)
+                make_transforms(opt, transforms_cls, vocabs=None, task=None)
 
 
 class TestFeaturesTransform(unittest.TestCase):

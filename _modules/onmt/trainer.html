@@ -628,7 +628,7 @@
         <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">():</span>
             <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="s1">&#39;has_grad&#39;</span><span class="p">):</span>
                 <span class="n">p</span><span class="o">.</span><span class="n">has_grad</span> <span class="o">=</span> <span class="kc">False</span>
-        
+
         <span class="k">return</span> <span class="n">stats</span></div>
 
     <span class="k">def</span> <span class="nf">_gradient_accumulation_over_lang_pairs</span><span class="p">(</span>

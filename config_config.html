@@ -321,7 +321,7 @@ Only supervised pairs are generated, unless <code class="docutils literal notran
 <div class="section" id="transforms-and-ae-transforms">
 <h4><code class="docutils literal notranslate"><span class="pre">transforms</span></code> and <code class="docutils literal notranslate"><span class="pre">ae_transforms</span></code><a class="headerlink" href="#transforms-and-ae-transforms" title="Permalink to this headline">¶</a></h4>
 <p>A list of transforms, for translation tasks and autoencoder tasks, respectively.
-Use this to apply subword segmentation, e.g. using <code class="docutils literal notranslate"><span class="pre">sentencepiece</span></code>, and <code class="docutils literal notranslate"><span class="pre">bart</span></code> noise for autoencoder.
+Use this to apply subword segmentation, e.g. using <code class="docutils literal notranslate"><span class="pre">sentencepiece</span></code>, and <code class="docutils literal notranslate"><span class="pre">denoising</span></code> noise for autoencoder.
 Both of these may change the sequence length, necessitating a <code class="docutils literal notranslate"><span class="pre">filtertoolong</span></code> transform.</p>
 </div>
 <div class="section" id="enc-sharing-groups-and-dec-sharing-groups">

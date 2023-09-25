@@ -2,7 +2,7 @@ from collections import defaultdict
 from torch import nn
 from typing import Dict, List
 
-from mammoth.decoders.decoder import DecoderBase
+from mammoth.modules.decoder import DecoderBase
 from mammoth.models.adapters import Adapter, AdaptedTransformerDecoder
 from mammoth.distributed import DatasetMetadata
 

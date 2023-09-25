@@ -1,5 +1,5 @@
 """Define a minimal encoder."""
-from mammoth.encoders.encoder import EncoderBase
+from mammoth.modules.encoder import EncoderBase
 from mammoth.utils.misc import sequence_mask
 import torch
 

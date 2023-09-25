@@ -9,8 +9,8 @@ import warnings
 import torch
 import torch.nn as nn
 
-from mammoth.encoders.encoder import EncoderBase
-from mammoth.decoders.decoder import DecoderBase
+from mammoth.modules.encoder import EncoderBase
+from mammoth.modules.decoder import DecoderBase
 from mammoth.models import NMTModel
 import mammoth.model_builder
 

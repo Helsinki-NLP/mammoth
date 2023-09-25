@@ -1,7 +1,7 @@
 from torch import nn
 from typing import Dict, List
 
-from mammoth.encoders.encoder import EncoderBase
+from mammoth.modules.encoder import EncoderBase
 from mammoth.models.adapters import Adapter, AdaptedTransformerEncoder
 from mammoth.utils.misc import sequence_mask
 from mammoth.distributed import DatasetMetadata

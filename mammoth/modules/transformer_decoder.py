@@ -6,7 +6,7 @@ subsequent transformer based architectures
 import torch
 import torch.nn as nn
 
-from mammoth.decoders.decoder import DecoderBase
+from mammoth.modules.decoder import DecoderBase
 from mammoth.modules import MultiHeadedAttention, AverageAttention
 from mammoth.modules.position_ffn import PositionwiseFeedForward
 from mammoth.modules.position_ffn import ActivationFunction

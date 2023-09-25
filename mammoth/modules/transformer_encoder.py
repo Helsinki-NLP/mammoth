@@ -4,7 +4,7 @@ Implementation of "Attention is All You Need"
 
 import torch.nn as nn
 
-from mammoth.encoders.encoder import EncoderBase
+from mammoth.modules.encoder import EncoderBase
 from mammoth.modules import MultiHeadedAttention
 from mammoth.modules.position_ffn import PositionwiseFeedForward
 from mammoth.modules.position_ffn import ActivationFunction

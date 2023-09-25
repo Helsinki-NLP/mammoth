@@ -16,8 +16,8 @@ from mammoth.models.adapters import (
     DecoderAdapterLayer,
 )
 from mammoth.constants import ModelTask, DefaultTokens
-from mammoth.decoders.layer_stack_decoder import LayerStackDecoder
-from mammoth.encoders.layer_stack_encoder import LayerStackEncoder
+from mammoth.modules.layer_stack_decoder import LayerStackDecoder
+from mammoth.modules.layer_stack_encoder import LayerStackEncoder
 from mammoth.modules import Embeddings
 from mammoth.modules.embeddings import PluggableEmbeddings
 from mammoth.modules.util_class import Cast
@@ -26,7 +26,7 @@ from mammoth.utils.misc import use_gpu
 from mammoth.utils.module_splitter import _combine_ordered_dicts
 from mammoth.utils.parse import ArgumentParser
 
-from mammoth.attention_bridge import AttentionBridge
+from mammoth.modules.attention_bridge import AttentionBridge
 
 
 def build_embeddings(opt, vocab, for_encoder=True):

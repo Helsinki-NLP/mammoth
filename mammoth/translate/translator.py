@@ -9,7 +9,7 @@ from itertools import count, zip_longest
 import torch
 
 import mammoth.model_builder
-import mammoth.decoders.ensemble
+import mammoth.modules.decoder_ensemble
 # from mammoth.inputters.text_dataset import InferenceDataIterator
 from mammoth.translate.beam_search import BeamSearch, BeamSearchLM
 from mammoth.translate.greedy_search import GreedySearch, GreedySearchLM
@@ -31,7 +31,7 @@ def build_translator(opt, task, report_score=True, logger=None, out_file=None):
         out_file = codecs.open(opt.output, "w+", "utf-8")
 
     load_test_model = (
-        mammoth.decoders.ensemble.load_test_model if len(opt.models) > 3
+        mammoth.modules.decoder_ensemble.load_test_model if len(opt.models) > 3
         else mammoth.model_builder.load_test_multitask_model
     )
     if logger:

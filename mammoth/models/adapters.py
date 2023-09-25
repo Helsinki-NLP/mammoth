@@ -8,8 +8,8 @@ import torch.nn.functional as F
 from abc import ABC
 from collections import defaultdict
 
-from mammoth.encoders import TransformerEncoder
-from mammoth.decoders import TransformerDecoder
+from mammoth.modules import TransformerEncoder
+from mammoth.modules import TransformerDecoder
 from mammoth.rmsnorm_torch import RMSNorm
 
 

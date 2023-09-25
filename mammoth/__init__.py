@@ -1,7 +1,5 @@
 """ Main entry point of the ONMT library """
 import mammoth.inputters
-import mammoth.encoders
-import mammoth.decoders
 import mammoth.models
 import mammoth.utils
 import mammoth.modules
@@ -15,8 +13,6 @@ sys.modules["mammoth.Optim"] = mammoth.utils.optimizers
 
 __all__ = [
     mammoth.inputters,
-    mammoth.encoders,
-    mammoth.decoders,
     mammoth.models,
     mammoth.utils,
     mammoth.modules,

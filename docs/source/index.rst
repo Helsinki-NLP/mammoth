@@ -11,22 +11,18 @@ Contents
       ref.rst
 
 .. toctree::
-      :caption: FAQ
+      :caption: MAMMOTH features
       :maxdepth: 2
 
+      config_config.md
+      attention_bridges.md
       FAQ.md
 
-
 .. toctree::
-      :caption: Examples
+      :caption: Tutorials
       :maxdepth: 2
 
-      examples/Library.md
-      examples/Translation.md
-      examples/Summarization.md
-      examples/LanguageModelGeneration.md
-      examples/GGNN.md
-
+      prepare_data.md
 
 .. toctree::
       :caption: Scripts
@@ -47,13 +43,3 @@ Contents
       mammoth.translation.rst
       mammoth.translate.translation_server.rst
       mammoth.inputters.rst
-
-
-.. toctree::
-      :caption: Legacy
-      :maxdepth: 2
-
-      legacy/FAQ.md
-      legacy/im2text.md
-      legacy/speech2text.md
-      legacy/vid2text.rst

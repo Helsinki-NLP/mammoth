@@ -48,6 +48,21 @@ extensions = ['recommonmark',
               'sphinxarg.ext',
               'sphinx_markdown_tables']
 
+mathjax_config = {
+    'tex2jax': {
+        'inlineMath': [["\\(", "\\)"]],
+        'displayMath': [["\\[", "\\]"]],
+    }
+}
+
+mathjax3_config = {
+  "tex": {
+    "inlineMath": [['\\(', '\\)']],
+    "displayMath": [["\\[", "\\]"]],
+  }
+}
+
+bibtex_bibfiles = ['refs.bib']
 # Show base classes
 autodoc_default_options = {
     'show-inheritance': True
@@ -70,9 +85,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = 'OpenNMT-py'
-copyright = '2017, srush'
-author = 'srush'
+project = 'MAMMOTH'
+copyright = '2023, HelsinkiNLP'
+author = 'HelsinkiNLP'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -88,7 +103,7 @@ release = ''
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -148,7 +163,7 @@ html_sidebars = {
 # -- Options for HTMLHelp output ------------------------------------------
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = 'OpenNMT-pydoc'
+htmlhelp_basename = 'MAMMOTH-doc'
 
 
 # -- Options for LaTeX output ---------------------------------------------
@@ -175,7 +190,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-    (master_doc, 'OpenNMT-py.tex', 'OpenNMT-py Documentation',
+    (master_doc, 'MAMMOTH.tex', 'MAMMOTH Documentation',
      'srush', 'manual'),
 ]
 
@@ -185,7 +200,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'opennmt-py', 'OpenNMT-py Documentation',
+    (master_doc, 'MAMMOTH', 'MAMMOTH Documentation',
      [author], 1)
 ]
 
@@ -196,12 +211,12 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-    (master_doc, 'OpenNMT-py', 'OpenNMT-py Documentation',
-     author, 'OpenNMT-py', 'One line description of project.',
+    (master_doc, 'MAMMOTH', 'MAMMOTH Documentation',
+     author, 'MAMMOTH', 'Modular Adaptable Massively Multilingual Open Translation @ Helsinki',
      'Miscellaneous'),
 ]
 
-github_doc_root = 'https://github.com/opennmt/opennmt-py/tree/master/doc/'
+github_doc_root = 'https://github.com/Helsinki-NLP/TODO/tree/master/doc/'
 
 
 def setup(app):

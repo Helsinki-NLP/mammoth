@@ -18,12 +18,15 @@ from mammoth.inputters.vocab import Vocab
 class Batch():
     src: tuple  # of torch Tensors
     tgt: torch.Tensor
+    labels: torch.Tensor
     batch_size: int
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
         if self.tgt is not None:
             self.tgt = self.tgt.to(device)
+        if self.labels is not None:
+            self.labels = self.labels.to(device)
         return self
 
 
@@ -156,8 +159,16 @@ class ParallelCorpus(IterableDataset):
         tgt_padidx = self.vocabs['tgt'][DefaultTokens.PAD]
         src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
         src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx).unsqueeze(-1), src_lengths)
-        tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1) if has_tgt else None
-        batch = Batch(src, tgt, len(examples))
+        if has_tgt:
+            tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1)
+            if 'labels' not in examples[0].keys():
+                labels = tgt
+            else:
+                labels = pad_sequence([ex['labels'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1)
+        else:
+            tgt = None
+            labels = None
+        batch = Batch(src, tgt, labels, len(examples))
         return batch
 
 
@@ -165,17 +176,26 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
-    corpus_opts = opts.data[task.corpus_id]
-    transforms_cls = get_transforms_cls(corpus_opts.get('transforms', opts.transforms))
-
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
+    corpus_opts = opts.data[task.corpus_id]
+    transforms_to_apply = corpus_opts.get('transforms', None)
+    transforms_to_apply = transforms_to_apply or opts.get('transforms', None)
+    transforms_to_apply = transforms_to_apply or []
+    transforms_cls = make_transforms(
+        opts,
+        get_transforms_cls(transforms_to_apply),
+        vocabs,
+        task=task,
+    )
+    transforms_to_apply = [transforms_cls[trf_name] for trf_name in transforms_to_apply]
+
     # build Dataset proper
     dataset = ParallelCorpus(
         corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
         corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],
         src_vocab,
         tgt_vocab,
-        TransformPipe(opts, make_transforms(opts, transforms_cls, vocabs, task=task).values()),
+        TransformPipe(opts, transforms_to_apply),
         stride=corpus_opts.get('stride', None),
         offset=corpus_opts.get('offset', None),
         is_train=is_train,

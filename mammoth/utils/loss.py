@@ -179,19 +179,19 @@ class LossComputeBase(nn.Module):
             batch_stats.update(stats)
         return None, batch_stats
 
-    def _stats(self, loss, scores, target):
+    def _stats(self, loss, scores, labels):
         """
         Args:
             loss (:obj:`FloatTensor`): the loss computed by the loss criterion.
             scores (:obj:`FloatTensor`): a score for each possible output
-            target (:obj:`FloatTensor`): true targets
+            labels (:obj:`FloatTensor`): true targets
 
         Returns:
             :obj:`mammoth.utils.Statistics` : statistics for this batch.
         """
         pred = scores.max(1)[1]
-        non_padding = target.ne(self.padding_idx)
-        num_correct = pred.eq(target).masked_select(non_padding).sum().item()
+        non_padding = labels.ne(self.padding_idx)
+        num_correct = pred.eq(labels).masked_select(non_padding).sum().item()
         num_non_padding = non_padding.sum().item()
         return mammoth.utils.Statistics(loss.item(), num_non_padding, num_correct)
 
@@ -221,14 +221,14 @@ class LabelSmoothingLoss(nn.Module):
 
         self.confidence = 1.0 - label_smoothing
 
-    def forward(self, output, target):
+    def forward(self, output, labels):
         """
         output (FloatTensor): batch_size x n_classes
-        target (LongTensor): batch_size
+        labels (LongTensor): batch_size
         """
-        model_prob = self.one_hot.repeat(target.size(0), 1)
-        model_prob.scatter_(1, target.unsqueeze(1), self.confidence)
-        model_prob.masked_fill_((target == self.ignore_index).unsqueeze(1), 0)
+        model_prob = self.one_hot.repeat(labels.size(0), 1)
+        model_prob.scatter_(1, labels.unsqueeze(1), self.confidence)
+        model_prob.masked_fill_((labels == self.ignore_index).unsqueeze(1), 0)
 
         return F.kl_div(output, model_prob, reduction='sum')
 
@@ -262,12 +262,14 @@ class CommonLossCompute(LossComputeBase):
         )
         shard_state.update({"std_attn": attns.get("std"), "coverage_attn": coverage})
 
-    def _compute_loss(self, batch, output, target, std_attn=None, coverage_attn=None, align_head=None, ref_align=None):
+    def _compute_loss(
+        self, batch, output, target, labels, std_attn=None, coverage_attn=None, align_head=None, ref_align=None
+    ):
 
         bottled_output = self._bottle(output)
 
         scores = self.generator(bottled_output)
-        gtruth = target.view(-1)
+        gtruth = labels.view(-1)
 
         loss = self.criterion(scores, gtruth)
         if self.lambda_coverage != 0.0:
@@ -327,7 +329,9 @@ class CommonLossCompute(LossComputeBase):
         range_end = range_[1]
         shard_state = {
             "output": output,
+            # TODO: target here is likely unnecessary, as it now corresponds to target-side input
             "target": batch.tgt[range_start:range_end, :, 0],
+            "labels": batch.labels[range_start:range_end, :, 0],
         }
         if self.lambda_coverage != 0.0:
             self._add_coverage_shard_state(shard_state, attns)

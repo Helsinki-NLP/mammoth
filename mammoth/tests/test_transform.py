@@ -11,7 +11,7 @@ from mammoth.transforms import (
     make_transforms,
     TransformPipe,
 )
-from mammoth.transforms.bart import BARTNoising
+from mammoth.transforms.denoising import BARTNoising
 
 
 class TestTransform(unittest.TestCase):
@@ -22,7 +22,7 @@ class TestTransform(unittest.TestCase):
             "sentencepiece",
             "bpe",
             "onmt_tokenize",
-            "bart",
+            "denoising",
             "switchout",
             "tokendrop",
             "tokenmask",
@@ -30,14 +30,14 @@ class TestTransform(unittest.TestCase):
         get_transforms_cls(builtin_transform)
 
     def test_vocab_required_transform(self):
-        transforms_cls = get_transforms_cls(["bart", "switchout"])
+        transforms_cls = get_transforms_cls(["denoising", "switchout"])
         opt = Namespace(seed=-1, switchout_temperature=1.0)
         # transforms that require vocab will not create if not provide vocab
         transforms = make_transforms(opt, transforms_cls, vocabs=None, task=None)
         self.assertEqual(len(transforms), 0)
         with self.assertRaises(ValueError):
             transforms_cls["switchout"](opt).warm_up(vocabs=None)
-            transforms_cls["bart"](opt).warm_up(vocabs=None)
+            transforms_cls["denoising"](opt).warm_up(vocabs=None)
 
     def test_transform_specials(self):
         transforms_cls = get_transforms_cls(["prefix"])
@@ -515,6 +515,12 @@ class TestBARTNoising(unittest.TestCase):
         # n_masked = math.ceil(n_words * bart_noise.mask_ratio)
         # print(f"Text Span Infilling: {infillied} / {tokens}")
         # print(n_words, n_masked)
+
+        def test_vocab_required_transform(self):
+            transforms_cls = get_transforms_cls(["denoising"])
+            opt = Namespace(random_ratio=1, denoising_objective='mass')
+            with self.assertRaises(ValueError):
+                make_transforms(opt, transforms_cls, vocabs=None, task=None)
 
 
 class TestFeaturesTransform(unittest.TestCase):

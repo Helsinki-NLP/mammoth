@@ -16,7 +16,7 @@ config_config:
   ae_transforms:
     - sentencepiece
     - filtertoolong
-    - bart
+    - denoising
   enc_sharing_groups:
     - GROUP
     - FULL
@@ -27,7 +27,7 @@ config_config:
   translation_config_dir: config/translation.opus
   n_gpus_per_node: 4
   n_nodes: 2
-  
+
   # Note that this specifies the groups manually instead of clustering
   groups:
     "en": "en"
@@ -43,7 +43,7 @@ config_config:
 
 save_data: generated/opus.spm32k
 # vocabs serve two purposes: defines the vocab files, and gives the potential languages to consider
-src_vocab: 
+src_vocab:
   "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
   "da": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.dan.32k.spm.vocab"
   "en": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.eng.32k.spm.vocab"

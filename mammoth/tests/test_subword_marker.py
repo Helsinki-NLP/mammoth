@@ -1,6 +1,6 @@
 import unittest
 
-from mammoth.transforms.bart import word_start_finder
+from mammoth.transforms.denoising import word_start_finder
 from mammoth.utils.alignment import subword_map_by_joiner, subword_map_by_spacer
 from mammoth.constants import SubwordMarker
 

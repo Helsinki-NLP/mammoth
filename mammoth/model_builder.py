@@ -346,7 +346,9 @@ def build_task_specific_model(
     def has_grad_hook(module, input, output) -> None:
         for param in module.parameters(recurse=False):
             if param.requires_grad:
-                param.has_grad = True
+                # NB: we're looking at whether gradient will/has been computed, which is only the
+                # case when the module is training.
+                param.has_grad = module.training
 
     for module in nmt_model.modules():
         module.register_forward_hook(has_grad_hook)

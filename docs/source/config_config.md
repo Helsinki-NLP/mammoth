@@ -99,7 +99,7 @@ Generate translation configs for zero-shot directions.
 #### `transforms` and `ae_transforms`
 
 A list of transforms, for translation tasks and autoencoder tasks, respectively.
-Use this to apply subword segmentation, e.g. using `sentencepiece`, and `ae_noise` noise for autoencoder.
+Use this to apply subword segmentation, e.g. using `sentencepiece`, and `denoising` noise for autoencoder.
 Both of these may change the sequence length, necessitating a `filtertoolong` transform.
 
 #### `enc_sharing_groups` and `dec_sharing_groups`

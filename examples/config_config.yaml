@@ -16,7 +16,7 @@ config_config:
   ae_transforms:
     - sentencepiece
     - filtertoolong
-    - ae_noise
+    - denoising
   enc_sharing_groups:
     - GROUP
     - FULL

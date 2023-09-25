@@ -322,9 +322,11 @@ class BARTNoising(object):
         return '{}({})'.format(cls_name, cls_args)
 
 
-@register_transform(name='ae_noise')
+@register_transform(name='denoising')
 class NoiseTransform(Transform):
     def __init__(self, opts):
+        if opts.random_ratio > 0 and opts.denoising_objective == 'mass':
+            raise ValueError('Random word replacement is incompatible with MASS')
         super().__init__(opts)
         self.denoising_objective = opts.denoising_objective
 
@@ -362,7 +364,7 @@ class NoiseTransform(Transform):
             "-random_ratio",
             type=float,
             default=0.0,
-            help="Instead of using {}, use random token this often.".format(DefaultTokens.MASK),
+            help=f"Instead of using {DefaultTokens.MASK}, use random token this often. Incompatible with MASS",
         )
 
         group.add(

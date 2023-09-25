@@ -329,6 +329,7 @@ class CommonLossCompute(LossComputeBase):
         range_end = range_[1]
         shard_state = {
             "output": output,
+            # TODO: target here is likely unnecessary, as it now corresponds to target-side input
             "target": batch.tgt[range_start:range_end, :, 0],
             "labels": batch.labels[range_start:range_end, :, 0],
         }

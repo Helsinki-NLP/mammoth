@@ -481,6 +481,9 @@ class Trainer(object):
             if src_lengths is not None:
                 report_stats.n_src_words += src_lengths.sum().item()
 
+            # tgt_outer corresponds to the target-side input. The expected
+            # decoder output will be read directly from the batch:
+            # cf. `onmt.utils.loss.CommonLossCompute._make_shard_state`
             tgt_outer = batch.tgt
 
             bptt = False

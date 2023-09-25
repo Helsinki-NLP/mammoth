@@ -85,7 +85,7 @@ class TestTransform(unittest.TestCase):
             "tgt": ["Bonjour", "le", "monde", "."],
         }
         # 4. apply transform pipe for example
-        ex_after = transform_pipe.apply(copy.deepcopy(ex), corpus_name="trainset")
+        ex_after = transform_pipe.apply(copy.deepcopy(ex), is_train=True, corpus_name="trainset")
         # 5. example after the pipe exceed the length limit, thus filtered
         self.assertIsNone(ex_after)
         # 6. Transform statistics registed (here for filtertoolong)
@@ -121,8 +121,9 @@ class TestMiscTransform(unittest.TestCase):
         }
         with self.assertRaises(ValueError):
             prefix_transform.apply(ex_in)
-            prefix_transform.apply(ex_in, corpus_name="validset")
-        ex_out = prefix_transform.apply(ex_in, corpus_name="trainset")
+        with self.assertRaises(ValueError):
+            prefix_transform.apply(ex_in, is_train=False, corpus_name="validset")
+        ex_out = prefix_transform.apply(ex_in, is_train=True, corpus_name="trainset")
         self.assertEqual(ex_out["src"][0], "｟_pf_src｠")
         self.assertEqual(ex_out["tgt"][0], "｟_pf_tgt｠")
 
@@ -135,10 +136,10 @@ class TestMiscTransform(unittest.TestCase):
             "src": ["Hello", "world", "."],
             "tgt": ["Bonjour", "le", "monde", "."],
         }
-        ex_out = filter_transform.apply(ex_in)
+        ex_out = filter_transform.apply(ex_in, is_train=True)
         self.assertIs(ex_out, ex_in)
         filter_transform.tgt_seq_length = 2
-        ex_out = filter_transform.apply(ex_in)
+        ex_out = filter_transform.apply(ex_in, is_train=True)
         self.assertIsNone(ex_out)
 
 

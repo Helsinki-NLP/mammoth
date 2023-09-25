@@ -29,7 +29,7 @@ class LayerStackEncoder(EncoderBase):
                     continue
                 stacks[module_id] = AdaptedTransformerEncoder(
                     n_layers,
-                    opt.enc_rnn_size,
+                    opt.rnn_size,
                     opt.heads,
                     opt.transformer_ff,
                     opt.dropout[0] if type(opt.dropout) is list else opt.dropout,
@@ -42,7 +42,7 @@ class LayerStackEncoder(EncoderBase):
                     opt.max_relative_positions,
                     pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
                     layer_norm_module=(
-                        nn.LayerNorm(opt.enc_rnn_size, eps=1e-6) if is_on_top
+                        nn.LayerNorm(opt.rnn_size, eps=1e-6) if is_on_top
                         else nn.Identity()
                     )
                 )
@@ -60,7 +60,7 @@ class LayerStackEncoder(EncoderBase):
             is_on_top = layer_stack_index == len(model_opt.enc_layers) - 1
             stacks[module_id] = AdaptedTransformerEncoder(
                 n_layers,
-                model_opt.enc_rnn_size,
+                model_opt.rnn_size,
                 model_opt.heads,
                 model_opt.transformer_ff,
                 model_opt.dropout[0] if type(model_opt.dropout) is list else model_opt.dropout,
@@ -73,7 +73,7 @@ class LayerStackEncoder(EncoderBase):
                 model_opt.max_relative_positions,
                 pos_ffn_activation_fn=model_opt.pos_ffn_activation_fn,
                 layer_norm_module=(
-                    nn.LayerNorm(model_opt.enc_rnn_size, eps=1e-6) if is_on_top
+                    nn.LayerNorm(model_opt.rnn_size, eps=1e-6) if is_on_top
                     else nn.Identity()
                 )
             )

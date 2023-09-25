@@ -146,7 +146,7 @@ class TransformerEncoder(EncoderBase):
             opt.max_relative_positions,
             pos_ffn_activation_fn=opt.pos_ffn_activation_fn,
             layer_norm_module=(
-                nn.LayerNorm(opt.enc_rnn_size, eps=1e-6) if is_on_top
+                nn.LayerNorm(opt.rnn_size, eps=1e-6) if is_on_top
                 else nn.Identity()
             )
         )

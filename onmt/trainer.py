@@ -450,7 +450,7 @@ class Trainer(object):
         for p in self.model.parameters():
             if hasattr(p, 'has_grad'):
                 p.has_grad = False
-        
+
         return stats
 
     def _gradient_accumulation_over_lang_pairs(

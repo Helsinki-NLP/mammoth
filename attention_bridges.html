@@ -186,7 +186,7 @@
             
   <div class="section" id="attention-bridge">
 <h1>Attention Bridge<a class="headerlink" href="#attention-bridge" title="Permalink to this headline">¶</a></h1>
-<p>The embeddings are generated through the self-attention mechanism (<a class="reference external" href="./onmt/attention_bridge.py">Attention Bridge</a>) of the encoder and establish a connection with language-specific decoders that focus their attention on these embeddings. This is why they are referred to as ‘bridges’. This architectural element serves to link the encoded information with the decoding process, enhancing the flow of information between different stages of language processing.</p>
+<p>The embeddings are generated through the self-attention mechanism (<a class="reference external" href="./mammoth/modules/attention_bridge.py">Attention Bridge</a>) of the encoder and establish a connection with language-specific decoders that focus their attention on these embeddings. This is why they are referred to as ‘bridges’. This architectural element serves to link the encoded information with the decoding process, enhancing the flow of information between different stages of language processing.</p>
 <p>There are five types of attention mechanism implemented:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">layer_type_to_cls</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s1">&#39;lin&#39;</span><span class="p">:</span> <span class="n">LinAttentionBridgeLayer</span><span class="p">,</span>

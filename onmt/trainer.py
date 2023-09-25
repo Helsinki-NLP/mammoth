@@ -447,11 +447,10 @@ class Trainer(object):
         # Set model back to training mode.
         valid_model.train()
 
-        # the forward hook `has_grad` was triggered, so we manually unset the flags to not fool the optim
         for p in self.model.parameters():
             if hasattr(p, 'has_grad'):
                 p.has_grad = False
-
+        
         return stats
 
     def _gradient_accumulation_over_lang_pairs(

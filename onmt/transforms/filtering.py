@@ -2,6 +2,9 @@ from onmt.transforms import register_transform
 from .transform import Transform, ObservableStats
 import regex as re
 import math
+import itertools
+import string
+import difflib
 
 class FilterTooLongStats(ObservableStats):
     """Runing statistics for FilterTooLongTransform."""
@@ -141,7 +144,7 @@ class FilterTerminalPunctuation(Transform):
     def add_options(cls, parser):
         """Avalilable options relate to this Transform."""
         group = parser.add_argument_group("Transform/Filter")
-        group.add("--punct_threshold", "-punct_threshold", type=int, default=-2, help="Number of times the substring is repeated.")
+        group.add("--punct_threshold", "-punct_threshold", type=int, default=-2, help="Minimum penalty score for discarding sentences based on their terminal punctuation signs")
 
     def _parse_opts(self):
         self.punct_threshold = self.opts.punct_threshold
@@ -166,3 +169,36 @@ class FilterTerminalPunctuation(Transform):
     def _repr_args(self):
         """Return str represent key arguments for class."""
         return '{}={}'.format('punct_threshold', self.punct_threshold)
+
+@register_transform(name='filternonzeronumerals')
+class FilterNonZeroNumerals(Transform):
+    """Filter segments based on a similarity measure of numerals between the segments with zeros removed"""
+
+    def __init__(self, opts):
+        super().__init__(opts)
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to this Transform."""
+        group = parser.add_argument_group("Transform/Filter")
+        group.add("--nonzero_threshold", "-nonzero_threshold", type=float, default=0.5, help="Threshold for discarding sentences based on a similarity measure of numerals between the segments with zeros removed")
+
+    def _parse_opts(self):
+        self.nonzero_threshold = self.opts.nonzero_threshold
+
+    def apply(self, example, **kwargs):
+        """Return None if the penalty is smaller than the threshold."""
+        src = ' '.join(example['src'])
+        tgt = ' '.join(example['tgt'])
+        nums = [[int(c) for c in sent if c in string.digits and c != '0'] for sent in [src,tgt]]
+        for num1, num2 in itertools.combinations(nums, 2):
+            seq = difflib.SequenceMatcher(None, num1, num2)
+            ratio = seq.ratio()
+        if ratio >= self.nonzero_threshold:
+            return example
+        else:
+            return None
+        
+    def _repr_args(self):
+        """Return str represent key arguments for class."""
+        return '{}={}'.format('nonzero_threshold', self.nonzero_threshold)

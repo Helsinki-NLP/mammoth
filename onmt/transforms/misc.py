@@ -2,6 +2,7 @@ from onmt.utils.logging import logger
 from onmt.transforms import register_transform
 from .transform import Transform
 
+
 @register_transform(name='prefix')
 class PrefixTransform(Transform):
     """Add Prefix to src (& tgt) sentence."""

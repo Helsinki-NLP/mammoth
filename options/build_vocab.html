@@ -95,7 +95,6 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../config_config.html">Config-config tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attention_bridges.html">Attention Bridge</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../FAQ.html">Questions</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -105,9 +104,8 @@
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Build Vocab</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#Configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#Data">Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Data/Tasks">Data/Tasks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Vocab">Vocab</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#Transform/BART">Transform/BART</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Filter">Transform/Filter</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Filter_repeat1">Transform/Filter</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Filter_repeat2">Transform/Filter</a></li>
@@ -119,6 +117,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Token_Mask">Transform/Token_Mask</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Subword/Common">Transform/Subword/Common</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Transform/Subword/ONMTTOK">Transform/Subword/ONMTTOK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Transform/Denoising AE">Transform/Denoising AE</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Reproducibility">Reproducibility</a></li>
 </ul>
 </li>
@@ -128,11 +127,11 @@
 </ul>
 <p class="caption"><span class="caption-text">API</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.html">Framework</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.modules.html">Modules</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.translation.html">Translation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.translate.translation_server.html">Server</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../onmt.inputters.html">Data Loaders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.inputters.html">Data Loaders</a></li>
 </ul>
 
             
@@ -201,22 +200,15 @@
 <h1>Build Vocab<a class="headerlink" href="#build-vocab" title="Permalink to this headline">¶</a></h1>
 <p><p>build_vocab.py</p>
 </p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">build_vocab</span><span class="o">.</span><span class="n">py</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">config</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">save_config</span> <span class="n">SAVE_CONFIG</span><span class="p">]</span> <span class="o">-</span><span class="n">data</span>
-                      <span class="n">DATA</span> <span class="p">[</span><span class="o">-</span><span class="n">skip_empty_level</span> <span class="p">{</span><span class="n">silent</span><span class="p">,</span><span class="n">warning</span><span class="p">,</span><span class="n">error</span><span class="p">}]</span>
-                      <span class="p">[</span><span class="o">-</span><span class="n">transforms</span> <span class="p">{</span><span class="n">bart</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">prefix</span><span class="p">}</span> <span class="p">[{</span><span class="n">bart</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">prefix</span><span class="p">}</span> <span class="o">...</span><span class="p">]]</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">build_vocab</span><span class="o">.</span><span class="n">py</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">config</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">save_config</span> <span class="n">SAVE_CONFIG</span><span class="p">]</span> <span class="o">-</span><span class="n">tasks</span>
+                      <span class="n">TASKS</span> <span class="p">[</span><span class="o">-</span><span class="n">skip_empty_level</span> <span class="p">{</span><span class="n">silent</span><span class="p">,</span><span class="n">warning</span><span class="p">,</span><span class="n">error</span><span class="p">}]</span>
+                      <span class="p">[</span><span class="o">-</span><span class="n">transforms</span> <span class="p">{</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">}</span> <span class="p">[{</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">}</span> <span class="o">...</span><span class="p">]]</span>
                       <span class="o">-</span><span class="n">save_data</span> <span class="n">SAVE_DATA</span> <span class="p">[</span><span class="o">-</span><span class="n">overwrite</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">n_sample</span> <span class="n">N_SAMPLE</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">dump_samples</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">num_threads</span> <span class="n">NUM_THREADS</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">vocab_sample_queue_size</span> <span class="n">VOCAB_SAMPLE_QUEUE_SIZE</span><span class="p">]</span>
                       <span class="o">-</span><span class="n">src_vocab</span> <span class="n">SRC_VOCAB</span> <span class="p">[</span><span class="o">-</span><span class="n">tgt_vocab</span> <span class="n">TGT_VOCAB</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">share_vocab</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">vocab_paths</span> <span class="n">VOCAB_PATHS</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">src_feats_vocab</span> <span class="n">SRC_FEATS_VOCAB</span><span class="p">]</span>
-                      <span class="p">[</span><span class="o">--</span><span class="n">permute_sent_ratio</span> <span class="n">PERMUTE_SENT_RATIO</span><span class="p">]</span>
-                      <span class="p">[</span><span class="o">--</span><span class="n">rotate_ratio</span> <span class="n">ROTATE_RATIO</span><span class="p">]</span>
-                      <span class="p">[</span><span class="o">--</span><span class="n">insert_ratio</span> <span class="n">INSERT_RATIO</span><span class="p">]</span>
-                      <span class="p">[</span><span class="o">--</span><span class="n">random_ratio</span> <span class="n">RANDOM_RATIO</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">mask_ratio</span> <span class="n">MASK_RATIO</span><span class="p">]</span>
-                      <span class="p">[</span><span class="o">--</span><span class="n">mask_length</span> <span class="p">{</span><span class="n">subword</span><span class="p">,</span><span class="n">word</span><span class="p">,</span><span class="n">span</span><span class="o">-</span><span class="n">poisson</span><span class="p">}]</span>
-                      <span class="p">[</span><span class="o">--</span><span class="n">poisson_lambda</span> <span class="n">POISSON_LAMBDA</span><span class="p">]</span>
-                      <span class="p">[</span><span class="o">--</span><span class="n">replace_length</span> <span class="p">{</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}]</span>
                       <span class="p">[</span><span class="o">--</span><span class="n">src_seq_length</span> <span class="n">SRC_SEQ_LENGTH</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">--</span><span class="n">tgt_seq_length</span> <span class="n">TGT_SEQ_LENGTH</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">--</span><span class="n">word_ratio_threshold</span> <span class="n">WORD_RATIO_THRESHOLD</span><span class="p">]</span>
@@ -242,7 +234,15 @@
                       <span class="p">[</span><span class="o">-</span><span class="n">src_subword_type</span> <span class="p">{</span><span class="n">none</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">}]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">tgt_subword_type</span> <span class="p">{</span><span class="n">none</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">}]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">src_onmttok_kwargs</span> <span class="n">SRC_ONMTTOK_KWARGS</span><span class="p">]</span>
-                      <span class="p">[</span><span class="o">-</span><span class="n">tgt_onmttok_kwargs</span> <span class="n">TGT_ONMTTOK_KWARGS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">seed</span> <span class="n">SEED</span><span class="p">]</span>
+                      <span class="p">[</span><span class="o">-</span><span class="n">tgt_onmttok_kwargs</span> <span class="n">TGT_ONMTTOK_KWARGS</span><span class="p">]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">permute_sent_ratio</span> <span class="n">PERMUTE_SENT_RATIO</span><span class="p">]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">rotate_ratio</span> <span class="n">ROTATE_RATIO</span><span class="p">]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">insert_ratio</span> <span class="n">INSERT_RATIO</span><span class="p">]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">random_ratio</span> <span class="n">RANDOM_RATIO</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">mask_ratio</span> <span class="n">MASK_RATIO</span><span class="p">]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">mask_length</span> <span class="p">{</span><span class="n">subword</span><span class="p">,</span><span class="n">word</span><span class="p">,</span><span class="n">span</span><span class="o">-</span><span class="n">poisson</span><span class="p">}]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">poisson_lambda</span> <span class="n">POISSON_LAMBDA</span><span class="p">]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">replace_length</span> <span class="p">{</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}]</span>
+                      <span class="p">[</span><span class="o">--</span><span class="n">denoising_objective</span> <span class="p">{</span><span class="n">bart</span><span class="p">,</span><span class="n">mass</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">seed</span> <span class="n">SEED</span><span class="p">]</span>
 </pre></div>
 </div>
 <div class="section" id="Configuration">
@@ -256,10 +256,10 @@
 </dd>
 </dl>
 </div>
-<div class="section" id="Data">
-<h2>Data<a class="headerlink" href="#Data" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="Data/Tasks">
+<h2>Data/Tasks<a class="headerlink" href="#Data/Tasks" title="Permalink to this headline">¶</a></h2>
 <dl class="option-list">
-<dt><kbd>-data, --data</kbd></dt>
+<dt><kbd>-tasks, --tasks</kbd></dt>
 <dd><p>List of datasets and their specifications. See examples/<a href="#id1"><span class="problematic" id="id2">*</span></a>.yaml for further details.</p>
 </dd>
 <dt><kbd>-skip_empty_level, --skip_empty_level</kbd></dt>
@@ -268,7 +268,7 @@
 <p>Default: “warning”</p>
 </dd>
 <dt><kbd>-transforms, --transforms</kbd></dt>
-<dd><p>Possible choices: bart, filtertoolong, filterwordratio, filterrepetitions, filterterminalpunct, filternonzeronumerals, filterfeats, inferfeats, switchout, tokendrop, tokenmask, sentencepiece, bpe, onmt_tokenize, prefix</p>
+<dd><p>Possible choices: filtertoolong, filterwordratio, filterrepetitions, filterterminalpunct, filternonzeronumerals, filterfeats, inferfeats, switchout, tokendrop, tokenmask, sentencepiece, bpe, onmt_tokenize, prefix, denoising</p>
 <p>Default transform pipeline to apply to data. Can be specified in each corpus of data to override.</p>
 <p>Default: []</p>
 </dd>
@@ -315,49 +315,6 @@
 </dd>
 <dt><kbd>-src_feats_vocab, --src_feats_vocab</kbd></dt>
 <dd><p>List of paths to save src features vocabulary files. Files format: one &lt;word&gt; or &lt;word&gt; &lt;count&gt; per line.</p>
-</dd>
-</dl>
-</div>
-<div class="section" id="Transform/BART">
-<h2>Transform/BART<a class="headerlink" href="#Transform/BART" title="Permalink to this headline">¶</a></h2>
-<div class="admonition caution">
-<p class="admonition-title">Caution</p>
-<p>This transform will not take effect when building vocabulary.</p>
-</div>
-<dl class="option-list">
-<dt><kbd>--permute_sent_ratio, -permute_sent_ratio</kbd></dt>
-<dd><p>Permute this proportion of sentences (boundaries defined by [‘.’, ‘?’, ‘!’]) in all inputs.</p>
-<p>Default: 0.0</p>
-</dd>
-<dt><kbd>--rotate_ratio, -rotate_ratio</kbd></dt>
-<dd><p>Rotate this proportion of inputs.</p>
-<p>Default: 0.0</p>
-</dd>
-<dt><kbd>--insert_ratio, -insert_ratio</kbd></dt>
-<dd><p>Insert this percentage of additional random tokens.</p>
-<p>Default: 0.0</p>
-</dd>
-<dt><kbd>--random_ratio, -random_ratio</kbd></dt>
-<dd><p>Instead of using &lt;mask&gt;, use random token this often.</p>
-<p>Default: 0.0</p>
-</dd>
-<dt><kbd>--mask_ratio, -mask_ratio</kbd></dt>
-<dd><p>Fraction of words/subwords that will be masked.</p>
-<p>Default: 0.0</p>
-</dd>
-<dt><kbd>--mask_length, -mask_length</kbd></dt>
-<dd><p>Possible choices: subword, word, span-poisson</p>
-<p>Length of masking window to apply.</p>
-<p>Default: “subword”</p>
-</dd>
-<dt><kbd>--poisson_lambda, -poisson_lambda</kbd></dt>
-<dd><p>Lambda for Poisson distribution to sample span length if <cite>-mask_length</cite> set to span-poisson.</p>
-<p>Default: 3.0</p>
-</dd>
-<dt><kbd>--replace_length, -replace_length</kbd></dt>
-<dd><p>Possible choices: -1, 0, 1</p>
-<p>When masking N tokens, replace with 0, 1, or N tokens. (use -1 for N)</p>
-<p>Default: -1</p>
 </dd>
 </dl>
 </div>
@@ -530,6 +487,50 @@
 <dt><kbd>-tgt_onmttok_kwargs, --tgt_onmttok_kwargs</kbd></dt>
 <dd><p>Other pyonmttok options for tgt in dict string, except subword related options listed earlier.</p>
 <p>Default: “{‘mode’: ‘none’}”</p>
+</dd>
+</dl>
+</div>
+<div class="section" id="Transform/Denoising AE">
+<h2>Transform/Denoising AE<a class="headerlink" href="#Transform/Denoising AE" title="Permalink to this headline">¶</a></h2>
+<dl class="option-list">
+<dt><kbd>--permute_sent_ratio, -permute_sent_ratio</kbd></dt>
+<dd><p>Permute this proportion of sentences (boundaries defined by [‘.’, ‘?’, ‘!’]) in all inputs.</p>
+<p>Default: 0.0</p>
+</dd>
+<dt><kbd>--rotate_ratio, -rotate_ratio</kbd></dt>
+<dd><p>Rotate this proportion of inputs.</p>
+<p>Default: 0.0</p>
+</dd>
+<dt><kbd>--insert_ratio, -insert_ratio</kbd></dt>
+<dd><p>Insert this percentage of additional random tokens.</p>
+<p>Default: 0.0</p>
+</dd>
+<dt><kbd>--random_ratio, -random_ratio</kbd></dt>
+<dd><p>Instead of using &lt;mask&gt;, use random token this often. Incompatible with MASS</p>
+<p>Default: 0.0</p>
+</dd>
+<dt><kbd>--mask_ratio, -mask_ratio</kbd></dt>
+<dd><p>Fraction of words/subwords that will be masked.</p>
+<p>Default: 0.0</p>
+</dd>
+<dt><kbd>--mask_length, -mask_length</kbd></dt>
+<dd><p>Possible choices: subword, word, span-poisson</p>
+<p>Length of masking window to apply.</p>
+<p>Default: “subword”</p>
+</dd>
+<dt><kbd>--poisson_lambda, -poisson_lambda</kbd></dt>
+<dd><p>Lambda for Poisson distribution to sample span length if <cite>-mask_length</cite> set to span-poisson.</p>
+<p>Default: 3.0</p>
+</dd>
+<dt><kbd>--replace_length, -replace_length</kbd></dt>
+<dd><p>Possible choices: -1, 0, 1</p>
+<p>When masking N tokens, replace with 0, 1, or N tokens. (use -1 for N)</p>
+<p>Default: -1</p>
+</dd>
+<dt><kbd>--denoising_objective</kbd></dt>
+<dd><p>Possible choices: bart, mass</p>
+<p>choose between BART-style or MASS-style denoising objectives</p>
+<p>Default: “bart”</p>
 </dd>
 </dl>
 </div>

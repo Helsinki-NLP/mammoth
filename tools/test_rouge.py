@@ -7,7 +7,7 @@ import shutil
 import sys
 import codecs
 
-from onmt.utils.logging import init_logger, logger
+from mammoth.utils.logging import init_logger, logger
 
 
 def eval_rouge(cand, ref):

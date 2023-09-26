@@ -7,12 +7,12 @@ import numpy as np
 import torch
 import tqdm
 
-from onmt.inputters.dataset import ParallelCorpus
-from onmt.inputters.dataloader import build_dataloader
-from onmt.model_builder import load_test_multitask_model
-from onmt.opts import build_bilingual_model, _add_dynamic_transform_opts
-from onmt.transforms import get_transforms_cls, make_transforms, TransformPipe
-from onmt.utils.parse import ArgumentParser
+from mammoth.inputters.dataset import ParallelCorpus
+from mammoth.inputters.dataloader import build_dataloader
+from mammoth.model_builder import load_test_multitask_model
+from mammoth.opts import build_bilingual_model, _add_dynamic_transform_opts
+from mammoth.transforms import get_transforms_cls, make_transforms, TransformPipe
+from mammoth.utils.parse import ArgumentParser
 
 
 def get_opts():
@@ -78,7 +78,7 @@ def _extract(sentences_file, model, vocabs_dict, transforms, enc_id, batch_size=
         yield (memory_bank, src_lengths)
 
 
-def extract(opts, vocabs_dict, model, model_opt, transforms):
+def extract(opts, vocabs_dict, model, model_opts, transforms):
     """Compute representations drawn from the encoder and save them to file."""
     sentence_reps = []
     for src, src_length in _extract(
@@ -95,7 +95,7 @@ def extract(opts, vocabs_dict, model, model_opt, transforms):
     torch.save(sentence_reps, opts.dump_file)
 
 
-def estimate(opts, vocabs_dict, model, model_opt, transforms):
+def estimate(opts, vocabs_dict, model, model_opts, transforms):
     """Estimate the matrix-variate distribution of representations drawn from the encoder."""
     try:
         import sklearn.covariance
@@ -134,7 +134,7 @@ def estimate(opts, vocabs_dict, model, model_opt, transforms):
     # return sampling_fn
 
 
-def classify(opts, vocabs_dict, model, model_opt, transforms):
+def classify(opts, vocabs_dict, model, model_opts, transforms):
     """Learn a simple SGD classifier using representations drawn from the encoder."""
     try:
         import sklearn.linear_model
@@ -224,7 +224,7 @@ def main():
     # ArgumentParser.validate_translate_opts_dynamic(opts)
     opts.enc_id = opts.enc_id or opts.src_lang
 
-    vocabs_dict, model, model_opt = load_test_multitask_model(opts, opts.model)
+    vocabs_dict, model, model_opts = load_test_multitask_model(opts, opts.model)
     command_fn = {
         fn.__name__: fn for fn in
         [extract, estimate, classify]
@@ -238,7 +238,7 @@ def main():
     ]
     transform = TransformPipe.build_from(data_transform)
 
-    command_fn(opts, vocabs_dict, model.to(opts.device), model_opt, transform)
+    command_fn(opts, vocabs_dict, model.to(opts.device), model_opts, transform)
 
 
 if __name__ == '__main__':

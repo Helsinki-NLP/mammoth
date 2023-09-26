@@ -2,14 +2,14 @@ import argparse
 
 import torch
 
-import onmt
-import onmt.model_builder
+import mammoth
+import mammoth.model_builder
 
-from onmt.utils.parse import ArgumentParser
-import onmt.opts
+from mammoth.utils.parse import ArgumentParser
+import mammoth.opts
 
-from onmt.utils.misc import use_gpu
-from onmt.utils.logging import init_logger, logger
+from mammoth.utils.misc import use_gpu
+from mammoth.utils.logging import init_logger, logger
 
 parser = argparse.ArgumentParser(description='translate.py')
 
@@ -29,31 +29,31 @@ def write_embeddings(filename, dict, embeddings):
 
 def main():
     dummy_parser = argparse.ArgumentParser(description='train.py')
-    onmt.opts.model_opts(dummy_parser)
+    mammoth.opts.model_opts(dummy_parser)
     dummy_opt = dummy_parser.parse_known_args([])[0]
-    opt = parser.parse_args()
-    opt.cuda = opt.gpu > -1
-    if opt.cuda:
-        torch.cuda.set_device(opt.gpu)
+    opts = parser.parse_args()
+    opts.cuda = opts.gpu > -1
+    if opts.cuda:
+        torch.cuda.set_device(opts.gpu)
 
     # Add in default model arguments, possibly added since training.
-    checkpoint = torch.load(opt.model, map_location=lambda storage, loc: storage)
-    model_opt = checkpoint['opt']
+    checkpoint = torch.load(opts.model, map_location=lambda storage, loc: storage)
+    model_opts = checkpoint['opts']
 
     fields = checkpoint['vocab']
     src_dict = fields['src'].base_field.vocab  # assumes src is text
     tgt_dict = fields['tgt'].base_field.vocab
 
-    model_opt = checkpoint['opt']
+    model_opts = checkpoint['opts']
     for arg in dummy_opt.__dict__:
-        if arg not in model_opt:
-            model_opt.__dict__[arg] = dummy_opt.__dict__[arg]
+        if arg not in model_opts:
+            model_opts.__dict__[arg] = dummy_opt.__dict__[arg]
 
     # build_base_model expects updated and validated opts
-    ArgumentParser.update_model_opts(model_opt)
-    ArgumentParser.validate_model_opts(model_opt)
+    ArgumentParser.update_model_opts(model_opts)
+    ArgumentParser.validate_model_opts(model_opts)
 
-    model = onmt.model_builder.build_base_model(model_opt, fields, use_gpu(opt), checkpoint)
+    model = mammoth.model_builder.build_base_model(model_opts, fields, use_gpu(opts), checkpoint)
     encoder = model.encoder  # no encoder for LM task
     decoder = model.decoder
 
@@ -61,10 +61,10 @@ def main():
     decoder_embeddings = decoder.embeddings.word_lut.weight.data.tolist()
 
     logger.info("Writing source embeddings")
-    write_embeddings(opt.output_dir + "/src_embeddings.txt", src_dict, encoder_embeddings)
+    write_embeddings(opts.output_dir + "/src_embeddings.txt", src_dict, encoder_embeddings)
 
     logger.info("Writing target embeddings")
-    write_embeddings(opt.output_dir + "/tgt_embeddings.txt", tgt_dict, decoder_embeddings)
+    write_embeddings(opts.output_dir + "/tgt_embeddings.txt", tgt_dict, decoder_embeddings)
 
     logger.info('... done.')
     logger.info('Converting model...')

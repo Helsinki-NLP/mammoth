@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from onmt.bin.translate import main
+from mammoth.bin.translate import main
 
 
 if __name__ == "__main__":

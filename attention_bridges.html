@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Prepare Data" href="prepare_data.html" />
+    <link rel="next" title="Questions" href="FAQ.html" />
     <link rel="prev" title="Config-config tool" href="config_config.html" /> 
 </head>
 
@@ -101,6 +101,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#feedforwardattentionbridgelayer">FeedForwardAttentionBridgeLayer</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Questions</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -115,11 +116,11 @@
 </ul>
 <p class="caption"><span class="caption-text">API</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mammoth.translation.html">Translation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mammoth.translate.translation_server.html">Server</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="onmt.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="onmt.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="onmt.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="onmt.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="onmt.inputters.html">Data Loaders</a></li>
 </ul>
 
             
@@ -186,7 +187,7 @@
             
   <div class="section" id="attention-bridge">
 <h1>Attention Bridge<a class="headerlink" href="#attention-bridge" title="Permalink to this headline">¶</a></h1>
-<p>The embeddings are generated through the self-attention mechanism (<a class="reference external" href="./mammoth/modules/attention_bridge.py">Attention Bridge</a>) of the encoder and establish a connection with language-specific decoders that focus their attention on these embeddings. This is why they are referred to as ‘bridges’. This architectural element serves to link the encoded information with the decoding process, enhancing the flow of information between different stages of language processing.</p>
+<p>The embeddings are generated through the self-attention mechanism (<a class="reference external" href="./onmt/attention_bridge.py">Attention Bridge</a>) of the encoder and establish a connection with language-specific decoders that focus their attention on these embeddings. This is why they are referred to as ‘bridges’. This architectural element serves to link the encoded information with the decoding process, enhancing the flow of information between different stages of language processing.</p>
 <p>There are five types of attention mechanism implemented:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">layer_type_to_cls</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s1">&#39;lin&#39;</span><span class="p">:</span> <span class="n">LinAttentionBridgeLayer</span><span class="p">,</span>
@@ -265,7 +266,7 @@ The final attended output is calculated by multiplying the attention weights wit
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="prepare_data.html" class="btn btn-neutral float-right" title="Prepare Data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="FAQ.html" class="btn btn-neutral float-right" title="Questions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="config_config.html" class="btn btn-neutral float-left" title="Config-config tool" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>

@@ -95,6 +95,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../config_config.html">Config-config tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attention_bridges.html">Attention Bridge</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../FAQ.html">Questions</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
@@ -105,7 +106,7 @@
 <li class="toctree-l1"><a class="reference internal" href="build_vocab.html">Build Vocab</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Train</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#Configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#Data/Tasks">Data/Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Data">Data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Vocab">Vocab</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Pruning">Pruning</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#Embeddings">Embeddings</a></li>
@@ -140,11 +141,11 @@
 </ul>
 <p class="caption"><span class="caption-text">API</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../mammoth.html">Framework</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../mammoth.modules.html">Modules</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../mammoth.translation.html">Translation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../mammoth.translate.translation_server.html">Server</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../mammoth.inputters.html">Data Loaders</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../onmt.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../onmt.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../onmt.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../onmt.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../onmt.inputters.html">Data Loaders</a></li>
 </ul>
 
             
@@ -213,7 +214,7 @@
 <h1>Train<a class="headerlink" href="#train" title="Permalink to this headline">¶</a></h1>
 <p><p>train.py</p>
 </p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">train</span><span class="o">.</span><span class="n">py</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">config</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">save_config</span> <span class="n">SAVE_CONFIG</span><span class="p">]</span> <span class="o">-</span><span class="n">tasks</span> <span class="n">TASKS</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">train</span><span class="o">.</span><span class="n">py</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">config</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">save_config</span> <span class="n">SAVE_CONFIG</span><span class="p">]</span> <span class="o">-</span><span class="n">data</span> <span class="n">DATA</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">skip_empty_level</span> <span class="p">{</span><span class="n">silent</span><span class="p">,</span><span class="n">warning</span><span class="p">,</span><span class="n">error</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">transforms</span> <span class="p">{</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">}</span> <span class="p">[{</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">}</span> <span class="o">...</span><span class="p">]]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">save_data</span> <span class="n">SAVE_DATA</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">overwrite</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">n_sample</span> <span class="n">N_SAMPLE</span><span class="p">]</span>
@@ -258,24 +259,32 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">mask_length</span> <span class="p">{</span><span class="n">subword</span><span class="p">,</span><span class="n">word</span><span class="p">,</span><span class="n">span</span><span class="o">-</span><span class="n">poisson</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">poisson_lambda</span> <span class="n">POISSON_LAMBDA</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">replace_length</span> <span class="p">{</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">1</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">denoising_objective</span> <span class="p">{</span><span class="n">bart</span><span class="p">,</span><span class="n">mass</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">share_decoder_embeddings</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">share_embeddings</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">position_encoding</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">update_vocab</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">src_word_vec_size</span> <span class="n">SRC_WORD_VEC_SIZE</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">tgt_word_vec_size</span> <span class="n">TGT_WORD_VEC_SIZE</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">word_vec_size</span> <span class="n">WORD_VEC_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">share_decoder_embeddings</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">share_embeddings</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">position_encoding</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">update_vocab</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">feat_merge</span> <span class="p">{</span><span class="n">concat</span><span class="p">,</span><span class="nb">sum</span><span class="p">,</span><span class="n">mlp</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">feat_vec_size</span> <span class="n">FEAT_VEC_SIZE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">feat_vec_exponent</span> <span class="n">FEAT_VEC_EXPONENT</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">model_task</span> <span class="p">{</span><span class="n">seq2seq</span><span class="p">,</span><span class="n">lm</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">model_type</span> <span class="p">{</span><span class="n">text</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">model_dtype</span> <span class="p">{</span><span class="n">fp32</span><span class="p">,</span><span class="n">fp16</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">encoder_type</span> <span class="p">{</span><span class="n">mean</span><span class="p">,</span><span class="n">transformer</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">decoder_type</span> <span class="p">{</span><span class="n">transformer</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">layers</span> <span class="n">LAYERS</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">enc_layers</span> <span class="n">ENC_LAYERS</span> <span class="p">[</span><span class="n">ENC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">encoder_type</span> <span class="p">{</span><span class="n">rnn</span><span class="p">,</span><span class="n">brnn</span><span class="p">,</span><span class="n">ggnn</span><span class="p">,</span><span class="n">mean</span><span class="p">,</span><span class="n">transformer</span><span class="p">,</span><span class="n">cnn</span><span class="p">,</span><span class="n">transformer_lm</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">decoder_type</span> <span class="p">{</span><span class="n">rnn</span><span class="p">,</span><span class="n">transformer</span><span class="p">,</span><span class="n">cnn</span><span class="p">,</span><span class="n">transformer_lm</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">layers</span> <span class="n">LAYERS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">enc_layers</span> <span class="n">ENC_LAYERS</span> <span class="p">[</span><span class="n">ENC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">dec_layers</span> <span class="n">DEC_LAYERS</span> <span class="p">[</span><span class="n">DEC_LAYERS</span> <span class="o">...</span><span class="p">]]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">model_dim</span> <span class="n">MODEL_DIM</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">pos_ffn_activation_fn</span> <span class="p">{</span><span class="n">relu</span><span class="p">,</span><span class="n">gelu</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">bridge</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">bridge_extra_node</span> <span class="n">BRIDGE_EXTRA_NODE</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">rnn_size</span> <span class="n">RNN_SIZE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">enc_rnn_size</span> <span class="n">ENC_RNN_SIZE</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">dec_rnn_size</span> <span class="n">DEC_RNN_SIZE</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">cnn_kernel_width</span> <span class="n">CNN_KERNEL_WIDTH</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">pos_ffn_activation_fn</span> <span class="p">{</span><span class="n">relu</span><span class="p">,</span><span class="n">gelu</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">input_feed</span> <span class="n">INPUT_FEED</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">bridge</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">rnn_type</span> <span class="p">{</span><span class="n">LSTM</span><span class="p">,</span><span class="n">GRU</span><span class="p">,</span><span class="n">SRU</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">brnn</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">context_gate</span> <span class="p">{</span><span class="n">source</span><span class="p">,</span><span class="n">target</span><span class="p">,</span><span class="n">both</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">bridge_extra_node</span> <span class="n">BRIDGE_EXTRA_NODE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">bidir_edges</span> <span class="n">BIDIR_EDGES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">state_dim</span> <span class="n">STATE_DIM</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">n_edge_types</span> <span class="n">N_EDGE_TYPES</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">n_node</span> <span class="n">N_NODE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">n_steps</span> <span class="n">N_STEPS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">src_ggnn_size</span> <span class="n">SRC_GGNN_SIZE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">global_attention</span> <span class="p">{</span><span class="n">dot</span><span class="p">,</span><span class="n">general</span><span class="p">,</span><span class="n">mlp</span><span class="p">,</span><span class="n">none</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">global_attention_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">global_attention_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">,</span><span class="n">sparsemax</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">self_attn_type</span> <span class="n">SELF_ATTN_TYPE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">max_relative_positions</span> <span class="n">MAX_RELATIVE_POSITIONS</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">heads</span> <span class="n">HEADS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">transformer_ff</span> <span class="n">TRANSFORMER_FF</span><span class="p">]</span>
@@ -283,7 +292,7 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">alignment_layer</span> <span class="n">ALIGNMENT_LAYER</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">alignment_heads</span> <span class="n">ALIGNMENT_HEADS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">full_context_alignment</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">copy_attn</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_attn_type</span> <span class="p">{</span><span class="n">dot</span><span class="p">,</span><span class="n">general</span><span class="p">,</span><span class="n">mlp</span><span class="p">,</span><span class="n">none</span><span class="p">}]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">generator_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_attn_force</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">generator_function</span> <span class="p">{</span><span class="n">softmax</span><span class="p">,</span><span class="n">sparsemax</span><span class="p">}]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_attn_force</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">reuse_copy_attn</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">copy_loss_by_seqlength</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">coverage_attn</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">lambda_coverage</span> <span class="n">LAMBDA_COVERAGE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">loss_scale</span> <span class="n">LOSS_SCALE</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">apex_opt_level</span> <span class="p">{</span><span class="n">O0</span><span class="p">,</span><span class="n">O1</span><span class="p">,</span><span class="n">O2</span><span class="p">,</span><span class="n">O3</span><span class="p">}]</span>
@@ -320,7 +329,7 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">train_steps</span> <span class="n">TRAIN_STEPS</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">single_pass</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">epochs</span> <span class="n">EPOCHS</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">early_stopping</span> <span class="n">EARLY_STOPPING</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">early_stopping_criteria</span> <span class="p">[</span><span class="n">EARLY_STOPPING_CRITERIA</span> <span class="p">[</span><span class="n">EARLY_STOPPING_CRITERIA</span> <span class="o">...</span><span class="p">]]]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">optim</span> <span class="p">{</span><span class="n">sgd</span><span class="p">,</span><span class="n">adagrad</span><span class="p">,</span><span class="n">adadelta</span><span class="p">,</span><span class="n">adam</span><span class="p">,</span><span class="n">adamw</span><span class="p">,</span><span class="n">adafactor</span><span class="p">,</span><span class="n">fusedadam</span><span class="p">}]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">optim</span> <span class="p">{</span><span class="n">sgd</span><span class="p">,</span><span class="n">adagrad</span><span class="p">,</span><span class="n">adadelta</span><span class="p">,</span><span class="n">adam</span><span class="p">,</span><span class="n">adamw</span><span class="p">,</span><span class="n">sparseadam</span><span class="p">,</span><span class="n">adafactor</span><span class="p">,</span><span class="n">fusedadam</span><span class="p">}]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">adagrad_accumulator_init</span> <span class="n">ADAGRAD_ACCUMULATOR_INIT</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">max_grad_norm</span> <span class="n">MAX_GRAD_NORM</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">weight_decay</span> <span class="n">WEIGHT_DECAY</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">dropout</span> <span class="n">DROPOUT</span> <span class="p">[</span><span class="n">DROPOUT</span> <span class="o">...</span><span class="p">]]</span>
@@ -341,7 +350,7 @@
                 <span class="p">[</span><span class="o">--</span><span class="n">verbose</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">report_every</span> <span class="n">REPORT_EVERY</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">exp_host</span> <span class="n">EXP_HOST</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">exp</span> <span class="n">EXP</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">tensorboard</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">--</span><span class="n">tensorboard_log_dir</span> <span class="n">TENSORBOARD_LOG_DIR</span><span class="p">]</span>
-                <span class="p">[</span><span class="o">--</span><span class="n">report_stats_from_parameters</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">pool_size</span> <span class="n">POOL_SIZE</span><span class="p">]</span>
+                <span class="p">[</span><span class="o">--</span><span class="n">report_stats_from_parameters</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">bucket_size</span> <span class="n">BUCKET_SIZE</span><span class="p">]</span>
                 <span class="p">[</span><span class="o">-</span><span class="n">n_buckets</span> <span class="n">N_BUCKETS</span><span class="p">]</span>
 </pre></div>
 </div>
@@ -356,10 +365,10 @@
 </dd>
 </dl>
 </div>
-<div class="section" id="Data/Tasks">
-<h2>Data/Tasks<a class="headerlink" href="#Data/Tasks" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="Data">
+<h2>Data<a class="headerlink" href="#Data" title="Permalink to this headline">¶</a></h2>
 <dl class="option-list">
-<dt><kbd>-tasks, --tasks</kbd></dt>
+<dt><kbd>-data, --data</kbd></dt>
 <dd><p>List of datasets and their specifications. See examples/<a href="#id1"><span class="problematic" id="id2">*</span></a>.yaml for further details.</p>
 </dd>
 <dt><kbd>-skip_empty_level, --skip_empty_level</kbd></dt>
@@ -630,6 +639,18 @@
 <div class="section" id="Model-Embeddings">
 <h2>Model-Embeddings<a class="headerlink" href="#Model-Embeddings" title="Permalink to this headline">¶</a></h2>
 <dl class="option-list">
+<dt><kbd>--src_word_vec_size, -src_word_vec_size</kbd></dt>
+<dd><p>Word embedding size for src.</p>
+<p>Default: 500</p>
+</dd>
+<dt><kbd>--tgt_word_vec_size, -tgt_word_vec_size</kbd></dt>
+<dd><p>Word embedding size for tgt.</p>
+<p>Default: 500</p>
+</dd>
+<dt><kbd>--word_vec_size, -word_vec_size</kbd></dt>
+<dd><p>Word embedding size for src and tgt.</p>
+<p>Default: -1</p>
+</dd>
 <dt><kbd>--share_decoder_embeddings, -share_decoder_embeddings</kbd></dt>
 <dd><p>Use a shared weight matrix for the input and output word  embeddings in the decoder.</p>
 <p>Default: False</p>
@@ -690,14 +711,14 @@
 <p>Default: “fp32”</p>
 </dd>
 <dt><kbd>--encoder_type, -encoder_type</kbd></dt>
-<dd><p>Possible choices: mean, transformer</p>
-<p>Type of encoder layer to use. Non-RNN layers are experimental. Options are [mean|transformer].</p>
-<p>Default: “transformer”</p>
+<dd><p>Possible choices: rnn, brnn, ggnn, mean, transformer, cnn, transformer_lm</p>
+<p>Type of encoder layer to use. Non-RNN layers are experimental. Options are [rnn|brnn|ggnn|mean|transformer|cnn|transformer_lm].</p>
+<p>Default: “rnn”</p>
 </dd>
 <dt><kbd>--decoder_type, -decoder_type</kbd></dt>
-<dd><p>Possible choices: transformer</p>
-<p>Type of decoder layer to use. Non-RNN layers are experimental. Options are [transformer].</p>
-<p>Default: “transformer”</p>
+<dd><p>Possible choices: rnn, transformer, cnn, transformer_lm</p>
+<p>Type of decoder layer to use. Non-RNN layers are experimental. Options are [rnn|transformer|cnn|transformer].</p>
+<p>Default: “rnn”</p>
 </dd>
 <dt><kbd>--layers, -layers</kbd></dt>
 <dd><p>Deprecated</p>
@@ -709,18 +730,46 @@
 <dt><kbd>--dec_layers, -dec_layers</kbd></dt>
 <dd><p>Number of layers in each decoder</p>
 </dd>
-<dt><kbd>--model_dim, -model_dim</kbd></dt>
-<dd><p>Size of rnn hidden states.</p>
+<dt><kbd>--rnn_size, -rnn_size</kbd></dt>
+<dd><p>Size of rnn hidden states. Overwrites enc_rnn_size and dec_rnn_size</p>
 <p>Default: -1</p>
+</dd>
+<dt><kbd>--enc_rnn_size, -enc_rnn_size</kbd></dt>
+<dd><p>Size of encoder rnn hidden states.</p>
+<p>Default: 500</p>
+</dd>
+<dt><kbd>--dec_rnn_size, -dec_rnn_size</kbd></dt>
+<dd><p>Size of decoder rnn hidden states.</p>
+<p>Default: 500</p>
+</dd>
+<dt><kbd>--cnn_kernel_width, -cnn_kernel_width</kbd></dt>
+<dd><p>Size of windows in the cnn, the kernel_size is (cnn_kernel_width, 1) in conv layer</p>
+<p>Default: 3</p>
 </dd>
 <dt><kbd>--pos_ffn_activation_fn, -pos_ffn_activation_fn</kbd></dt>
 <dd><p>Possible choices: relu, gelu</p>
 <p>The activation function to use in PositionwiseFeedForward layer. Choices are dict_keys([‘relu’, ‘gelu’]). Default to relu.</p>
 <p>Default: “relu”</p>
 </dd>
+<dt><kbd>--input_feed, -input_feed</kbd></dt>
+<dd><p>Feed the context vector at each time step as additional input (via concatenation with the word embeddings) to the decoder.</p>
+<p>Default: 1</p>
+</dd>
 <dt><kbd>--bridge, -bridge</kbd></dt>
 <dd><p>Have an additional layer between the last encoder state and the first decoder state</p>
 <p>Default: False</p>
+</dd>
+<dt><kbd>--rnn_type, -rnn_type</kbd></dt>
+<dd><p>Possible choices: LSTM, GRU, SRU</p>
+<p>The gate type to use in the RNNs</p>
+<p>Default: “LSTM”</p>
+</dd>
+<dt><kbd>--brnn, -brnn</kbd></dt>
+<dd><p>Deprecated, use <cite>encoder_type</cite>.</p>
+</dd>
+<dt><kbd>--context_gate, -context_gate</kbd></dt>
+<dd><p>Possible choices: source, target, both</p>
+<p>Type of context gate to use. Do not select for no context gate.</p>
 </dd>
 <dt><kbd>--bridge_extra_node, -bridge_extra_node</kbd></dt>
 <dd><p>Graph encoder bridges only extra node to decoder as input</p>
@@ -761,7 +810,7 @@
 <p>Default: “general”</p>
 </dd>
 <dt><kbd>--global_attention_function, -global_attention_function</kbd></dt>
-<dd><p>Possible choices: softmax</p>
+<dd><p>Possible choices: softmax, sparsemax</p>
 <p>Default: “softmax”</p>
 </dd>
 <dt><kbd>--self_attn_type, -self_attn_type</kbd></dt>
@@ -821,8 +870,8 @@
 <p>The copy attention type to use. Leave as None to use the same as -global_attention.</p>
 </dd>
 <dt><kbd>--generator_function, -generator_function</kbd></dt>
-<dd><p>Possible choices: softmax</p>
-<p>Which function to use for generating probabilities over the target vocabulary (choices: softmax)</p>
+<dd><p>Possible choices: softmax, sparsemax</p>
+<p>Which function to use for generating probabilities over the target vocabulary (choices: softmax, sparsemax)</p>
 <p>Default: “softmax”</p>
 </dd>
 <dt><kbd>--copy_attn_force, -copy_attn_force</kbd></dt>
@@ -851,7 +900,7 @@
 </dd>
 <dt><kbd>--apex_opt_level, -apex_opt_level</kbd></dt>
 <dd><p>Possible choices: O0, O1, O2, O3</p>
-<p>For FP16 training, the opt_level to use. See <a class="reference external" href="https://nvidia.github.io/apex/amp.html#opts-levels">https://nvidia.github.io/apex/amp.html#opts-levels</a>.</p>
+<p>For FP16 training, the opt_level to use. See <a class="reference external" href="https://nvidia.github.io/apex/amp.html#opt-levels">https://nvidia.github.io/apex/amp.html#opt-levels</a>.</p>
 <p>Default: “O1”</p>
 </dd>
 </dl>
@@ -1061,7 +1110,7 @@
 <dd><p>Criteria to use for early stopping.</p>
 </dd>
 <dt><kbd>--optim, -optim</kbd></dt>
-<dd><p>Possible choices: sgd, adagrad, adadelta, adam, adamw, adafactor, fusedadam</p>
+<dd><p>Possible choices: sgd, adagrad, adadelta, adam, adamw, sparseadam, adafactor, fusedadam</p>
 <p>Optimization method.</p>
 <p>Default: “sgd”</p>
 </dd>
@@ -1178,7 +1227,7 @@
 </dd>
 <dt><kbd>--tensorboard_log_dir, -tensorboard_log_dir</kbd></dt>
 <dd><p>Log directory for Tensorboard. This is also the name of the run.</p>
-<p>Default: “runs/mammoth”</p>
+<p>Default: “runs/onmt”</p>
 </dd>
 <dt><kbd>--report_stats_from_parameters, -report_stats_from_parameters=</kbd></dt>
 <dd><p>Report parameter-level statistics in tensorboard. This has a huge impact on performance: only use for debugging.</p>
@@ -1189,7 +1238,7 @@
 <div class="section" id="Dynamic data">
 <h2>Dynamic data<a class="headerlink" href="#Dynamic data" title="Permalink to this headline">¶</a></h2>
 <dl class="option-list">
-<dt><kbd>-pool_size, --pool_size</kbd></dt>
+<dt><kbd>-bucket_size, --bucket_size</kbd></dt>
 <dd><p>Number of examples to dynamically pool before batching.</p>
 <p>Default: 2048</p>
 </dd>

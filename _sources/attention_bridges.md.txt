@@ -1,7 +1,7 @@
 
 # Attention Bridge
 
-The embeddings are generated through the self-attention mechanism ([Attention Bridge](./mammoth/modules/attention_bridge.py)) of the encoder and establish a connection with language-specific decoders that focus their attention on these embeddings. This is why they are referred to as 'bridges'. This architectural element serves to link the encoded information with the decoding process, enhancing the flow of information between different stages of language processing.
+The embeddings are generated through the self-attention mechanism ([Attention Bridge](./onmt/attention_bridge.py)) of the encoder and establish a connection with language-specific decoders that focus their attention on these embeddings. This is why they are referred to as 'bridges'. This architectural element serves to link the encoded information with the decoding process, enhancing the flow of information between different stages of language processing.
 
 There are five types of attention mechanism implemented:
 
@@ -61,7 +61,7 @@ The `PerceiverAttentionBridgeLayer` involves a multi-headed dot product self-att
 
 3. **Linear Layer**: After normalization, the data is fed into a linear layer. This linear transformation can be seen as a learned projection of the attention-weighted data into a new space.
 
-4. **ReLU Activation**: The output of the linear layer undergoes the Rectified Linear Unit (ReLU) activation function.
+4. **ReLU Activation**: The output of the linear layer undergoes the Rectified Linear Unit (ReLU) activation function. 
 
 5. **Linear Layer (Second)**: Another linear layer is applied to the ReLU-activated output.
 
@@ -72,11 +72,11 @@ The `PerceiverAttentionBridgeLayer` involves a multi-headed dot product self-att
 The process described involves dot product self-attention. The steps are as follows:
 
 1. **Input Transformation**: Given an input matrix $\mathbf{H} \in \mathbb{R}^{d_h \times n}$, two sets of learned weight matrices are used to transform the input. These weight matrices are $\mathbf{W}_1 \in \mathbb{R}^{d_h \times d_a}$ and $\mathbf{W}_2 \in \mathbb{R}^{d_h \times d_a}$. The multiplication of $\mathbf{H}$ with $\mathbf{W}_1$ and $\mathbf{W}_2$ produces matrices $\mathbf{V}$ and $\mathbf{K}$, respectively:
-
+   
    - $\mathbf{V} = \mathbf{H} \mathbf{W}_1$
    - $\mathbf{K} = \mathbf{H} \mathbf{W}_2$
 
-2. **Attention Calculation**: The core attention calculation involves three matrices: $\mathbf{Q} \in \mathbb{R}^{d_h \times n}$, $\mathbf{K}$ (calculated previously), and $\mathbf{V}$ (calculated previously). The dot product of $\mathbf{Q}$ and $\mathbf{K}^\top$ is divided by the square root of the dimensionality of the input features ($\sqrt{d_h}$).
+2. **Attention Calculation**: The core attention calculation involves three matrices: $\mathbf{Q} \in \mathbb{R}^{d_h \times n}$, $\mathbf{K}$ (calculated previously), and $\mathbf{V}$ (calculated previously). The dot product of $\mathbf{Q}$ and $\mathbf{K}^\top$ is divided by the square root of the dimensionality of the input features ($\sqrt{d_h}$). 
 The final attended output is calculated by multiplying the attention weights with the $\mathbf{V}$ matrix: $\mathbf{H}^\prime = \operatorname{Softmax}(\frac{\mathbf{Q}\mathbf{K}^\top}{\sqrt{d_h}})\mathbf{V}$
 
 
@@ -86,4 +86,5 @@ The TransformerEncoderLayer employs multi-headed dot product self-attention (by 
 
 ## FeedForwardAttentionBridgeLayer
 
-The `FeedForwardAttentionBridgeLayer` module applies a sequence of linear transformations and `ReLU` activations to the input data, followed by an attention bridge normalization, enhancing the connectivity between different parts of the model.
+The `FeedForwardAttentionBridgeLayer` module applies a sequence of linear transformations and `ReLU` activations to the input data, followed by an attention bridge normalization, enhancing the connectivity between different parts of the model. 
+

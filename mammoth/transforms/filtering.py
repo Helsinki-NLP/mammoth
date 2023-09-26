@@ -1,6 +1,7 @@
 from onmt.transforms import register_transform
 from .transform import Transform, ObservableStats
 import regex as re
+import math
 
 class FilterTooLongStats(ObservableStats):
     """Runing statistics for FilterTooLongTransform."""
@@ -128,3 +129,40 @@ class FilterRepetitions(Transform):
     def _repr_args(self):
         """Return str represent key arguments for class."""
         return '{}={}, {}={}, {}={}'.format('rep_threshold', self.rep_threshold, 'rep_min_len', self.rep_min_len, 'rep_max_len', self.rep_max_len)
+
+@register_transform(name='filterterminalpunct')
+class FilterTerminalPunctuation(Transform):
+    """Filter segments with respect to the co-occurrence of terminal punctuation marks"""
+
+    def __init__(self, opts):
+        super().__init__(opts)
+
+    @classmethod
+    def add_options(cls, parser):
+        """Avalilable options relate to this Transform."""
+        group = parser.add_argument_group("Transform/Filter")
+        group.add("--punct_threshold", "-punct_threshold", type=int, default=-2, help="Number of times the substring is repeated.")
+
+    def _parse_opts(self):
+        self.punct_threshold = self.opts.punct_threshold
+
+    def apply(self, example, **kwargs):
+        """Return None if the penalty is smaller than the threshold."""
+        src = ' '.join(example['src'])
+        tgt = ' '.join(example['tgt'])
+        spun = len([c for c in src if c in ['.', '?', '!', '…']])
+        tpun = len([c for c in tgt if c in ['.', '?', '!', '…']])
+        score = abs(spun - tpun)
+        if spun > 1:
+            score += spun - 1
+        if tpun > 1:
+            score += tpun - 1
+        score = -math.log(score + 1)
+        if score >= self.punct_threshold:
+            return example
+        else:
+            return None
+
+    def _repr_args(self):
+        """Return str represent key arguments for class."""
+        return '{}={}'.format('punct_threshold', self.punct_threshold)

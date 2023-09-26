@@ -1,6 +1,6 @@
 from onmt.transforms import register_transform
 from .transform import Transform, ObservableStats
-import regex as re
+import re
 import math
 import itertools
 import string

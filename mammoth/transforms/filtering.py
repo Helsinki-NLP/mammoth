@@ -1,4 +1,4 @@
-from onmt.transforms import register_transform
+from mammoth.transforms import register_transform
 from .transform import Transform, ObservableStats
 import re
 import math

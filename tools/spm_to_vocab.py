@@ -3,7 +3,7 @@
 # counts)
 import sys
 import math
-from mammoth.constants import DefaultTokens
+from onmt.constants import DefaultTokens
 
 OMIT = (DefaultTokens.UNK, DefaultTokens.BOS, DefaultTokens.EOS)
 

@@ -4,7 +4,7 @@ from __future__ import division
 import six
 import argparse
 import torch
-from mammoth.utils.logging import init_logger, logger
+from onmt.utils.logging import init_logger, logger
 
 
 # FIXME haven't touched that file yet...
@@ -79,48 +79,48 @@ def main():
     parser.add_argument('-verbose', action="store_true", default=False)
     parser.add_argument('-skip_lines', type=int, default=0, help="Skip first lines of the embedding file")
     parser.add_argument('-type', choices=["GloVe", "word2vec"], default="GloVe")
-    opts = parser.parse_args()
+    opt = parser.parse_args()
 
-    enc_vocab, dec_vocab = get_vocabs(opts.dict_file)
+    enc_vocab, dec_vocab = get_vocabs(opt.dict_file)
 
     # Read in embeddings
-    skip_lines = 1 if opts.type == "word2vec" else opts.skip_lines
-    if opts.emb_file_both is not None:
-        if opts.emb_file_enc is not None:
+    skip_lines = 1 if opt.type == "word2vec" else opt.skip_lines
+    if opt.emb_file_both is not None:
+        if opt.emb_file_enc is not None:
             raise ValueError("If --emb_file_both is passed in, you should not" "set --emb_file_enc.")
-        if opts.emb_file_dec is not None:
+        if opt.emb_file_dec is not None:
             raise ValueError("If --emb_file_both is passed in, you should not" "set --emb_file_dec.")
         set_of_src_and_tgt_vocab = set(enc_vocab.stoi.keys()) | set(dec_vocab.stoi.keys())
-        logger.info("Reading encoder and decoder embeddings from {}".format(opts.emb_file_both))
-        src_vectors, total_vec_count = read_embeddings(opts.emb_file_both, skip_lines, set_of_src_and_tgt_vocab)
+        logger.info("Reading encoder and decoder embeddings from {}".format(opt.emb_file_both))
+        src_vectors, total_vec_count = read_embeddings(opt.emb_file_both, skip_lines, set_of_src_and_tgt_vocab)
         tgt_vectors = src_vectors
         logger.info("\tFound {} total vectors in file".format(total_vec_count))
     else:
-        if opts.emb_file_enc is None:
+        if opt.emb_file_enc is None:
             raise ValueError(
                 "If --emb_file_enc not provided. Please specify "
                 "the file with encoder embeddings, or pass in "
                 "--emb_file_both"
             )
-        if opts.emb_file_dec is None:
+        if opt.emb_file_dec is None:
             raise ValueError(
                 "If --emb_file_dec not provided. Please specify "
                 "the file with encoder embeddings, or pass in "
                 "--emb_file_both"
             )
-        logger.info("Reading encoder embeddings from {}".format(opts.emb_file_enc))
-        src_vectors, total_vec_count = read_embeddings(opts.emb_file_enc, skip_lines, filter_set=enc_vocab.stoi)
+        logger.info("Reading encoder embeddings from {}".format(opt.emb_file_enc))
+        src_vectors, total_vec_count = read_embeddings(opt.emb_file_enc, skip_lines, filter_set=enc_vocab.stoi)
         logger.info("\tFound {} total vectors in file.".format(total_vec_count))
-        logger.info("Reading decoder embeddings from {}".format(opts.emb_file_dec))
-        tgt_vectors, total_vec_count = read_embeddings(opts.emb_file_dec, skip_lines, filter_set=dec_vocab.stoi)
+        logger.info("Reading decoder embeddings from {}".format(opt.emb_file_dec))
+        tgt_vectors, total_vec_count = read_embeddings(opt.emb_file_dec, skip_lines, filter_set=dec_vocab.stoi)
         logger.info("\tFound {} total vectors in file".format(total_vec_count))
     logger.info("After filtering to vectors in vocab:")
     logger.info("\t* enc: %d match, %d missing, (%.2f%%)" % calc_vocab_load_stats(enc_vocab, src_vectors))
     logger.info("\t* dec: %d match, %d missing, (%.2f%%)" % calc_vocab_load_stats(dec_vocab, tgt_vectors))
 
     # Write to file
-    enc_output_file = opts.output_file + ".enc.pt"
-    dec_output_file = opts.output_file + ".dec.pt"
+    enc_output_file = opt.output_file + ".enc.pt"
+    dec_output_file = opt.output_file + ".dec.pt"
     logger.info("\nSaving embedding as:\n\t* enc: %s\n\t* dec: %s" % (enc_output_file, dec_output_file))
     torch.save(convert_to_torch_tensor(src_vectors, enc_vocab), enc_output_file)
     torch.save(convert_to_torch_tensor(tgt_vectors, dec_vocab), dec_output_file)

@@ -60,12 +60,12 @@ def main():
         help="""Specifies 'src' or 'tgt' side for 'field' file_type.""",
     )
 
-    opts = parser.parse_args()
+    opt = parser.parse_args()
 
     vocabulary = {}
-    if opts.file_type == 'text':
+    if opt.file_type == 'text':
         print("Reading input file...")
-        for batch in read_files_batch(opts.file):
+        for batch in read_files_batch(opt.file):
             for sentence in batch:
                 for w in sentence:
                     if w in vocabulary:
@@ -74,19 +74,19 @@ def main():
                         vocabulary[w] = 1
 
         print("Writing vocabulary file...")
-        with open(opts.out_file, "w") as f:
+        with open(opt.out_file, "w") as f:
             for w, count in sorted(vocabulary.items(), key=lambda x: x[1], reverse=True):
                 f.write("{0}\n".format(w))
     else:
-        if opts.side not in ['src', 'tgt']:
+        if opt.side not in ['src', 'tgt']:
             raise ValueError("If using -file_type='field', specifies 'src' or 'tgt' argument for -side.")
         import torch
 
         print("Reading input file...")
-        if not len(opts.file) == 1:
+        if not len(opt.file) == 1:
             raise ValueError("If using -file_type='field', only pass one argument for -file.")
-        vocabs = torch.load(opts.file[0])
-        voc = dict(vocabs)[opts.side]
+        vocabs = torch.load(opt.file[0])
+        voc = dict(vocabs)[opt.side]
 
         try:
             word_list = voc[0][1].base_field.vocab.itos
@@ -94,7 +94,7 @@ def main():
             word_list = voc[0][1].vocab.itos
 
         print("Writing vocabulary file...")
-        with open(opts.out_file, "wb") as f:
+        with open(opt.out_file, "wb") as f:
             for w in word_list:
                 f.write(u"{0}\n".format(w).encode("utf-8"))
 

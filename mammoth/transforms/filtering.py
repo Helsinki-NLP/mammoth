@@ -113,7 +113,6 @@ class FilterRepetitions(Transform):
         reps = []
         for segment in example['src'], example['tgt']:
             match = regex.search(' '.join(segment))
-            print(match)
             if match:
                 full = match.group(0)
                 repeated = match.group(1)
@@ -121,7 +120,6 @@ class FilterRepetitions(Transform):
             else:
                 rep = 0
             reps.append(rep)
-        print(reps)
         if max(reps) > self.rep_threshold:
             return None
         else:

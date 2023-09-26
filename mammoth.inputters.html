@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Overview &mdash; MAMMOTH  documentation</title>
+  <title>Data Loaders &mdash; MAMMOTH  documentation</title>
   
 
   
@@ -38,8 +38,7 @@
   <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Quickstart" href="quickstart.html" />
-    <link rel="prev" title="Contents" href="index.html" /> 
+    <link rel="prev" title="Server" href="mammoth.translate.translation_server.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -84,12 +83,8 @@
             
             
               <p class="caption"><span class="caption-text">Getting Started</span></p>
-<ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#citation">Citation</a></li>
-</ul>
-</li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
@@ -111,12 +106,16 @@
 <li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
 </ul>
 <p class="caption"><span class="caption-text">API</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.translation.html">Translation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.translate.translation_server.html">Server</a></li>
-<li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data Loaders</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#data-readers">Data Readers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dataset">Dataset</a></li>
+</ul>
+</li>
 </ul>
 
             
@@ -162,13 +161,13 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>Overview</li>
+      <li>Data Loaders</li>
     
     
       <li class="wy-breadcrumbs-aside">
         
             
-            <a href="_sources/main.md.txt" rel="nofollow"> View page source</a>
+            <a href="_sources/mammoth.inputters.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
@@ -181,39 +180,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="overview">
-<h1>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h1>
-<p>This portal provides a detailed documentation of the <strong>MAMMOTH</strong>: Modular Adaptable Massively Multilingual Open Translation &#64; Helsinki.</p>
-<div class="section" id="installation">
-<h2>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>https://github.com/Helsinki-NLP/mammoth.git
-<span class="nb">cd</span><span class="w"> </span>mammoth
-pip3<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
-pip3<span class="w"> </span>install<span class="w"> </span><span class="nv">sentencepiece</span><span class="o">==</span><span class="m">0</span>.1.97<span class="w"> </span><span class="nv">sacrebleu</span><span class="o">==</span><span class="m">2</span>.3.1
-</pre></div>
+  <div class="section" id="data-loaders">
+<h1>Data Loaders<a class="headerlink" href="#data-loaders" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="data-readers">
+<h2>Data Readers<a class="headerlink" href="#data-readers" title="Permalink to this headline">¶</a></h2>
 </div>
-<p>Check out the <a class="reference internal" href="install.html"><span class="doc">installation guide</span></a> to install in specific clusters.</p>
-<p>Take a look at the <a class="reference internal" href="quickstart.html"><span class="doc">quickstart</span></a> to familiarize yourself with the main training workflow.</p>
-</div>
-<div class="section" id="citation">
-<h2>Citation<a class="headerlink" href="#citation" title="Permalink to this headline">¶</a></h2>
-<p>This project is based on <a class="reference external" href="https://opennmt.net">OpenNMT V2</a>.
-When using OpenNMT-py for research please cite the
-<a class="reference external" href="https://doi.org/10.18653/v1/P17-4012">OpenNMT technical report</a></p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nd">@inproceedings</span><span class="p">{</span><span class="n">opennmt</span><span class="p">,</span>
-  <span class="n">author</span>    <span class="o">=</span> <span class="p">{</span><span class="n">Guillaume</span> <span class="n">Klein</span> <span class="ow">and</span>
-               <span class="n">Yoon</span> <span class="n">Kim</span> <span class="ow">and</span>
-               <span class="n">Yuntian</span> <span class="n">Deng</span> <span class="ow">and</span>
-               <span class="n">Jean</span> <span class="n">Senellart</span> <span class="ow">and</span>
-               <span class="n">Alexander</span> <span class="n">M</span><span class="o">.</span> <span class="n">Rush</span><span class="p">},</span>
-  <span class="n">title</span>     <span class="o">=</span> <span class="p">{</span><span class="n">OpenNMT</span><span class="p">:</span> <span class="n">Open</span><span class="o">-</span><span class="n">Source</span> <span class="n">Toolkit</span> <span class="k">for</span> <span class="n">Neural</span> <span class="n">Machine</span> <span class="n">Translation</span><span class="p">},</span>
-  <span class="n">booktitle</span> <span class="o">=</span> <span class="p">{</span><span class="n">Proc</span><span class="o">.</span> <span class="n">ACL</span><span class="p">},</span>
-  <span class="n">year</span>      <span class="o">=</span> <span class="p">{</span><span class="mi">2017</span><span class="p">},</span>
-  <span class="n">url</span>       <span class="o">=</span> <span class="p">{</span><span class="n">https</span><span class="p">:</span><span class="o">//</span><span class="n">doi</span><span class="o">.</span><span class="n">org</span><span class="o">/</span><span class="mf">10.18653</span><span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">P17</span><span class="o">-</span><span class="mi">4012</span><span class="p">},</span>
-  <span class="n">doi</span>       <span class="o">=</span> <span class="p">{</span><span class="mf">10.18653</span><span class="o">/</span><span class="n">v1</span><span class="o">/</span><span class="n">P17</span><span class="o">-</span><span class="mi">4012</span><span class="p">}</span>
-<span class="p">}</span>
-</pre></div>
-</div>
+<div class="section" id="dataset">
+<h2>Dataset<a class="headerlink" href="#dataset" title="Permalink to this headline">¶</a></h2>
 </div>
 </div>
 
@@ -225,10 +198,8 @@ When using OpenNMT-py for research please cite the
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="quickstart.html" class="btn btn-neutral float-right" title="Quickstart" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
-      
-        <a href="index.html" class="btn btn-neutral float-left" title="Contents" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="mammoth.translate.translation_server.html" class="btn btn-neutral float-left" title="Server" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

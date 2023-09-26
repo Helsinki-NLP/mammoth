@@ -28,7 +28,7 @@ class FilterTooLongTransform(Transform):
 
     @classmethod
     def add_options(cls, parser):
-        """Avalilable options relate to this Transform."""
+        """Available options relating to this Transform."""
         group = parser.add_argument_group("Transform/Filter")
         group.add("--src_seq_length", "-src_seq_length", type=int, default=200, help="Maximum source sequence length.")
         group.add("--tgt_seq_length", "-tgt_seq_length", type=int, default=200, help="Maximum target sequence length.")
@@ -69,7 +69,7 @@ class FilterWordRatio(Transform):
 
     @classmethod
     def add_options(cls, parser):
-        """Avalilable options relate to this Transform."""
+        """Available options relating to this Transform."""
         group = parser.add_argument_group("Transform/Filter")
         group.add("--word_ratio_threshold", "-word_ratio_threshold", type=int, default=3,
                   help="Threshold for discarding sentences based on word ratio.")
@@ -105,7 +105,7 @@ class FilterRepetitions(Transform):
 
     @classmethod
     def add_options(cls, parser):
-        """Avalilable options relate to this Transform."""
+        """Available options relating to this Transform."""
         group = parser.add_argument_group("Transform/Filter")
         group.add("--rep_threshold", "-rep_threshold", type=int, default=2,
                   help="Number of times the substring is repeated.")
@@ -154,7 +154,7 @@ class FilterTerminalPunctuation(Transform):
 
     @classmethod
     def add_options(cls, parser):
-        """Avalilable options relate to this Transform."""
+        """Available options relating to this Transform."""
         group = parser.add_argument_group("Transform/Filter")
         group.add("--punct_threshold", "-punct_threshold", type=int, default=-2,
                   help="Minimum penalty score for discarding sentences based on their terminal punctuation signs")
@@ -193,7 +193,7 @@ class FilterNonZeroNumerals(Transform):
 
     @classmethod
     def add_options(cls, parser):
-        """Avalilable options relate to this Transform."""
+        """Available options relating to this Transform."""
         group = parser.add_argument_group("Transform/Filter")
         group.add("--nonzero_threshold", "-nonzero_threshold", type=float, default=0.5,
                   help="Threshold for discarding sentences based on numerals between the segments with zeros removed")

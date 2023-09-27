@@ -191,8 +191,9 @@ class LookAheadBucketing():
                 while self.bucket_is_empty(*current_bucket_idx):
                     current_bucket_idx = next(next_indices)
                 # retrieve and process the example
-                example = self._buckets[current_bucket_idx].pop()
-                self._lens[current_bucket_idx] -= 1
+                s_bucket, t_bucket = current_bucket_idx
+                example = self._buckets[s_bucket][t_bucket].pop()
+                self._lens[s_bucket][t_bucket] -= 1
                 accum.append(example)
                 numel = self.numel_fn(example)
                 cur_batch_size += numel

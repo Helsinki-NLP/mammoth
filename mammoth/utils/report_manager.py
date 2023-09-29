@@ -4,7 +4,7 @@ from datetime import datetime
 
 import mammoth
 
-from mammoth.utils.logging import logger
+from mammoth.utils.logging import logger, valid_logger
 
 
 def build_report_manager(opts, node_rank, local_rank):
@@ -50,6 +50,10 @@ class ReportMgrBase(object):
 
     def log(self, *args, **kwargs):
         logger.info(*args, **kwargs)
+
+    def log_valid(self, *args, **kwargs):
+        if valid_logger is not None:
+            valid_logger.info(*args, **kwargs)
 
     def report_training(self, step, num_steps, learning_rate, patience, report_stats, multigpu=False):
         """
@@ -142,5 +146,5 @@ class ReportMgr(ReportMgrBase):
         if valid_stats is not None:
             self.log('Validation perplexity: %g' % valid_stats.ppl())
             self.log('Validation accuracy: %g' % valid_stats.accuracy())
-
+            self.log_valid(f'Step {step}; lr: {lr}; ppl: {valid_stats.ppl()}; acc: {valid_stats.accuracy()}; xent: {valid_stats.xent()};' )
             self.maybe_log_tensorboard(valid_stats, "valid", lr, patience, step)

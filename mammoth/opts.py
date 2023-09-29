@@ -23,6 +23,7 @@ def config_opts(parser):
 def _add_logging_opts(parser, is_train=True):
     group = parser.add_argument_group('Logging')
     group.add('--log_file', '-log_file', type=str, default="", help="Output logs to a file under this path.")
+    group.add('--valid_log_file', '-valid_log_file', type=str, default="", help="Output logs to a file under this path.")
     group.add(
         '--log_file_level',
         '-log_file_level',

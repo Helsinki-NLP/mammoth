@@ -15,7 +15,7 @@ from mammoth.distributed import (
 )
 from mammoth.utils.misc import set_random_seed
 # from mammoth.modules.embeddings import prepare_pretrained_embeddings
-from mammoth.utils.logging import init_logger, logger
+from mammoth.utils.logging import init_logger, logger,init_valid_logger
 
 from mammoth.models.model_saver import load_checkpoint
 from mammoth.train_single import main as single_main
@@ -145,6 +145,8 @@ def validate_slurm_node_opts(current_env, world_context, opts):
 
 def train(opts):
     init_logger(opts.log_file)
+    if opts.valid_log_file is not None and opts.valid_log_file !="":
+        init_valid_logger(opts.valid_log_file)
     ArgumentParser.validate_train_opts(opts)
     ArgumentParser.update_model_opts(opts)
     ArgumentParser.validate_model_opts(opts)

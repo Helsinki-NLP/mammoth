@@ -43,7 +43,7 @@ def init_valid_logger(
     log_level=logging.DEBUG,
     gpu_id='',
 ):
-    log_format = logging.Formatter(f"[%(asctime)s %(process)s {gpu_id} %(levelname)s] %(message)s")
+    log_format = logging.Formatter(f"%(message)s")
     logger = logging.getLogger("valid_logger")
     logger.setLevel(log_level)
     console_handler = logging.StreamHandler()

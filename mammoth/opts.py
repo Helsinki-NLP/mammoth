@@ -24,6 +24,13 @@ def _add_logging_opts(parser, is_train=True):
     group = parser.add_argument_group('Logging')
     group.add('--log_file', '-log_file', type=str, default="", help="Output logs to a file under this path.")
     group.add(
+        '--structured_log_file',
+        '-structured_log_file',
+        type=str,
+        default="",
+        help="Output machine-readable structured logs to a file under this path."
+    )
+    group.add(
         '--log_file_level',
         '-log_file_level',
         type=str,

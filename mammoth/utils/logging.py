@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-import os
 import json
 import logging
 from logging.handlers import RotatingFileHandler
+from typing import Dict, Union
 
 logger = logging.getLogger()
 
@@ -13,6 +13,7 @@ def init_logger(
     rotate=False,
     log_level=logging.INFO,
     gpu_id='',
+    structured_log_file=None,
 ):
     log_format = logging.Formatter(f"[%(asctime)s %(process)s {gpu_id} %(levelname)s] %(message)s")
     logger = logging.getLogger()
@@ -31,18 +32,31 @@ def init_logger(
         file_handler.setFormatter(log_format)
         logger.addHandler(file_handler)
 
+    if structured_log_file:
+        init_structured_logger(structured_log_file)
+
     return logger
 
 
-def log_lca_values(step, lca_logs, lca_params, opath, dump_logs=False):
-    for k, v in lca_params.items():
-        lca_sum = v.sum().item()
-        lca_mean = v.mean().item()
-        lca_logs[k][f'STEP_{step}'] = {'sum': lca_sum, 'mean': lca_mean}
+def init_structured_logger(
+    log_file=None,
+):
+    # Log should be parseable as a jsonl file. Format should not include anything extra.
+    log_format = logging.Formatter("%(message)s")
+    logger = logging.getLogger("structured_logger")
+    logger.setLevel(logging.INFO)
+    file_handler = logging.FileHandler(log_file, mode='a', delay=True)
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(log_format)
+    logger.handlers = [file_handler]
+    logger.propagate = False
 
-    if dump_logs:
-        if os.path.exists(opath):
-            os.system(f'cp {opath} {opath}.previous')
-        with open(opath, 'w+') as f:
-            json.dump(lca_logs, f)
-        logger.info(f'dumped LCA logs in {opath}')
+
+def structured_logging(obj: Dict[str, Union[str, int, float]]):
+    structured_logger = logging.getLogger("structured_logger")
+    if not structured_logger.hasHandlers:
+        return
+    try:
+        structured_logger.info(json.dumps(obj))
+    except Exception:
+        pass

@@ -144,7 +144,7 @@ def validate_slurm_node_opts(current_env, world_context, opts):
 
 
 def train(opts):
-    init_logger(opts.log_file)
+    init_logger(opts.log_file, structured_log_file=opts.structured_log_file)
     ArgumentParser.validate_train_opts(opts)
     ArgumentParser.update_model_opts(opts)
     ArgumentParser.validate_model_opts(opts)

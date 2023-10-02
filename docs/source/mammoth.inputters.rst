@@ -1,20 +1,28 @@
 Data Loaders
 =================
 
-Data Readers
--------------
-
-.. autoexception:: mammoth.inputters.datareader_base.MissingDependencyException
-
-.. autoclass:: mammoth.inputters.DataReaderBase
-    :members:
-
-.. autoclass:: mammoth.inputters.TextDataReader
-    :members:
-
-
 Dataset
---------
+-------
 
-.. autoclass:: mammoth.inputters.Dataset
+.. autoclass:: mammoth.inputters.dataset.ParallelCorpus
+    :members:
+
+
+Data loading
+------------
+
+.. autoclass:: mammoth.inputters.dataloader.DynamicDatasetIter
+    :members:
+
+.. autoclass:: mammoth.inputters.dataloader.LookAheadBucketing
+    :members:
+
+.. autoclass:: mammoth.inputters.dataloader.InferenceBatcher
+    :members:
+
+
+Vocab
+-----
+
+.. autoclass:: mammoth.inputters.vocab.Vocab
     :members:

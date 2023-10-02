@@ -5,7 +5,7 @@ from mammoth.distributed.tasks import WeightedSamplingTaskDistributionStrategy, 
 
 
 def test_weights_all_zero():
-    opts = Namespace(data={
+    opts = Namespace(tasks={
         'a': {
             'weight': 0,
             'introduce_at_training_step': 0,
@@ -25,7 +25,7 @@ def test_weights_all_zero():
 
 
 def test_weights_all_postponed():
-    opts = Namespace(data={
+    opts = Namespace(tasks={
         'a': {
             'weight': 1,
             'introduce_at_training_step': 1,
@@ -45,7 +45,7 @@ def test_weights_all_postponed():
 
 
 def test_invalid_curriculum():
-    opts = Namespace(data={
+    opts = Namespace(tasks={
         # 'a' disabled by weight
         'a': {
             'weight': 0,
@@ -67,7 +67,7 @@ def test_invalid_curriculum():
 
 
 def test_sampling_task_distribution_strategy():
-    opts = Namespace(data={
+    opts = Namespace(tasks={
         # 'a' disabled by weight
         'a': {
             'weight': 0,

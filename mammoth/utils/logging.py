@@ -45,7 +45,7 @@ def init_structured_logger(
     log_format = logging.Formatter("%(message)s")
     logger = logging.getLogger("structured_logger")
     logger.setLevel(logging.INFO)
-    file_handler = logging.FileHandler(log_file, mode='a', buffering=1, delay=True)
+    file_handler = logging.FileHandler(log_file, mode='a', delay=True)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(log_format)
     logger.handlers = [file_handler]

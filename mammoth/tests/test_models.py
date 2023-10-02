@@ -14,7 +14,7 @@ mammoth.opts.model_opts(parser)
 mammoth.opts._add_train_general_opts(parser)
 
 # -data option is required, but not used in this test, so dummy.
-opts = parser.parse_known_args(['-tasks', 'dummy', '-node_rank', '0', '-model_dim', '500'])[0]
+opts = parser.parse_known_args(['-tasks', 'dummy', '-node_rank', '0', '-model_dim', '500'], strict=False)[0]
 
 
 class TestModel(unittest.TestCase):

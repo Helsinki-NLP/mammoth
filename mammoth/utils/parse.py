@@ -269,9 +269,9 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         defaults = dummy_parser.parse_known_args([])[0]
         return defaults
 
-    def parse_known_args(self):
-        opts, unknown = super().parse_known_args()
-        if unknown:
+    def parse_known_args(self, *args, strict=True, **kwargs):
+        opts, unknown = super().parse_known_args(*args, **kwargs)
+        if strict and unknown:
             raise ValueError(f'unknown arguments provided:\n{unknown}')
         return opts, unknown
 

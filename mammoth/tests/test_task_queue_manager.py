@@ -15,7 +15,7 @@ def test_init_minimal():
         'gpu_ranks': [0, 1],
         'enc_layers': [1],
         'dec_layers': [1],
-        'data': {
+        'tasks': {
             'train_a-b': {'path_src': 'dummy', 'path_tgt': 'dummy', 'src_tgt': 'a-b'},
             'train_c-d': {'path_src': 'dummy', 'path_tgt': 'dummy', 'src_tgt': 'c-d'},
         }
@@ -52,7 +52,7 @@ def create_basic_task_queue_manager():
         # enc_sharing_group x is twice, on two devices 0:0 and 0:1
         # dec_sharing_group y is twice, on two devices 0:0 and 1:0
         # dec_sharing_group yy is twice, but only on a single device 0:1
-        'data': {
+        'tasks': {
             'train_0_a-b': {
                 'path_src': 'dummy',
                 'path_tgt': 'dummy',
@@ -183,7 +183,7 @@ def test_cpu_distributed_groups():
         'n_nodes': 1,
         'enc_layers': [1],
         'dec_layers': [1],
-        'data': {
+        'tasks': {
             'train_a-b': {
                 'path_src': 'dummy',
                 'path_tgt': 'dummy',
@@ -221,7 +221,7 @@ def test_distributed_groups_no_encoder_group():
         'dec_layers': [1],
         'gpu_ranks': [0, 1],
         # every language pair on its own gpu: no overlap
-        'data': {
+        'tasks': {
             'train_a-b': {
                 'path_src': 'dummy',
                 'path_tgt': 'dummy',

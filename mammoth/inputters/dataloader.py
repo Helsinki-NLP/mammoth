@@ -119,26 +119,31 @@ class LookAheadBucketing():
         except StopIteration:
             self._is_exhausted = True
 
-    def bucket_is_empty(self, s_idx, t_idx) -> bool:
+    def bucket_is_empty(self, s_idx: int, t_idx: int) -> bool:
+        """check if this bucket is empty"""
         return self._lens[s_idx][t_idx] == 0
 
-    def _choose_and_prepare_bucket(self, bucket_idx=None):
-        """pick a bucket (at random unless specified) and prepare examples for iteration"""
-        if bucket_idx is None:
-            buckets = [(s, t) for s in range(self.n_buckets) for t in range(self.n_buckets)]
-            weights = [self._lens[s][t] for s in range(self.n_buckets) for t in range(self.n_buckets)]
-            s_bucket, t_bucket = random.choices(buckets, weights=weights, k=1)[0]
-        # if bucket_idx >= len(self._buckets):
-        #     import pdb; pdb.set_trace()
-        # if len(self._prefetched[self._buckets[bucket_idx]]) == 0:
-        #     import pdb; pdb.set_trace()
-        random.shuffle(self._buckets[s_bucket][t_bucket])
-        return s_bucket, t_bucket
+    def _choose_bucket(self):
+        """pick a bucket at random"""
+        buckets = [(s, t) for s in range(self.n_buckets) for t in range(self.n_buckets)]
+        weights = [self._lens[s][t] for s in range(self.n_buckets) for t in range(self.n_buckets)]
+        bucket_idx = random.choices(buckets, weights=weights, k=1)[0]
+        return bucket_idx
 
-    def is_empty(self):
+    def _select_from_bucket(self, s_idx: int, t_idx: int) -> object:
+        """randomly select an item from a bucket"""
+        bucket = self._buckets[s_idx][t_idx]
+        obj_idx = random.randrange(self._lens[s_idx][t_idx])
+        self._lens[s_idx][t_idx] -= 1
+        # swap to last to get O(1) deletion
+        bucket[obj_idx], bucket[-1] = bucket[-1], bucket[obj_idx]
+        return bucket.pop()
+
+    def is_empty(self) -> bool:
+        """check if all buckets are empty"""
         return all(size == 0 for len_array in self._lens for size in len_array)
 
-    def _spiralling(self, s_idx, t_idx):
+    def _spiralling(self, s_idx: int, t_idx: int):
         def _seq():
             # from https://math.stackexchange.com/questions/163080/on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361  # noqa: E501
             for n in itertools.count(1):
@@ -147,64 +152,31 @@ class LookAheadBucketing():
                 m = t ** 2
                 t = t - 1
                 if n >= m - t:
-                    yield s_idx + k - (m - n), t_idx - k
+                    yield k - (m - n), k
                 else:
                     m = m - t
-                if n >= m - t:
-                    yield s_idx - k, t_idx - k + (m - n)
-                else:
-                    m = m - t
-                if n >= m - t:
-                    yield s_idx - k + (m - n), t_idx + k
-                else:
-                    yield s_idx + k, t_idx + k - (m - n - t)
+                    if n >= m - t:
+                        yield -k, k - (m - n)
+                    else:
+                        m = m - t
+                        if n >= m - t:
+                            yield -k + (m - n), -k
+                        else:
+                            yield k, -k + (m - n - t)
 
-        offsets = _seq()
-        offsets = itertools.takewhile(
-            # this far out is obviously too far out
-            lambda tup: (tup[0] < self.n_buckets * 2 + 1) and (tup[1] < self.n_buckets * 2 + 1),
-            offsets,
-        )
+        offsets = ((s_idx + x, t_idx + y) for x, y in _seq())
+        # offsets = itertools.takewhile(
+        #     # this far out is obviously too far out
+        #     lambda tup: (tup[0] < self.n_buckets * 2 + 1) and (tup[1] < self.n_buckets * 2 + 1),
+        #     offsets,
+        # )
         offsets = filter(
             lambda tup: (0 <= tup[0] < self.n_buckets) and (0 <= tup[1] < self.n_buckets),
             offsets,
         )
-        # below is an alternative break to line 169
-        # num_usable_buckets = sum(int(size > 0) for len_array in self._lens for size in len_array)
-        # offsets = itertools.islice(offsets, num_usable_buckets)
-        yield from offsets
-
-    def _spiralling(self, s_idx, t_idx):
-        def _seq():
-            # from https://math.stackexchange.com/questions/163080/
-            # on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361
-            for n in itertools.count(1):
-                k = math.ceil((math.sqrt(n) - 1) / 2.0)
-                t = 2 * k + 1
-                m = t ** 2
-                t = t - 1
-                if n >= m - t:
-                    yield s_idx + k - (m - n), t_idx - k
-                else:
-                    m = m - t
-                if n >= m - t:
-                    yield s_idx - k, t_idx - k + (m - n)
-                else:
-                    m = m - t
-                if n >= m - t:
-                    yield s_idx - k + (m - n), t_idx + k
-                else:
-                    yield s_idx + k, t_idx + k - (m - n - t)
-
-        offsets = map(lambda tup: (tup[0] + s_idx, tup[1] + t_idx),  _seq())
-        offsets = filter(
-            lambda tup: (0 <= tup[0] < self.n_buckets) and (0 <= tup[1] < self.n_buckets),
-            offsets,
-        )
-        offsets = filter(
-            lambda tup: self._lens[tup[0]][tup[1]] > 0,
-            offsets,
-        )
+        # maybe more brittle than the takewhile a few lines above
+        num_usable_buckets = sum(int(size > 0) for len_array in self._lens for size in len_array)
+        offsets = itertools.islice(offsets, num_usable_buckets)
         yield from offsets
 
     def __iter__(self):
@@ -215,10 +187,11 @@ class LookAheadBucketing():
                 self._init()
             accum, cur_batch_size = [], 0
             # 2. pick a length at random
-            smallest_bucket_idx = self._choose_and_prepare_bucket()
+            smallest_bucket_idx = self._choose_bucket()
             current_bucket_idx = smallest_bucket_idx
             # 3. build batch
             batch_is_complete = False
+            # stop either when batch is built or when it can't be built
             while not (batch_is_complete or self.is_empty()):
                 # maybe switch buckets
                 current_bucket_idx = smallest_bucket_idx
@@ -226,16 +199,14 @@ class LookAheadBucketing():
                 while self.bucket_is_empty(*current_bucket_idx):
                     current_bucket_idx = next(next_indices)
                 # retrieve and process the example
-                s_bucket, t_bucket = current_bucket_idx
-                example = self._buckets[s_bucket][t_bucket].pop()
-                self._lens[s_bucket][t_bucket] -= 1
+                example = self._select_from_bucket(*current_bucket_idx)
                 accum.append(example)
                 numel = self.numel_fn(example)
                 cur_batch_size += numel
                 batch_is_complete = cur_batch_size >= self.batch_size
 
                 # 4. try to replenish reservoir if possible
-                # will also update self._is_exhausted
+                # if not, this will also update self._is_exhausted
                 self.maybe_replenish()
 
             yield self.collate_fn(accum)

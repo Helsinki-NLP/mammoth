@@ -9,8 +9,8 @@ from mammoth.inputters.dataset import get_corpus
 from mammoth.utils.logging import logger
 
 
-def infinite_iterator(iterable):
-    return itertools.chain.from_iterable(itertools.repeat(iterable))
+# def infinite_iterator(iterable):
+#     return itertools.chain.from_iterable(itertools.repeat(iterable))
 
 
 def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True):
@@ -18,7 +18,7 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
     if not cycle:
         loader = InferenceBatcher(dataset, batch_size)
     else:
-        examples_stream = infinite_iterator(dataset)
+        # examples_stream = infinite_iterator(dataset)
         if batch_type == 'sents':
             n_buckets = 1
 
@@ -49,8 +49,7 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
                     true_size = len(example_dict['src'])
                 return true_size
 
-        collate_fn = dataset.collate_fn
-        loader = LookAheadBucketing(examples_stream, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn)
+        loader = LookAheadBucketing(dataset, pool_size, n_buckets, batch_size, bucket_fn, numel_fn)
     return iter(loader) if as_iter else loader
 
 
@@ -76,8 +75,12 @@ class InferenceBatcher():
 
 
 class LookAheadBucketing():
-    def __init__(self, examples_stream, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, collate_fn):
-        self.examples_stream = examples_stream
+    def __init__(self, dataset, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn):
+        self.dataset = dataset
+        # actual generator of examples
+        self.examples_stream = iter([])
+        # tracks whether the stream needs to be restarted
+        self._is_exhausted = True
         self.n_buckets = n_buckets
         self._buckets = [
             [
@@ -97,28 +100,29 @@ class LookAheadBucketing():
         self.batch_size = batch_size
         self.bucket_fn = bucket_fn
         self.numel_fn = numel_fn
-        self.collate_fn = collate_fn
+        self.collate_fn = dataset.collate_fn
         self._init()
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
-        for example in itertools.islice(self.examples_stream, self.look_ahead_size):
-            s_bucket, t_bucket = self.bucket_fn(example)
-            self._buckets[s_bucket][t_bucket].append(example)
-            self._lens[s_bucket][t_bucket] += 1
+        self.examples_stream = iter(self.dataset)
+        for example in range(self.look_ahead_size):
+            self.maybe_replenish()
+            if self._is_exhausted:
+                break
+        assert not self.is_empty(), 'Dataset contains no usable example!'
         logger.info('LookAheadBucketing: initialization done')
 
-    def maybe_replenish(self) -> bool:
-        """look up one more example to add to this reservoir."""
+    def maybe_replenish(self):
+        """try to look up one more example to add to this reservoir."""
         try:
             example = next(self.examples_stream)
             s_bucket, t_bucket = self.bucket_fn(example)
-            creates_new_bucket = self._lens[s_bucket][t_bucket] == 0
             self._buckets[s_bucket][t_bucket].append(example)
             self._lens[s_bucket][t_bucket] += 1
-            return creates_new_bucket
+            self._is_exhausted = False
         except StopIteration:
-            return None
+            self._is_exhausted = True
 
     def bucket_is_empty(self, s_idx, t_idx) -> bool:
         return self._lens[s_idx][t_idx] == 0
@@ -137,12 +141,11 @@ class LookAheadBucketing():
         return s_bucket, t_bucket
 
     def is_empty(self):
-        return all(size == 0 for size in self._lens)
+        return all(size == 0 for len_array in self._lens for size in len_array)
 
     def _spiralling(self, s_idx, t_idx):
         def _seq():
-            # from https://math.stackexchange.com/questions/163080/
-            # on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361
+            # from https://math.stackexchange.com/questions/163080/on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361  # noqa: E501
             for n in itertools.count(1):
                 k = math.ceil((math.sqrt(n) - 1) / 2.0)
                 t = 2 * k + 1
@@ -161,30 +164,34 @@ class LookAheadBucketing():
                 else:
                     yield s_idx + k, t_idx + k - (m - n - t)
 
-        offsets = map(lambda tup: (tup[0] + s_idx, tup[1] + t_idx),  _seq())
+        offsets = _seq()
+        offsets = itertools.takewhile(
+            # this far out is obviously too far out
+            lambda tup: (tup[0] < self.n_buckets * 2 + 1) and (tup[1] < self.n_buckets * 2 + 1),
+            offsets,
+        )
         offsets = filter(
             lambda tup: (0 <= tup[0] < self.n_buckets) and (0 <= tup[1] < self.n_buckets),
             offsets,
         )
-        offsets = filter(
-            lambda tup: self._lens[tup[0]][tup[1]] > 0,
-            offsets,
-        )
+        # below is an alternative break to line 169
+        # num_usable_buckets = sum(int(size > 0) for len_array in self._lens for size in len_array)
+        # offsets = itertools.islice(offsets, num_usable_buckets)
         yield from offsets
 
     def __iter__(self):
         while True:
-            # 1. maybe we've exhausted the stream and the buckets
-            if self.is_empty():
-                break
+            # 1. maybe we've exhausted both the stream and the buckets:
+            # if so, we restart the example stream
+            if self.is_empty() and self._is_exhausted:
+                self._init()
             accum, cur_batch_size = [], 0
             # 2. pick a length at random
             smallest_bucket_idx = self._choose_and_prepare_bucket()
             current_bucket_idx = smallest_bucket_idx
             # 3. build batch
             batch_is_complete = False
-            while not batch_is_complete:
-                assert not self.is_empty(), 'Stream should never end!'
+            while not (batch_is_complete or self.is_empty()):
                 # maybe switch buckets
                 current_bucket_idx = smallest_bucket_idx
                 next_indices = self._spiralling(*current_bucket_idx)
@@ -200,14 +207,10 @@ class LookAheadBucketing():
                 batch_is_complete = cur_batch_size >= self.batch_size
 
                 # 4. try to replenish reservoir if possible
+                # will also update self._is_exhausted
                 self.maybe_replenish()
-                # if (new_bucket is not None) and (new_bucket <= bucket):
-                #     assert self._buckets[bucket_idx] != bucket
-                #     bucket_idx += 1
 
             yield self.collate_fn(accum)
-            # if self.bucket_is_empty(bucket_idx):
-            #     del self._buckets[bucket_idx]
 
 
 class DynamicDatasetIter(object):

@@ -4,7 +4,7 @@ from datetime import datetime
 
 import mammoth
 
-from mammoth.utils.logging import logger, valid_logger
+from mammoth.utils.logging import logger, structured_logging
 
 
 def build_report_manager(opts, node_rank, local_rank):
@@ -50,10 +50,6 @@ class ReportMgrBase(object):
 
     def log(self, *args, **kwargs):
         logger.info(*args, **kwargs)
-
-    def log_valid(self, *args, **kwargs):
-        if valid_logger is not None:
-            valid_logger.info(*args, **kwargs)
 
     def report_training(self, step, num_steps, learning_rate, patience, report_stats, multigpu=False):
         """
@@ -144,7 +140,16 @@ class ReportMgr(ReportMgrBase):
             self.maybe_log_tensorboard(train_stats, "train", lr, patience, step)
 
         if valid_stats is not None:
-            self.log('Validation perplexity: %g' % valid_stats.ppl())
-            self.log('Validation accuracy: %g' % valid_stats.accuracy())
-            self.log_valid(f'Step {step}; lr: {lr}; ppl: {valid_stats.ppl()}; acc: {valid_stats.accuracy()}; xent: {valid_stats.xent()};' )
+            ppl = valid_stats.ppl()
+            acc = valid_stats.accuracy()
+            self.log('Validation perplexity: %g', ppl)
+            self.log('Validation accuracy: %g', acc)
+            structured_logging({
+                'type': 'validation',
+                'step': step,
+                'learning_rate': lr,
+                'perplexity': ppl,
+                'accuracy': acc,
+                'crossentropy': valid_stats.xent(),
+            })
             self.maybe_log_tensorboard(valid_stats, "valid", lr, patience, step)

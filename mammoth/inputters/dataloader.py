@@ -175,8 +175,7 @@ class LookAheadBucketing():
             offsets,
         )
         # maybe more brittle than the takewhile a few lines above
-        num_usable_buckets = sum(int(size > 0) for len_array in self._lens for size in len_array)
-        offsets = itertools.islice(offsets, num_usable_buckets)
+        offsets = itertools.islice(offsets, self.n_buckets ** 2)
         yield from offsets
 
     def __iter__(self):

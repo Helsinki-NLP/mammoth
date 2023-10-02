@@ -9,16 +9,11 @@ from mammoth.inputters.dataset import get_corpus
 from mammoth.utils.logging import logger
 
 
-# def infinite_iterator(iterable):
-#     return itertools.chain.from_iterable(itertools.repeat(iterable))
-
-
 def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True):
     """Convert an mammoth.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         loader = InferenceBatcher(dataset, batch_size)
     else:
-        # examples_stream = infinite_iterator(dataset)
         if batch_type == 'sents':
             n_buckets = 1
 
@@ -177,6 +172,39 @@ class LookAheadBucketing():
         # below is an alternative break to line 169
         # num_usable_buckets = sum(int(size > 0) for len_array in self._lens for size in len_array)
         # offsets = itertools.islice(offsets, num_usable_buckets)
+        yield from offsets
+
+    def _spiralling(self, s_idx, t_idx):
+        def _seq():
+            # from https://math.stackexchange.com/questions/163080/
+            # on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361
+            for n in itertools.count(1):
+                k = math.ceil((math.sqrt(n) - 1) / 2.0)
+                t = 2 * k + 1
+                m = t ** 2
+                t = t - 1
+                if n >= m - t:
+                    yield s_idx + k - (m - n), t_idx - k
+                else:
+                    m = m - t
+                if n >= m - t:
+                    yield s_idx - k, t_idx - k + (m - n)
+                else:
+                    m = m - t
+                if n >= m - t:
+                    yield s_idx - k + (m - n), t_idx + k
+                else:
+                    yield s_idx + k, t_idx + k - (m - n - t)
+
+        offsets = map(lambda tup: (tup[0] + s_idx, tup[1] + t_idx),  _seq())
+        offsets = filter(
+            lambda tup: (0 <= tup[0] < self.n_buckets) and (0 <= tup[1] < self.n_buckets),
+            offsets,
+        )
+        offsets = filter(
+            lambda tup: self._lens[tup[0]][tup[1]] > 0,
+            offsets,
+        )
         yield from offsets
 
     def __iter__(self):

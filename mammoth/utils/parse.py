@@ -269,6 +269,12 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         defaults = dummy_parser.parse_known_args([])[0]
         return defaults
 
+    def parse_known_args(self):
+        opts, unknown = super().parse_known_args()
+        if unknown:
+            raise ValueError(f'unknown arguments provided:\n{unknown}')
+        return opts, unknown
+
     @classmethod
     def update_model_opts(cls, model_opts):
         cls._validate_adapters(model_opts)

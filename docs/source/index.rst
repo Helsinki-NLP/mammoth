@@ -7,6 +7,7 @@ Contents
 
       main.md
       quickstart.md
+      install.md
       CONTRIBUTING.md
       ref.rst
 
@@ -16,13 +17,13 @@ Contents
 
       config_config.md
       attention_bridges.md
-      FAQ.md
 
 .. toctree::
       :caption: Tutorials
       :maxdepth: 2
 
       prepare_data.md
+      examples/Translation.md
 
 .. toctree::
       :caption: Scripts

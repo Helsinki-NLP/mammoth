@@ -179,7 +179,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
     corpus_opts = opts.tasks[task.corpus_id]
     transforms_to_apply = corpus_opts.get('transforms', None)
-    transforms_to_apply = transforms_to_apply or opts.get('transforms', None)
+    transforms_to_apply = transforms_to_apply or opts.transforms
     transforms_to_apply = transforms_to_apply or []
     transforms_cls = make_transforms(
         opts,

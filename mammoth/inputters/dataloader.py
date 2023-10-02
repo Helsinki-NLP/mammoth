@@ -84,13 +84,6 @@ class LookAheadBucketing():
             ]
             for _ in range(n_buckets)
         ]
-        self._lens = [
-            [
-                0
-                for _ in range(n_buckets)
-            ]
-            for _ in range(n_buckets)
-        ]
         self.look_ahead_size = look_ahead_size
         self.batch_size = batch_size
         self.bucket_fn = bucket_fn
@@ -112,36 +105,34 @@ class LookAheadBucketing():
         """try to look up one more example to add to this reservoir."""
         try:
             example = next(self.examples_stream)
-            s_bucket, t_bucket = self.bucket_fn(example)
-            self._buckets[s_bucket][t_bucket].append(example)
-            self._lens[s_bucket][t_bucket] += 1
+            s_idx, t_idx = self.bucket_fn(example)
+            self._buckets[s_idx][t_idx].append(example)
             self._is_exhausted = False
         except StopIteration:
             self._is_exhausted = True
 
     def bucket_is_empty(self, s_idx: int, t_idx: int) -> bool:
         """check if this bucket is empty"""
-        return self._lens[s_idx][t_idx] == 0
+        return len(self._buckets[s_idx][t_idx]) == 0
 
     def _choose_bucket(self):
         """pick a bucket at random"""
         buckets = [(s, t) for s in range(self.n_buckets) for t in range(self.n_buckets)]
-        weights = [self._lens[s][t] for s in range(self.n_buckets) for t in range(self.n_buckets)]
+        weights = [len(self._buckets[s][t]) for s in range(self.n_buckets) for t in range(self.n_buckets)]
         bucket_idx = random.choices(buckets, weights=weights, k=1)[0]
         return bucket_idx
 
     def _select_from_bucket(self, s_idx: int, t_idx: int) -> object:
         """randomly select an item from a bucket"""
         bucket = self._buckets[s_idx][t_idx]
-        obj_idx = random.randrange(self._lens[s_idx][t_idx])
-        self._lens[s_idx][t_idx] -= 1
+        obj_idx = random.randrange(len(bucket))
         # swap to last to get O(1) deletion
         bucket[obj_idx], bucket[-1] = bucket[-1], bucket[obj_idx]
         return bucket.pop()
 
     def is_empty(self) -> bool:
         """check if all buckets are empty"""
-        return all(size == 0 for len_array in self._lens for size in len_array)
+        return all(len(bucket) == 0 for bucket in itertools.chain.from_iterable(self._buckets))
 
     def _spiralling(self, s_idx: int, t_idx: int):
         def _seq():

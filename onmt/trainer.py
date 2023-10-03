@@ -25,8 +25,8 @@ def iter_on_device(iterator, device_context):
         device = torch.device(f'cuda:{device_context.local_rank}')
     else:
         device = torch.device('cpu')
-    for batch, meta, comm_batch_id in iterator:
-        yield batch.to(device), meta, comm_batch_id
+    for batch, meta, comm_batch_id, states in iterator:
+        yield batch.to(device), meta, comm_batch_id, states
 
 
 def build_trainer(
@@ -253,9 +253,6 @@ class Trainer(object):
         Returns:
             The gathered statistics.
         """
-        ddi = self.task_queue_manager.ddi
-        print('QUI:', id(ddi))
-        print('QUI:', id(train_iter))
         train_iter = iter_on_device(train_iter, device_context)
         if valid_iter is None:
             logger.info('Start training loop without validation...')
@@ -390,13 +387,19 @@ class Trainer(object):
             #             break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                print('QUI:', id(ddi))
-                print('QUI:', id(train_iter))
-                ddi.update_data_state()
-                self.model_saver.data_state = ddi.data_state
                 if device_context.is_distributed() and device_context.is_master():
-                    self.model_saver.data_state  = onmt.utils.distributed.all_gather_list(ddi.data_state)
-                    print(ddi.data_state, self.model_saver.data_state)
+                    new_data_state  = onmt.utils.distributed.gather_data_state(self.model_saver.data_state)
+                    print(k,type(new_data_state), new_data_state.keys() )
+                    for k in new_data_state.keys():
+                        print(k['indices'])
+
+                    print('###########################################################################')
+                    print(device_context)
+                    print(self.model_saver.data_state.keys())
+                    print('###########################################################################')
+                    #list_data_state  = onmt.utils.distributed.all_gather_list(self.model_saver.data_state, 255*256)
+                    #print(type(list_data_state),len(list_data_state), type(list_data_state[0].keys()),  type(list_data_state[-1].keys()))
+                    print('###########################################################################')
 
                 self.model_saver.save(step, moving_average=self.moving_average)
 
@@ -467,7 +470,7 @@ class Trainer(object):
     ):
         normalization = 0
         seen_comm_batches = set()
-        for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
+        for k, (batch, metadata, comm_batch, data_states) in enumerate(batches_with_meta):
             seen_comm_batches.add(comm_batch)
             if self.norm_method == "tokens":
                 num_tokens = (
@@ -515,6 +518,10 @@ class Trainer(object):
                         trunc_size=trunc_size,
                     )
                     # logger.info(loss)
+
+                if data_states is not None:
+                    for k,v in data_states.items():
+                        self.model_saver.data_state[k] = v
                 try:
                     if loss is not None:
                         self.optim.backward(loss)

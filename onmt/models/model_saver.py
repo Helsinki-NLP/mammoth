@@ -9,13 +9,12 @@ import torch.nn as nn
 from onmt.utils.module_splitter import explode_model
 
 
-def build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context):
+def build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context, data_state):
     # _check_save_model_path
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
-
     model_saver = ModelSaver(
-        opt.save_model, model, model_opt, vocabs_dict, optim, opt.keep_checkpoint, device_context, opt.save_all_gpus
+        opt.save_model, model, model_opt, vocabs_dict, optim, data_state, opt.keep_checkpoint, device_context, opt.save_all_gpus
     )
     return model_saver
 
@@ -49,6 +48,7 @@ class ModelSaverBase(object):
         model_opt,
         vocabs_dict,
         optim,
+        data_state=None,
         keep_checkpoint=-1,
         device_context=None,
         all_gpus=False,
@@ -65,7 +65,7 @@ class ModelSaverBase(object):
         assert device_context is not None
         self.device_context = device_context
         self.all_gpus = all_gpus
-        self.data_state = defaultdict(dict)
+        self.data_state = data_state if data_state is not None else defaultdict(dict)
 
     def save(self, step, moving_average=None):
         """Main entry point for model saver

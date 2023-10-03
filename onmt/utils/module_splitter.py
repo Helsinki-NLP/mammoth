@@ -64,6 +64,7 @@ def explode_model(full_ab_model):
         "vocab": full_ab_model["vocab"],
         "opt": full_ab_model["opt"],
         "optim": full_ab_model["optim"],
+        "data_state": full_ab_model["data_state"],
     }
 
     return modules, model_frame

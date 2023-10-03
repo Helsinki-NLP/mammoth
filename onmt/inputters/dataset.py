@@ -19,13 +19,11 @@ class Batch():
     src: tuple  # of torch Tensors
     tgt: torch.Tensor
     batch_size: int
-    idx: torch.Tensor
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
         if self.tgt is not None:
             self.tgt = self.tgt.to(device)
-        self.idx = self.idx
         return self
 
 
@@ -171,12 +169,11 @@ class ParallelCorpus(IterableDataset):
         src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
         src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx).unsqueeze(-1), src_lengths)
         tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1) if has_tgt else None
-        idx = torch.tensor([ex['idx'] for ex in examples]).max()
-        batch = Batch(src, tgt, len(examples), idx)
+        batch = Batch(src, tgt, len(examples))
         return batch
 
 
-def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False, current_file_index=None):
+def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False, data_state=None):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
@@ -185,6 +182,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
 
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}
     # build Dataset proper
+    current_file_index = 0 if not data_state else data_state['indices']
     dataset = ParallelCorpus(
         corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
         corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],

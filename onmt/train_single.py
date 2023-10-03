@@ -109,11 +109,12 @@ def main(
     opt,
     vocabs_dict,
     device_context,
+    data_state,
     error_queue=None,
     batch_queue=None,
     semaphore=None,
     task_queue_manager=None,
-    data_state=None,
+    checkpoint=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opt`` has been validated and updated
@@ -127,10 +128,6 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opt._all_transform)
-    checkpoint, data_state = None, None
-    if opt.train_from:
-        checkpoint = load_checkpoint(ckpt_path=opt.train_from)
-        data_state = checkpoint.get('data_state', dict())
     model_opt = _get_model_opts(opt, checkpoint=checkpoint)
 
     # Build model.
@@ -157,7 +154,7 @@ def main(
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context)
+    model_saver = build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context, data_state)
 
     logger.info("{} - Build trainer".format(device_context.id))
     trainer = build_trainer(
@@ -182,7 +179,6 @@ def main(
             is_train=True,
             data_state=data_state,
         )
-        task_queue_manager.ddi = train_iter
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():
         #     train_iter = IterOnDevice(_train_iter, device_context.local_rank)
@@ -193,10 +189,10 @@ def main(
 
         def _train_iter():
             while True:
-                batch, metadata, communication_batch_id = batch_queue.get()
+                batch, metadata, communication_batch_id, data_states = batch_queue.get()
                 semaphore.release()
                 # TODO: confirm that batch-providing corpus has already been to'd to the correct place
-                yield batch, metadata, communication_batch_id
+                yield batch, metadata, communication_batch_id, data_states
 
         train_iter = _train_iter()
     # train_iter = iter_on_device(train_iter, device_context)

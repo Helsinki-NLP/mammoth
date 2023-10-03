@@ -99,16 +99,17 @@ class LookAheadBucketing():
         self.bucket_fn = bucket_fn
         self.numel_fn = numel_fn
         self.collate_fn = collate_fn
-        if data_state is None:
+        if data_state is None or (isinstance(data_state,dict) and data_state['buckets'] is None):
             self.current_file_index = None
             self._buckets = [[] for _ in range(n_buckets)]
             self._lens = [0 for _ in range(n_buckets)]
             self._init()
         else:
-            self.current_file_index = data_state[0]
+            self.current_file_index = data_state['indices']
             logger.info('LookAheadBucketing: relying on pre-computed buckets, no initialization')
-            self._buckets = data_state[1]
-            self._lens = list(map(len, data_state[1]))
+            self._buckets = data_state['buckets']
+            self._lens = list(map(len, data_state['buckets']))
+
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
@@ -147,6 +148,9 @@ class LookAheadBucketing():
 
     def is_empty(self):
         return all(size == 0 for size in self._lens)
+
+    def get_data_state(self):
+        return {'indices': self.current_file_index, 'buckets': self._buckets}
 
     def __iter__(self):
         while True:
@@ -195,8 +199,7 @@ class LookAheadBucketing():
                 self.maybe_replenish()
                 # if (new_bucket is not None) and (new_bucket <= bucket):
                 #     assert self._buckets[bucket_idx] != bucket
-                #     bucket_idx += 1
-
+                #     bucket_idx += 1 
             yield self.collate_fn(accum)
             # if self.bucket_is_empty(bucket_idx):
             #     del self._buckets[bucket_idx]
@@ -296,10 +299,6 @@ class DynamicDatasetIter(object):
 
     def _init_datasets(self):
         self.dataset_iterators = dict()
-        if self.data_state:
-            idxs = self.data_state.get('indices', dict())
-            buckets = self.data_state.get('buckets', dict())
-
         for task in self.task_queue_manager.get_tasks():
             src_vocab = self.vocabs_dict[('src', task.src_lang)]
             tgt_vocab = self.vocabs_dict[('tgt', task.tgt_lang)]
@@ -314,12 +313,11 @@ class DynamicDatasetIter(object):
                 else 'cpu'
             )
             # Recover current file index from the data state
-            idx4thisfile = 0 if not self.data_state else idxs.get(task.corpus_id, 0)
-            thisfilebuckets = None if not self.data_state else buckets.get(task.corpus_id, None)
-            data_state = (idx4thisfile, thisfilebuckets) if thisfilebuckets is not None else None
-            if idx4thisfile > 0:
+            corpus_datastate = None
+            if self.data_state: 
+                corpus_datastate = self.data_state.get(task.corpus_id, {'indices': 0, 'buckets': None})
                 logger.info(
-                    f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {idx4thisfile} in corpus'
+                    f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {corpus_datastate["indices"]} in corpus'
                     )
             # Case 1: we are training, and the task must contain some path to training data
             # Case 2: we are validation (hence self.is_train := False), we need an iterator
@@ -327,7 +325,7 @@ class DynamicDatasetIter(object):
             # is defined
             if self.is_train or self.opts.data[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
-                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train, current_file_index=idx4thisfile
+                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train, data_state=corpus_datastate,
                 ).to(device)
 
                 # iterator over minibatches
@@ -339,20 +337,13 @@ class DynamicDatasetIter(object):
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
                     as_iter=self.is_train,
-                    data_state=data_state,
+                    data_state=corpus_datastate,
                 )
 
                 self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)
 
         self.init_iterators = True
 
-    def update_data_state(self):
-        # initialize
-        if self.data_state is None:
-            self.data_state = {'indices': dict(), 'buckets': dict()}
-        for taskname, (_, lab, _) in self.dataset_iterators.items():
-            self.data_state['indices'][taskname] = lab.current_file_index
-            self.data_state['buckets'][taskname] = lab._buckets
 
     def __iter__(self):
         if self.init_iterators is False:
@@ -370,6 +361,7 @@ class DynamicDatasetIter(object):
             # All minibatches with the same communication_batch_id should be trained on
             # before synching gradients between devices
             communication_batch_id = 0
+            total_num_batches = 0
             while True:
                 for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
                     ordered_iter, _, metadata = self.dataset_iterators[corpus_id]
@@ -387,7 +379,17 @@ class DynamicDatasetIter(object):
                             logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
                             toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
-                    yield batch, metadata, communication_batch_id
+                    total_num_batches += 1
+                    # FIXME: make the following compatible with len(accum_count) > 1
+                    final_step = self.opts.train_steps * self.opts.accum_count[0]
+                    real_step = self.opts.save_checkpoint_steps * self.opts.accum_count[0]
+                    if (total_num_batches % real_step == 0) or (total_num_batches == final_step):
+                        data_states = dict()
+                        for taskname, (_, lab, _) in self.dataset_iterators.items():
+                            data_states[taskname] = lab.get_data_state()
+                    else:
+                        data_states = None
+                    yield batch, metadata, communication_batch_id, data_states
 
                 communication_batch_id += 1
                 if communication_batch_id % 1000 == 0:
@@ -395,3 +397,5 @@ class DynamicDatasetIter(object):
                     logger.info(f'Task sampling distribution: (total {total})')
                     for task, count in self.task_queue_manager.sampled_task_counts.most_common():
                         logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+                
+

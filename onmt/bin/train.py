@@ -186,12 +186,18 @@ def train(opt):
             # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
             vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
     # initialize data states
-    data_state = {'indices':dict(), 'buckets':dict()}        
-    data_state['indices'] = { task.corpus_id:0 for task in global_task_queue_manager.get_tasks() }
+    checkpoint = None
+    if opt.train_from:
+        checkpoint = load_checkpoint(ckpt_path=opt.train_from)
+        data_state = checkpoint.get('data_state', dict())
+    else:
+        data_state = {task.corpus_id : {'indices' : 0, 'buckets' : None} for task in global_task_queue_manager.get_tasks()}
+
+
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
-    train_process = partial(single_main, vocabs_dict=vocabs_dict)
+    train_process = partial(single_main, vocabs_dict=vocabs_dict, data_state=data_state)
 
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 
@@ -226,6 +232,21 @@ def train(opt):
             # store rank in env (FIXME: is this obsolete?)
             current_env["RANK"] = str(device_context.global_rank)
             current_env["LOCAL_RANK"] = str(device_context.local_rank)
+            
+            q = mp.Queue(opt.queue_size)
+            semaphore = mp.Semaphore(opt.queue_size)
+            queues.append(q)
+            semaphores.append(semaphore)
+            procs.append(
+                mp.Process(
+                    target=consumer,
+                    args=(train_process, opt, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
+                    daemon=True,
+                )
+            )
+            procs[local_rank].start()
+            logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
+            error_handler.add_child(procs[local_rank].pid)
 
             # Get the iterator to generate from
             train_iter = DynamicDatasetIter.from_opts(
@@ -236,23 +257,6 @@ def train(opt):
                 is_train=True,
                 data_state=data_state,
             )
-            task_queue_manager.ddi = train_iter
-            
-            q = mp.Queue(opt.queue_size)
-            semaphore = mp.Semaphore(opt.queue_size)
-            queues.append(q)
-            semaphores.append(semaphore)
-            procs.append(
-                mp.Process(
-                    target=consumer,
-                    args=(train_process, opt, device_context, error_queue, q, semaphore, task_queue_manager),
-                    daemon=True,
-                )
-            )
-            procs[local_rank].start()
-            logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
-            error_handler.add_child(procs[local_rank].pid)
-
             producer = mp.Process(
                 target=batch_producer, args=(train_iter, q, semaphore, opt, local_rank), daemon=True
             )
@@ -279,7 +283,7 @@ def train(opt):
             local_rank=0,
             opt=opt
         )
-        train_process(opt, device_context=device_context, task_queue_manager=task_queue_manager, data_state=data_state)
+        train_process(opt, device_context=device_context, task_queue_manager=task_queue_manager, checkpoint=checkpoint)
 
 
 def _get_parser():

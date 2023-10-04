@@ -387,19 +387,8 @@ class Trainer(object):
             #             break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                if device_context.is_distributed() and device_context.is_master():
-                    new_data_state  = onmt.utils.distributed.gather_data_state(self.model_saver.data_state)
-                    print(k,type(new_data_state), new_data_state.keys() )
-                    for k in new_data_state.keys():
-                        print(k['indices'])
-
-                    print('###########################################################################')
-                    print(device_context)
-                    print(self.model_saver.data_state.keys())
-                    print('###########################################################################')
-                    #list_data_state  = onmt.utils.distributed.all_gather_list(self.model_saver.data_state, 255*256)
-                    #print(type(list_data_state),len(list_data_state), type(list_data_state[0].keys()),  type(list_data_state[-1].keys()))
-                    print('###########################################################################')
+                if device_context.is_distributed(): # and device_context.is_master():
+                    self.model_saver.data_state = self._gather_data_state(device_context)
 
                 self.model_saver.save(step, moving_average=self.moving_average)
 
@@ -461,6 +450,50 @@ class Trainer(object):
         valid_model.train()
 
         return stats
+
+    def _gather_data_state(self, device_context):
+        new_data_state  = self.model_saver.data_state.copy() 
+        #print('################################  BEFORE UPDATE  ###########################################')
+        #for k,v in new_data_state.items():
+        #    print(f'DEBUG...GPU{device_context.node_rank}:{device_context.local_rank} ',k, v['indices'])
+        for taskname, idx_n_buckets in self.model_saver.data_state.items():
+            # gather indices
+            tmplist = onmt.utils.distributed.all_gather_list(idx_n_buckets['indices'])
+            print(f'DEBUG...GPU{device_context.node_rank}:{device_context.local_rank}',taskname,tmplist,'old one:', new_data_state[taskname]['indices'])
+
+            tmplist = [x for x in tmplist if  isinstance(x,int)]
+            if device_context.is_master():
+                new_data_state[taskname]['indices'] = max(tmplist)
+
+            # FIXME: gather each bucket separately (object is too big to commuincate)
+            # gathering the buckets makes the training just to keep hanging ... I THINK IT IS BECAUSE SOME BUCKETS ARE EMPTY LISTS
+            if True:
+                if idx_n_buckets['buckets'] is None:
+                    idx_n_buckets['buckets'] = [[-1]]
+                else:
+                    for i, bucket in enumerate(idx_n_buckets['buckets']):
+                        print(f"DEBUG...GPU{device_context.node_rank}:{device_context.local_rank}", taskname, bucket)
+                        if len(bucket) < 1:
+                            idx_n_buckets['buckets'].append(-1)
+                print(f"DEBUG...GPU{device_context.node_rank}:{device_context.local_rank}", taskname, len(idx_n_buckets['buckets']), type(idx_n_buckets['buckets']))
+                buckets = []
+                for bucket in idx_n_buckets['buckets']:
+                    print(f"BUCKET LOOP: GPU{device_context.node_rank}:{device_context.local_rank}", taskname, type(bucket), 'len',len(bucket), bucket)
+                    tmplist = onmt.utils.distributed.all_gather_list(bucket, max_size=255*255)
+                    print(f"BUCKET LOOP: GPU{device_context.node_rank}:{device_context.local_rank}", taskname, type(bucket), 'len',len(bucket), bucket)
+                    buckets.append([x for x in tmplist if x is not None][0])
+
+                new_data_state[taskname]['buckets'] = buckets
+        #print('###############################  AFTER UPDATE  ############################################')
+        #for k,v in new_data_state.items():
+        #    print(f'DEBUG...GPU{device_context.node_rank}:{device_context.local_rank} ',k, v['indices'])
+        
+        print(f'GPU{device_context.node_rank}:{device_context.local_rank} REACHED END OF ROUTINE! :D')
+
+        return new_data_state
+        
+
+
 
     def _gradient_accumulation_over_lang_pairs(
         self,

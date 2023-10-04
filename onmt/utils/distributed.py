@@ -284,41 +284,6 @@ def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None, buffer_si
     if len(buffer) > 0:
         all_reduce_buffer()
 
-def gather_data_state(data_state_dict, max_size=3264000):
-    """Gathers the data_state form all devices."""
-
-    world_size = torch.distributed.get_world_size()
-    if not hasattr(gather_data_state, '_in_buffer') or max_size != gather_data_state._in_buffer.size():
-        gather_data_state._in_buffer = torch.cuda.ByteTensor(max_size)
-        gather_data_state._out_buffers = [torch.cuda.ByteTensor(max_size) for i in range(world_size)]
-    in_buffer = gather_data_state._in_buffer
-    out_buffers = gather_data_state._out_buffers
-
-    results = dict()
-    for k,data in data_state_dict.items():
-        enc = pickle.dumps(data)
-        enc_size = len(enc)
-        if enc_size + 2 > max_size:
-            raise ValueError('encoded data exceeds max_size: {}'.format(enc_size + 2))
-        assert max_size <= 255 * 256 * 50
-        in_buffer[0] = enc_size // (12750)  # this encoding works for max_size < 65k*50
-        in_buffer[1] = enc_size % (12750)
-        in_buffer[2:enc_size + 2] = torch.ByteTensor(list(enc))
-
-        torch.distributed.all_gather(out_buffers, in_buffer.cuda())
-
-        
-        for i in range(world_size):
-            out_buffer = out_buffers[i]
-            size = ((255*50) * out_buffer[0].item()) + out_buffer[1].item()
-
-            bytes_list = bytes(out_buffer[2:size + 2].tolist())
-            result = pickle.loads(bytes_list)
-            if result['buckets'] is not None:
-                results[k] = result
-    return results
-
-
 
 def all_gather_list(data, max_size=4096):
     """Gathers arbitrary data from all nodes into a list."""

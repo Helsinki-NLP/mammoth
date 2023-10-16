@@ -385,30 +385,3 @@ jobs:
 #          -rnn_size 16  -train_steps 20 \
 #          -update_vocab -reset_optim "states" \
 #          -train_from /tmp/lm.onmt.model_step_10.pt
-
-  build-docs:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install --upgrade setuptools
-        pip install -e .
-        pip install -r docs/requirements.txt
-    - name: Build docs
-      run: |
-        set -e
-        # Check that docs are built without errors
-        cd docs/ && make html && cd ..
-    - name: Deploy docs
-      uses: JamesIves/github-pages-deploy-action@3.7.1
-      with:
-        GITHUB_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
-        BRANCH: gh-pages
-        FOLDER: docs/build/html
-        CLEAN: true

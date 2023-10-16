@@ -196,7 +196,8 @@ class TaskQueueManager:
         When set to None, all items are returned.
         """
         self.tasks = tasks
-        self.accum_count = accum_count
+        # TODO: no support for variable accumulation across training
+        self.accum_count = accum_count[0] if type(accum_count) is list else accum_count
         self.task_distribution_strategy = task_distribution_strategy
         self.world_context = world_context
         self.device_context = device_context

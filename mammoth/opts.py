@@ -24,6 +24,13 @@ def _add_logging_opts(parser, is_train=True):
     group = parser.add_argument_group('Logging')
     group.add('--log_file', '-log_file', type=str, default="", help="Output logs to a file under this path.")
     group.add(
+        '--structured_log_file',
+        '-structured_log_file',
+        type=str,
+        default="",
+        help="Output machine-readable structured logs to a file under this path."
+    )
+    group.add(
         '--log_file_level',
         '-log_file_level',
         type=str,
@@ -1194,9 +1201,6 @@ def translate_opts(parser, dynamic=False):
     )  # noqa: E501
     group.add('--tgt', '-tgt', help='True target sequence (optional)')
     group.add(
-        '--tgt_prefix', '-tgt_prefix', action='store_true', help='Generate predictions using provided `-tgt` as prefix.'
-    )
-    group.add(
         '--shard_size',
         '-shard_size',
         type=int,
@@ -1247,6 +1251,19 @@ def translate_opts(parser, dynamic=False):
 
         # Adding options related to Transforms
         _add_dynamic_transform_opts(parser)
+
+        group.add(
+            "--src_prefix",
+            "-src_prefix",
+            default="",
+            help="The encoder prefix, i.e. language selector token",
+        )
+        group.add(
+            "--tgt_prefix",
+            "-tgt_prefix",
+            default="",
+            help="The decoder prefix (FIXME: does not work, but must be set nevertheless)",
+        )
 
 
 def build_bilingual_model(parser):

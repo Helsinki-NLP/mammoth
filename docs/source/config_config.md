@@ -85,6 +85,11 @@ Note that if both `use_weight` and `use_introduce_at_training_step` are specific
 
 Note that high-resource language pairs (would train for over 75% of the training time) all start at 0. This avoids starting training with only one GPU doing work, while the other GPUs are idle waiting for their LPs to start.
 
+#### `use_src_lang_token`
+
+Only has an effect when using the `prefix` transform.
+Normally, the prefix transform only includes a target language selector token: `<to_yyy>` where `yyy` is the code of the target language.
+If this flag is set, then also the source language is specified, e.g. `<from_xxx> <to_yyy>`.
 
 #### `translation_config_dir`
 

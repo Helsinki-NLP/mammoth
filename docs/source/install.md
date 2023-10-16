@@ -11,7 +11,7 @@ In the login node, create a directory in the `projappl` linked to our project to
 # where to install the necessary python packages
 ENV_DIR="/projappl/project_2005099/test"
 # where the codebase was copied to
-CODE_DIR="/scratch/project_2005099/path/to/OpenNMT-py-v2"
+CODE_DIR="/scratch/project_2005099/path/to/mammoth"
 
 # set up variables & modules
 module load pytorch
@@ -32,7 +32,7 @@ In slurm job scripts, update environment variables to get python to run your cod
 
 ```
 ENV_DIR="/projappl/project_2005099/test"
-CODE_DIR="/scratch/project_2005099/path/to/OpenNMT-py-v2"
+CODE_DIR="/scratch/project_2005099/path/to/mammoth"
 
 module load pytorch
 export PYTHONUSERBASE=$ENV_DIR
@@ -63,7 +63,7 @@ srun python3 -u $CODE_DIR/train.py ...
 5. Install mammoth 
     
     ```bash
-    cd /pfs/lustrep1/projappl/${PROJECT}/${USER}/OpenNMT-py-v2
+    cd /pfs/lustrep1/projappl/${PROJECT}/${USER}/mammoth
     pip3 install -e .
     pip3 install sentencepiece==0.1.97 sacrebleu==2.3.1
     ```

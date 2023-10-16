@@ -38,7 +38,7 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout_2 = nn.Dropout(dropout)
         self.layer_norm2 = nn.Identity()
         if is_normformer:
-            self.layer_norm2 = nn.LayerNorm(d_model, eps=1e-6)
+            self.layer_norm2 = nn.LayerNorm(d_ff, eps=1e-6)
 
     def forward(self, x):
         """Layer definition.

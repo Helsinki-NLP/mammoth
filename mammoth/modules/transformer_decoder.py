@@ -153,14 +153,14 @@ class TransformerDecoderLayerBase(nn.Module):
 
     def _forward_self_attn(self, inputs_norm, dec_mask, layer_cache, step):
         if isinstance(self.self_attn, MultiHeadedAttention):
-            return self.layer_norm_3(self.self_attn(
+            return self.self_attn(
                 inputs_norm,
                 inputs_norm,
                 inputs_norm,
                 mask=dec_mask,
                 layer_cache=layer_cache,
                 attn_type="self",
-            ))
+            )
         elif isinstance(self.self_attn, AverageAttention):
             return self.self_attn(inputs_norm, mask=dec_mask, layer_cache=layer_cache, step=step)
         else:
@@ -266,18 +266,20 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         inputs_norm = self.layer_norm_1(inputs)
 
         query, _ = self._forward_self_attn(inputs_norm, dec_mask, layer_cache, step)
+        query = self.layer_norm_3(query)
 
         query = self.drop(query) + inputs
 
         query_norm = self.layer_norm_2(query)
-        mid, attns = self.layer_norm_4(self.context_attn(
+        mid, attns = self.context_attn(
             memory_bank,
             memory_bank,
             query_norm,
             mask=src_pad_mask,
             layer_cache=layer_cache,
             attn_type="context",
-        ))
+        )
+        mid = self.layer_norm_4(mid)
         output = self.feed_forward(self.drop(mid) + query)
 
         return output, attns

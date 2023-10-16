@@ -44,7 +44,8 @@ class LayerStackEncoder(EncoderBase):
                     layer_norm_module=(
                         nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
                         else nn.Identity()
-                    )
+                    ),
+                    is_normformer=opts.normformer,
                 )
             encoders.append(stacks)
         return cls(embeddings, encoders)
@@ -75,7 +76,8 @@ class LayerStackEncoder(EncoderBase):
                 layer_norm_module=(
                     nn.LayerNorm(model_opts.model_dim, eps=1e-6) if is_on_top
                     else nn.Identity()
-                )
+                ),
+                is_normformer=model_opts.normformer,
             )
             encoders.append(stacks)
         return cls(embeddings, encoders)

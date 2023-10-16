@@ -51,6 +51,7 @@ class LayerStackDecoder(DecoderBase):
                         nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
                         else nn.Identity()
                     ),
+                    is_normformer=opts.normformer,
                 )
             decoders.append(stacks)
         return cls(embeddings, decoders)
@@ -88,6 +89,7 @@ class LayerStackDecoder(DecoderBase):
                     nn.LayerNorm(model_opts.model_dim, eps=1e-6) if is_on_top
                     else nn.Identity()
                 ),
+                is_normformer=model_opts.normformer,
             )
             decoders.append(stacks)
         return cls(embeddings, decoders)

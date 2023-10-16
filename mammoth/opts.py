@@ -437,6 +437,8 @@ def model_opts(parser):
         f' {ActivationFunction.relu}.',
     )
 
+    group.add('-normformer', '--normformer', action='store_true', help='NormFormer-style normalization')
+
     # group.add(
     #     '--input_feed',
     #     '-input_feed',

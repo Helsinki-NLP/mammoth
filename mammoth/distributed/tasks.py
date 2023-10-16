@@ -26,10 +26,12 @@ class TaskDistributionStrategy(ABC):
     @classmethod
     @abstractmethod
     def from_opts(cls, my_corpus_ids: List[str], opts: dict):
+        """Alternative constructor."""
         pass
 
     @abstractmethod
     def sample_corpus_ids(self, n_samples: int, communication_batch_id: int) -> List[str]:
+        """Select corpora to sample from."""
         pass
 
 
@@ -174,7 +176,7 @@ class TaskQueueManager:
     def __init__(
         self,
         tasks: List[TaskSpecs],
-        tasks_per_communication_batch: int,
+        accum_count: int,
         world_context: WorldContext,
         device_context: Optional[DeviceContext] = None,
         components_to_gpus=None,
@@ -194,7 +196,7 @@ class TaskQueueManager:
         When set to None, all items are returned.
         """
         self.tasks = tasks
-        self.tasks_per_communication_batch = tasks_per_communication_batch
+        self.accum_count = accum_count
         self.task_distribution_strategy = task_distribution_strategy
         self.world_context = world_context
         self.device_context = device_context
@@ -308,7 +310,7 @@ class TaskQueueManager:
         return cls(
             tasks,
             world_context=world_context,
-            tasks_per_communication_batch=opts.accum_count,
+            accum_count=opts.accum_count,
             uses_adapters=uses_adapters,
         )
 
@@ -319,7 +321,7 @@ class TaskQueueManager:
         device_context = self.world_context.global_to_local(node_rank, local_rank)
         return self.__class__(
             self.tasks,
-            tasks_per_communication_batch=self.tasks_per_communication_batch,
+            accum_count=self.accum_count,
             world_context=self.world_context,
             device_context=device_context,
             components_to_gpus=self.components_to_gpus,
@@ -587,10 +589,11 @@ class TaskQueueManager:
         return result
 
     def sample_corpus_ids(self, communication_batch_id: int):
-        corpus_ids = self.task_distribution_strategy.sample_corpus_ids(
-            self.tasks_per_communication_batch,
+        corpus_id = self.task_distribution_strategy.sample_corpus_ids(
+            1,
             communication_batch_id,
-        )
+        )[0]
+        corpus_ids = [corpus_id for _ in range(self.accum_count)]
         self.sampled_task_counts.update(corpus_ids)
         return corpus_ids
 

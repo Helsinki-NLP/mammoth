@@ -24,9 +24,11 @@ class PositionwiseFeedForward(nn.Module):
             of the FNN.
         dropout (float): dropout probability in :math:`[0, 1)`.
         activation_fn (ActivationFunction): activation function used.
+        is_normformer (bool):
+            whether to apply normformer-style normalization
     """
 
-    def __init__(self, d_model, d_ff, dropout=0.1, activation_fn=ActivationFunction.relu):
+    def __init__(self, d_model, d_ff, dropout=0.1, activation_fn=ActivationFunction.relu, is_normformer=False):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = nn.Linear(d_model, d_ff)
         self.w_2 = nn.Linear(d_ff, d_model)
@@ -34,6 +36,9 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout_1 = nn.Dropout(dropout)
         self.activation = ACTIVATION_FUNCTIONS[activation_fn]
         self.dropout_2 = nn.Dropout(dropout)
+        self.layer_norm2 = nn.Identity()
+        if is_normformer:
+            self.layer_norm2 = nn.LayerNorm(d_ff, eps=1e-6)
 
     def forward(self, x):
         """Layer definition.
@@ -46,7 +51,7 @@ class PositionwiseFeedForward(nn.Module):
         """
 
         inter = self.dropout_1(self.activation(self.w_1(self.layer_norm(x))))
-        output = self.dropout_2(self.w_2(inter))
+        output = self.dropout_2(self.w_2(self.layer_norm2(inter)))
         return output + x
 
     def update_dropout(self, dropout):

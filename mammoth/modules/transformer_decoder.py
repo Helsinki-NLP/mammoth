@@ -8,11 +8,12 @@ import torch.nn as nn
 
 from mammoth.modules.decoder import DecoderBase
 from mammoth.modules import MultiHeadedAttention, AverageAttention
-from mammoth.modules.position_ffn import PositionwiseFeedForward
-from mammoth.modules.position_ffn import ActivationFunction
+from mammoth.modules.position_ffn import PositionwiseFeedForward, ActivationFunction
 from mammoth.utils.misc import sequence_mask
 
 
+# TODO: this abstract base class that's not even declared as one should be merged with
+# its sole child class
 class TransformerDecoderLayerBase(nn.Module):
     def __init__(
         self,
@@ -27,6 +28,7 @@ class TransformerDecoderLayerBase(nn.Module):
         full_context_alignment=False,
         alignment_heads=0,
         pos_ffn_activation_fn=ActivationFunction.relu,
+        is_normformer=False,
     ):
         """
         Args:
@@ -53,6 +55,8 @@ class TransformerDecoderLayerBase(nn.Module):
                 N. of cross attention heads to use for alignment guiding
             pos_ffn_activation_fn (ActivationFunction):
                 activation function choice for PositionwiseFeedForward layer
+            is_normformer (bool):
+                whether to apply normformer-style normalization
 
         """
         super(TransformerDecoderLayerBase, self).__init__()
@@ -65,10 +69,22 @@ class TransformerDecoderLayerBase(nn.Module):
                 max_relative_positions=max_relative_positions,
             )
         elif self_attn_type == "average":
+            assert not is_normformer, 'normformer only supported with scaled-dot attn'
             self.self_attn = AverageAttention(d_model, dropout=attention_dropout, aan_useffn=aan_useffn)
 
-        self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout, pos_ffn_activation_fn)
+        self.feed_forward = PositionwiseFeedForward(
+            d_model,
+            d_ff,
+            dropout,
+            pos_ffn_activation_fn,
+            is_normformer=is_normformer,
+        )
         self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
+        self.layer_norm_3 = nn.Identity()  # normformer's
+        self.layer_norm_4 = nn.Identity()  # normformer's
+        if is_normformer:
+            self.layer_norm_3 = nn.LayerNorm(d_model, eps=1e-6)
+            self.layer_norm_4 = nn.LayerNorm(d_model, eps=1e-6)
         self.drop = nn.Dropout(dropout)
         self.full_context_alignment = full_context_alignment
         self.alignment_heads = alignment_heads
@@ -184,6 +200,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         full_context_alignment=False,
         alignment_heads=0,
         pos_ffn_activation_fn=ActivationFunction.relu,
+        is_normformer=False,
     ):
         """
         Args:
@@ -201,6 +218,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             full_context_alignment,
             alignment_heads,
             pos_ffn_activation_fn=pos_ffn_activation_fn,
+            is_normformer=is_normformer,
         )
         self.context_attn = MultiHeadedAttention(heads, d_model, dropout=attention_dropout)
         self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
@@ -248,6 +266,7 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
         inputs_norm = self.layer_norm_1(inputs)
 
         query, _ = self._forward_self_attn(inputs_norm, dec_mask, layer_cache, step)
+        query = self.layer_norm_3(query)
 
         query = self.drop(query) + inputs
 
@@ -260,13 +279,14 @@ class TransformerDecoderLayer(TransformerDecoderLayerBase):
             layer_cache=layer_cache,
             attn_type="context",
         )
+        mid = self.layer_norm_4(mid)
         output = self.feed_forward(self.drop(mid) + query)
 
         return output, attns
 
 
 class TransformerDecoderBase(DecoderBase):
-    def __init__(self, d_model, copy_attn, embeddings, alignment_layer, layer_norm_module):
+    def __init__(self, d_model, copy_attn, embeddings, alignment_layer, layer_norm_module, **_):
         super(TransformerDecoderBase, self).__init__()
 
         self.embeddings = embeddings
@@ -305,6 +325,7 @@ class TransformerDecoderBase(DecoderBase):
                 nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
                 else nn.Identity()
             ),
+            is_normformer=opts.normformer,
         )
 
     def init_state(self, src, memory_bank, enc_hidden):
@@ -376,6 +397,8 @@ class TransformerDecoder(TransformerDecoderBase):
         alignment_layer (int): N° Layer to supervise with for alignment guiding
         alignment_heads (int):
             N. of cross attention heads to use for alignment guiding
+        is_normformer (bool):
+            whether to apply normformer-style normalization
     """
 
     def __init__(
@@ -396,6 +419,7 @@ class TransformerDecoder(TransformerDecoderBase):
         alignment_heads,
         pos_ffn_activation_fn=ActivationFunction.relu,
         layer_norm_module=None,
+        is_normformer=False,
     ):
         super(TransformerDecoder, self).__init__(d_model, copy_attn, embeddings, alignment_layer, layer_norm_module)
 
@@ -413,6 +437,7 @@ class TransformerDecoder(TransformerDecoderBase):
                     full_context_alignment=full_context_alignment,
                     alignment_heads=alignment_heads,
                     pos_ffn_activation_fn=pos_ffn_activation_fn,
+                    is_normformer=is_normformer,
                 )
                 for i in range(num_layers)
             ]

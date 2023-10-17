@@ -6,8 +6,7 @@ import torch.nn as nn
 
 from mammoth.modules.encoder import EncoderBase
 from mammoth.modules import MultiHeadedAttention
-from mammoth.modules.position_ffn import PositionwiseFeedForward
-from mammoth.modules.position_ffn import ActivationFunction
+from mammoth.modules.position_ffn import PositionwiseFeedForward, ActivationFunction
 from mammoth.utils.misc import sequence_mask
 
 
@@ -24,6 +23,8 @@ class TransformerEncoderLayer(nn.Module):
         dropout (float): dropout probability(0-1.0).
         pos_ffn_activation_fn (ActivationFunction):
             activation function choice for PositionwiseFeedForward layer
+        is_normformer (bool):
+            whether to apply normformer-style normalization
     """
 
     def __init__(
@@ -35,14 +36,24 @@ class TransformerEncoderLayer(nn.Module):
         attention_dropout,
         max_relative_positions=0,
         pos_ffn_activation_fn=ActivationFunction.relu,
+        is_normformer=False,
     ):
         super(TransformerEncoderLayer, self).__init__()
 
         self.self_attn = MultiHeadedAttention(
             heads, d_model, dropout=attention_dropout, max_relative_positions=max_relative_positions
         )
-        self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout, pos_ffn_activation_fn)
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
+        self.feed_forward = PositionwiseFeedForward(
+            d_model,
+            d_ff,
+            dropout,
+            pos_ffn_activation_fn,
+            is_normformer=is_normformer,
+        )
+        self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
+        self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
+        if is_normformer:
+            self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, inputs, mask):
@@ -56,9 +67,9 @@ class TransformerEncoderLayer(nn.Module):
 
             * outputs ``(batch_size, src_len, model_dim)``
         """
-        input_norm = self.layer_norm(inputs)
+        input_norm = self.layer_norm_1(inputs)
         context, _ = self.self_attn(input_norm, input_norm, input_norm, mask=mask, attn_type="self")
-        out = self.dropout(context) + inputs
+        out = self.dropout(self.layer_norm_2(context)) + inputs
         return self.feed_forward(out)
 
     def update_dropout(self, dropout, attention_dropout):
@@ -92,6 +103,8 @@ class TransformerEncoder(EncoderBase):
           embeddings to use, should have positional encodings
         pos_ffn_activation_fn (ActivationFunction):
             activation function choice for PositionwiseFeedForward layer
+        is_normformer (bool):
+            whether to apply normformer-style normalization
 
     Returns:
         (torch.FloatTensor, torch.FloatTensor):
@@ -112,6 +125,7 @@ class TransformerEncoder(EncoderBase):
         max_relative_positions,
         pos_ffn_activation_fn=ActivationFunction.relu,
         layer_norm_module=None,
+        is_normformer=False,
     ):
         super(TransformerEncoder, self).__init__()
 
@@ -126,6 +140,7 @@ class TransformerEncoder(EncoderBase):
                     attention_dropout,
                     max_relative_positions=max_relative_positions,
                     pos_ffn_activation_fn=pos_ffn_activation_fn,
+                    is_normformer=is_normformer,
                 )
                 for i in range(num_layers)
             ]
@@ -148,7 +163,8 @@ class TransformerEncoder(EncoderBase):
             layer_norm_module=(
                 nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
                 else nn.Identity()
-            )
+            ),
+            is_normformer=opts.normformer,
         )
 
     def forward(self, src, lengths=None, skip_embedding=False, mask=None):

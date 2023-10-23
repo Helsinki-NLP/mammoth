@@ -395,7 +395,7 @@ class Trainer(object):
 
         if self.model_saver is not None:
             self.model_saver.save(step, moving_average=self.moving_average)
-        if self.report_manager is not None:
+        if device_context.is_master() and self.report_manager is not None:
             self.report_manager.report_end(step)
         return total_stats
 

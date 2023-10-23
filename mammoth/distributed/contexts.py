@@ -29,13 +29,6 @@ class WorldContext:
         """Data tensors must be moved to the GPU for compute"""
         return self.context != DeviceContextEnum.CPU
 
-    def is_master(self):
-        """For code that should only run in one process:
-        - saving fully shared modules from one device only
-        - avoiding log spam when all devices would log the same result
-        """
-        return not self.is_distributed() or self.global_rank == 0
-
     def global_to_local(self, node_rank, local_rank):
         assert node_rank is not None
         assert local_rank is not None
@@ -93,6 +86,13 @@ class DeviceContext(WorldContext):
             return f'GPU {self.node_rank}:{self.local_rank}'
         else:
             return 'CPU'
+
+    def is_master(self):
+        """For code that should only run in one process:
+        - saving fully shared modules from one device only
+        - avoiding log spam when all devices would log the same result
+        """
+        return not self.is_distributed() or self.global_rank == 0
 
     def validate(self, world_context):
         # check that this DeviceContext is consistent with given WorldContext

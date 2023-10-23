@@ -99,6 +99,17 @@ class ReportMgrBase(object):
     def _report_step(self, *args, **kwargs):
         raise NotImplementedError()
 
+    def _report_end(self, step):
+        raise NotImplementedError()
+
+    def report_end(self, step):
+        if self.start_time < 0:
+            raise ValueError(
+                """ReportMgr needs to be started
+                                (set 'start_time' or use 'start()'"""
+            )
+        self._report_end(step)
+
 
 class ReportMgr(ReportMgrBase):
     def __init__(self, report_every, start_time=-1.0, tensorboard_writer=None):
@@ -153,3 +164,15 @@ class ReportMgr(ReportMgrBase):
                 'crossentropy': valid_stats.xent(),
             })
             self.maybe_log_tensorboard(valid_stats, "valid", lr, patience, step)
+
+    def _report_end(self, step):
+        end_time = time.time()
+        duration_s = end_time - self.start_time
+        self.log('Training ended. Duration %g s', duration_s)
+        structured_logging({
+            'type': 'end',
+            'step': step,
+            'start_time': self.start_time,
+            'end_time': end_time,
+            'duration_s': duration_s,
+        })

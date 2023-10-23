@@ -7,7 +7,6 @@ from onmt.utils.optimizers import Optimizer
 from onmt.utils.misc import set_random_seed
 from onmt.trainer import build_trainer
 from onmt.models import build_model_saver
-from onmt.models.model_saver import load_checkpoint
 from onmt.utils.logging import init_logger, logger
 from onmt.utils.parse import ArgumentParser
 from onmt.utils.distributed import broadcast_tensors

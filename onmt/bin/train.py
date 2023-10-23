@@ -191,11 +191,7 @@ def train(opt):
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
         data_state = checkpoint.get('data_state', dict())
     else:
-        data_state = {task.corpus_id : {'indices' : 0, 'buckets' : None} for task in global_task_queue_manager.get_tasks()}
-
-
-    # for key, val in fields_dict:
-    #     print(f'{key}:\t{val}')
+        data_state = {task.corpus_id: {'indices': 0, 'buckets': None} for task in global_task_queue_manager.get_tasks()}
 
     train_process = partial(single_main, vocabs_dict=vocabs_dict, data_state=data_state)
 
@@ -232,7 +228,6 @@ def train(opt):
             # store rank in env (FIXME: is this obsolete?)
             current_env["RANK"] = str(device_context.global_rank)
             current_env["LOCAL_RANK"] = str(device_context.local_rank)
-            
             q = mp.Queue(opt.queue_size)
             semaphore = mp.Semaphore(opt.queue_size)
             queues.append(q)
@@ -240,7 +235,16 @@ def train(opt):
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opt, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
+                    args=(
+                        train_process,
+                        opt,
+                        device_context,
+                        error_queue,
+                        q,
+                        semaphore,
+                        task_queue_manager,
+                        checkpoint
+                        ),
                     daemon=True,
                 )
             )

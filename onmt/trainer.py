@@ -387,7 +387,7 @@ class Trainer(object):
             #             break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                if device_context.is_distributed(): # and device_context.is_master():
+                if device_context.is_distributed():
                     self.model_saver.data_state = self._gather_data_state(device_context)
 
                 self.model_saver.save(step, moving_average=self.moving_average)
@@ -452,22 +452,20 @@ class Trainer(object):
         return stats
 
     def _gather_data_state(self, device_context):
-        new_data_state  = self.model_saver.data_state.copy() 
-        #print('################################  BEFORE UPDATE  ###########################################')
-        #for k,v in new_data_state.items():
-        #    print(f'DEBUG...GPU{device_context.node_rank}:{device_context.local_rank} ',k, v['indices'])
+        new_data_state = self.model_saver.data_state.copy()
         for taskname, idx_n_buckets in self.model_saver.data_state.items():
             # gather indices
             tmplist = onmt.utils.distributed.all_gather_list(idx_n_buckets['indices'])
-            print(f'DEBUG...GPU{device_context.node_rank}:{device_context.local_rank}',taskname,tmplist,'old one:', new_data_state[taskname]['indices'])
-
-            tmplist = [x for x in tmplist if  isinstance(x,int)]
+            tmplist = [x for x in tmplist if isinstance(x, int)]
             if device_context.is_master():
                 new_data_state[taskname]['indices'] = max(tmplist)
 
-            # FIXME: gather each bucket separately (object is too big to commuincate)
-            # gathering the buckets makes the training just to keep hanging ... I THINK IT IS BECAUSE SOME BUCKETS ARE EMPTY LISTS
-            if True:
+            # FIXME: Communicationg the buckets is NOT working
+            #        Take "if False: away to debug
+            #        gathering the buckets makes the training just to keep hanging ...
+            #        I THINK IT IS BECAUSE SOME BUCKETS ARE EMPTY LISTS
+            #        gather each bucket separately (object is too big to commuincate)
+            if False:
                 if idx_n_buckets['buckets'] is None:
                     idx_n_buckets['buckets'] = [[-1]]
                 else:
@@ -475,25 +473,16 @@ class Trainer(object):
                         print(f"DEBUG...GPU{device_context.node_rank}:{device_context.local_rank}", taskname, bucket)
                         if len(bucket) < 1:
                             idx_n_buckets['buckets'].append(-1)
-                print(f"DEBUG...GPU{device_context.node_rank}:{device_context.local_rank}", taskname, len(idx_n_buckets['buckets']), type(idx_n_buckets['buckets']))
                 buckets = []
                 for bucket in idx_n_buckets['buckets']:
-                    print(f"BUCKET LOOP: GPU{device_context.node_rank}:{device_context.local_rank}", taskname, type(bucket), 'len',len(bucket), bucket)
                     tmplist = onmt.utils.distributed.all_gather_list(bucket, max_size=255*255)
-                    print(f"BUCKET LOOP: GPU{device_context.node_rank}:{device_context.local_rank}", taskname, type(bucket), 'len',len(bucket), bucket)
                     buckets.append([x for x in tmplist if x is not None][0])
 
                 new_data_state[taskname]['buckets'] = buckets
-        #print('###############################  AFTER UPDATE  ############################################')
-        #for k,v in new_data_state.items():
-        #    print(f'DEBUG...GPU{device_context.node_rank}:{device_context.local_rank} ',k, v['indices'])
-        
-        print(f'GPU{device_context.node_rank}:{device_context.local_rank} REACHED END OF ROUTINE! :D')
+            else:
+                new_data_state[taskname]['buckets'] = None
 
         return new_data_state
-        
-
-
 
     def _gradient_accumulation_over_lang_pairs(
         self,
@@ -553,7 +542,7 @@ class Trainer(object):
                     # logger.info(loss)
 
                 if data_states is not None:
-                    for k,v in data_states.items():
+                    for k, v in data_states.items():
                         self.model_saver.data_state[k] = v
                 try:
                     if loss is not None:

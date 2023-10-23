@@ -99,7 +99,7 @@ class LookAheadBucketing():
         self.bucket_fn = bucket_fn
         self.numel_fn = numel_fn
         self.collate_fn = collate_fn
-        if data_state is None or (isinstance(data_state,dict) and data_state['buckets'] is None):
+        if data_state is None or (isinstance(data_state, dict) and data_state['buckets'] is None):
             self.current_file_index = None
             self._buckets = [[] for _ in range(n_buckets)]
             self._lens = [0 for _ in range(n_buckets)]
@@ -109,7 +109,6 @@ class LookAheadBucketing():
             logger.info('LookAheadBucketing: relying on pre-computed buckets, no initialization')
             self._buckets = data_state['buckets']
             self._lens = list(map(len, data_state['buckets']))
-
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
@@ -199,7 +198,7 @@ class LookAheadBucketing():
                 self.maybe_replenish()
                 # if (new_bucket is not None) and (new_bucket <= bucket):
                 #     assert self._buckets[bucket_idx] != bucket
-                #     bucket_idx += 1 
+                #     bucket_idx += 1
             yield self.collate_fn(accum)
             # if self.bucket_is_empty(bucket_idx):
             #     del self._buckets[bucket_idx]
@@ -314,10 +313,11 @@ class DynamicDatasetIter(object):
             )
             # Recover current file index from the data state
             corpus_datastate = None
-            if self.data_state: 
+            if self.data_state:
                 corpus_datastate = self.data_state.get(task.corpus_id, {'indices': 0, 'buckets': None})
+                resumeidx = corpus_datastate["indices"]
                 logger.info(
-                    f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {corpus_datastate["indices"]} in corpus'
+                    f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {resumeidx} in corpus'
                     )
             # Case 1: we are training, and the task must contain some path to training data
             # Case 2: we are validation (hence self.is_train := False), we need an iterator
@@ -343,7 +343,6 @@ class DynamicDatasetIter(object):
                 self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)
 
         self.init_iterators = True
-
 
     def __iter__(self):
         if self.init_iterators is False:
@@ -397,5 +396,3 @@ class DynamicDatasetIter(object):
                     logger.info(f'Task sampling distribution: (total {total})')
                     for task, count in self.task_queue_manager.sampled_task_counts.most_common():
                         logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
-                
-

@@ -14,7 +14,15 @@ def build_model_saver(model_opt, opt, model, vocabs_dict, optim, device_context,
     save_model_path = os.path.abspath(opt.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
     model_saver = ModelSaver(
-        opt.save_model, model, model_opt, vocabs_dict, optim, data_state, opt.keep_checkpoint, device_context, opt.save_all_gpus
+        opt.save_model,
+        model,
+        model_opt,
+        vocabs_dict,
+        optim,
+        data_state,
+        opt.keep_checkpoint,
+        device_context,
+        opt.save_all_gpus
     )
     return model_saver
 

@@ -395,7 +395,8 @@ class Trainer(object):
 
         if self.model_saver is not None:
             self.model_saver.save(step, moving_average=self.moving_average)
-        self.report_manager.report_end(step)
+        if self.report_manager is not None:
+            self.report_manager.report_end(step)
         return total_stats
 
     def validate(self, valid_iter, moving_average=None, task=None):

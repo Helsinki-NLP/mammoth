@@ -1,17 +1,21 @@
 
 # Installation
 
-## Puhti / Mahti
+Installing from source usually works. Here, we provide two examples that install MAMMOTH in Nvidia and AMD platforms. 
+
+## Puhti / Mahti 
+
+This first example install MAMMOTH on clusters ([Puhti/Mahti](https://docs.csc.fi/computing/)) with Nvidia GPUs.
 
 ### Install
 In the login node, create a directory in the `projappl` linked to our project to host the shared python dependencies, and install the code base & dependencies there:
 
-<!-- TODO: modify project name  -->
 ```
 # where to install the necessary python packages
-ENV_DIR="/projappl/project_2005099/test"
+PROJECT=<your_project_name_is_your_account>
+ENV_DIR="/projappl/${PROJECT}/test"
 # where the codebase was copied to
-CODE_DIR="/scratch/project_2005099/path/to/mammoth"
+CODE_DIR="/scratch/${PROJECT}/path/to/mammoth"
 
 # set up variables & modules
 module load pytorch
@@ -31,8 +35,8 @@ chmod -R 777 $CODE_DIR
 In slurm job scripts, update environment variables to get python to run your code properly:
 
 ```
-ENV_DIR="/projappl/project_2005099/test"
-CODE_DIR="/scratch/project_2005099/path/to/mammoth"
+ENV_DIR="/projappl/${PROJECT}/test"
+CODE_DIR="/scratch/${PROJECT}/path/to/mammoth"
 
 module load pytorch
 export PYTHONUSERBASE=$ENV_DIR
@@ -45,8 +49,12 @@ srun python3 -u $CODE_DIR/train.py ...
 
 ## LUMI
 
+The GPU partition of [LUMI supercomputer](https://lumi-supercomputer.github.io) is AMD-based. 
+This example uses python virtual environment without container. But as recommended by the LUST team of LUMI, better to use container. An instruction to install MAMMOTH under Singularity container will release in the future.
+<!-- TODO -->
+
 ### Install 
-1. start an interactive session `srun --account="$PROJECT" --partition=dev-g --ntasks=1 --gres=gpu:mi250:1 --time=2:00:00 --mem=25G --pty bash`
+1. Start an interactive session `srun --account="$PROJECT" --partition=dev-g --ntasks=1 --gres=gpu:mi250:1 --time=2:00:00 --mem=25G --pty bash`
 2. Load modules: 
     
     ```bash
@@ -69,5 +77,8 @@ srun python3 -u $CODE_DIR/train.py ...
     ```
 
 ### Run
-
-TODO
+You can train in slurm job scripts, such as
+```bash
+srun python -u $CODE_DIR/train.py ...
+```
+For more details, we refer to the tutorial section. 

@@ -27,7 +27,6 @@
         <script src="../../../_static/language_data.js"></script>
         <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-        <script src="https://unpkg.com/mermaid@8.4.8/dist/mermaid.min.js"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -89,14 +88,22 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../ref.html">References</a></li>
 </ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modular_model.html">Modular Model</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../config_config.html">Config-config tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/Translation.html">Translation</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -192,7 +199,7 @@
     <span class="k">pass</span>
 
 
-<div class="viewcode-block" id="PositionalEncoding"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.PositionalEncoding">[docs]</a><span class="k">class</span> <span class="nc">PositionalEncoding</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">PositionalEncoding</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Sinusoidal positional encoding for non-recurrent neural networks.</span>
 
 <span class="sd">    Implementation based on &quot;Attention Is All You Need&quot;</span>
@@ -217,7 +224,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Dropout</span><span class="p">(</span><span class="n">p</span><span class="o">=</span><span class="n">dropout</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">dim</span> <span class="o">=</span> <span class="n">dim</span>
 
-<div class="viewcode-block" id="PositionalEncoding.forward"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.PositionalEncoding.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">emb</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">emb</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Embed inputs.</span>
 
 <span class="sd">        Args:</span>
@@ -236,7 +243,7 @@
             <span class="p">)</span>
         <span class="n">emb</span> <span class="o">=</span> <span class="n">emb</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">pe</span><span class="p">[</span><span class="n">step</span><span class="p">:(</span><span class="n">emb</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">step</span><span class="p">)]</span>
         <span class="n">emb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span><span class="p">(</span><span class="n">emb</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">emb</span></div></div>
+        <span class="k">return</span> <span class="n">emb</span>
 
 
 <div class="viewcode-block" id="Embeddings"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.Embeddings">[docs]</a><span class="k">class</span> <span class="nc">Embeddings</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>

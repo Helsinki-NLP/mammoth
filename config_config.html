@@ -39,7 +39,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Attention Bridge" href="attention_bridges.html" />
-    <link rel="prev" title="References" href="ref.html" /> 
+    <link rel="prev" title="Modular Machine Translation" href="modular_MT.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -87,11 +87,18 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
 </ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="modular_MT.html">Modular Machine Translation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Config-config tool</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#command">Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#inputs">Inputs</a><ul>
@@ -103,6 +110,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#n-groups"><code class="docutils literal notranslate"><span class="pre">n_groups</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#use-weight"><code class="docutils literal notranslate"><span class="pre">use_weight</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#use-introduce-at-training-step"><code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#use-src-lang-token"><code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#translation-config-dir"><code class="docutils literal notranslate"><span class="pre">translation_config_dir</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#zero-shot"><code class="docutils literal notranslate"><span class="pre">zero_shot</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#transforms-and-ae-transforms"><code class="docutils literal notranslate"><span class="pre">transforms</span></code> and <code class="docutils literal notranslate"><span class="pre">ae_transforms</span></code></a></li>
@@ -142,6 +150,7 @@
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/Translation.html">Translation</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -223,19 +232,21 @@
             
   <div class="section" id="config-config-tool">
 <h1>Config-config tool<a class="headerlink" href="#config-config-tool" title="Permalink to this headline">¶</a></h1>
-<p>A meta-configuration tool, or config generator for FoTran OpenNMT.</p>
-<p>The FoTran OpenNMT configuration options have become unwieldly as complexity has increased.
+<p>A meta-configuration tool, or config generator for MAMMOTH.</p>
+<p>The MAMMOTH configuration options have become unwieldy as complexity has increased.
 Especially the introduction of LayerStacks (the mechanism for dividing encoders and decoders into several subcomponents with different parameter sharing) and Adapters has made specifying parameters on the command line into a total nightmare, and even writing yaml configs by hand is cumbersome.
 Other functionality that is cumbersome to specify by hand includes:</p>
 <ul class="simple">
-<li><p>Node and GPU assigments for massively multilingual models,</p></li>
+<li><p>Node and GPU assignments for massively multilingual models,</p></li>
 <li><p>Weights and curricula (starting step for specific tasks),</p></li>
 <li><p>Parameter sharing groups based on language similarity.</p></li>
 </ul>
 <p>To ease the creation of configs, the config-config tool reads in a human-writable configuration template, and computes the specific values expected by OpenNMT, writing them out as a less-readable yaml file.</p>
 <div class="section" id="command">
 <h2>Command<a class="headerlink" href="#command" title="Permalink to this headline">¶</a></h2>
-<p>python3 OpenNMT-py-v2/tools/config_config.py config_all –in_config input.yaml –out_config output.yaml</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>mammoth/tools/config_config.py<span class="w"> </span>config_all<span class="w"> </span>--in_config<span class="w"> </span>input.yaml<span class="w"> </span>--out_config<span class="w"> </span>output.yaml
+</pre></div>
+</div>
 </div>
 <div class="section" id="inputs">
 <h2>Inputs<a class="headerlink" href="#inputs" title="Permalink to this headline">¶</a></h2>
@@ -246,7 +257,7 @@ Other functionality that is cumbersome to specify by hand includes:</p>
 </ul>
 <div class="section" id="input-yaml">
 <h3>Input yaml<a class="headerlink" href="#input-yaml" title="Permalink to this headline">¶</a></h3>
-<p>See the example in <code class="docutils literal notranslate"><span class="pre">OpenNMT-py-v2/examples/config_config.yaml</span></code></p>
+<p>See the example in <code class="docutils literal notranslate"><span class="pre">mammoth/examples/config_config.yaml</span></code></p>
 <p>The meta-parameters under the <code class="docutils literal notranslate"><span class="pre">config_config</span></code> key:</p>
 <div class="section" id="src-path-and-tgt-path">
 <h4><code class="docutils literal notranslate"><span class="pre">src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_path</span></code><a class="headerlink" href="#src-path-and-tgt-path" title="Permalink to this headline">¶</a></h4>
@@ -299,13 +310,19 @@ If unset, autoencoder pairs will use <code class="docutils literal notranslate">
 <div class="section" id="use-weight">
 <h4><code class="docutils literal notranslate"><span class="pre">use_weight</span></code><a class="headerlink" href="#use-weight" title="Permalink to this headline">¶</a></h4>
 <p>If set to <code class="docutils literal notranslate"><span class="pre">True</span></code>, use corpus weights based on temperature-adjusted corpus size.</p>
-<p>Note that the actual weight is proportional to the weights of the the other tasks assinged to the same GPU. E.g. if only one task is assigned to a GPU, it will receive 100% weight regardless of what the computed weight is.</p>
+<p>Note that the actual weight is proportional to the weights of the the other tasks assigned to the same GPU. E.g. if only one task is assigned to a GPU, it will receive 100% weight regardless of what the computed weight is.</p>
 </div>
 <div class="section" id="use-introduce-at-training-step">
 <h4><code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code><a class="headerlink" href="#use-introduce-at-training-step" title="Permalink to this headline">¶</a></h4>
 <p>If set to <code class="docutils literal notranslate"><span class="pre">True</span></code>, use a curriculum introducing corpora based on temperature-adjusted corpus size.</p>
-<p>Note that if both <code class="docutils literal notranslate"><span class="pre">use_weight</span></code> and <code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code> are specificed, the weight is distributed to the two according to the square root, so that when both of them are applied (multiplicatively), the desired weight is achieved.</p>
+<p>Note that if both <code class="docutils literal notranslate"><span class="pre">use_weight</span></code> and <code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code> are specified, the weight is distributed to the two according to the square root, so that when both of them are applied (multiplicatively), the desired weight is achieved.</p>
 <p>Note that high-resource language pairs (would train for over 75% of the training time) all start at 0. This avoids starting training with only one GPU doing work, while the other GPUs are idle waiting for their LPs to start.</p>
+</div>
+<div class="section" id="use-src-lang-token">
+<h4><code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code><a class="headerlink" href="#use-src-lang-token" title="Permalink to this headline">¶</a></h4>
+<p>Only has an effect when using the <code class="docutils literal notranslate"><span class="pre">prefix</span></code> transform.
+Normally, the prefix transform only includes a target language selector token: <code class="docutils literal notranslate"><span class="pre">&lt;to_yyy&gt;</span></code> where <code class="docutils literal notranslate"><span class="pre">yyy</span></code> is the code of the target language.
+If this flag is set, then also the source language is specified, e.g. <code class="docutils literal notranslate"><span class="pre">&lt;from_xxx&gt;</span> <span class="pre">&lt;to_yyy&gt;</span></code>.</p>
 </div>
 <div class="section" id="translation-config-dir">
 <h4><code class="docutils literal notranslate"><span class="pre">translation_config_dir</span></code><a class="headerlink" href="#translation-config-dir" title="Permalink to this headline">¶</a></h4>
@@ -340,7 +357,7 @@ Each list element takes one of 7 values:</p>
 </div>
 <div class="section" id="n-nodes-and-n-gpus-per-node">
 <h4><code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> and <code class="docutils literal notranslate"><span class="pre">n_gpus_per_node</span></code><a class="headerlink" href="#n-nodes-and-n-gpus-per-node" title="Permalink to this headline">¶</a></h4>
-<p>The number of nodes and GPUs, for assigment of tasks to devices.
+<p>The number of nodes and GPUs, for assignment of tasks to devices.
 Note that you also need to separately specify this information to slurm.</p>
 </div>
 <div class="section" id="other-top-level-keys-than-config-config">
@@ -359,12 +376,12 @@ Note that you also need to separately specify this information to slurm.</p>
 </div>
 <div class="section" id="id1">
 <h3>Distance matrix<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
-<p>See the example distance matrix in <code class="docutils literal notranslate"><span class="pre">OpenNMT-py-v2/examples/config_config.distance.csv</span></code>.</p>
+<p>See the example distance matrix in <code class="docutils literal notranslate"><span class="pre">mammoth/examples/config_config.distance.csv</span></code>.</p>
 <p>The distance matrix is given as a csv file, with a column <code class="docutils literal notranslate"><span class="pre">lang</span></code> and one column per language.
 There should be one row per language, with the language code in the first <code class="docutils literal notranslate"><span class="pre">lang</span></code> column, followed by a float giving the distance to the language specified by the column.
 The rows should appear in the same order as the columns.
 This means that the matrix must be square and symmetrical.
-The upper and lower triange are redundant, but both must be given.</p>
+The upper and lower triangle are redundant, but both must be given.</p>
 <p>Note that the values are distances: the distance of a language to itself (the diagonal) should be 0.</p>
 <div class="section" id="alternative-specify-language-groups-manually">
 <h4>Alternative: specify language groups manually<a class="headerlink" href="#alternative-specify-language-groups-manually" title="Permalink to this headline">¶</a></h4>
@@ -387,7 +404,7 @@ The upper and lower triange are redundant, but both must be given.</p>
 </div>
 <div class="section" id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">OpenNMT</span><span class="o">-</span><span class="n">py</span><span class="o">-</span><span class="n">v2</span><span class="o">/</span><span class="n">tools</span><span class="o">/</span><span class="n">config_config</span><span class="o">.</span><span class="n">py</span> <span class="n">config_all</span> <span class="o">--</span><span class="n">in_config</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="nb">input</span><span class="o">.</span><span class="n">yaml</span> <span class="o">--</span><span class="n">out_config</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">output</span><span class="o">.</span><span class="n">yaml</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mammoth</span><span class="o">/</span><span class="n">tools</span><span class="o">/</span><span class="n">config_config</span><span class="o">.</span><span class="n">py</span> <span class="n">config_all</span> <span class="o">--</span><span class="n">in_config</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="nb">input</span><span class="o">.</span><span class="n">yaml</span> <span class="o">--</span><span class="n">out_config</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">output</span><span class="o">.</span><span class="n">yaml</span>
 </pre></div>
 </div>
 <div class="section" id="stages">
@@ -463,7 +480,7 @@ If a value is given both in the input yaml and on the command line, the command 
         <a href="attention_bridges.html" class="btn btn-neutral float-right" title="Attention Bridge" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="ref.html" class="btn btn-neutral float-left" title="References" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="modular_MT.html" class="btn btn-neutral float-left" title="Modular Machine Translation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

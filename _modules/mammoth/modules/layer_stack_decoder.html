@@ -1,0 +1,438 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mammoth.modules.layer_stack_decoder &mdash; MAMMOTH  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/theme_overrides.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> MAMMOTH
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ref.html">References</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
+<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modular_model.html">Modular Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/Translation.html">Translation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/build_vocab.html">Build Vocab</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/server.html">Server</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MAMMOTH</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>mammoth.modules.layer_stack_decoder</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mammoth.modules.layer_stack_decoder</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span>
+
+<span class="kn">from</span> <span class="nn">mammoth.modules.decoder</span> <span class="kn">import</span> <span class="n">DecoderBase</span>
+<span class="kn">from</span> <span class="nn">mammoth.models.adapters</span> <span class="kn">import</span> <span class="n">Adapter</span><span class="p">,</span> <span class="n">AdaptedTransformerDecoder</span>
+<span class="kn">from</span> <span class="nn">mammoth.distributed</span> <span class="kn">import</span> <span class="n">DatasetMetadata</span>
+
+
+<div class="viewcode-block" id="LayerStackDecoder"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder">[docs]</a><span class="k">class</span> <span class="nc">LayerStackDecoder</span><span class="p">(</span><span class="n">DecoderBase</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">decoders</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">embeddings</span> <span class="o">=</span> <span class="n">embeddings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">:</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">]</span> <span class="o">=</span> <span class="n">decoders</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_adapter_to_stack</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+<div class="viewcode-block" id="LayerStackDecoder.from_opts"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.from_opts">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">task_queue_manager</span><span class="p">,</span> <span class="n">is_on_top</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Alternate constructor for use during training.&quot;&quot;&quot;</span>
+        <span class="n">decoders</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">layer_stack_index</span><span class="p">,</span> <span class="n">n_layers</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">dec_layers</span><span class="p">):</span>
+            <span class="n">is_on_top</span> <span class="o">=</span> <span class="n">layer_stack_index</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">dec_layers</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">stacks</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">module_id</span> <span class="ow">in</span> <span class="n">task_queue_manager</span><span class="o">.</span><span class="n">get_decoders</span><span class="p">(</span><span class="n">layer_stack_index</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">module_id</span> <span class="ow">in</span> <span class="n">stacks</span><span class="p">:</span>
+                    <span class="c1"># several tasks using the same layer stack</span>
+                    <span class="k">continue</span>
+                <span class="n">stacks</span><span class="p">[</span><span class="n">module_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">AdaptedTransformerDecoder</span><span class="p">(</span>
+                    <span class="n">n_layers</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">heads</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">transformer_ff</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">copy_attn</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">self_attn_type</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span> <span class="k">else</span> <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span>
+                    <span class="p">(</span>
+                        <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span>
+                        <span class="k">else</span> <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span>
+                    <span class="p">),</span>
+                    <span class="kc">None</span><span class="p">,</span>  <span class="c1"># embeddings,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">max_relative_positions</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">aan_useffn</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">full_context_alignment</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">alignment_layer</span><span class="p">,</span>
+                    <span class="n">alignment_heads</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">alignment_heads</span><span class="p">,</span>
+                    <span class="n">pos_ffn_activation_fn</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">pos_ffn_activation_fn</span><span class="p">,</span>
+                    <span class="n">layer_norm_module</span><span class="o">=</span><span class="p">(</span>
+                        <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_on_top</span>
+                        <span class="k">else</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">()</span>
+                    <span class="p">),</span>
+                <span class="p">)</span>
+            <span class="n">decoders</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stacks</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">decoders</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="LayerStackDecoder.from_trans_opt"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.from_trans_opt">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_trans_opt</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">model_opts</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">opt_stack</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Alternate constructor for use during translation.&quot;&quot;&quot;</span>
+        <span class="n">decoders</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">layer_stack_index</span><span class="p">,</span> <span class="n">n_layers</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">dec_layers</span><span class="p">):</span>
+            <span class="n">stacks</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">()</span>
+            <span class="n">is_on_top</span> <span class="o">=</span> <span class="n">layer_stack_index</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">dec_layers</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">module_opts</span> <span class="o">=</span> <span class="n">opt_stack</span><span class="p">[</span><span class="s1">&#39;decoder&#39;</span><span class="p">][</span><span class="n">layer_stack_index</span><span class="p">]</span>
+            <span class="n">module_id</span> <span class="o">=</span> <span class="n">module_opts</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span>
+            <span class="n">stacks</span><span class="p">[</span><span class="n">module_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">AdaptedTransformerDecoder</span><span class="p">(</span>
+                <span class="n">n_layers</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">heads</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">transformer_ff</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">copy_attn</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">self_attn_type</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span> <span class="k">else</span> <span class="n">model_opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span>
+                <span class="p">(</span>
+                    <span class="n">model_opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span>
+                    <span class="k">else</span> <span class="n">model_opts</span><span class="o">.</span><span class="n">attention_dropout</span>
+                <span class="p">),</span>
+                <span class="kc">None</span><span class="p">,</span>  <span class="c1"># embeddings,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">max_relative_positions</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">aan_useffn</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">full_context_alignment</span><span class="p">,</span>
+                <span class="n">model_opts</span><span class="o">.</span><span class="n">alignment_layer</span><span class="p">,</span>
+                <span class="n">alignment_heads</span><span class="o">=</span><span class="n">model_opts</span><span class="o">.</span><span class="n">alignment_heads</span><span class="p">,</span>
+                <span class="n">pos_ffn_activation_fn</span><span class="o">=</span><span class="n">model_opts</span><span class="o">.</span><span class="n">pos_ffn_activation_fn</span><span class="p">,</span>
+                <span class="n">layer_norm_module</span><span class="o">=</span><span class="p">(</span>
+                    <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_on_top</span>
+                    <span class="k">else</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">()</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+            <span class="n">decoders</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stacks</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">decoders</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="LayerStackDecoder.init_state"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.init_state">[docs]</a>    <span class="k">def</span> <span class="nf">init_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">memory_bank</span><span class="p">,</span> <span class="n">enc_hidden</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize decoder state.&quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">stacks</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">init_state</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">memory_bank</span><span class="p">,</span> <span class="n">enc_hidden</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">detach_state</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">stacks</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">detach_state</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">map_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn_map_state</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">stacks</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">map_state</span><span class="p">(</span><span class="n">fn_map_state</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">update_dropout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dropout</span><span class="p">,</span> <span class="n">attention_dropout</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">embeddings</span><span class="o">.</span><span class="n">update_dropout</span><span class="p">(</span><span class="n">dropout</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">stacks</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">update_dropout</span><span class="p">(</span><span class="n">dropout</span><span class="p">,</span> <span class="n">attention_dropout</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LayerStackDecoder.forward"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tgt</span><span class="p">,</span> <span class="n">memory_bank</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">memory_lengths</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="c1"># wrapper embeds tgt and creates tgt_pad_mask</span>
+        <span class="n">tgt_words</span> <span class="o">=</span> <span class="n">tgt</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">pad_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">embeddings</span><span class="o">.</span><span class="n">word_padding_idx</span>
+        <span class="n">tgt_pad_mask</span> <span class="o">=</span> <span class="n">tgt_words</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">eq</span><span class="p">(</span><span class="n">pad_idx</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># [B, 1, T_tgt]</span>
+        <span class="n">emb</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">embeddings</span><span class="p">(</span><span class="n">tgt</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">emb</span><span class="o">.</span><span class="n">dim</span><span class="p">()</span> <span class="o">==</span> <span class="mi">3</span>  <span class="c1"># len x batch x embedding_dim</span>
+        <span class="n">emb</span> <span class="o">=</span> <span class="n">emb</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="c1"># memory bank transposed to batch-first order</span>
+        <span class="n">memory_bank</span> <span class="o">=</span> <span class="n">memory_bank</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="n">emb</span>
+        <span class="n">attns</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">active_id</span><span class="p">,</span> <span class="n">stacks</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_active</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">):</span>
+            <span class="n">decoder</span> <span class="o">=</span> <span class="n">stacks</span><span class="p">[</span><span class="n">active_id</span><span class="p">]</span>
+            <span class="n">output</span><span class="p">,</span> <span class="n">dec_attns</span> <span class="o">=</span> <span class="n">decoder</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span>
+                <span class="n">output</span><span class="p">,</span>
+                <span class="n">memory_bank</span><span class="o">=</span><span class="n">memory_bank</span><span class="p">,</span>
+                <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="p">,</span>
+                <span class="n">memory_lengths</span><span class="o">=</span><span class="n">memory_lengths</span><span class="p">,</span>
+                <span class="n">tgt_pad_mask</span><span class="o">=</span><span class="n">tgt_pad_mask</span><span class="p">,</span>
+                <span class="n">skip_embedding</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">dec_attns</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">attns</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+
+        <span class="c1"># only at the end transpose back to timestep-first</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">output</span><span class="p">,</span> <span class="n">attns</span></div>
+
+    <span class="k">def</span> <span class="nf">freeze_base_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">stacks</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">freeze_base_model</span><span class="p">(</span><span class="n">requires_grad</span><span class="o">=</span><span class="n">requires_grad</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">n_layer_stacks</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LayerStackDecoder.get_submodule"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.get_submodule">[docs]</a>    <span class="k">def</span> <span class="nf">get_submodule</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layer_stack_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">module_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">][</span><span class="n">module_id</span><span class="p">]</span></div>
+
+    <span class="k">def</span> <span class="nf">get_adapter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">module_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">adapter_group</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">Adapter</span><span class="o">.</span><span class="n">_name</span><span class="p">(</span><span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">)</span>
+        <span class="n">layer_stack_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adapter_to_stack</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">][</span><span class="n">module_id</span><span class="p">]</span><span class="o">.</span><span class="n">get_adapter</span><span class="p">(</span><span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">)</span>
+
+<div class="viewcode-block" id="LayerStackDecoder.add_adapter"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.add_adapter">[docs]</a>    <span class="k">def</span> <span class="nf">add_adapter</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">adapter_group</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">sub_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">adapter</span><span class="p">:</span> <span class="n">Adapter</span><span class="p">,</span>
+        <span class="n">layer_stack_index</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">module_ids</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adds the specified adapter with the name (adapter_group, sub_id)</span>
+<span class="sd">        into the module_id sharing group of the layer_stack_index&#39;th stack&quot;&quot;&quot;</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">Adapter</span><span class="o">.</span><span class="n">_name</span><span class="p">(</span><span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adapter_to_stack</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Duplicate Adapter &quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_adapter_to_stack</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">layer_stack_index</span>
+        <span class="k">if</span> <span class="n">layer_stack_index</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s1">&#39;No layer stack with index </span><span class="si">{</span><span class="n">layer_stack_index</span><span class="si">}</span><span class="s1">. There are </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">))</span><span class="si">}</span><span class="s1"> layer stacks&#39;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">module_ids</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Adapter </span><span class="si">{</span><span class="n">adapter_group</span><span class="si">}</span><span class="s1"> </span><span class="si">{</span><span class="n">sub_id</span><span class="si">}</span><span class="s1"> has no module_ids&#39;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">module_id</span> <span class="ow">in</span> <span class="n">module_ids</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">module_id</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s1">&#39;No sharing group / module_id &quot;</span><span class="si">{</span><span class="n">module_id</span><span class="si">}</span><span class="s1">&quot; in the selected index </span><span class="si">{</span><span class="n">layer_stack_index</span><span class="si">}</span><span class="s1">. &#39;</span>
+                    <span class="sa">f</span><span class="s1">&#39;Expected one of </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s1">&#39;</span>
+                <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">][</span><span class="n">module_id</span><span class="p">]</span><span class="o">.</span><span class="n">add_adapter</span><span class="p">(</span><span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">,</span> <span class="n">adapter</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">deactivate_adapters</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">stacks</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stack</span> <span class="ow">in</span> <span class="n">stacks</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+                <span class="n">stack</span><span class="o">.</span><span class="n">deactivate_adapters</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">activate_adapter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">module_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">adapter_group</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">Adapter</span><span class="o">.</span><span class="n">_name</span><span class="p">(</span><span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">layer_stack_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_adapter_to_stack</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+        <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s1">&quot; not in </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_adapter_to_stack</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">decoders</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">][</span><span class="n">module_id</span><span class="p">]</span><span class="o">.</span><span class="n">activate_adapter</span><span class="p">(</span><span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">activate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metadata</span><span class="p">:</span> <span class="n">DatasetMetadata</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_active</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">decoder_id</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">embeddings</span><span class="o">.</span><span class="n">activate</span><span class="p">(</span><span class="n">metadata</span><span class="o">.</span><span class="n">tgt_lang</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">metadata</span><span class="o">.</span><span class="n">decoder_adapter_ids</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">deactivate_adapters</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">layer_stack_index</span><span class="p">,</span> <span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span> <span class="ow">in</span> <span class="n">metadata</span><span class="o">.</span><span class="n">decoder_adapter_ids</span><span class="p">:</span>
+                <span class="n">module_id</span> <span class="o">=</span> <span class="n">metadata</span><span class="o">.</span><span class="n">decoder_id</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">activate_adapter</span><span class="p">(</span><span class="n">module_id</span><span class="p">,</span> <span class="n">adapter_group</span><span class="p">,</span> <span class="n">sub_id</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2023, HelsinkiNLP
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

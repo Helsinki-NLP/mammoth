@@ -1,109 +1,60 @@
 Modules
 =============
 
-Core Modules
-------------
+Embeddings
+----------
 
 .. autoclass:: mammoth.modules.Embeddings
     :members:
 
 
+Attention Bridge
+----------------
+
+.. autoclass:: mammoth.modules.attention_bridge.AttentionBridge
+    :members:
+
+
 Encoders
----------
+--------
 
-.. autoclass:: mammoth.encoders.EncoderBase
+.. autoclass:: mammoth.modules.encoder.EncoderBase
     :members:
 
-.. autoclass:: mammoth.encoders.MeanEncoder
+.. autoclass:: mammoth.modules.transformer_encoder.TransformerEncoder
     :members:
 
-.. autoclass:: mammoth.encoders.RNNEncoder
+.. autoclass:: mammoth.modules.mean_encoder.MeanEncoder
+    :members:
+
+.. autoclass:: mammoth.modules.layer_stack_encoder.LayerStackEncoder
     :members:
 
 
 Decoders
+--------
+
+.. autoclass:: mammoth.modules.decoder.DecoderBase
+    :members:
+
+.. autoclass:: mammoth.modules.layer_stack_decoder.LayerStackDecoder
+    :members:
+
+.. autoclass:: mammoth.modules.decoder_ensemble.EnsembleModel
+    :members:
+
+.. autoclass:: mammoth.modules.transformer_decoder.TransformerDecoder
+    :members:
+
+
+Sublayers
 ---------
 
-
-.. autoclass:: mammoth.decoders.DecoderBase
-    :members:
-    
-.. autoclass:: mammoth.decoders.decoder.RNNDecoderBase
+.. autoclass:: mammoth.modules.average_attn.AverageAttention
     :members:
 
-.. autoclass:: mammoth.decoders.StdRNNDecoder
-    :members:
-
-.. autoclass:: mammoth.decoders.InputFeedRNNDecoder
-    :members:
-
-Attention
-----------
-
-.. autoclass:: mammoth.modules.AverageAttention
-    :members:
-
-.. autoclass:: mammoth.modules.GlobalAttention
-    :members:
-
-
-
-Architecture: Transformer
-----------------------------
-
-.. autoclass:: mammoth.modules.PositionalEncoding
+.. autoclass:: mammoth.modules.multi_headed_attn.MultiHeadedAttention
     :members:
 
 .. autoclass:: mammoth.modules.position_ffn.PositionwiseFeedForward
-    :members:
-
-.. autoclass:: mammoth.encoders.TransformerEncoder
-    :members:
-
-.. autoclass:: mammoth.decoders.TransformerDecoder
-    :members:
-
-.. autoclass:: mammoth.modules.MultiHeadedAttention
-    :members:
-    :undoc-members:
-
-
-Architecture: Conv2Conv
-----------------------------
-
-(These methods are from a user contribution
-and have not been thoroughly tested.)
-
-
-.. autoclass:: mammoth.encoders.CNNEncoder
-    :members:
-
-
-.. autoclass:: mammoth.decoders.CNNDecoder
-    :members:
-
-.. autoclass:: mammoth.modules.ConvMultiStepAttention
-    :members:
-
-.. autoclass:: mammoth.modules.WeightNormConv2d
-    :members:
-
-Architecture: SRU
-----------------------------
-
-.. autoclass:: mammoth.models.sru.SRU
-    :members:
-
-
-Copy Attention
---------------
-
-.. autoclass:: mammoth.modules.CopyGenerator
-    :members:
-
-
-Structured Attention
--------------------------------------------
-
-.. autoclass:: mammoth.modules.structured_attention.MatrixTree
     :members:

@@ -27,7 +27,6 @@
         <script src="../../../_static/language_data.js"></script>
         <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-        <script src="https://unpkg.com/mermaid@8.4.8/dist/mermaid.min.js"></script>
     
     <script type="text/javascript" src="../../../_static/js/theme.js"></script>
 
@@ -89,14 +88,22 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../ref.html">References</a></li>
 </ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modular_model.html">Modular Model</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../config_config.html">Config-config tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/Translation.html">Translation</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -185,7 +192,7 @@
 <span class="c1"># from mammoth.utils.misc import aeq</span>
 
 
-<div class="viewcode-block" id="MultiHeadedAttention"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.MultiHeadedAttention">[docs]</a><span class="k">class</span> <span class="nc">MultiHeadedAttention</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<div class="viewcode-block" id="MultiHeadedAttention"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.multi_headed_attn.MultiHeadedAttention">[docs]</a><span class="k">class</span> <span class="nc">MultiHeadedAttention</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Multi-Head Attention module from &quot;Attention is All You Need&quot;</span>
 <span class="sd">    :cite:`DBLP:journals/corr/VaswaniSPUJGKP17`.</span>
 
@@ -246,7 +253,7 @@
             <span class="n">vocab_size</span> <span class="o">=</span> <span class="n">max_relative_positions</span> <span class="o">*</span> <span class="mi">2</span> <span class="o">+</span> <span class="mi">1</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">relative_positions_embeddings</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dim_per_head</span><span class="p">)</span>
 
-<div class="viewcode-block" id="MultiHeadedAttention.forward"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.MultiHeadedAttention.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">layer_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attn_type</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="MultiHeadedAttention.forward"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.multi_headed_attn.MultiHeadedAttention.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">layer_cache</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attn_type</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Compute the context vector and the attention vectors.</span>
 
@@ -380,8 +387,8 @@
 
         <span class="k">return</span> <span class="n">output</span><span class="p">,</span> <span class="n">attns</span></div>
 
-<div class="viewcode-block" id="MultiHeadedAttention.update_dropout"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.MultiHeadedAttention.update_dropout">[docs]</a>    <span class="k">def</span> <span class="nf">update_dropout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dropout</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">dropout</span></div></div>
+    <span class="k">def</span> <span class="nf">update_dropout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dropout</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dropout</span><span class="o">.</span><span class="n">p</span> <span class="o">=</span> <span class="n">dropout</span></div>
 </pre></div>
 
            </div>

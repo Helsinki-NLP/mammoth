@@ -1,20 +1,21 @@
 # Config-config tool
 
-A meta-configuration tool, or config generator for FoTran OpenNMT.
+A meta-configuration tool, or config generator for MAMMOTH.
 
-The FoTran OpenNMT configuration options have become unwieldly as complexity has increased.
+The MAMMOTH configuration options have become unwieldy as complexity has increased.
 Especially the introduction of LayerStacks (the mechanism for dividing encoders and decoders into several subcomponents with different parameter sharing) and Adapters has made specifying parameters on the command line into a total nightmare, and even writing yaml configs by hand is cumbersome.
 Other functionality that is cumbersome to specify by hand includes:
 
-  - Node and GPU assigments for massively multilingual models,
+  - Node and GPU assignments for massively multilingual models,
   - Weights and curricula (starting step for specific tasks),
   - Parameter sharing groups based on language similarity.
 
 To ease the creation of configs, the config-config tool reads in a human-writable configuration template, and computes the specific values expected by OpenNMT, writing them out as a less-readable yaml file.
 
 ## Command
-
-python3 OpenNMT-py-v2/tools/config\_config.py config\_all --in\_config input.yaml --out\_config output.yaml
+```bash
+python3 mammoth/tools/config_config.py config_all --in_config input.yaml --out_config output.yaml
+```
 
 ## Inputs
 
@@ -25,7 +26,7 @@ The primary input is a yaml file, which contains two types of parameters
 
 ### Input yaml
 
-See the example in `OpenNMT-py-v2/examples/config_config.yaml`
+See the example in `mammoth/examples/config_config.yaml`
 
 The meta-parameters under the `config_config` key:
 
@@ -75,16 +76,21 @@ The number of language groups to create when clustering.
 
 If set to `True`, use corpus weights based on temperature-adjusted corpus size.
 
-Note that the actual weight is proportional to the weights of the the other tasks assinged to the same GPU. E.g. if only one task is assigned to a GPU, it will receive 100% weight regardless of what the computed weight is.
+Note that the actual weight is proportional to the weights of the the other tasks assigned to the same GPU. E.g. if only one task is assigned to a GPU, it will receive 100% weight regardless of what the computed weight is.
 
 #### `use_introduce_at_training_step`
 
 If set to `True`, use a curriculum introducing corpora based on temperature-adjusted corpus size.
 
-Note that if both `use_weight` and `use_introduce_at_training_step` are specificed, the weight is distributed to the two according to the square root, so that when both of them are applied (multiplicatively), the desired weight is achieved.
+Note that if both `use_weight` and `use_introduce_at_training_step` are specified, the weight is distributed to the two according to the square root, so that when both of them are applied (multiplicatively), the desired weight is achieved.
 
 Note that high-resource language pairs (would train for over 75% of the training time) all start at 0. This avoids starting training with only one GPU doing work, while the other GPUs are idle waiting for their LPs to start.
 
+#### `use_src_lang_token`
+
+Only has an effect when using the `prefix` transform.
+Normally, the prefix transform only includes a target language selector token: `<to_yyy>` where `yyy` is the code of the target language.
+If this flag is set, then also the source language is specified, e.g. `<from_xxx> <to_yyy>`.
 
 #### `translation_config_dir`
 
@@ -119,7 +125,7 @@ Note that it is possible to have target-language-dependent components in the enc
 
 #### `n_nodes` and `n_gpus_per_node`
 
-The number of nodes and GPUs, for assigment of tasks to devices.
+The number of nodes and GPUs, for assignment of tasks to devices.
 Note that you also need to separately specify this information to slurm.
 
 #### Other top-level keys than `config_config`
@@ -136,13 +142,13 @@ The key `adapters.encoder.{adapter_name}.ids` takes one of 3 values:
 
 ### Distance matrix
 
-See the example distance matrix in `OpenNMT-py-v2/examples/config_config.distance.csv`.
+See the example distance matrix in `mammoth/examples/config_config.distance.csv`.
 
 The distance matrix is given as a csv file, with a column `lang` and one column per language.
 There should be one row per language, with the language code in the first `lang` column, followed by a float giving the distance to the language specified by the column.
 The rows should appear in the same order as the columns.
 This means that the matrix must be square and symmetrical.
-The upper and lower triange are redundant, but both must be given.
+The upper and lower triangle are redundant, but both must be given.
 
 Note that the values are distances: the distance of a language to itself (the diagonal) should be 0.
 
@@ -163,8 +169,9 @@ The actual corpus files are used in two ways:
 Because of this, you need to run `config_config` so that it can access the corpora using the specified `src_path` and `tgt_path`.
 
 ## Usage
-
-    python OpenNMT-py-v2/tools/config_config.py config_all --in_config path/to/input.yaml --out_config path/to/output.yaml
+```
+python mammoth/tools/config_config.py config_all --in_config path/to/input.yaml --out_config path/to/output.yaml
+```
 
 ### Stages
 

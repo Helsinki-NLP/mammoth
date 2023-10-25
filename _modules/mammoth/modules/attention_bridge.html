@@ -1,0 +1,605 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mammoth.modules.attention_bridge &mdash; MAMMOTH  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/theme_overrides.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> MAMMOTH
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ref.html">References</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
+<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modular_model.html">Modular Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/Translation.html">Translation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/build_vocab.html">Build Vocab</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/server.html">Server</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MAMMOTH</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>mammoth.modules.attention_bridge</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mammoth.modules.attention_bridge</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">__future__</span> <span class="kn">import</span> <span class="n">division</span>
+
+<span class="kn">import</span> <span class="nn">warnings</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">from</span> <span class="nn">mammoth.rmsnorm_torch</span> <span class="kn">import</span> <span class="n">RMSNorm</span>
+<span class="kn">from</span> <span class="nn">mammoth.modules.transformer_encoder</span> <span class="kn">import</span> <span class="n">TransformerEncoderLayer</span>
+
+<span class="kn">from</span> <span class="nn">mammoth.modules.multi_headed_attn</span> <span class="kn">import</span> <span class="n">MultiHeadedAttention</span>
+
+
+<span class="k">class</span> <span class="nc">BaseAttentionBridgeLayer</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for attention bridge layers</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_fixed_length</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;whether this layer always produce output of the same size&quot;&quot;&quot;</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+
+<span class="k">class</span> <span class="nc">AttentionBridgeNorm</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Norm component (shared implementation across architectures).&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">normalized_shape</span><span class="p">,</span> <span class="n">ab_layer_norm_type</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">ab_layer_norm_type</span> <span class="o">==</span> <span class="s1">&#39;rmsnorm&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">norm</span> <span class="o">=</span> <span class="n">RMSNorm</span><span class="p">(</span><span class="n">normalized_shape</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ab_layer_norm_type</span> <span class="o">==</span> <span class="s1">&#39;layernorm&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">norm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">normalized_shape</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">ab_layer_norm_type</span> <span class="o">==</span> <span class="s1">&#39;none&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">norm</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ab_layer_norm_type `</span><span class="si">{</span><span class="n">ab_layer_norm_type</span><span class="si">}</span><span class="s2">` is not recognized.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">input</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>  <span class="c1"># possibly an nn.Identity</span>
+
+
+<span class="k">class</span> <span class="nc">PerceiverAttentionBridgeLayer</span><span class="p">(</span><span class="n">BaseAttentionBridgeLayer</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">latent_size</span><span class="p">,</span> <span class="n">ff_size</span><span class="p">,</span> <span class="n">fixed_seqlen</span><span class="p">,</span> <span class="n">n_heads</span><span class="p">,</span> <span class="n">attention_dropout</span><span class="p">,</span> <span class="n">max_relative_positions</span><span class="p">,</span> <span class="n">norm_type</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">latent_array</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">fixed_seqlen</span><span class="p">,</span> <span class="n">latent_size</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cross_attention_block</span> <span class="o">=</span> <span class="n">MultiHeadedAttention</span><span class="p">(</span>
+            <span class="n">n_heads</span><span class="p">,</span>
+            <span class="n">latent_size</span><span class="p">,</span>
+            <span class="n">attention_dropout</span><span class="p">,</span>
+            <span class="n">max_relative_positions</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cross_attention_norm</span> <span class="o">=</span> <span class="n">AttentionBridgeNorm</span><span class="p">(</span><span class="n">latent_size</span><span class="p">,</span> <span class="n">norm_type</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cross_ff_block</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">latent_size</span><span class="p">,</span> <span class="n">ff_size</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">ff_size</span><span class="p">,</span> <span class="n">latent_size</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">cross_ff_norm</span> <span class="o">=</span> <span class="n">AttentionBridgeNorm</span><span class="p">(</span><span class="n">latent_size</span><span class="p">,</span> <span class="n">norm_type</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">self_attention_block</span> <span class="o">=</span> <span class="n">MultiHeadedAttention</span><span class="p">(</span>
+            <span class="n">n_heads</span><span class="p">,</span>
+            <span class="n">latent_size</span><span class="p">,</span>
+            <span class="n">attention_dropout</span><span class="p">,</span>
+            <span class="n">max_relative_positions</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">self_attention_norm</span> <span class="o">=</span> <span class="n">AttentionBridgeNorm</span><span class="p">(</span><span class="n">latent_size</span><span class="p">,</span> <span class="n">norm_type</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">self_ff_block</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">latent_size</span><span class="p">,</span> <span class="n">ff_size</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">ff_size</span><span class="p">,</span> <span class="n">latent_size</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">self_ff_norm</span> <span class="o">=</span> <span class="n">AttentionBridgeNorm</span><span class="p">(</span><span class="n">latent_size</span><span class="p">,</span> <span class="n">norm_type</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">hidden_ab_size</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">ab_fixed_length</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">heads</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">max_relative_positions</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">ab_layer_norm</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_fixed_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intermediate_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        intermediate_output: ``(batch, seq_len, hidden_dim)``</span>
+<span class="sd">        enc_output: original input to the attention bridge</span>
+<span class="sd">        mask: binary mask 1/0 indicating which keys have</span>
+<span class="sd">        zero/non-zero attention ``(batch, query_len, key_len)`` -&gt; # [bsz, 1, len]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">S</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">F</span> <span class="o">=</span> <span class="n">encoder_output</span><span class="o">.</span><span class="n">shape</span>
+        <span class="k">if</span> <span class="n">intermediate_output</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cross_query</span> <span class="o">=</span> <span class="n">intermediate_output</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cross_query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">latent_array</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">encoder_output</span> <span class="o">=</span> <span class="n">encoder_output</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+        <span class="c1"># sublayer 1: projects to fixed size</span>
+        <span class="n">cross_attention_output</span><span class="p">,</span> <span class="n">alphas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cross_attention_block</span><span class="p">(</span>
+            <span class="n">encoder_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">cross_query</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="n">mask</span><span class="p">,</span> <span class="n">attn_type</span><span class="o">=</span><span class="s1">&#39;context&#39;</span>
+        <span class="p">)</span>
+        <span class="n">cross_attention_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cross_attention_norm</span><span class="p">(</span><span class="n">cross_attention_output</span> <span class="o">+</span> <span class="n">cross_query</span><span class="p">)</span>
+        <span class="n">cross_attention_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cross_ff_block</span><span class="p">(</span><span class="n">cross_attention_output</span><span class="p">)</span> <span class="o">+</span> <span class="n">cross_attention_output</span>
+        <span class="n">cross_attention_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">cross_ff_norm</span><span class="p">(</span><span class="n">cross_attention_output</span><span class="p">)</span>
+
+        <span class="c1"># sublayer 2: performs self-attention</span>
+        <span class="n">self_attention_output</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">self_attention_block</span><span class="p">(</span>
+            <span class="n">cross_attention_output</span><span class="p">,</span> <span class="n">cross_attention_output</span><span class="p">,</span> <span class="n">cross_attention_output</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attn_type</span><span class="o">=</span><span class="s1">&#39;self&#39;</span>
+        <span class="p">)</span>
+        <span class="n">self_attention_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">self_attention_norm</span><span class="p">(</span><span class="n">self_attention_output</span> <span class="o">+</span> <span class="n">cross_attention_output</span><span class="p">)</span>
+        <span class="n">self_attention_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">self_ff_block</span><span class="p">(</span><span class="n">self_attention_output</span><span class="p">)</span> <span class="o">+</span> <span class="n">self_attention_output</span>
+        <span class="n">self_attention_output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">self_ff_norm</span><span class="p">(</span><span class="n">self_attention_output</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">alphas</span><span class="p">,</span> <span class="n">self_attention_output</span>
+
+
+<span class="k">class</span> <span class="nc">LinAttentionBridgeLayer</span><span class="p">(</span><span class="n">BaseAttentionBridgeLayer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Multi-headed attention. Bridge between encoders-&gt;decoders.</span>
+<span class="sd">    Based on Lin et al. (2017) A structured self-attentive sentence embedding</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">hidden_size</span><span class="p">,</span>
+        <span class="n">attention_heads</span><span class="p">,</span>
+        <span class="n">hidden_ab_size</span><span class="p">,</span>
+        <span class="n">model_type</span><span class="p">,</span>
+        <span class="n">model_dim</span><span class="p">,</span>
+        <span class="n">ab_layer_norm</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Attention Heads Layer:&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">LinAttentionBridgeLayer</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">hidden_size</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="n">hidden_ab_size</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">attention_heads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dd</span> <span class="o">=</span> <span class="n">u</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">model_type</span> <span class="o">=</span> <span class="n">model_type</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_type</span> <span class="o">!=</span> <span class="s2">&quot;text&quot;</span><span class="p">:</span>
+            <span class="n">d</span> <span class="o">=</span> <span class="n">model_dim</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ws1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ws2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">relu</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">softmax</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Softmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">attention_hops</span> <span class="o">=</span> <span class="n">r</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">M</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># TODO : remove</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm</span> <span class="o">=</span> <span class="n">AttentionBridgeNorm</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">ab_layer_norm</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Alternate constructor.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">ab_fixed_length</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">hidden_ab_size</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_type</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">ab_layer_norm</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intermediate_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        intermediate_output: ``(batch, seq_len, hidden_dim)``</span>
+<span class="sd">        enc_output: unused</span>
+<span class="sd">        mask: binary mask 1/0 indicating which keys have</span>
+<span class="sd">        zero/non-zero attention ``(batch, query_len, key_len)`` -&gt; # [bsz, 1, len]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">B</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">intermediate_output</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>  <span class="c1"># [bsz, len, nhid]</span>
+        <span class="n">compressed_embeddings</span> <span class="o">=</span> <span class="n">intermediate_output</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">H</span><span class="p">)</span>  <span class="c1"># [bsz*len, nhid*2]</span>
+        <span class="n">hbar</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ws1</span><span class="p">(</span><span class="n">compressed_embeddings</span><span class="p">)</span>  <span class="c1"># [bsz*len, attention-unit]</span>
+
+        <span class="n">hbar</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="n">hbar</span><span class="p">)</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ws2</span><span class="p">(</span><span class="n">hbar</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># [bsz, len, hop]</span>
+        <span class="n">alphas</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">alphas</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>  <span class="c1"># [bsz, hop, len]</span>
+
+        <span class="c1"># previously, we would penalize alphas if &quot;text&quot; and only the 1st AB-layer</span>
+        <span class="c1"># but we should only consider penalizing if there&#39;s something to mask</span>
+        <span class="k">if</span> <span class="n">mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mask_reshaped</span> <span class="o">=</span> <span class="n">mask</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span><span class="o">.</span><span class="n">expand</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attention_hops</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>  <span class="c1"># [bsz, hop, len]</span>
+            <span class="n">penalized_alphas</span> <span class="o">=</span> <span class="n">alphas</span> <span class="o">+</span> <span class="p">(</span><span class="o">-</span><span class="mi">10000</span> <span class="o">*</span> <span class="p">(</span><span class="n">mask_reshaped</span> <span class="o">==</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">float</span><span class="p">())</span>  <span class="c1"># [bsz, hop, len] + [bsz, hop, len]</span>
+            <span class="n">alphas</span> <span class="o">=</span> <span class="n">penalized_alphas</span>
+
+        <span class="n">alphas</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">alphas</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">L</span><span class="p">))</span>  <span class="c1"># [bsz*hop, len]</span>
+        <span class="n">alphas</span> <span class="o">=</span> <span class="n">alphas</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">attention_hops</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>  <span class="c1"># [bsz, hop, len]</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">bmm</span><span class="p">(</span><span class="n">alphas</span><span class="p">,</span> <span class="n">intermediate_output</span><span class="p">)</span>
+
+        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">output</span><span class="p">)</span>
+        <span class="c1"># TODO: why cache? not sure what else is looking at layer.M</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">M</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span>
+            <span class="n">output</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>  <span class="c1"># [r,bsz,nhid]       torch.transpose(output, 0, 1).contiguous() #[r,bsz,nhid]</span>
+        <span class="k">return</span> <span class="n">alphas</span><span class="p">,</span> <span class="n">output</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_fixed_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+
+<span class="k">class</span> <span class="nc">SimpleAttentionBridgeLayer</span><span class="p">(</span><span class="n">BaseAttentionBridgeLayer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simple attention based bridge layer using a fixed query matrix.</span>
+<span class="sd">    This matrix is a learned parameter: the model should learn to probe the</span>
+<span class="sd">    latent key space to produce coherent mixtures of value vectors.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_size</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">fixed_seqlen</span><span class="p">,</span> <span class="n">ab_layer_norm</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">query_matrix</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">fixed_seqlen</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">keys_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">values_proj</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span> <span class="n">input_size</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">d_sqrt</span> <span class="o">=</span> <span class="n">hidden_size</span><span class="o">**</span><span class="mf">0.5</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">R</span> <span class="o">=</span> <span class="n">fixed_seqlen</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">softmax</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Softmax</span><span class="p">(</span><span class="n">dim</span><span class="o">=-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">norm</span> <span class="o">=</span> <span class="n">AttentionBridgeNorm</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span> <span class="n">ab_layer_norm</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_fixed_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intermediate_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        intermediate_output: ``(batch, seq_len, hidden_dim)``</span>
+<span class="sd">        encoder_output: unused</span>
+<span class="sd">        mask: binary mask 1/0 indicating which keys have</span>
+<span class="sd">        zero/non-zero attention ``(batch, query_len, key_len)`` -&gt; # [bsz, 1, len]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">B</span><span class="p">,</span> <span class="n">L</span><span class="p">,</span> <span class="n">H</span> <span class="o">=</span> <span class="n">intermediate_output</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+        <span class="n">R</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">R</span>
+        <span class="n">keys</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">keys_proj</span><span class="p">(</span><span class="n">intermediate_output</span><span class="p">)</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">values_proj</span><span class="p">(</span><span class="n">intermediate_output</span><span class="p">)</span>
+        <span class="n">raw_scores</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">query_matrix</span> <span class="o">@</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">keys</span><span class="p">,</span> <span class="n">end_dim</span><span class="o">=-</span><span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">T</span><span class="p">)</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="n">R</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">mask</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">mask_reshaped</span> <span class="o">=</span> <span class="n">mask</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="n">B</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">L</span><span class="p">)</span>
+            <span class="n">raw_scores</span> <span class="o">=</span> <span class="n">raw_scores</span><span class="o">.</span><span class="n">masked_fill</span><span class="p">(</span><span class="n">mask_reshaped</span><span class="p">,</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">))</span>
+        <span class="n">attention_weights</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">raw_scores</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">d_sqrt</span><span class="p">)</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">attention_weights</span> <span class="o">@</span> <span class="n">values</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">attention_weights</span><span class="p">,</span> <span class="n">output</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">hidden_ab_size</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">ab_fixed_length</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">ab_layer_norm</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<span class="c1"># TODO: for now I&#39;ve used the basic implementation of TransformerEncoderLayer;</span>
+<span class="c1"># we could consider an attention-bridge-specific implementation that would allow</span>
+<span class="c1"># us to control the norm and return alphas if necessary.</span>
+<span class="k">class</span> <span class="nc">TransformerAttentionBridgeLayer</span><span class="p">(</span><span class="n">BaseAttentionBridgeLayer</span><span class="p">,</span> <span class="n">TransformerEncoderLayer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Using a Transformer encoder layer as a shared component in the attention bridge&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+        <span class="n">TransformerEncoderLayer</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_fixed_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intermediate_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        mask: binary mask 1/0 indicating which keys have</span>
+<span class="sd">        enc_output: ``(batch, seq_len, hidden_dim)``</span>
+<span class="sd">        zero/non-zero attention ``(batch, query_len, key_len)`` -&gt; # [bsz, 1, len]</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">outp</span> <span class="o">=</span> <span class="n">TransformerEncoderLayer</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intermediate_output</span><span class="p">,</span> <span class="n">mask</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">outp</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">heads</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">hidden_ab_size</span><span class="p">,</span>  <span class="c1"># d_ff</span>
+            <span class="c1"># TODO: that list indexing things seems suspicious to me...</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">max_relative_positions</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">max_relative_positions</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<span class="k">class</span> <span class="nc">FeedForwardAttentionBridgeLayer</span><span class="p">(</span><span class="n">BaseAttentionBridgeLayer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Simple feedforward bridge component&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_size</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">,</span> <span class="n">ab_layer_norm</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">module</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">(</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span> <span class="n">hidden_size</span><span class="p">),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">ReLU</span><span class="p">(),</span>
+            <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">hidden_size</span><span class="p">,</span> <span class="n">input_size</span><span class="p">),</span>
+            <span class="n">AttentionBridgeNorm</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span> <span class="n">ab_layer_norm</span><span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_fixed_length</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">intermediate_output</span><span class="p">,</span> <span class="n">encoder_output</span><span class="p">,</span> <span class="n">mask</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        intermediate_output: ``(batch, seq_len, hidden_dim)``</span>
+<span class="sd">        encoder_output: unused</span>
+<span class="sd">        mask: unused</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">module</span><span class="p">(</span><span class="n">intermediate_output</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">hidden_ab_size</span><span class="p">,</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">ab_layer_norm</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="AttentionBridge"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.attention_bridge.AttentionBridge">[docs]</a><span class="k">class</span> <span class="nc">AttentionBridge</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    N-layered attention-bridge between encoders-&gt;decoders</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">layers</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Attention Heads Layer&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">AttentionBridge</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layers</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span><span class="n">layers</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_fixed_length</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">is_fixed_length</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">)</span>
+
+<div class="viewcode-block" id="AttentionBridge.from_opts"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.attention_bridge.AttentionBridge.from_opts">[docs]</a>    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_opts</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Alternate constructor.&quot;&quot;&quot;</span>
+        <span class="c1"># convert opts specifications to architectures</span>
+        <span class="n">layer_type_to_cls</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;lin&#39;</span><span class="p">:</span> <span class="n">LinAttentionBridgeLayer</span><span class="p">,</span>
+            <span class="s1">&#39;perceiver&#39;</span><span class="p">:</span> <span class="n">PerceiverAttentionBridgeLayer</span><span class="p">,</span>
+            <span class="s1">&#39;simple&#39;</span><span class="p">:</span> <span class="n">SimpleAttentionBridgeLayer</span><span class="p">,</span>
+            <span class="s1">&#39;transformer&#39;</span><span class="p">:</span> <span class="n">TransformerAttentionBridgeLayer</span><span class="p">,</span>
+            <span class="s1">&#39;feedforward&#39;</span><span class="p">:</span> <span class="n">FeedForwardAttentionBridgeLayer</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="c1"># preconstruct layers using .from_opts(...)</span>
+        <span class="n">layers</span> <span class="o">=</span> <span class="p">[</span><span class="n">layer_type_to_cls</span><span class="p">[</span><span class="n">layer_type</span><span class="p">]</span><span class="o">.</span><span class="n">from_opts</span><span class="p">(</span><span class="n">opts</span><span class="p">)</span> <span class="k">for</span> <span class="n">layer_type</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">ab_layers</span><span class="p">]</span>
+
+        <span class="c1"># FIXME: locking-in edge case behavior</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">layer</span> <span class="o">==</span> <span class="s1">&#39;perceiver&#39;</span> <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">ab_layers</span><span class="p">):</span>
+            <span class="n">first_perceiver_index</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">idx</span> <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">layer</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">ab_layers</span><span class="p">)</span> <span class="k">if</span> <span class="n">layer</span> <span class="o">==</span> <span class="s1">&#39;perceiver&#39;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">first_perceiver_index</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="nb">any</span><span class="p">(</span><span class="n">layer</span><span class="o">.</span><span class="n">is_fixed_length</span> <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">[:</span><span class="n">first_perceiver_index</span><span class="p">]),</span> \
+                    <span class="s1">&#39;Unsupported bridge configuration: at least one layer must be fixed-size before perceiver&#39;</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">layer</span> <span class="o">==</span> <span class="s1">&#39;perceiver&#39;</span> <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="n">opts</span><span class="o">.</span><span class="n">ab_layers</span><span class="p">):</span>
+                <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s1">&#39;Architecture-mixing not fully supported with perceiver.&#39;</span><span class="p">)</span>
+            <span class="c1"># FIXME: deleting unused params manually</span>
+            <span class="k">for</span> <span class="n">perceiver_layer</span> <span class="ow">in</span> <span class="n">layers</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+                <span class="n">perceiver_layer</span><span class="o">.</span><span class="n">latent_array</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">layers</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="AttentionBridge.forward"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.attention_bridge.AttentionBridge.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enc_output</span><span class="p">,</span> <span class="n">mask</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Forward pass for the bridge layers&quot;&quot;&quot;</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">enc_output</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">PerceiverAttentionBridgeLayer</span><span class="p">):</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">alphas</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">orig_mask</span> <span class="o">=</span> <span class="n">mask</span>
+        <span class="k">for</span> <span class="n">layer</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">layers</span><span class="p">:</span>
+            <span class="n">mask_</span> <span class="o">=</span> <span class="n">orig_mask</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">layer</span><span class="p">,</span> <span class="n">PerceiverAttentionBridgeLayer</span><span class="p">)</span> <span class="k">else</span> <span class="n">mask</span>
+            <span class="n">alphas</span><span class="p">,</span> <span class="n">out</span> <span class="o">=</span> <span class="n">layer</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">enc_output</span><span class="p">,</span> <span class="n">mask_</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">layer</span><span class="o">.</span><span class="n">is_fixed_length</span><span class="p">:</span>
+                <span class="c1"># In this case, we&#39;ve ensured all batch items have a constant</span>
+                <span class="c1"># sequence length, so the mask is no longer required.</span>
+                <span class="n">mask</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">contiguous</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">out</span><span class="p">,</span> <span class="n">alphas</span>  <span class="c1"># [hop, bsz, nhid], [bsz, hop, srcseqlen]</span></div></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2023, HelsinkiNLP
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

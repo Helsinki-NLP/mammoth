@@ -1,0 +1,493 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>mammoth.inputters.dataset &mdash; MAMMOTH  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../../../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/theme_overrides.css" type="text/css" />
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> MAMMOTH
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../ref.html">References</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
+<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../modular_model.html">Modular Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/Translation.html">Translation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/build_vocab.html">Build Vocab</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../options/server.html">Server</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MAMMOTH</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html">Docs</a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>mammoth.inputters.dataset</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for mammoth.inputters.dataset</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span> <span class="nn">collections</span>
+<span class="kn">from</span> <span class="nn">dataclasses</span> <span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">import</span> <span class="nn">gzip</span>
+
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torch.nn.utils.rnn</span> <span class="kn">import</span> <span class="n">pad_sequence</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">IterableDataset</span>
+
+<span class="kn">from</span> <span class="nn">mammoth.constants</span> <span class="kn">import</span> <span class="n">DefaultTokens</span>
+<span class="kn">from</span> <span class="nn">mammoth.transforms</span> <span class="kn">import</span> <span class="n">TransformPipe</span><span class="p">,</span> <span class="n">get_transforms_cls</span><span class="p">,</span> <span class="n">make_transforms</span>
+<span class="kn">from</span> <span class="nn">mammoth.utils.logging</span> <span class="kn">import</span> <span class="n">logger</span>
+<span class="kn">from</span> <span class="nn">mammoth.inputters.vocab</span> <span class="kn">import</span> <span class="n">Vocab</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span> <span class="nc">Batch</span><span class="p">():</span>
+    <span class="n">src</span><span class="p">:</span> <span class="nb">tuple</span>  <span class="c1"># of torch Tensors</span>
+    <span class="n">tgt</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="n">labels</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">src</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">src</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">src</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tgt</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tgt</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tgt</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">labels</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">device</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+
+<span class="k">def</span> <span class="nf">read_examples_from_files</span><span class="p">(</span>
+    <span class="n">src_path</span><span class="p">,</span>
+    <span class="n">tgt_path</span><span class="p">,</span>
+    <span class="n">tokenize_fn</span><span class="o">=</span><span class="nb">str</span><span class="o">.</span><span class="n">split</span><span class="p">,</span>
+    <span class="n">transforms_fn</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span>
+    <span class="n">stride</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">offset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Helper function to read examples&quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">_make_example_dict</span><span class="p">(</span><span class="n">packed</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper function to convert lines to dicts&quot;&quot;&quot;</span>
+        <span class="n">src_str</span><span class="p">,</span> <span class="n">tgt_str</span> <span class="o">=</span> <span class="n">packed</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s1">&#39;src&#39;</span><span class="p">:</span> <span class="n">tokenize_fn</span><span class="p">(</span><span class="n">src_str</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s1">&#39;src&#39;</span><span class="p">),</span>
+            <span class="s1">&#39;tgt&#39;</span><span class="p">:</span> <span class="n">tokenize_fn</span><span class="p">(</span><span class="n">tgt_str</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s1">&#39;tgt&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">tgt_str</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="c1"># &#39;align&#39;: None,</span>
+        <span class="p">}</span>
+
+    <span class="k">if</span> <span class="n">src_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.gz&#39;</span><span class="p">):</span>
+        <span class="n">src_fh</span> <span class="o">=</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">src_path</span><span class="p">,</span> <span class="s1">&#39;rt&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">src_fh</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">src_path</span><span class="p">,</span> <span class="s1">&#39;rt&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">tgt_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tgt_fh</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">tgt_path</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.gz&#39;</span><span class="p">):</span>
+        <span class="n">tgt_fh</span> <span class="o">=</span> <span class="n">gzip</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">tgt_path</span><span class="p">,</span> <span class="s1">&#39;rt&#39;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">tgt_fh</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">tgt_path</span><span class="p">,</span> <span class="s1">&#39;rt&#39;</span><span class="p">)</span>
+
+    <span class="n">examples</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">src_fh</span><span class="p">,</span> <span class="n">tgt_fh</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">stride</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">offset</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Start by skipping offset examples. After that return every stride:th example.</span>
+        <span class="n">examples</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">islice</span><span class="p">(</span><span class="n">examples</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">stride</span><span class="p">)</span>
+    <span class="n">examples</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">_make_example_dict</span><span class="p">,</span> <span class="n">examples</span><span class="p">)</span>
+    <span class="n">examples</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">transforms_fn</span><span class="p">,</span> <span class="n">examples</span><span class="p">)</span>
+    <span class="n">examples</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="n">examples</span><span class="p">)</span>  <span class="c1"># filtertoolong replaces invalid examples with None</span>
+    <span class="k">yield from</span> <span class="n">examples</span>
+
+    <span class="n">src_fh</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">tgt_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">tgt_fh</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="ParallelCorpus"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataset.ParallelCorpus">[docs]</a><span class="k">class</span> <span class="nc">ParallelCorpus</span><span class="p">(</span><span class="n">IterableDataset</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Torch-style dataset&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">src_file</span><span class="p">,</span>
+        <span class="n">tgt_file</span><span class="p">,</span>
+        <span class="n">src_vocab</span><span class="p">,</span>
+        <span class="n">tgt_vocab</span><span class="p">,</span>
+        <span class="n">transforms</span><span class="p">,</span>
+        <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">,</span>
+        <span class="n">stride</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">offset</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">is_train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">task</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">src_file</span> <span class="o">=</span> <span class="n">src_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tgt_file</span> <span class="o">=</span> <span class="n">tgt_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">transforms</span> <span class="o">=</span> <span class="n">transforms</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">vocabs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s1">&#39;src&#39;</span><span class="p">:</span> <span class="n">src_vocab</span><span class="p">,</span>
+            <span class="s1">&#39;tgt&#39;</span><span class="p">:</span> <span class="n">tgt_vocab</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stride</span> <span class="o">=</span> <span class="n">stride</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">offset</span> <span class="o">=</span> <span class="n">offset</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_train</span> <span class="o">=</span> <span class="n">is_train</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">corpus_id</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">corpus_id</span>
+
+    <span class="c1"># FIXME: most likely redundant with mammoth.transforms.tokenize</span>
+    <span class="k">def</span> <span class="nf">_tokenize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">string</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s1">&#39;src&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Split string, accompanied by a drumroll&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">string</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">_numericalize</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tokens</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="s1">&#39;src&#39;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert list of strings into list of indices&quot;&quot;&quot;</span>
+        <span class="n">vocab</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vocabs</span><span class="p">[</span><span class="n">side</span><span class="p">]</span>
+        <span class="n">bos</span> <span class="o">=</span> <span class="n">vocab</span><span class="p">[</span><span class="n">DefaultTokens</span><span class="o">.</span><span class="n">BOS</span><span class="p">]</span>
+        <span class="n">eos</span> <span class="o">=</span> <span class="n">vocab</span><span class="p">[</span><span class="n">DefaultTokens</span><span class="o">.</span><span class="n">EOS</span><span class="p">]</span>
+        <span class="n">unk</span> <span class="o">=</span> <span class="n">vocab</span><span class="p">[</span><span class="n">DefaultTokens</span><span class="o">.</span><span class="n">UNK</span><span class="p">]</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span>
+            <span class="n">bos</span><span class="p">,</span>
+            <span class="o">*</span><span class="p">(</span><span class="n">vocab</span><span class="o">.</span><span class="n">stoi</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="n">unk</span><span class="p">)</span> <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">tokens</span><span class="p">),</span>
+            <span class="n">eos</span><span class="p">,</span>
+        <span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">indices</span>
+
+    <span class="k">def</span> <span class="nf">to</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">device</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">device</span> <span class="o">=</span> <span class="n">device</span>
+        <span class="k">return</span> <span class="bp">self</span>
+
+    <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Read file, produce batches of examples&quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="nf">_cast</span><span class="p">(</span><span class="n">example_dict</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span>
+                <span class="n">k</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numericalize</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">side</span><span class="o">=</span><span class="n">k</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">example_dict</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">v</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="p">}</span>
+
+        <span class="n">examples</span> <span class="o">=</span> <span class="n">read_examples_from_files</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">src_file</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tgt_file</span><span class="p">,</span>
+            <span class="n">tokenize_fn</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_tokenize</span><span class="p">,</span>
+            <span class="n">transforms_fn</span><span class="o">=</span><span class="p">(</span>
+                <span class="n">partial</span><span class="p">(</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">apply</span><span class="p">,</span>
+                    <span class="n">is_train</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">is_train</span><span class="p">,</span>
+                    <span class="n">corpus_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">corpus_id</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">transforms</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span>
+            <span class="p">),</span>
+            <span class="n">stride</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">stride</span><span class="p">,</span>
+            <span class="n">offset</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">offset</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">examples</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">_cast</span><span class="p">,</span> <span class="n">examples</span><span class="p">)</span>
+        <span class="k">yield from</span> <span class="n">examples</span>
+
+    <span class="c1"># FIXME: some RNN archs require sorting src&#39;s by length</span>
+    <span class="k">def</span> <span class="nf">collate_fn</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">examples</span><span class="p">):</span>
+        <span class="n">has_tgt</span> <span class="o">=</span> <span class="s1">&#39;tgt&#39;</span> <span class="ow">in</span> <span class="n">examples</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+        <span class="n">src_padidx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vocabs</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">][</span><span class="n">DefaultTokens</span><span class="o">.</span><span class="n">PAD</span><span class="p">]</span>
+        <span class="n">tgt_padidx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vocabs</span><span class="p">[</span><span class="s1">&#39;tgt&#39;</span><span class="p">][</span><span class="n">DefaultTokens</span><span class="o">.</span><span class="n">PAD</span><span class="p">]</span>
+        <span class="n">src_lengths</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">([</span><span class="n">ex</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">]</span><span class="o">.</span><span class="n">numel</span><span class="p">()</span> <span class="k">for</span> <span class="n">ex</span> <span class="ow">in</span> <span class="n">examples</span><span class="p">],</span> <span class="n">device</span><span class="o">=</span><span class="s1">&#39;cpu&#39;</span><span class="p">)</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="p">(</span><span class="n">pad_sequence</span><span class="p">([</span><span class="n">ex</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">ex</span> <span class="ow">in</span> <span class="n">examples</span><span class="p">],</span> <span class="n">padding_value</span><span class="o">=</span><span class="n">src_padidx</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="n">src_lengths</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">has_tgt</span><span class="p">:</span>
+            <span class="n">tgt</span> <span class="o">=</span> <span class="n">pad_sequence</span><span class="p">([</span><span class="n">ex</span><span class="p">[</span><span class="s1">&#39;tgt&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">ex</span> <span class="ow">in</span> <span class="n">examples</span><span class="p">],</span> <span class="n">padding_value</span><span class="o">=</span><span class="n">tgt_padidx</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="k">if</span> <span class="s1">&#39;labels&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">examples</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+                <span class="n">labels</span> <span class="o">=</span> <span class="n">tgt</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">labels</span> <span class="o">=</span> <span class="n">pad_sequence</span><span class="p">([</span><span class="n">ex</span><span class="p">[</span><span class="s1">&#39;labels&#39;</span><span class="p">]</span> <span class="k">for</span> <span class="n">ex</span> <span class="ow">in</span> <span class="n">examples</span><span class="p">],</span> <span class="n">padding_value</span><span class="o">=</span><span class="n">tgt_padidx</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">tgt</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">labels</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="n">batch</span> <span class="o">=</span> <span class="n">Batch</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="n">tgt</span><span class="p">,</span> <span class="n">labels</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">examples</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">batch</span></div>
+
+
+<span class="k">def</span> <span class="nf">get_corpus</span><span class="p">(</span><span class="n">opts</span><span class="p">,</span> <span class="n">task</span><span class="p">,</span> <span class="n">src_vocab</span><span class="p">:</span> <span class="n">Vocab</span><span class="p">,</span> <span class="n">tgt_vocab</span><span class="p">:</span> <span class="n">Vocab</span><span class="p">,</span> <span class="n">is_train</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;build an iterable Dataset object&quot;&quot;&quot;</span>
+    <span class="c1"># get transform classes to infer special tokens</span>
+    <span class="c1"># FIXME ensure TQM properly initializes transform with global if necessary</span>
+    <span class="n">vocabs</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;src&#39;</span><span class="p">:</span> <span class="n">src_vocab</span><span class="p">,</span> <span class="s1">&#39;tgt&#39;</span><span class="p">:</span> <span class="n">tgt_vocab</span><span class="p">}</span>
+    <span class="n">corpus_opts</span> <span class="o">=</span> <span class="n">opts</span><span class="o">.</span><span class="n">tasks</span><span class="p">[</span><span class="n">task</span><span class="o">.</span><span class="n">corpus_id</span><span class="p">]</span>
+    <span class="n">transforms_to_apply</span> <span class="o">=</span> <span class="n">corpus_opts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;transforms&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="n">transforms_to_apply</span> <span class="o">=</span> <span class="n">transforms_to_apply</span> <span class="ow">or</span> <span class="n">opts</span><span class="o">.</span><span class="n">transforms</span>
+    <span class="n">transforms_to_apply</span> <span class="o">=</span> <span class="n">transforms_to_apply</span> <span class="ow">or</span> <span class="p">[]</span>
+    <span class="n">transforms_cls</span> <span class="o">=</span> <span class="n">make_transforms</span><span class="p">(</span>
+        <span class="n">opts</span><span class="p">,</span>
+        <span class="n">get_transforms_cls</span><span class="p">(</span><span class="n">transforms_to_apply</span><span class="p">),</span>
+        <span class="n">vocabs</span><span class="p">,</span>
+        <span class="n">task</span><span class="o">=</span><span class="n">task</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">transforms_to_apply</span> <span class="o">=</span> <span class="p">[</span><span class="n">transforms_cls</span><span class="p">[</span><span class="n">trf_name</span><span class="p">]</span> <span class="k">for</span> <span class="n">trf_name</span> <span class="ow">in</span> <span class="n">transforms_to_apply</span><span class="p">]</span>
+
+    <span class="c1"># build Dataset proper</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">ParallelCorpus</span><span class="p">(</span>
+        <span class="n">corpus_opts</span><span class="p">[</span><span class="s2">&quot;path_src&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">is_train</span> <span class="k">else</span> <span class="n">corpus_opts</span><span class="p">[</span><span class="s2">&quot;path_valid_src&quot;</span><span class="p">],</span>
+        <span class="n">corpus_opts</span><span class="p">[</span><span class="s2">&quot;path_tgt&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">is_train</span> <span class="k">else</span> <span class="n">corpus_opts</span><span class="p">[</span><span class="s2">&quot;path_valid_tgt&quot;</span><span class="p">],</span>
+        <span class="n">src_vocab</span><span class="p">,</span>
+        <span class="n">tgt_vocab</span><span class="p">,</span>
+        <span class="n">TransformPipe</span><span class="p">(</span><span class="n">opts</span><span class="p">,</span> <span class="n">transforms_to_apply</span><span class="p">),</span>
+        <span class="n">stride</span><span class="o">=</span><span class="n">corpus_opts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;stride&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">offset</span><span class="o">=</span><span class="n">corpus_opts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;offset&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+        <span class="n">is_train</span><span class="o">=</span><span class="n">is_train</span><span class="p">,</span>
+        <span class="n">task</span><span class="o">=</span><span class="n">task</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">dataset</span>
+
+
+<span class="k">def</span> <span class="nf">build_sub_vocab</span><span class="p">(</span><span class="n">examples</span><span class="p">,</span> <span class="n">n_sample</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build vocab counts on (strided) subpart of the data.&quot;&quot;&quot;</span>
+    <span class="n">sub_counter_src</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">()</span>
+    <span class="n">sub_counter_tgt</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">examples</span><span class="p">):</span>
+        <span class="n">src</span><span class="p">,</span> <span class="n">tgt</span> <span class="o">=</span> <span class="n">item</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">],</span> <span class="n">item</span><span class="p">[</span><span class="s1">&#39;tgt&#39;</span><span class="p">]</span>
+        <span class="c1"># for feat_name, feat_line in maybe_example[&quot;src&quot;].items():</span>
+        <span class="c1">#     if feat_name not in [&quot;src&quot;, &quot;src_original&quot;]:</span>
+        <span class="c1">#         sub_counter_src_feats[feat_name].update(feat_line.split(&#39; &#39;))</span>
+        <span class="c1">#         if opts.dump_samples:</span>
+        <span class="c1">#             src_line_pretty = append_features_to_example(src_line_pretty, feat_line)</span>
+        <span class="n">sub_counter_src</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
+        <span class="n">sub_counter_tgt</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">tgt</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n_sample</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">n_sample</span><span class="p">:</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">sub_counter_src</span><span class="p">,</span> <span class="n">sub_counter_tgt</span>
+
+
+<span class="k">def</span> <span class="nf">init_pool</span><span class="p">(</span><span class="n">queues</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Add the queues as attribute of the pooled function.&quot;&quot;&quot;</span>
+    <span class="n">build_sub_vocab</span><span class="o">.</span><span class="n">queues</span> <span class="o">=</span> <span class="n">queues</span>
+
+
+<span class="k">def</span> <span class="nf">build_vocab_counts</span><span class="p">(</span><span class="n">opts</span><span class="p">,</span> <span class="n">corpus_id</span><span class="p">,</span> <span class="n">transforms</span><span class="p">,</span> <span class="n">n_sample</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build vocabulary counts from data.&quot;&quot;&quot;</span>
+
+    <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+    <span class="kn">import</span> <span class="nn">multiprocessing</span> <span class="k">as</span> <span class="nn">mp</span>
+
+    <span class="k">if</span> <span class="n">n_sample</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n_sample=</span><span class="si">{</span><span class="n">n_sample</span><span class="si">}</span><span class="s2">: Build vocab on full datasets.&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">n_sample</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Build vocab on </span><span class="si">{</span><span class="n">n_sample</span><span class="si">}</span><span class="s2"> transformed examples/corpus.&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n_sample should &gt; 0 or == -1, get </span><span class="si">{</span><span class="n">n_sample</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># FIXME</span>
+    <span class="k">assert</span> <span class="ow">not</span> <span class="n">opts</span><span class="o">.</span><span class="n">dump_samples</span><span class="p">,</span> <span class="s1">&#39;Not implemented&#39;</span>
+
+    <span class="n">corpora</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">corpus_id</span><span class="p">:</span> <span class="n">read_examples_from_files</span><span class="p">(</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">tasks</span><span class="p">[</span><span class="n">corpus_id</span><span class="p">][</span><span class="s2">&quot;path_src&quot;</span><span class="p">],</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">tasks</span><span class="p">[</span><span class="n">corpus_id</span><span class="p">][</span><span class="s2">&quot;path_tgt&quot;</span><span class="p">],</span>
+                <span class="c1"># FIXME this is likely not working</span>
+                <span class="n">transforms_fn</span><span class="o">=</span><span class="n">TransformPipe</span><span class="p">(</span><span class="n">transforms</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span> <span class="k">if</span> <span class="n">transforms</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">}</span>
+    <span class="n">counter_src</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">()</span>
+    <span class="n">counter_tgt</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">()</span>
+
+    <span class="n">queues</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">c_name</span><span class="p">:</span> <span class="p">[</span><span class="n">mp</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">vocab_sample_queue_size</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">num_threads</span><span class="p">)]</span> <span class="k">for</span> <span class="n">c_name</span> <span class="ow">in</span> <span class="n">corpora</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="p">}</span>
+    <span class="c1"># sample_path = os.path.join(os.path.dirname(opts.save_data), CorpusName.SAMPLE)</span>
+    <span class="k">with</span> <span class="n">mp</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">num_threads</span><span class="p">,</span> <span class="n">init_pool</span><span class="p">,</span> <span class="p">[</span><span class="n">queues</span><span class="p">])</span> <span class="k">as</span> <span class="n">p</span><span class="p">:</span>
+        <span class="n">func</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">build_sub_vocab</span><span class="p">,</span> <span class="n">corpora</span><span class="p">[</span><span class="n">corpus_id</span><span class="p">],</span> <span class="n">n_sample</span><span class="p">,</span> <span class="n">opts</span><span class="o">.</span><span class="n">num_threads</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">sub_counter_src</span><span class="p">,</span> <span class="n">sub_counter_tgt</span> <span class="ow">in</span> <span class="n">p</span><span class="o">.</span><span class="n">imap</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">opts</span><span class="o">.</span><span class="n">num_threads</span><span class="p">)):</span>
+            <span class="n">counter_src</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">sub_counter_src</span><span class="p">)</span>
+            <span class="n">counter_tgt</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">sub_counter_tgt</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">counter_src</span><span class="p">,</span> <span class="n">counter_tgt</span>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2023, HelsinkiNLP
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

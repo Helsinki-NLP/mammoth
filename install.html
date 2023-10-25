@@ -37,7 +37,9 @@
   <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
   <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
-    <link rel="search" title="Search" href="search.html" /> 
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Contributors" href="CONTRIBUTING.html" />
+    <link rel="prev" title="Quickstart" href="quickstart.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -82,20 +84,40 @@
             
             
               <p class="caption"><span class="caption-text">Getting Started</span></p>
-<ul>
+<ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#puhti-mahti">Puhti / Mahti</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#install">Install</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#run">Run</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#lumi">LUMI</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Install</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Run</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
 </ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="modular_MT.html">Modular Machine Translation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/Translation.html">Translation</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -177,15 +199,18 @@
             
   <div class="section" id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Permalink to this headline">¶</a></h1>
+<p>Installing from source usually works. Here, we provide two examples that install MAMMOTH in Nvidia and AMD platforms.</p>
 <div class="section" id="puhti-mahti">
 <h2>Puhti / Mahti<a class="headerlink" href="#puhti-mahti" title="Permalink to this headline">¶</a></h2>
+<p>This first example install MAMMOTH on clusters (<a class="reference external" href="https://docs.csc.fi/computing/">Puhti/Mahti</a>) with Nvidia GPUs.</p>
 <div class="section" id="install">
 <h3>Install<a class="headerlink" href="#install" title="Permalink to this headline">¶</a></h3>
 <p>In the login node, create a directory in the <code class="docutils literal notranslate"><span class="pre">projappl</span></code> linked to our project to host the shared python dependencies, and install the code base &amp; dependencies there:</p>
-<!-- TODO: modify project name  --><div class="highlight-default notranslate"><div class="highlight"><pre><span></span># where to install the necessary python packages
-ENV_DIR=&quot;/projappl/project_2005099/test&quot;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># where to install the necessary python packages
+PROJECT=&lt;your_project_name_is_your_account&gt;
+ENV_DIR=&quot;/projappl/${PROJECT}/test&quot;
 # where the codebase was copied to
-CODE_DIR=&quot;/scratch/project_2005099/path/to/OpenNMT-py-v2&quot;
+CODE_DIR=&quot;/scratch/${PROJECT}/path/to/mammoth&quot;
 
 # set up variables &amp; modules
 module load pytorch
@@ -205,8 +230,8 @@ chmod -R 777 $CODE_DIR
 <div class="section" id="run">
 <h3>Run<a class="headerlink" href="#run" title="Permalink to this headline">¶</a></h3>
 <p>In slurm job scripts, update environment variables to get python to run your code properly:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>ENV_DIR=&quot;/projappl/project_2005099/test&quot;
-CODE_DIR=&quot;/scratch/project_2005099/path/to/OpenNMT-py-v2&quot;
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>ENV_DIR=&quot;/projappl/${PROJECT}/test&quot;
+CODE_DIR=&quot;/scratch/${PROJECT}/path/to/mammoth&quot;
 
 module load pytorch
 export PYTHONUSERBASE=$ENV_DIR
@@ -220,10 +245,12 @@ srun python3 -u $CODE_DIR/train.py ...
 </div>
 <div class="section" id="lumi">
 <h2>LUMI<a class="headerlink" href="#lumi" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="id1">
+<p>The GPU partition of <a class="reference external" href="https://lumi-supercomputer.github.io">LUMI supercomputer</a> is AMD-based.
+This example uses python virtual environment without container. But as recommended by the LUST team of LUMI, better to use container. An instruction to install MAMMOTH under Singularity container will release in the future.</p>
+<!-- TODO --><div class="section" id="id1">
 <h3>Install<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
 <ol>
-<li><p>start an interactive session <code class="docutils literal notranslate"><span class="pre">srun</span> <span class="pre">--account=&quot;$PROJECT&quot;</span> <span class="pre">--partition=dev-g</span> <span class="pre">--ntasks=1</span> <span class="pre">--gres=gpu:mi250:1</span> <span class="pre">--time=2:00:00</span> <span class="pre">--mem=25G</span> <span class="pre">--pty</span> <span class="pre">bash</span></code></p></li>
+<li><p>Start an interactive session <code class="docutils literal notranslate"><span class="pre">srun</span> <span class="pre">--account=&quot;$PROJECT&quot;</span> <span class="pre">--partition=dev-g</span> <span class="pre">--ntasks=1</span> <span class="pre">--gres=gpu:mi250:1</span> <span class="pre">--time=2:00:00</span> <span class="pre">--mem=25G</span> <span class="pre">--pty</span> <span class="pre">bash</span></code></p></li>
 <li><p>Load modules:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>module<span class="w"> </span>load<span class="w"> </span>cray-python
 module<span class="w"> </span>load<span class="w"> </span>LUMI/22.08<span class="w"> </span>partition/G<span class="w"> </span>rocm/5.2.3
@@ -236,7 +263,7 @@ module<span class="w"> </span>load<span class="w"> </span>aws-ofi-rccl/rocm-5.2.
 <li><p>Create virtual environment <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">venv</span> <span class="pre">your_vevn_name</span></code> and activate it <code class="docutils literal notranslate"><span class="pre">source</span> <span class="pre">your_venv_name/bin/activate</span></code>.</p></li>
 <li><p>Install pytorch: <code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-m</span> <span class="pre">pip</span> <span class="pre">install</span> <span class="pre">--upgrade</span> <span class="pre">torch==1.13.1+rocm5.2</span> <span class="pre">--extra-index-url</span> <span class="pre">https://download.pytorch.org/whl/rocm5.2</span></code></p></li>
 <li><p>Install mammoth</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>/pfs/lustrep1/projappl/<span class="si">${</span><span class="nv">PROJECT</span><span class="si">}</span>/<span class="si">${</span><span class="nv">USER</span><span class="si">}</span>/OpenNMT-py-v2
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span><span class="w"> </span>/pfs/lustrep1/projappl/<span class="si">${</span><span class="nv">PROJECT</span><span class="si">}</span>/<span class="si">${</span><span class="nv">USER</span><span class="si">}</span>/mammoth
 pip3<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span>.
 pip3<span class="w"> </span>install<span class="w"> </span><span class="nv">sentencepiece</span><span class="o">==</span><span class="m">0</span>.1.97<span class="w"> </span><span class="nv">sacrebleu</span><span class="o">==</span><span class="m">2</span>.3.1
 </pre></div>
@@ -246,7 +273,11 @@ pip3<span class="w"> </span>install<span class="w"> </span><span class="nv">sent
 </div>
 <div class="section" id="id2">
 <h3>Run<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
-<p>TODO</p>
+<p>You can train in slurm job scripts, such as</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>srun<span class="w"> </span>python<span class="w"> </span>-u<span class="w"> </span><span class="nv">$CODE_DIR</span>/train.py<span class="w"> </span>...
+</pre></div>
+</div>
+<p>For more details, we refer to the tutorial section.</p>
 </div>
 </div>
 </div>
@@ -256,6 +287,15 @@ pip3<span class="w"> </span>install<span class="w"> </span><span class="nv">sent
            
           </div>
           <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="CONTRIBUTING.html" class="btn btn-neutral float-right" title="Contributors" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="quickstart.html" class="btn btn-neutral float-left" title="Quickstart" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
   
 
   <hr/>

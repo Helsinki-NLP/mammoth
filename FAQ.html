@@ -1,0 +1,287 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>About MAMMOTH &mdash; MAMMOTH  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Config-config tool" href="config_config.html" />
+    <link rel="prev" title="References" href="ref.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> MAMMOTH
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">About MAMMOTH</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-are-the-key-features-and-functionalities-of-the-mammoth">What are the key features and functionalities of the MAMMOTH?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#are-there-any-specific-use-cases-or-domains-where-mammoth-is-particularly-well-suited">Are there any specific use cases or domains where MAMMOTH is particularly well-suited?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-unique-approaches-or-algorithms-does-mammoth-uses">What unique approaches or algorithms does MAMMOTH uses?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-is-the-development-status-of-mammoth-and-are-there-plans-for-future-enhancements-or-features">What is the development status of MAMMOTH, and are there plans for future enhancements or features?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-can-users-contribute-to-the-development-of-mammoth-or-report-issues-with-the-repository-and-documentation">How can users contribute to the development of MAMMOTH or report issues with the repository and documentation?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#mammoth-and-opennmt">MAMMOTH and OpenNMT</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#what-the-relationship-between-mammoth-and-the-original-opennmt-project">What the relationship between MAMMOTH and the original OpenNMT project?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-does-mammoth-leverage-the-capabilities-of-opennmt-while-introducing-its-own-innovations">How does MAMMOTH leverage the capabilities of OpenNMT while introducing its own innovations?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#what-are-the-modifications-that-mammoth-has-made-to-opennmt-py">What are the modifications that MAMMOTH has made to OpenNMT-py?</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/Translation.html">Translation</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="options/build_vocab.html">Build Vocab</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MAMMOTH</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>About MAMMOTH</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/FAQ.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="about-mammoth">
+<h1>About MAMMOTH<a class="headerlink" href="#about-mammoth" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="what-are-the-key-features-and-functionalities-of-the-mammoth">
+<h2>What are the key features and functionalities of the MAMMOTH?<a class="headerlink" href="#what-are-the-key-features-and-functionalities-of-the-mammoth" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH is a flexible for building modular sequence-to-sequence models. Its key features include modularity with different parameter sharing strategies and adapters, useful tools such as  automatic configure generation, and hyper-parameter optimization in scalable multilingual training.</p>
+</div>
+<div class="section" id="are-there-any-specific-use-cases-or-domains-where-mammoth-is-particularly-well-suited">
+<h2>Are there any specific use cases or domains where MAMMOTH is particularly well-suited?<a class="headerlink" href="#are-there-any-specific-use-cases-or-domains-where-mammoth-is-particularly-well-suited" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH can be use for training neural machine translation models from scratch using data in any domains. It is particularly well-suited for massively multilingual scenario.</p>
+</div>
+<div class="section" id="what-unique-approaches-or-algorithms-does-mammoth-uses">
+<h2>What unique approaches or algorithms does MAMMOTH uses?<a class="headerlink" href="#what-unique-approaches-or-algorithms-does-mammoth-uses" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH uses the transformer-based sequence-to-sequence model. It adopts modular neural architectures with flexible sharing mechanisms.</p>
+</div>
+<div class="section" id="what-is-the-development-status-of-mammoth-and-are-there-plans-for-future-enhancements-or-features">
+<h2>What is the development status of MAMMOTH, and are there plans for future enhancements or features?<a class="headerlink" href="#what-is-the-development-status-of-mammoth-and-are-there-plans-for-future-enhancements-or-features" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH is under active development now. We are testing MAMMOTH in massively multilingual setting, and plan to improve the modularity by adding support for different adapter networks, and consider sparse architectures with mixture-of-expert.</p>
+</div>
+<div class="section" id="how-can-users-contribute-to-the-development-of-mammoth-or-report-issues-with-the-repository-and-documentation">
+<h2>How can users contribute to the development of MAMMOTH or report issues with the repository and documentation?<a class="headerlink" href="#how-can-users-contribute-to-the-development-of-mammoth-or-report-issues-with-the-repository-and-documentation" title="Permalink to this headline">¶</a></h2>
+<p>As a open-source project, we love contributions from the community. Users can refer to <a class="reference internal" href="CONTRIBUTING.html"><span class="doc">CONTRIBUTING.md</span></a> for details.</p>
+</div>
+</div>
+<div class="section" id="mammoth-and-opennmt">
+<h1>MAMMOTH and OpenNMT<a class="headerlink" href="#mammoth-and-opennmt" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="what-the-relationship-between-mammoth-and-the-original-opennmt-project">
+<h2>What the relationship between MAMMOTH and the original OpenNMT project?<a class="headerlink" href="#what-the-relationship-between-mammoth-and-the-original-opennmt-project" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH build upon OpenNMT-py - the PyTorch version of OpenNMT project.</p>
+</div>
+<div class="section" id="how-does-mammoth-leverage-the-capabilities-of-opennmt-while-introducing-its-own-innovations">
+<h2>How does MAMMOTH leverage the capabilities of OpenNMT while introducing its own innovations?<a class="headerlink" href="#how-does-mammoth-leverage-the-capabilities-of-opennmt-while-introducing-its-own-innovations" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH chooses PyTorch-based OpenNMT, which allows it to fully leverage the capabilities of OpenNMT and PyTorch ecosystem to enable user friendly development.</p>
+</div>
+<div class="section" id="what-are-the-modifications-that-mammoth-has-made-to-opennmt-py">
+<h2>What are the modifications that MAMMOTH has made to OpenNMT-py?<a class="headerlink" href="#what-are-the-modifications-that-mammoth-has-made-to-opennmt-py" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH improves OpenNMT-py to enable more flexible modularity.</p>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="config_config.html" class="btn btn-neutral float-right" title="Config-config tool" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="ref.html" class="btn btn-neutral float-left" title="References" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2023, HelsinkiNLP
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

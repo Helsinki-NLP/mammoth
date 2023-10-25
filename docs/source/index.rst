@@ -7,14 +7,20 @@ Contents
 
       main.md
       quickstart.md
-      install.md
       CONTRIBUTING.md
       ref.rst
+
+.. toctree::
+      :caption: Frequently Asked Questions
+      :maxdepth: 2
+
+      FAQ.md
 
 .. toctree::
       :caption: MAMMOTH features
       :maxdepth: 2
 
+      modular_model.md
       config_config.md
       attention_bridges.md
 
@@ -22,6 +28,7 @@ Contents
       :caption: Tutorials
       :maxdepth: 2
 
+      install.md
       prepare_data.md
       examples/Translation.md
 

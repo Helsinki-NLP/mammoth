@@ -1,6 +1,6 @@
 # Contributors
 
-OpenNMT-py is a community developed project and we love developer contributions.
+MAMMOTH, built on top of OpenNMT-py, is a community developed project and we love developer contributions.
 
 ## Guidelines
 Before sending a PR, please do this checklist first:

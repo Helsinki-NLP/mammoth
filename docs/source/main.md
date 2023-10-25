@@ -24,6 +24,9 @@ This project is based on [OpenNMT V2](https://opennmt.net).
 When using OpenNMT-py for research please cite the
 [OpenNMT technical report](https://doi.org/10.18653/v1/P17-4012)
 
+We published [FoTraNMT](https://github.com/Helsinki-NLP/FoTraNMT) the ancestor of MAMMOTH, when using MAMMOTH for research, please cite [Boggia et al. (2023)](https://aclanthology.org/2023.nodalida-1.24).
+
+
 ```
 @inproceedings{opennmt,
   author    = {Guillaume Klein and
@@ -36,5 +39,23 @@ When using OpenNMT-py for research please cite the
   year      = {2017},
   url       = {https://doi.org/10.18653/v1/P17-4012},
   doi       = {10.18653/v1/P17-4012}
+}
+
+@inproceedings{boggia-etal-2023-dozens,
+    title = "Dozens of Translation Directions or Millions of Shared Parameters? Comparing Two Types of Multilinguality in Modular Machine Translation",
+    author = {Boggia, Michele  and
+      Gr{\"o}nroos, Stig-Arne  and
+      Loppi, Niki  and
+      Mickus, Timothee  and
+      Raganato, Alessandro  and
+      Tiedemann, J{\"o}rg  and
+      V{\'a}zquez, Ra{\'u}l},
+    booktitle = "Proceedings of the 24th Nordic Conference on Computational Linguistics (NoDaLiDa)",
+    month = may,
+    year = "2023",
+    address = "T{\'o}rshavn, Faroe Islands",
+    publisher = "University of Tartu Library",
+    url = "https://aclanthology.org/2023.nodalida-1.24",
+    pages = "238--247"
 }
 ```

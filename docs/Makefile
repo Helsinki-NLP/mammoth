@@ -4,7 +4,7 @@
 # You can set these variables from the command line.
 SPHINXOPTS    =
 SPHINXBUILD   = python3 -msphinx
-SPHINXPROJ    = OpenNMT-py
+SPHINXPROJ    = mammoth
 SOURCEDIR     = source
 BUILDDIR      = build
 

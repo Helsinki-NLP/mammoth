@@ -12,6 +12,12 @@ Contents
       ref.rst
 
 .. toctree::
+      :caption: Frequently Asked Questions
+      :maxdepth: 2
+
+      FAQ.md
+
+.. toctree::
       :caption: MAMMOTH features
       :maxdepth: 2
 

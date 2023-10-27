@@ -180,18 +180,23 @@ def train(opt):
     global_task_queue_manager = TaskQueueManager.from_opt(opt, world_context)
 
     vocab_size = {'src': opt.src_vocab_size or None, 'tgt': opt.tgt_vocab_size or None}
-    for side in ('src', 'tgt'):
-        for lang in global_task_queue_manager.get_langs(side):
-            vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
-            # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
-            vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
     # initialize data states
     checkpoint = None
     if opt.train_from:
         checkpoint = load_checkpoint(ckpt_path=opt.train_from)
         data_state = checkpoint.get('data_state', dict())
+        # load vocabs from frame
+        logger.info('Loading vocabs from frame')
+        vocabs_dict = checkpoint.get('vocab')
+        # ToDo: check id there is a new task and create necessary vocabs
     else:
         data_state = {task.corpus_id: {'indices': 0, 'buckets': None} for task in global_task_queue_manager.get_tasks()}
+        # initialize vocabs
+        for side in ('src', 'tgt'):
+            for lang in global_task_queue_manager.get_langs(side):
+                vocab_path = opt.__getattribute__(f'{side}_vocab')[lang]
+                # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
+                vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
 
     train_process = partial(single_main, vocabs_dict=vocabs_dict, data_state=data_state)
 

@@ -32,7 +32,7 @@ class DataOptsCheckerMixin(object):
         opts.adapters = adapter_opts
 
     @classmethod
-    def _validate_data(cls, opts):
+    def _validate_tasks(cls, opts):
         """Parse tasks/language-pairs/corpora specified in data field of YAML file."""
         default_transforms = opts.transforms
         if len(default_transforms) != 0:
@@ -159,7 +159,7 @@ class DataOptsCheckerMixin(object):
 
     @classmethod
     def _get_all_transform(cls, opts):
-        """Should only called after `_validate_data`."""
+        """Should only called after `_validate_tasks`."""
         all_transforms = set(opts.transforms)
         for cname, corpus in opts.tasks.items():
             _transforms = set(corpus['transforms'])
@@ -237,7 +237,7 @@ class DataOptsCheckerMixin(object):
                 opts.save_data
             ), "-save_data should be set if \
                 want save samples."
-        cls._validate_data(opts)
+        cls._validate_tasks(opts)
         cls._get_all_transform(opts)
         cls._validate_transforms_opts(opts)
         cls._validate_fields_opts(opts, build_vocab_only=build_vocab_only)
@@ -259,6 +259,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         super(ArgumentParser, self).__init__(
             config_file_parser_class=config_file_parser_class, formatter_class=formatter_class, **kwargs
         )
+        self.translation = False
 
     @classmethod
     def defaults(cls, *args):
@@ -271,8 +272,11 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
     def parse_known_args(self, *args, strict=True, **kwargs):
         opts, unknown = super().parse_known_args(*args, **kwargs)
+        strict = strict and not self.translation
         if strict and unknown:
             raise ValueError(f'unknown arguments provided:\n{unknown}')
+        if self.translation:
+            unknown = []
         return opts, unknown
 
     @classmethod
@@ -374,5 +378,3 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         # It comes from training
         # TODO: needs to be added as inference opts
         opts.share_vocab = False
-
-        opts.stack = yaml.safe_load(opts.stack)

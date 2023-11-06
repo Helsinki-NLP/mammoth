@@ -8,41 +8,37 @@ from mammoth.transforms import get_transforms_cls, make_transforms, TransformPip
 
 import mammoth.opts as opts
 from mammoth.distributed import TaskSpecs
+from mammoth.distributed.tasks import get_adapter_ids
 from mammoth.utils.parse import ArgumentParser
 
 
 def translate(opts):
+    ArgumentParser.validate_prepare_opts(opts)
     ArgumentParser.validate_translate_opts(opts)
-    ArgumentParser._get_all_transform_translate(opts)
-    ArgumentParser._validate_transforms_opts(opts)
     ArgumentParser.validate_translate_opts_dynamic(opts)
     logger = init_logger(opts.log_file)
 
-    encoder_adapter_ids = set()
-    for layer_stack_idx, stack in enumerate(opts.stack['encoder']):
-        if 'adapters' in stack:
-            for group_id, sub_id in stack['adapters']:
-                encoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
-    decoder_adapter_ids = set()
-    for layer_stack_idx, stack in enumerate(opts.stack['decoder']):
-        if 'adapters' in stack:
-            for group_id, sub_id in stack['adapters']:
-                decoder_adapter_ids.add((layer_stack_idx, group_id, sub_id))
-
-    logger.info(
-        'It is ok that src_vocab and tgt_vocab are None here. '
-        'The vocabs are separately loaded in model_builder.'
-    )
+    corpus_id = opts.task_id
+    corpus_opts = opts.tasks[corpus_id]
+    src_lang, tgt_lang = corpus_opts['src_tgt'].split('-', 1)
+    encoder_id = corpus_opts.get('enc_sharing_group', [src_lang])
+    decoder_id = corpus_opts.get('dec_sharing_group', [tgt_lang])
+    if 'adapters' in corpus_opts:
+        encoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'encoder')
+        decoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'decoder')
+    else:
+        encoder_adapter_ids = None
+        decoder_adapter_ids = None
     task = TaskSpecs(
         node_rank=None,
         local_rank=None,
-        src_lang=opts.src_lang,
-        tgt_lang=opts.tgt_lang,
-        encoder_id=[stack['id'] for stack in opts.stack['encoder']],
-        decoder_id=[stack['id'] for stack in opts.stack['decoder']],
-        corpus_id='trans',
-        weight=1,
-        corpus_opts=dict(),
+        src_lang=src_lang,
+        tgt_lang=tgt_lang,
+        encoder_id=encoder_id,
+        decoder_id=decoder_id,
+        corpus_id=corpus_id,
+        weight=1.0,
+        corpus_opts=corpus_opts,
         src_vocab=None,
         tgt_vocab=None,
         encoder_adapter_ids=encoder_adapter_ids,
@@ -85,10 +81,10 @@ def translate(opts):
 
 def _get_parser():
     parser = ArgumentParser(description='translate.py')
+    parser.translation = True
 
-    opts.config_opts(parser)
+    opts.dynamic_prepare_opts(parser)
     opts.translate_opts(parser, dynamic=True)
-    opts.build_bilingual_model(parser)
     return parser
 
 

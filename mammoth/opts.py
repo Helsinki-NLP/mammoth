@@ -1185,13 +1185,10 @@ def translate_opts(parser, dynamic=False):
         "Necessary for models whose output layers can assign "
         "zero probability.",
     )
-    group.add('--lang_pair', '-lang_pair', help="language pair to translate")
+    group.add('--task_id', '-task_id', help="Task id to determine components to load for translation")
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text", help="Type of the source input. Options: [text].")
-
-    #    group.add('--lang_pair', '-lang_pair',
-    #              help="language pair to translate")
 
     group.add('--src', '-src', required=True, help="Source sequence to decode (one line per sequence)")
     group.add(
@@ -1241,53 +1238,6 @@ def translate_opts(parser, dynamic=False):
     )
     group.add('--gpu', '-gpu', type=int, default=-1, help="Device to run on")
 
-    if dynamic:
-        group.add(
-            "-transforms",
-            "--transforms",
-            default=[],
-            nargs="+",
-            choices=AVAILABLE_TRANSFORMS.keys(),
-            help="Default transform pipeline to apply to data.",
-        )
-
-        # Adding options related to Transforms
-        _add_dynamic_transform_opts(parser)
-
-        group.add(
-            "--src_prefix",
-            "-src_prefix",
-            default="",
-            help="The encoder prefix, i.e. language selector token",
-        )
-        group.add(
-            "--tgt_prefix",
-            "-tgt_prefix",
-            default="",
-            help="The decoder prefix (FIXME: does not work, but must be set nevertheless)",
-        )
-
-
-def build_bilingual_model(parser):
-    """options for modular translation"""
-    group = parser.add_argument_group("Source and Target Languages")
-    group.add(
-        "--src_lang",
-        "-src_lang",
-        required=True,
-        help="The 2-character source language code",
-    )
-    group.add(
-        "--tgt_lang",
-        "-tgt_lang",
-        required=True,
-        help="The 2-character target language code",
-    )
-    group.add(
-        "--stack",
-        required=True,
-        help="The stack of modules to use. Use a yaml conf, for your own sanity"
-    )
     group.add(
         "--output_model",
         "-output_model",

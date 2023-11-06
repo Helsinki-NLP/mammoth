@@ -35,7 +35,7 @@ def build_translator(opts, task, report_score=True, logger=None, out_file=None):
     )
     if logger:
         logger.info(str(task))
-    vocabs, model, model_opts = load_test_model(opts)
+    vocabs, model, model_opts = load_test_model(opts, task)
 
     scorer = mammoth.translate.GNMTGlobalScorer.from_opts(opts)
 
@@ -290,7 +290,7 @@ class Inference(object):
             ignore_when_blocking=set(opts.ignore_when_blocking),
             replace_unk=opts.replace_unk,
             ban_unk_token=opts.ban_unk_token,
-            tgt_prefix=opts.tgt_prefix,
+            tgt_prefix=task.corpus_opts['tgt_prefix'],
             phrase_table=opts.phrase_table,
             data_type=opts.data_type,
             verbose=opts.verbose,

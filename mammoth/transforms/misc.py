@@ -43,20 +43,7 @@ class PrefixTransform(Transform):
     def warm_up(self, vocabs=None):
         """Warm up to get prefix dictionary."""
         super().warm_up(None)
-        # TODO: The following try/except is a hack to work around the different
-        # structure of opts during training vs translation, and the fact the transform
-        # does not know whether it is being warmed up for training or translation.
-        # This is most elegantly fixed by redesigning and unifying the formats of opts.
-        try:
-            # This should succeed during training
-            self.prefix_dict = self.get_prefix_dict(self.opts)
-        except AttributeError:
-            # Normal during translation
-            src_prefix = self.opts.src_prefix
-            tgt_prefix = self.opts.tgt_prefix
-            self.prefix_dict = {
-                'trans': {'src': src_prefix, 'tgt': tgt_prefix}
-            }
+        self.prefix_dict = self.get_prefix_dict(self.opts)
 
     def _prepend(self, example, prefix):
         """Prepend `prefix` to `tokens`."""
@@ -68,19 +55,14 @@ class PrefixTransform(Transform):
     def apply(self, example, is_train=False, stats=None, **kwargs):
         """Apply prefix prepend to example.
 
-        Should provide `corpus_name` to get correspond prefix.
+        Should provide `corpus_name` to get corresponding prefix.
         """
-        if is_train:
-            corpus_name = kwargs.get('corpus_name', None)
-            if corpus_name is None:
-                raise ValueError('corpus_name is required.')
-            corpus_prefix = self.prefix_dict.get(corpus_name, None)
-            if corpus_prefix is None:
-                raise ValueError(f'prefix for {corpus_name} does not exist.')
-        else:
-            corpus_prefix = self.prefix_dict.get('trans', None)
-            if corpus_prefix is None:
-                raise ValueError('failed to set prefixes for translation')
+        corpus_name = kwargs.get('corpus_name', None)
+        if corpus_name is None:
+            raise ValueError('corpus_name is required.')
+        corpus_prefix = self.prefix_dict.get(corpus_name, None)
+        if corpus_prefix is None:
+            raise ValueError(f'prefix for {corpus_name} does not exist.')
         return self._prepend(example, corpus_prefix)
 
     def _repr_args(self):

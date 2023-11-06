@@ -5,7 +5,7 @@ from collections import OrderedDict, namedtuple, Counter
 from dataclasses import dataclass
 from itertools import cycle, islice
 from pprint import pformat
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Tuple
 
 import numpy as np
 import torch
@@ -138,8 +138,8 @@ class TaskSpecs():
     corpus_opts: dict
     src_vocab: Any  # FIXME: type
     tgt_vocab: Any
-    encoder_adapter_ids: List[str]
-    decoder_adapter_ids: List[str]
+    encoder_adapter_ids: List[Tuple[int, str, str]]
+    decoder_adapter_ids: List[Tuple[int, str, str]]
 
     def get_serializable_metadata(self):
         """

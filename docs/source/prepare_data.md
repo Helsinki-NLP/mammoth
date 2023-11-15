@@ -1,9 +1,71 @@
 
 # Prepare Data
 
-## Tatoeba Challenge
+## Europarl
 
-TODO
+### Step 1: Download the data
+[Europarl parallel corpus](https://www.statmt.org/europarl/) is a multilingual resource extracted from European Parliament proceedings and contains texts in 21 European languages. Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or 
+download the processed data by us:
+```bash
+wget https://mammoth101.a3s.fi/europarl.tar.gz
+```
+
+We use a SentencePiece model trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
+```bash
+# Download the SentencePiece model
+wget https://mammoth101.a3s.fi/opusTC.mul.64k.spm
+# Download the vocabulary
+wget https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt
+```
+
+
+### Step 2: Tokenization
+Then, read parallel text data, processes it, and generate output files for training and validation sets. 
+Here's a high-level summary of the main processing steps. For each language in 'langs,' 
+- read parallel data files.
+- clean the data by removing empty lines.
+- shuffle the data randomly.
+- tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.
+
+We use a positional argument 'lang' that can accept one or more values, for specifying the languages (e.g., `bg` and `cs` as used in Europarl) to process.
+
+You're free to skip this step if you directly download the processed data.
+
+```python
+import argparse
+import random
+
+import tqdm
+import sentencepiece as sp
+
+parser = argparse.ArgumentParser()
+parser.add_argument('lang', nargs='+')
+langs = parser.parse_args().lang
+
+sp_path = 'vocab/opusTC.mul.64k.spm'
+spm = sp.SentencePieceProcessor(model_file=sp_path)
+
+for lang in tqdm.tqdm(langs):
+    en_side_in = f'{lang}-en/europarl-v7.{lang}-en.en'
+    xx_side_in = f'{lang}-en/europarl-v7.{lang}-en.{lang}'
+    with open(xx_side_in) as xx_stream, open(en_side_in) as en_stream:
+        data = zip(map(str.strip, xx_stream), map(str.strip, en_stream))
+        data = [(xx, en) for xx, en in tqdm.tqdm(data, leave=False, desc=f'read {lang}') if xx and en] # drop empty lines
+        random.shuffle(data)
+    en_side_out = f'{lang}-en/valid.{lang}-en.en.sp'
+    xx_side_out = f'{lang}-en/valid.{lang}-en.{lang}.sp'
+    with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
+        for xx, en in tqdm.tqdm(data[:1000], leave=False, desc=f'valid {lang}'):
+            print(*spm.encode(xx, out_type=str), file=xx_stream)
+            print(*spm.encode(en, out_type=str), file=en_stream)
+    en_side_out = f'{lang}-en/train.{lang}-en.en.sp'
+    xx_side_out = f'{lang}-en/train.{lang}-en.{lang}.sp'
+    with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
+        for xx, en in tqdm.tqdm(data[1000:], leave=False, desc=f'train {lang}'):
+            print(*spm.encode(xx, out_type=str), file=xx_stream)
+            print(*spm.encode(en, out_type=str), file=en_stream)
+```
+
 
 ## OPUS 100 
 To get started, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/opus-100.php)

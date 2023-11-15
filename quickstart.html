@@ -27,7 +27,6 @@
         <script src="_static/language_data.js"></script>
         <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-        <script src="https://unpkg.com/mermaid@8.4.8/dist/mermaid.min.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -90,6 +89,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#step-0-install-mammoth">Step 0: Install mammoth</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-start-training">Step 2: Start training</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
@@ -204,7 +204,20 @@ pip3<span class="w"> </span>install<span class="w"> </span><span class="nv">sent
 </div>
 <div class="section" id="step-1-prepare-the-data">
 <h2>Step 1: Prepare the data<a class="headerlink" href="#step-1-prepare-the-data" title="Permalink to this headline">¶</a></h2>
-<p>For example, OPUS100 following the <a class="reference internal" href="prepare_data.html"><span class="doc">tutorial</span></a></p>
+<p>Prepare the data for training. You can refer to the data preparation <a class="reference internal" href="prepare_data.html"><span class="doc">tutorial</span></a> for more details.</p>
+</div>
+<div class="section" id="step-2-start-training">
+<h2>Step 2: Start training<a class="headerlink" href="#step-2-start-training" title="Permalink to this headline">¶</a></h2>
+<p>You will need to configure your training settings. We recommend our <a class="reference internal" href="config_config.html"><span class="doc">automatic configuration generation tool</span></a> for generating your configurations.
+Then launch the training script, for example, through the Slurm manager, via:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-u<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="w"> </span>--node_rank<span class="w"> </span><span class="nv">$SLURM_NODEID</span><span class="w"> </span>-u<span class="w"> </span><span class="si">${</span><span class="nv">PATH_TO_MAMMOTH</span><span class="si">}</span>/train.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-config<span class="w"> </span><span class="si">${</span><span class="nv">CONFIG_DIR</span><span class="si">}</span>/your_config.yml<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-save_model<span class="w"> </span><span class="si">${</span><span class="nv">SAVE_DIR</span><span class="si">}</span>/models/<span class="si">${</span><span class="nv">EXP_ID</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-master_port<span class="w"> </span><span class="m">9974</span><span class="w"> </span>-master_ip<span class="w"> </span><span class="nv">$SLURMD_NODENAME</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-tensorboard<span class="w"> </span>-tensorboard_log_dir<span class="w"> </span><span class="si">${</span><span class="nv">LOG_DIR</span><span class="si">}</span>/<span class="si">${</span><span class="nv">EXP_ID</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>A complete example of training on the Europarl dataset is available at <a class="reference internal" href="examples/train_mammoth_101.html"><span class="doc">MAMMOTH101</span></a>.</p>
 </div>
 </div>
 

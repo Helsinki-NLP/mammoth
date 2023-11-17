@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Modular Model &mdash; MAMMOTH  documentation</title>
+  <title>Component-level Modularity &mdash; MAMMOTH  documentation</title>
   
 
   
@@ -27,7 +27,6 @@
         <script src="_static/language_data.js"></script>
         <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
         <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-        <script src="https://unpkg.com/mermaid@8.4.8/dist/mermaid.min.js"></script>
     
     <script type="text/javascript" src="_static/js/theme.js"></script>
 
@@ -39,7 +38,7 @@
   <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Config-config tool" href="config_config.html" />
+    <link rel="next" title="Config-config Tool" href="config_config.html" />
     <link rel="prev" title="About MAMMOTH" href="FAQ.html" /> 
 </head>
 
@@ -98,15 +97,23 @@
 </ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul class="current">
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Modular Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config tool</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Component-level Modularity</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#anatomy-of-parameter-sharing">Anatomy of Parameter Sharing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#flexible-modularity">Flexible Modularity</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#bridges-and-structures-for-sharing">Bridges and Structures for Sharing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#custom-model-parallelism">Custom Model Parallelism</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Train your MAMMOTH model 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -167,7 +174,7 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>Modular Model</li>
+      <li>Component-level Modularity</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -186,9 +193,36 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
             
-  <div class="section" id="modular-model">
-<h1>Modular Model<a class="headerlink" href="#modular-model" title="Permalink to this headline">¶</a></h1>
-<p>MAMMOTH is a modular framework for machine translation that offers flexibility in designing different sharing schemes for its modules. Let’s break down the key aspects and features mentioned:</p>
+  <div class="section" id="component-level-modularity">
+<h1>Component-level Modularity<a class="headerlink" href="#component-level-modularity" title="Permalink to this headline">¶</a></h1>
+<p>Building a scalable modular Neural Machine Translation (mNMT) system involves considering various features to ensure flexibility, efficiency, and ease of expansion.
+MAMMOTH allows for flexible parameter sharing among modules. This includes sharing at different levels such as word embeddings, encoder states, or attention mechanisms.
+It implements efficient GPU allocation strategies to make the most of available hardware resources. This involves optimizing the distribution of model components across GPUs, minimizing data transfer between GPUs, and leveraging parallel processing capabilities for training and inference.</p>
+<p>MAMMOTH offers component-level modularity for machine translation and flexibility in designing different sharing schemes for its modules.
+The toolkit focuses on architectures where modular components can be
+defined a priori and operate as separable units to enable flexible modular configuration.
+Each task definition must explicitly state the sequence of modules to be used for the encoders and decoders (or “sharing groups”).</p>
+<div class="section" id="anatomy-of-parameter-sharing">
+<h2>Anatomy of Parameter Sharing<a class="headerlink" href="#anatomy-of-parameter-sharing" title="Permalink to this headline">¶</a></h2>
+<p>The trichotomy of parameter sharing is (1) full sharing, (2) no sharing, and (3) partial sharing (or everything in between).
+Partial sharing includes:</p>
+<ul class="simple">
+<li><p>Transversal, e.g., <a class="reference external" href="https://aclanthology.org/2022.eamt-1.12/">Purason &amp; Tättar (2022)</a></p></li>
+<li><p>Longitudinal, e.g., <a class="reference external" href="https://aclanthology.org/2021.acl-long.25/">Lin et al. (2021)</a></p></li>
+<li><p>Embeddings or vocab hacks, .e.g., <a class="reference external" href="https://aclanthology.org/Q17-1024/">Johnson et al. (2017)</a>, <a class="reference external" href="https://aclanthology.org/2018.iwslt-1.8/">Lakew et al. (2018)</a>, and <a class="reference external" href="https://aclanthology.org/2020.emnlp-main.214/">Chronopoulou et al. (2020)</a></p></li>
+</ul>
+<p>The training process is organized into a series of smaller “tasks,” each of which is characterized by distinct attributes to enhance modularity and efficiency.
+We break down mNMT training into a series of smaller “tasks”</p>
+<ul class="simple">
+<li><p>A task requires specific modules</p></li>
+<li><p>A task is done on a specific device</p></li>
+<li><p>A task corresponds to a specific (parallel) corpus</p></li>
+</ul>
+<p>A centralized manager handles tasks synchronization.
+This manager oversees the parallel execution of tasks, coordinating the flow of information between different modules, devices, and corpora to ensure a cohesive and synchronized training process.</p>
+<div class="section" id="flexible-modularity">
+<h3>Flexible Modularity<a class="headerlink" href="#flexible-modularity" title="Permalink to this headline">¶</a></h3>
+<p>Let’s break down the key aspects of modularity by design:</p>
 <ol class="simple">
 <li><p><strong>Depth of Encoder &amp; Decoder</strong>:</p>
 <ul class="simple">
@@ -196,23 +230,16 @@
 <li><p><strong>Deep-enc-shallow-dec</strong>: The encoder is deep, while the decoder is relatively shallow.</p></li>
 </ul>
 </li>
-<li><p><strong>Target Language Selection Token</strong>:</p>
-<ul class="simple">
-<li><p>There is an option to include or exclude a target language selection token in the architecture.</p></li>
-</ul>
-</li>
 <li><p><strong>Layerwise Parameter Sharing Schemes</strong>:</p>
 <ul class="simple">
-<li><p><strong>Fully Shared Encoder and Fully Shared Decoder (Baseline)</strong>: Both the encoder and decoder have shared parameters, meaning they are common across all languages or translation pairs.</p></li>
+<li><p><strong>Fully Shared Encoder and Fully Shared Decoder</strong>: Both the encoder and decoder have shared parameters, meaning they are common across all languages or translation pairs.</p></li>
 <li><p><strong>Fully Shared Encoder and Target-Specific Decoder</strong>: The encoder is shared, but each target language has its own decoder.</p></li>
-<li><p><strong>Apple-Style Learning Language-specific Layers</strong>: The encoder contains both source and target-specific layers, which suggests a more intricate sharing pattern.</p></li>
-<li><p><strong>Neural Architecture Search</strong>: Potentially, a method to automatically discover optimal sharing patterns.</p></li>
-<li><p><strong>Adapter-Like Low-Rank Residual Layers</strong>: This implies the use of adapter-like layers with low-rank residual connections, which can facilitate adaptation for different languages or translation tasks.</p></li>
+<li><p><strong>Apple-Style Learning Language-specific Layers</strong>: The encoder contains both source and target-specific layers.</p></li>
+<li><p><strong>Adapter-Like Low-Rank Residual Layers</strong>: To facilitate adaptation for different languages or translation tasks.</p></li>
 </ul>
 </li>
-<li><p><strong>Groups for Groupwise Shared Parameters</strong>:</p>
+<li><p><strong>Groupwise Sharing Schemes</strong>:</p>
 <ul class="simple">
-<li><p><strong>Not Used (Only Fully Shared and Language-Specific)</strong>: In this case, there are no specific parameter sharing groups beyond fully shared and language-specific ones.</p></li>
 <li><p><strong>Phylogenetic</strong>: Parameters could be shared among languages that are phylogenetically related, meaning they share a common ancestry.</p></li>
 <li><p><strong>Clustering Based on Typological Database</strong>: Sharing could be determined based on linguistic typological features or characteristics.</p></li>
 <li><p><strong>Clustering Based on Language Embeddings</strong>: This could involve sharing parameters based on the embeddings of languages in a common vector space.</p></li>
@@ -220,10 +247,58 @@
 </li>
 <li><p><strong>Subword Vocabularies</strong>:</p>
 <ul class="simple">
-<li><p><strong>Fully Shared vs Language-Specific</strong>: The system allows for a choice between using a fully shared subword vocabulary for all languages or using language-specific subword vocabularies, which can be beneficial for languages with unique linguistic characteristics.</p></li>
+<li><p><strong>Fully Shared</strong>: a fully shared subword vocabulary for all languages</p></li>
+<li><p><strong>Language-Specific</strong>: language-specific subword vocabularies for each separate language</p></li>
 </ul>
 </li>
 </ol>
+</div>
+</div>
+<div class="section" id="bridges-and-structures-for-sharing">
+<h2>Bridges and Structures for Sharing<a class="headerlink" href="#bridges-and-structures-for-sharing" title="Permalink to this headline">¶</a></h2>
+<p>Structures for the shared parameters consider two key approaches: fully-shared layers and adapters.</p>
+<ul class="simple">
+<li><p>Fully-shared layers</p>
+<ul>
+<li><p>Transformer layers</p></li>
+<li><p>Feed-forward layers</p></li>
+<li><p><a class="reference internal" href="attention_bridges.html"><span class="doc">Attention bridges</span></a>, shared across all tasks as the visual representation as below</p></li>
+</ul>
+</li>
+</ul>
+<p><img alt="attention-bridges" src="_images/attention-bridge.png" /></p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://aclanthology.org/D19-1165/">Adapters</a> for finer-grained sharing by adapting specific components</p></li>
+</ul>
+<p>By combining these structures, MAMMOTH achieves a balance between broad parameter sharing through fully-shared layers and targeted adaptability through adapters.</p>
+</div>
+<div class="section" id="custom-model-parallelism">
+<h2>Custom Model Parallelism<a class="headerlink" href="#custom-model-parallelism" title="Permalink to this headline">¶</a></h2>
+<p>MAMMOTH enables scaling-up a mNMT to a (very) large number of languages.
+It deals with the task2gpu allocation problem as illustrated below.</p>
+<p><img alt="task2gpu-allocation" src="_images/task2gpu-allocations.png" /></p>
+<p>It allow for custom model parallelism across nodes and GPUs to ensure optimal utilization of resources.
+Modules allocated in more than 1 GPU have to be synced at all times.
+The figure below illustrates the distribution of modules across multiple nodes:</p>
+<p><img alt="multi-model-parallelism" src="_images/multiple-nodes.png" /></p>
+<p>Custom model parallelism increases parameter sharing versatility, allowing for synchronization of modules in GPUs based on specific criteria. For example:</p>
+<ul class="simple">
+<li><p>AB layer synced in GPUs 1,3&amp;4</p></li>
+<li><p>Language-specific components synced as needed (e.g., EN-decoder in all GPUs)</p></li>
+<li><p>Language group-specific components also synced as needed (e.g., GER in GPUs 1,2&amp;3)</p></li>
+</ul>
+<p><img alt="Custom model parallelism increases param. sharing versatility" src="_images/single-node.png" /></p>
+<p>Custom model parallelism increases inference efficiency:</p>
+<ul class="simple">
+<li><p>All modules are saved independently, allowing for streamlined loading during inference.</p></li>
+<li><p>Lightweight inference is achieved by loading only the modules relevant to the translation task at hand (e.g., DE-&gt;FR).</p></li>
+</ul>
+<p><img alt="Custom model parallelism increases inference efficiency" src="_images/inference.png" /></p>
+<p>At training time, [^1]coder communication is based on layer stacks (and adapters).
+Gradients are broadcasted only for modules currently in use, optimizing communication and reducing computational overhead.</p>
+<p>In conclusion, the custom model parallelism in MAMMOTH is implemented to overcome the task-to-GPU allocation challenge, enhance parameter sharing versatility, and optimize both training and inference efficiency.</p>
+<p>[^1]: Thanks to CSC infrastructure</p>
+</div>
 </div>
 
 
@@ -234,7 +309,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="config_config.html" class="btn btn-neutral float-right" title="Config-config tool" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="config_config.html" class="btn btn-neutral float-right" title="Config-config Tool" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="FAQ.html" class="btn btn-neutral float-left" title="About MAMMOTH" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>

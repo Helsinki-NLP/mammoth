@@ -89,7 +89,8 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#step-0-install-mammoth">Step 0: Install mammoth</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-2-start-training">Step 2: Start training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-configurations">Step 2: Configurations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-3-start-training">Step 3: Start training</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
@@ -102,15 +103,15 @@
 </ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Modular Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Train your MAMMOTH model 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -206,10 +207,99 @@ pip3<span class="w"> </span>install<span class="w"> </span><span class="nv">sent
 <h2>Step 1: Prepare the data<a class="headerlink" href="#step-1-prepare-the-data" title="Permalink to this headline">¶</a></h2>
 <p>Prepare the data for training. You can refer to the data preparation <a class="reference internal" href="prepare_data.html"><span class="doc">tutorial</span></a> for more details.</p>
 </div>
-<div class="section" id="step-2-start-training">
-<h2>Step 2: Start training<a class="headerlink" href="#step-2-start-training" title="Permalink to this headline">¶</a></h2>
-<p>You will need to configure your training settings. We recommend our <a class="reference internal" href="config_config.html"><span class="doc">automatic configuration generation tool</span></a> for generating your configurations.
-Then launch the training script, for example, through the Slurm manager, via:</p>
+<div class="section" id="step-2-configurations">
+<h2>Step 2: Configurations<a class="headerlink" href="#step-2-configurations" title="Permalink to this headline">¶</a></h2>
+<p>You will need to configure your training settings.
+Below is a list of configuration examples:</p>
+<details>
+<summary>Task-specific encoders and decoders</summary><div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">train_bg-en</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bg-en</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">bg</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:0&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.bg-en.bg</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.bg-en.en</span>
+<span class="w">  </span><span class="nt">train_cs-en</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cs-en</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.cs</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.en</span>
+<span class="w">  </span><span class="nt">train_en-cs</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">en-cs</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.en</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.cs</span>
+
+<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
+<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</details><details>
+<summary>Arbitrarily shared layers in encoders and task-specific decoders</summary><div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">train_bg-en</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bg-en</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">bg</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:0&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.bg-en.bg</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.bg-en.en</span>
+<span class="w">  </span><span class="nt">train_cs-en</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cs-en</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.cs</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.en</span>
+<span class="w">  </span><span class="nt">train_en-cs</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">en-cs</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.en</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.cs</span>
+
+<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">4</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4</span><span class="p p-Indicator">]</span>
+<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">4</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</details><details>
+<summary>Non-modular multilingual system </summary><div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">train_bg-en</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all-all</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:0&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.bg-en.bg</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.bg-en.en</span>
+<span class="w">  </span><span class="nt">train_cs-en</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all-all</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.cs</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.en</span>
+<span class="w">  </span><span class="nt">train_en-cs</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all-all</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">all</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.en</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/train.cs-en.cs</span>
+
+<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
+<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</details><p>We recommend our <a class="reference internal" href="config_config.html"><span class="doc">automatic configuration generation tool</span></a> for generating your configurations.</p>
+</div>
+<div class="section" id="step-3-start-training">
+<h2>Step 3: Start training<a class="headerlink" href="#step-3-start-training" title="Permalink to this headline">¶</a></h2>
+<p>Finally, launch the training script, for example, through the Slurm manager, via:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-u<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="w"> </span>--node_rank<span class="w"> </span><span class="nv">$SLURM_NODEID</span><span class="w"> </span>-u<span class="w"> </span><span class="si">${</span><span class="nv">PATH_TO_MAMMOTH</span><span class="si">}</span>/train.py<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-config<span class="w"> </span><span class="si">${</span><span class="nv">CONFIG_DIR</span><span class="si">}</span>/your_config.yml<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-save_model<span class="w"> </span><span class="si">${</span><span class="nv">SAVE_DIR</span><span class="si">}</span>/models/<span class="si">${</span><span class="nv">EXP_ID</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>

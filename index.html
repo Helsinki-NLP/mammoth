@@ -96,15 +96,15 @@
 </ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Modular Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Train your MAMMOTH model 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -197,7 +197,8 @@
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-0-install-mammoth">Step 0: Install mammoth</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-2-start-training">Step 2: Start training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-2-configurations">Step 2: Configurations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-3-start-training">Step 3: Start training</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a><ul>
@@ -229,8 +230,13 @@
 <div class="toctree-wrapper compound">
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Modular Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config tool</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="modular_model.html#anatomy-of-parameter-sharing">Anatomy of Parameter Sharing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modular_model.html#bridges-and-structures-for-sharing">Bridges and Structures for Sharing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="modular_model.html#custom-model-parallelism">Custom Model Parallelism</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="config_config.html#command">Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="config_config.html#inputs">Inputs</a></li>
 <li class="toctree-l2"><a class="reference internal" href="config_config.html#usage">Usage</a></li>
@@ -259,7 +265,7 @@
 <li class="toctree-l2"><a class="reference internal" href="prepare_data.html#opus-100">OPUS 100</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Train your MAMMOTH model 101</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="examples/train_mammoth_101.html#step-0-download-the-data-and-sentencepiece-model">Step 0: Download the data and SentencePiece model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/train_mammoth_101.html#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/train_mammoth_101.html#step-3-configuration">Step 3: Configuration</a></li>

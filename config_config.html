@@ -8,7 +8,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <title>Config-config tool &mdash; MAMMOTH  documentation</title>
+  <title>Config-config Tool &mdash; MAMMOTH  documentation</title>
   
 
   
@@ -39,7 +39,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Attention Bridge" href="attention_bridges.html" />
-    <link rel="prev" title="Modular Model" href="modular_model.html" /> 
+    <link rel="prev" title="Component-level Modularity" href="modular_model.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -97,8 +97,8 @@
 </ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Modular Model</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Config-config tool</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Config-config Tool</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#command">Command</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#inputs">Inputs</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#input-yaml">Input yaml</a><ul>
@@ -150,7 +150,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Train your MAMMOTH model 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -211,7 +211,7 @@
     
       <li><a href="index.html">Docs</a> &raquo;</li>
         
-      <li>Config-config tool</li>
+      <li>Config-config Tool</li>
     
     
       <li class="wy-breadcrumbs-aside">
@@ -231,7 +231,7 @@
            <div itemprop="articleBody">
             
   <div class="section" id="config-config-tool">
-<h1>Config-config tool<a class="headerlink" href="#config-config-tool" title="Permalink to this headline">¶</a></h1>
+<h1>Config-config Tool<a class="headerlink" href="#config-config-tool" title="Permalink to this headline">¶</a></h1>
 <p>A meta-configuration tool, or config generator for MAMMOTH.</p>
 <p>The MAMMOTH configuration options have become unwieldy as complexity has increased.
 Especially the introduction of LayerStacks (the mechanism for dividing encoders and decoders into several subcomponents with different parameter sharing) and Adapters has made specifying parameters on the command line into a total nightmare, and even writing yaml configs by hand is cumbersome.
@@ -480,7 +480,7 @@ If a value is given both in the input yaml and on the command line, the command 
         <a href="attention_bridges.html" class="btn btn-neutral float-right" title="Attention Bridge" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="modular_model.html" class="btn btn-neutral float-left" title="Modular Model" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="modular_model.html" class="btn btn-neutral float-left" title="Component-level Modularity" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

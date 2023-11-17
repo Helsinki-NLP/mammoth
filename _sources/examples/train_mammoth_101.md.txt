@@ -1,5 +1,5 @@
 
-# Train your MAMMOTH model 101
+# Training MAMMOTH 101
 
 
 This example uses the [Europarl parallel corpus](https://www.statmt.org/europarl/) - a multilingual resource extracted from European Parliament proceedings, containing text in 21 European languages. If you use the data in your research, please cite the paper by Philipp Koehn, "Europarl: A Parallel Corpus for Statistical Machine Translation," presented at the MT Summit 2005.

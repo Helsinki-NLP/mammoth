@@ -1,4 +1,4 @@
-# Config-config tool
+# Config-config Tool
 
 A meta-configuration tool, or config generator for MAMMOTH.
 

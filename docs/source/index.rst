@@ -30,7 +30,7 @@ Contents
 
       install.md
       prepare_data.md
-      examples/Translation.md
+      examples/train_mammoth_101.md
 
 .. toctree::
       :caption: Scripts

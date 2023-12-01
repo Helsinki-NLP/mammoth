@@ -76,51 +76,51 @@ Here, we provide two configuration examples for training a dummy transformer mod
 <details>
 <summary>Single-node configuration</summary>
 
-```
+```yaml
 src_vocab:
-  'bg': path_to_vocabopusTC.mul.vocab.onmt
-  'cs': path_to_vocabopusTC.mul.vocab.onmt
-  'da': path_to_vocabopusTC.mul.vocab.onmt
-  'de': path_to_vocabopusTC.mul.vocab.onmt
-  'el': path_to_vocabopusTC.mul.vocab.onmt
-  'en': path_to_vocabopusTC.mul.vocab.onmt
-  'es': path_to_vocabopusTC.mul.vocab.onmt
-  'et': path_to_vocabopusTC.mul.vocab.onmt
-  'fi': path_to_vocabopusTC.mul.vocab.onmt
-  'fr': path_to_vocabopusTC.mul.vocab.onmt
-  'hu': path_to_vocabopusTC.mul.vocab.onmt
-  'it': path_to_vocabopusTC.mul.vocab.onmt
-  'lt': path_to_vocabopusTC.mul.vocab.onmt
-  'lv': path_to_vocabopusTC.mul.vocab.onmt
-  'nl': path_to_vocabopusTC.mul.vocab.onmt
-  'pl': path_to_vocabopusTC.mul.vocab.onmt
-  'pt': path_to_vocabopusTC.mul.vocab.onmt
-  'ro': path_to_vocabopusTC.mul.vocab.onmt
-  'sk': path_to_vocabopusTC.mul.vocab.onmt
-  'sl': path_to_vocabopusTC.mul.vocab.onmt
-  'sv': path_to_vocabopusTC.mul.vocab.onmt
+  'bg': path_to_vocab/opusTC.mul.vocab.onmt
+  'cs': path_to_vocab/opusTC.mul.vocab.onmt
+  'da': path_to_vocab/opusTC.mul.vocab.onmt
+  'de': path_to_vocab/opusTC.mul.vocab.onmt
+  'el': path_to_vocab/opusTC.mul.vocab.onmt
+  'en': path_to_vocab/opusTC.mul.vocab.onmt
+  'es': path_to_vocab/opusTC.mul.vocab.onmt
+  'et': path_to_vocab/opusTC.mul.vocab.onmt
+  'fi': path_to_vocab/opusTC.mul.vocab.onmt
+  'fr': path_to_vocab/opusTC.mul.vocab.onmt
+  'hu': path_to_vocab/opusTC.mul.vocab.onmt
+  'it': path_to_vocab/opusTC.mul.vocab.onmt
+  'lt': path_to_vocab/opusTC.mul.vocab.onmt
+  'lv': path_to_vocab/opusTC.mul.vocab.onmt
+  'nl': path_to_vocab/opusTC.mul.vocab.onmt
+  'pl': path_to_vocab/opusTC.mul.vocab.onmt
+  'pt': path_to_vocab/opusTC.mul.vocab.onmt
+  'ro': path_to_vocab/opusTC.mul.vocab.onmt
+  'sk': path_to_vocab/opusTC.mul.vocab.onmt
+  'sl': path_to_vocab/opusTC.mul.vocab.onmt
+  'sv': path_to_vocab/opusTC.mul.vocab.onmt
 tgt_vocab:
-  'bg': path_to_vocabopusTC.mul.vocab.onmt
-  'cs': path_to_vocabopusTC.mul.vocab.onmt
-  'da': path_to_vocabopusTC.mul.vocab.onmt
-  'de': path_to_vocabopusTC.mul.vocab.onmt
-  'el': path_to_vocabopusTC.mul.vocab.onmt
-  'en': path_to_vocabopusTC.mul.vocab.onmt
-  'es': path_to_vocabopusTC.mul.vocab.onmt
-  'et': path_to_vocabopusTC.mul.vocab.onmt
-  'fi': path_to_vocabopusTC.mul.vocab.onmt
-  'fr': path_to_vocabopusTC.mul.vocab.onmt
-  'hu': path_to_vocabopusTC.mul.vocab.onmt
-  'it': path_to_vocabopusTC.mul.vocab.onmt
-  'lt': path_to_vocabopusTC.mul.vocab.onmt
-  'lv': path_to_vocabopusTC.mul.vocab.onmt
-  'nl': path_to_vocabopusTC.mul.vocab.onmt
-  'pl': path_to_vocabopusTC.mul.vocab.onmt
-  'pt': path_to_vocabopusTC.mul.vocab.onmt
-  'ro': path_to_vocabopusTC.mul.vocab.onmt
-  'sk': path_to_vocabopusTC.mul.vocab.onmt
-  'sl': path_to_vocabopusTC.mul.vocab.onmt
-  'sv': path_to_vocabopusTC.mul.vocab.onmt
+  'bg': path_to_vocab/opusTC.mul.vocab.onmt
+  'cs': path_to_vocab/opusTC.mul.vocab.onmt
+  'da': path_to_vocab/opusTC.mul.vocab.onmt
+  'de': path_to_vocab/opusTC.mul.vocab.onmt
+  'el': path_to_vocab/opusTC.mul.vocab.onmt
+  'en': path_to_vocab/opusTC.mul.vocab.onmt
+  'es': path_to_vocab/opusTC.mul.vocab.onmt
+  'et': path_to_vocab/opusTC.mul.vocab.onmt
+  'fi': path_to_vocab/opusTC.mul.vocab.onmt
+  'fr': path_to_vocab/opusTC.mul.vocab.onmt
+  'hu': path_to_vocab/opusTC.mul.vocab.onmt
+  'it': path_to_vocab/opusTC.mul.vocab.onmt
+  'lt': path_to_vocab/opusTC.mul.vocab.onmt
+  'lv': path_to_vocab/opusTC.mul.vocab.onmt
+  'nl': path_to_vocab/opusTC.mul.vocab.onmt
+  'pl': path_to_vocab/opusTC.mul.vocab.onmt
+  'pt': path_to_vocab/opusTC.mul.vocab.onmt
+  'ro': path_to_vocab/opusTC.mul.vocab.onmt
+  'sk': path_to_vocab/opusTC.mul.vocab.onmt
+  'sl': path_to_vocab/opusTC.mul.vocab.onmt
+  'sv': path_to_vocab/opusTC.mul.vocab.onmt
 
 overwrite: False
 tasks:
@@ -805,7 +805,7 @@ early_stopping_criteria: accuracy
 <details>
 <summary>Multi-node configuration</summary>
 
-```
+```yaml
 
 src_vocab:
   'bg': path_to_vocab/opusTC.mul.vocab.onmt

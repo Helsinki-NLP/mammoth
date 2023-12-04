@@ -187,6 +187,10 @@ def add_translation_configs_args(parser):
     parser.add_argument('--zero_shot', action='store_true')
 
 
+def add_extra_fully_shared_hack_args(parser):
+    parser.add_argument('--joint_vocab', type=str, required=True, help='Path to joint vocab')
+
+
 def get_opts():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
@@ -229,6 +233,7 @@ def get_opts():
     parser_extra_cpu = subparsers.add_parser('extra_cpu')
     add_configs_args(parser_extra_cpu)
     parser_extra_fully_shared_hack = subparsers.add_parser('extra_fully_shared_hack')
+    add_extra_fully_shared_hack_args(parser_extra_fully_shared_hack)
     add_configs_args(parser_extra_fully_shared_hack)
     return parser.parse_args()
 
@@ -811,6 +816,10 @@ def extra_fully_shared_hack(opts):
 
         # src_tgt overridden with a dummy value
         task_opts['src_tgt'] = 'all-all'
+
+    # Override vocabs
+    opts.in_config[0]['src_vocab'] = {'all': opts.joint_vocab}
+    opts.in_config[0]['tgt_vocab'] = {'all': opts.joint_vocab}
 
 
 if __name__ == '__main__':

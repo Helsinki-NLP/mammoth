@@ -228,6 +228,8 @@ def get_opts():
     add_translation_configs_args(parser_config_all)
     parser_extra_cpu = subparsers.add_parser('extra_cpu')
     add_configs_args(parser_extra_cpu)
+    parser_extra_fully_shared_hack = subparsers.add_parser('extra_fully_shared_hack')
+    add_configs_args(parser_extra_fully_shared_hack)
     return parser.parse_args()
 
 
@@ -789,6 +791,28 @@ def extra_cpu(opts):
         del task_opts['node_gpu']
 
 
+def extra_fully_shared_hack(opts):
+    # Extra step: not included in config_all
+    # Modifies config to use the "all" language hack for a fully shared decoder
+    for task_opts in opts.in_config[0]['tasks'].values():
+        # Prefix transform to apply target language selection token
+        if 'prefix' not in task_opts['transforms']:
+            if task_opts['transforms'][-1] == 'filtertoolong':
+                # insert prefix before last filtertoolong
+                task_opts['transforms'].insert(-1, 'prefix')
+            else:
+                task_opts['transforms'].append('prefix')
+            task_src, task_tgt = task_opts['src_tgt'].split('-')
+            task_opts['src_prefix'] = f'<to_{task_src}>'
+            task_opts['tgt_prefix'] = ''
+
+        # decoder is fully shared
+        task_opts['dec_sharing_group'] = ['full']
+
+        # src_tgt overridden with a dummy value
+        task_opts['src_tgt'] = 'all-all'
+
+
 if __name__ == '__main__':
     init_logging()
     opts = get_opts()
@@ -808,6 +832,7 @@ if __name__ == '__main__':
             remove_temporary_keys,
             config_all,
             extra_cpu,
+            extra_fully_shared_hack,
         )
     }[opts.command]
     main(opts)

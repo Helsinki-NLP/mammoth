@@ -191,6 +191,10 @@ def add_extra_fully_shared_hack_args(parser):
     parser.add_argument('--joint_vocab', type=str, required=True, help='Path to joint vocab')
 
 
+def add_extra_copy_gpu_assignment_args(parser):
+    parser.add_argument('--copy_from', required=True, type=load_yaml, help='Config containing the desired assignments')
+
+
 def get_opts():
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='command')
@@ -235,6 +239,9 @@ def get_opts():
     parser_extra_fully_shared_hack = subparsers.add_parser('extra_fully_shared_hack')
     add_extra_fully_shared_hack_args(parser_extra_fully_shared_hack)
     add_configs_args(parser_extra_fully_shared_hack)
+    parser_extra_copy_gpu_assignment = subparsers.add_parser('extra_copy_gpu_assignment')
+    add_extra_copy_gpu_assignment_args(parser_extra_copy_gpu_assignment)
+    add_configs_args(parser_extra_copy_gpu_assignment)
     return parser.parse_args()
 
 
@@ -822,6 +829,17 @@ def extra_fully_shared_hack(opts):
     opts.in_config[0]['tgt_vocab'] = {'all': opts.joint_vocab}
 
 
+def extra_copy_gpu_assignment(opts):
+    tasks_in_current = set(opts.in_config[0]['tasks'].keys())
+    tasks_in_source = set(opts.copy_from[0]['tasks'].keys())
+    if not tasks_in_current == tasks_in_source:
+        missing_tasks = tasks_in_current - tasks_in_source
+        unused_tasks = tasks_in_source - tasks_in_current
+        raise Exception(f'Tasks do not match. Missing tasks: {missing_tasks}, Unused tasks: {unused_tasks}')
+    for task_key, task_opts in opts.in_config[0]['tasks'].items():
+        task_opts['node_gpu'] = opts.copy_from[0]['tasks'][task_key]['node_gpu']
+
+
 if __name__ == '__main__':
     init_logging()
     opts = get_opts()
@@ -842,6 +860,7 @@ if __name__ == '__main__':
             config_all,
             extra_cpu,
             extra_fully_shared_hack,
+            extra_copy_gpu_assignment,
         )
     }[opts.command]
     main(opts)

@@ -103,6 +103,10 @@ def _read_vocab_file(vocab_path, tag):
             has_count = (len(first_line) == 2 and first_line[-1].isdigit())
             if has_count:
                 vocab = [line.split(None, 1) for line in lines]
+                orig_len = len(vocab)
+                vocab = [tpl for tpl in vocab if len(tpl) == 2]
+                if len(vocab) != orig_len:
+                    logger.warning(f'Dropped invalid entries from {vocab_path}')
             else:
                 vocab = [line.strip().split()[0] for line in lines]
             return vocab, has_count

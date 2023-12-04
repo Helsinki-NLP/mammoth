@@ -12,6 +12,7 @@ from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
 from mammoth.distributed import broadcast_tensors
+from mammoth.distributed.communication import debug_cuda_mem
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
@@ -144,6 +145,7 @@ def main(
     else:
         # Initialize some data structures
         _ = task_queue_manager.get_distributed_groups()
+    debug_cuda_mem('after init distributed', torch.distributed.get_rank())
     enc, dec = model.count_parameters(log=logger.debug)
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
     logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))
@@ -156,6 +158,7 @@ def main(
         task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
     )
+    debug_cuda_mem('after optimizer', torch.distributed.get_rank())
 
     # Build model saver
     model_saver = build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context)

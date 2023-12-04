@@ -11,6 +11,14 @@ from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
 
 
+def debug_cuda_mem(name, rank):
+    logger.warning('rank {} cuda allocated {}: {}'.format(
+        rank,
+        name,
+        torch.cuda.memory_allocated(device=rank))
+    )
+
+
 def multi_init(opts, global_rank):
     dist_init_method = 'tcp://{master_ip}:{master_port}'.format(master_ip=opts.master_ip, master_port=opts.master_port)
 

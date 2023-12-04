@@ -18,6 +18,7 @@ import traceback
 
 from itertools import islice
 from mammoth.utils.logging import logger
+from mammoth.distributed.communication import debug_cuda_mem
 
 
 def iter_on_device(iterator, device_context):
@@ -281,6 +282,7 @@ class Trainer(object):
                 total_stats,
                 report_stats,
             )
+            debug_cuda_mem('after grad accum', torch.distributed.get_rank())
 
             # Note that all group ids are tuples, some with length 1
             for (layer_stack_index, encoder_id), (_, group) in self.my_encoder_groups.items():
@@ -334,6 +336,7 @@ class Trainer(object):
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
             self.optim.step()
+            debug_cuda_mem('after optim step', torch.distributed.get_rank())
             self.optim.zero_grad()
             for p in self.model.parameters():
                 if hasattr(p, 'has_grad'):
@@ -501,6 +504,7 @@ class Trainer(object):
                     outputs, attns = self.model(
                         src, tgt, src_lengths, bptt=bptt, with_align=self.with_align, metadata=metadata
                     )
+                    debug_cuda_mem('after forward', torch.distributed.get_rank())
                     bptt = True
 
                     # 3. Compute loss.
@@ -513,6 +517,7 @@ class Trainer(object):
                         trunc_start=j,
                         trunc_size=trunc_size,
                     )
+                    debug_cuda_mem('after loss', torch.distributed.get_rank())
                     # logger.info(loss)
 
                 try:

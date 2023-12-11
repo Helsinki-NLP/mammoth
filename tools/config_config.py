@@ -838,6 +838,9 @@ def extra_copy_gpu_assignment(opts):
         raise Exception(f'Tasks do not match. Missing tasks: {missing_tasks}, Unused tasks: {unused_tasks}')
     for task_key, task_opts in opts.in_config[0]['tasks'].items():
         task_opts['node_gpu'] = opts.copy_from[0]['tasks'][task_key]['node_gpu']
+    opts.in_config[0]['n_nodes'] = opts.copy_from[0]['n_nodes']
+    opts.in_config[0]['world_size'] = opts.copy_from[0]['world_size']
+    opts.in_config[0]['gpu_ranks'] = opts.copy_from[0]['gpu_ranks']
 
 
 if __name__ == '__main__':

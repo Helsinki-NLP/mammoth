@@ -640,6 +640,18 @@ def model_opts(parser):
         choices=['none', 'rmsnorm', 'layernorm'],
         help="""Use layer normalization after lin, simple and feedforward bridge layers""",
     )
+    group.add('--ab_final_norm', '-ab_final_norm', action='store_true', help='normalize AB output')
+    # group.add('--enc_final_norm', '-enc_final_norm', action='store_true', help='normalize enc output')
+    group.add(
+        '--ab_residual_connection_mode',
+        '-ab_residual_connection_mode',
+        type=str,
+        default='none',
+        choices=['none', 'same_size', 'average_uneven', 'average_all', 'exp_uneven', 'exp_all'],
+        help='apply residual connections & define algorithm for uneven input/output matrices',
+    )
+    group.add('--ab_zero_init', '-ab_zero_init', action='store_true', help='initilize AB params to 0')
+    group.add('--ab_final_pos_enc', '-ab_final_pos_enc', action='store_true', help='add positional encodings.')
 
     # adapter options are in a dict "adapters", and in the corpus options
     group = parser.add_argument_group("Adapters")

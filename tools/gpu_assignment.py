@@ -1,7 +1,10 @@
 import random
+import json
+import time
 from collections import defaultdict, Counter, namedtuple
 from functools import lru_cache
 from typing import Set, Dict, Tuple, Optional, Callable, List
+from tqdm import tqdm
 
 INTER_NODE_COST = 5
 INTRA_NODE_COST = 1
@@ -272,33 +275,30 @@ class AssignmentOptimizer:
 
     def best_swap_for(self, slot_a: GpuSlot, assignment, current_cost):
         costs = [(current_cost, slot_a)]
-        for i, slot_b in enumerate(self.gpu_slots):
+        for i, slot_b in enumerate(tqdm(self.gpu_slots, desc='best_swap_for', leave=False)):
             if slot_a.node == slot_b.node and slot_a.gpu == slot_b.gpu:
                 # No point swapping pairs already on the same device
                 continue
             proposal = assignment.swap(slot_a, slot_b, self)
             costs.append((self.cost(proposal), slot_b))
-            if i > 0 and i % 100 == 0:
-                print('.', end='', flush=True)
         costs = sorted(costs)
         best_cost, slot_b = costs[0]
         best_assignment = assignment.swap(slot_a, slot_b, self)
         return best_cost, best_assignment
 
     def swap_all_slots_once(self, assignment, current_cost):
-        for i, slot_a in enumerate(self.gpu_slots):
+        for i, slot_a in enumerate(tqdm(self.gpu_slots, desc='swap_all_slots_once', leave=False)):
             current_cost, assignment = self.best_swap_for(slot_a, assignment, current_cost)
-            print('o', end='', flush=True)
         return current_cost, assignment
 
     def optimize(self, assignment, current_cost, iterations=10, patience=1):
         prev_cost = None
         stalled = 0
         print(f'initial cost: {current_cost}', flush=True)
-        for i in range(iterations):
+        for i in tqdm(range(iterations), desc='iterations'):
             prev_cost = current_cost
             current_cost, assignment = self.swap_all_slots_once(assignment, current_cost)
-            print(f'iteration {i} cost: {current_cost}', flush=True)
+            print(f'\niteration {i} cost: {current_cost}', flush=True)
             if prev_cost == current_cost:
                 stalled += 1
             else:
@@ -306,7 +306,7 @@ class AssignmentOptimizer:
             if stalled > patience:
                 print('No improvement, finishing early', flush=True)
                 break
-        return current_cost, assignment
+        return current_cost, assignment, i
 
 
 def print_assignment(assignment, group_mapping, ready_to_start=None):
@@ -334,6 +334,7 @@ def optimize_gpu_assignment(
     lang_pairs: List[Tuple[str, str]],
     lang_to_group_mapping: Dict[str, str],
     lps_ready_to_start: Optional[Set[Tuple[str, str]]],
+    log_name: Optional[str] = None,
 ):
     optimizer = AssignmentOptimizer(
         n_nodes=n_nodes,
@@ -345,9 +346,28 @@ def optimize_gpu_assignment(
 
     initial = optimizer.initial_assignment(lang_pairs)
     initial_cost = optimizer.cost(initial)
-    best_cost, assignment = optimizer.optimize(initial, initial_cost)
+    start = time.time()
+    best_cost, assignment, iterations = optimizer.optimize(initial, initial_cost)
+    duration_s = time.time() - start
     print_assignment(assignment, lang_to_group_mapping, ready_to_start=lps_ready_to_start)
     print(f'assignment cost {best_cost}', flush=True)
+
+    if log_name:
+        with open('gpu_assignment_cost_log.jsonl', 'a') as fout:
+            record = {
+                'method': 'original',
+                'name': log_name,
+                'n_nodes': n_nodes,
+                'n_gpus_per_node': n_gpus_per_node,
+                'n_slots_per_gpu': n_slots_per_gpu,
+                'n_lps': len(lang_pairs),
+                'initial_cost': initial_cost,
+                'best_cost': best_cost,
+                'iterations': iterations,
+                'duration_s': duration_s,
+            }
+            json.dump(record, fout)
+            fout.write('\n')
     return assignment
 
 

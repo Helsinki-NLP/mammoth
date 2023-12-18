@@ -4,10 +4,12 @@ import random
 import yaml
 from itertools import product
 
+
 def create_langs(n_langs):
     langs = ['centric']
     langs.extend(["lang{:05d}".format(i) for i in range(2, n_langs + 1)])
     return langs
+
 
 def centric_pairs(langs):
     result = []
@@ -18,12 +20,14 @@ def centric_pairs(langs):
     result.append(('centric', 'centric'))
     return result
 
+
 def complete_language_pairs(langs, sparsity):
     if sparsity == 'multiparallel':
         return list(product(langs, langs))
     pairs = centric_pairs(langs)
     if sparsity == 'centric':
         return pairs
+
 
 def create_tasks(lang_pairs, curriculum):
     tasks = dict()
@@ -41,13 +45,14 @@ def create_tasks(lang_pairs, curriculum):
         }
     return tasks
 
+
 def dummy_config(langs, tasks, architecture, n_gpus_per_node, n_slots_per_gpu):
     groups = {lang: 'all' for lang in langs}
-    if architecture == 'full/langspec':
+    if architecture == 'full+langspec':
         enc_layers = [6]
         enc_sharing_groups = ['FULL']
         dec_sharing_groups = ['TGT_LANGUAGE']
-    elif architecture == 'langspec/langspec':
+    elif architecture == 'langspec+langspec':
         enc_layers = [6]
         enc_sharing_groups = ['SRC_LANGUAGE']
         dec_sharing_groups = ['TGT_LANGUAGE']
@@ -74,13 +79,20 @@ def dummy_config(langs, tasks, architecture, n_gpus_per_node, n_slots_per_gpu):
 @click.command()
 @click.option('--n_langs', type=int, required=True)
 @click.option('--sparsity', type=click.Choice(['multiparallel', 'centric', 'semi-centric']), required=True)
-@click.option('--architecture', type=click.Choice(['full/langspec', 'langspec/langspec', 'apple']), required=True)
+@click.option('--architecture', type=click.Choice(['full+langspec', 'langspec+langspec', 'apple']), required=True)
 @click.option('--curriculum', is_flag=True)
 @click.option('--n_gpus_per_node', type=int, default=8)
 @click.option('--n_slots_per_gpu', type=int, required=True)
 def main(n_langs, sparsity, architecture, curriculum, n_gpus_per_node, n_slots_per_gpu):
-    name = f'n_langs={n_langs}_sparsity={sparsity}_architecture={architecture}_curriculum={curriculum}_n_gpus_per_node={n_gpus_per_node}_n_slots_per_gpu={n_slots_per_gpu}'
-    name = name.replace('/', '+')
+    variables = [
+        ('n_langs', n_langs),
+        ('sparsity', sparsity),
+        ('architecture', architecture),
+        ('curriculum', curriculum),
+        ('n_gpus_per_node', n_gpus_per_node),
+        ('n_slots_per_gpu', n_slots_per_gpu),
+    ]
+    name = '_'.join(f'{key}={val}' for key, val in variables)
     langs = create_langs(n_langs)
     lang_pairs = sorted(complete_language_pairs(langs, sparsity))
     tasks = create_tasks(lang_pairs, curriculum)

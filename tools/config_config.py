@@ -506,6 +506,25 @@ def allocate_devices(opts):
     logger.info(f'total slots:      {n_nodes * n_gpus_per_node * n_slots_per_gpu}')
     logger.info(f'lang_pairs:       {len(lang_pairs)}')
 
+    # If there are fewer ready tasks than GPUs: adjust the curriculum
+    if len(lps_ready_to_start) < (n_nodes * n_gpus_per_node):
+        iats = [
+            corpus.get('introduce_at_training_step', 0)
+            for _, corpus in opts.in_config[0]['tasks'].items()
+        ]
+        iats = sorted(iats)
+        iats_at_last_gpu = iats[n_nodes * n_gpus_per_node]
+        lps_ready_to_start = []
+        for cname, corpus in opts.in_config[0]['tasks'].items():
+            src_lang, tgt_lang = corpus['src_tgt'].split('-')
+            if 'introduce_at_training_step' not in corpus:
+                lps_ready_to_start.append((src_lang, tgt_lang))
+                continue
+            adjusted = max(0, corpus.get('introduce_at_training_step', 0) - iats_at_last_gpu)
+            corpus['introduce_at_training_step'] = adjusted
+            if adjusted == 0:
+                lps_ready_to_start.append((src_lang, tgt_lang))
+
     assignment = optimize_gpu_assignment(
         n_nodes=n_nodes,
         n_gpus_per_node=n_gpus_per_node,

@@ -246,9 +246,10 @@ class AssignmentOptimizer:
             else:
                 # also populate gpus with zero count
                 filled[gpu] += 0
+        n_empty = sum(1 for x in filled.values() if x == 0)
         min_filled = min(filled.values())
         max_filled = max(filled.values())
-        penalty = extra_empty_penalty if min_filled == 0 else 0
+        penalty = n_empty * extra_empty_penalty
         if filled[(0, 0)] > min_filled:
             # There are unassigned slots, but more of them on some other device than master (0:0)
             # Master has some extra duties, so it is the optimal place for empty slots
@@ -355,7 +356,7 @@ def optimize_gpu_assignment(
     if log_name:
         with open('gpu_assignment_cost_log.jsonl', 'a') as fout:
             record = {
-                'method': 'original',
+                'method': 'empty_penalty',
                 'name': log_name,
                 'n_nodes': n_nodes,
                 'n_gpus_per_node': n_gpus_per_node,

@@ -129,6 +129,62 @@ class Assignment:
     def get_gpus(gpus: Counter):
         return tuple(key for key, val in gpus.items() if val > 0)
 
+    def get_least_favorite_slots(self, ao):
+        """
+        Returns one slot per GPU.
+        The selected slot is the one that is locally optimal to get rid of:
+        i.e. not considering the destination of the swap.
+        """
+        def sort_func(slot):
+            return (slot.node * ao.n_gpus_per_node) + slot.gpu
+        sorted_slots = list(sorted(self.assignment.keys(), key=sort_func))
+        result = []
+        for _, group in itertools.groupby(sorted_slots, sort_func):
+            result.append(self._least_favorite_slot_single(group, ao))
+        return result
+
+    def _least_favorite_slot_single(self, gpu_slots, ao):
+        gpu_slots = list(gpu_slots)
+        # compute local statistics
+        component_counts = Counter()
+        n_ready = 0
+        for gpu_slot in gpu_slots:
+            lp = self.assignment[gpu_slot]
+            if lp is None:
+                continue
+            src_lang, tgt_lang = lp
+            components = ao.get_components(src_lang, tgt_lang)
+            for component in components:
+                component_counts[component] += 1
+            if ao._is_ready_to_start(lp):
+                n_ready += 1
+        # use local stats to sort the slots
+        weighted_slots = []
+        for gpu_slot in gpu_slots:
+            lp = self.assignment[gpu_slot]
+            if lp is None:
+                weighted_slots.append((0, gpu_slot))
+                continue
+            cost = 0
+            src_lang, tgt_lang = lp
+            components = ao.get_components(src_lang, tgt_lang)
+            for component in components:
+                if component_counts[component] == 1:
+                    # solo components are good choices to get rid of
+                    cost -= 5
+                else:
+                    cost += component_counts[component]
+            if ao._is_ready_to_start(lp):
+                if n_ready == 1:
+                    # don't get rid of the last ready task
+                    cost += VERY_BAD
+            else:
+                # prefer moving non-ready tasks
+                cost -= 1
+            weighted_slots.append((cost, gpu_slot))
+        _, gpu_slot = sorted(weighted_slots)[0]
+        return gpu_slot
+
 
 class AssignmentOptimizer:
     def __init__(
@@ -313,6 +369,15 @@ class AssignmentOptimizer:
         print(f'initial cost: {current_cost}', flush=True)
         for i in tqdm(range(iterations), desc='iterations'):
             prev_cost = current_cost
+            # Subset consisting of least favorite tasks
+            slot_subset = assignment.get_least_favorite_slots(self)
+            current_cost, assignment = self.swap_all_slots_once(
+                assignment,
+                current_cost,
+                slot_subset
+            )
+            print(f'\niteration {i} least_favorite cost: {current_cost}', flush=True)
+            # Random subsets
             slot_subsets = self.slot_subsets(self.gpu_slots, n=100)
             for slot_subset in tqdm(slot_subsets, desc='subset'):
                 current_cost, assignment = self.swap_all_slots_once(
@@ -320,7 +385,7 @@ class AssignmentOptimizer:
                     current_cost,
                     slot_subset
                 )
-            print(f'\niteration {i} cost: {current_cost}', flush=True)
+            print(f'\niteration {i} random cost: {current_cost}', flush=True)
             if prev_cost == current_cost:
                 stalled += 1
             else:
@@ -390,7 +455,7 @@ def optimize_gpu_assignment(
     if log_name:
         with open('gpu_assignment_cost_log.jsonl', 'a') as fout:
             record = {
-                'method': 'better_init',
+                'method': 'least_favorite_slot',
                 'name': log_name,
                 'n_nodes': n_nodes,
                 'n_gpus_per_node': n_gpus_per_node,

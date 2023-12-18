@@ -346,7 +346,7 @@ class AssignmentOptimizer:
     def best_swap_for(self, slot_a: GpuSlot, assignment, current_cost, slot_subset=None):
         slot_subset = self.gpu_slots if slot_subset is None else slot_subset
         costs = [(current_cost, slot_a)]
-        for i, slot_b in enumerate(tqdm(slot_subset, desc='best_swap_for', leave=False)):
+        for i, slot_b in enumerate(slot_subset):
             if slot_a.node == slot_b.node and slot_a.gpu == slot_b.gpu:
                 # No point swapping pairs already on the same device
                 continue

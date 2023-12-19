@@ -361,9 +361,13 @@ class AssignmentOptimizer:
         slot_subset = self.gpu_slots if slot_subset is None else slot_subset
         for i, slot_a in enumerate(tqdm(slot_subset, desc='swap_all_slots_once', leave=False)):
             current_cost, assignment = self.best_swap_for(slot_a, assignment, current_cost, slot_subset)
+            if self.deadline and time.time() > self.deadline:
+                print('Time budget exceeded, finishing early mid-iteration', flush=True)
+                break
         return current_cost, assignment
 
-    def optimize(self, assignment, current_cost, iterations=10, patience=1):
+    def optimize(self, assignment, current_cost, iterations=10, patience=1, time_budget_s=None):
+        self.deadline = time.time() + time_budget_s if time_budget_s else None
         prev_cost = None
         stalled = 0
         print(f'initial cost: {current_cost}', flush=True)
@@ -376,6 +380,9 @@ class AssignmentOptimizer:
                 current_cost,
                 slot_subset
             )
+            if self.deadline and time.time() > self.deadline:
+                print('Time budget exceeded, finishing early', flush=True)
+                break
             print(f'\niteration {i} least_favorite cost: {current_cost}', flush=True)
             # Random subsets
             slot_subsets = self.slot_subsets(self.gpu_slots, n=100)
@@ -392,6 +399,9 @@ class AssignmentOptimizer:
                 stalled = 0
             if stalled > patience:
                 print('No improvement, finishing early', flush=True)
+                break
+            if self.deadline and time.time() > self.deadline:
+                print('Time budget exceeded, finishing early', flush=True)
                 break
         return current_cost, assignment, i
 
@@ -435,6 +445,7 @@ def optimize_gpu_assignment(
     lang_to_group_mapping: Dict[str, str],
     lps_ready_to_start: Optional[Set[Tuple[str, str]]],
     log_name: Optional[str] = None,
+    time_budget_s: Optional[int] = None,
 ):
     optimizer = AssignmentOptimizer(
         n_nodes=n_nodes,
@@ -447,7 +458,11 @@ def optimize_gpu_assignment(
     initial = optimizer.initial_assignment(lang_pairs)
     initial_cost = optimizer.cost(initial)
     start = time.time()
-    best_cost, assignment, iterations = optimizer.optimize(initial, initial_cost)
+    best_cost, assignment, iterations = optimizer.optimize(
+        initial,
+        initial_cost,
+        time_budget_s=time_budget_s
+    )
     duration_s = time.time() - start
     print_assignment(assignment, lang_to_group_mapping, ready_to_start=lps_ready_to_start)
     print(f'assignment cost {best_cost}', flush=True)

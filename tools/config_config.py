@@ -167,6 +167,10 @@ def add_allocate_device_args(parser):
     parser.add_argument('--n_gpus_per_node', type=int)
     parser.add_argument('--n_slots_per_gpu', type=int)
     parser.add_argument('--log_name', type=str)
+    parser.add_argument(
+        '--time_budget_s', type=int,
+        help='time budget for GPU assignment, in seconds',
+    )
 
 
 def add_set_transforms_args(parser):
@@ -533,6 +537,7 @@ def allocate_devices(opts):
         lang_to_group_mapping=cc_opts['groups'],
         lps_ready_to_start=lps_ready_to_start,
         log_name=opts.log_name,
+        time_budget_s=opts.time_budget_s,
     )
 
     for gpu_slot, lp in assignment.items():

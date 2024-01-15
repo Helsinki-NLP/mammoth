@@ -99,13 +99,14 @@ def load_test_multitask_model(opts, task=None, model_path=None):
                     f'encoder_{layer_stack_idx}_{layer_stack_key}'
                 )
             )
-        for layer_stack_idx, adapter_group, sub_id in task.encoder_adapter_ids:
-            checkpoint_modules.append(
-                (
-                    f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
-                    f'encoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+        if task.encoder_adapter_ids:
+            for layer_stack_idx, adapter_group, sub_id in task.encoder_adapter_ids:
+                checkpoint_modules.append(
+                    (
+                        f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
+                        f'encoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+                    )
                 )
-            )
         for layer_stack_idx, layer_stack_key in enumerate(task.decoder_id):
             checkpoint_modules.append(
                 (
@@ -113,13 +114,14 @@ def load_test_multitask_model(opts, task=None, model_path=None):
                     f'decoder_{layer_stack_idx}_{layer_stack_key}'
                 )
             )
-        for layer_stack_idx, adapter_group, sub_id in task.decoder_adapter_ids:
-            checkpoint_modules.append(
-                (
-                    f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
-                    f'decoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+        if task.decoder_adapter_ids:
+            for layer_stack_idx, adapter_group, sub_id in task.decoder_adapter_ids:
+                checkpoint_modules.append(
+                    (
+                        f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
+                        f'decoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+                    )
                 )
-            )
 
         model_path = model_path.rstrip('_')
         checkpoint_paths = [

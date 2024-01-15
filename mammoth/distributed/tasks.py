@@ -138,8 +138,8 @@ class TaskSpecs():
     corpus_opts: dict
     src_vocab: Any  # FIXME: type
     tgt_vocab: Any
-    encoder_adapter_ids: List[Tuple[int, str, str]]
-    decoder_adapter_ids: List[Tuple[int, str, str]]
+    encoder_adapter_ids: Optional[List[Tuple[int, str, str]]]
+    decoder_adapter_ids: Optional[List[Tuple[int, str, str]]]
 
     def get_serializable_metadata(self):
         """

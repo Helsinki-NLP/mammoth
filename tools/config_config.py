@@ -826,7 +826,8 @@ def extra_cpu(opts):
     del opts.in_config[0]['world_size']
     opts.in_config[0]['n_nodes'] = 1
     for task_opts in opts.in_config[0]['tasks'].values():
-        del task_opts['node_gpu']
+        if 'node_gpu' in task_opts:
+            del task_opts['node_gpu']
 
 
 def extra_fully_shared_hack(opts):

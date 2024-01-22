@@ -1,0 +1,14 @@
+{
+    "models_root": "./models",
+    "models": [
+        {
+            "id": 0,
+            "opts": {
+                "config": "out.modernize.cpu.yaml",
+                "model": "models/smoketest.modernize_step_10",
+                "task_id": "train_de-fr_split0"
+            },
+            "models": ["smoketest.modernize_step_10"]
+        }
+    ]
+}

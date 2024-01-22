@@ -5,6 +5,7 @@ import random
 import inspect
 import numpy as np
 from itertools import islice, repeat
+from io import StringIO
 import os
 
 
@@ -30,16 +31,16 @@ def split_corpus(path, shard_size, default=None):
 
 
 def _split_corpus(path, shard_size):
-    """Yield a `list` containing `shard_size` line of `path`."""
-    with open(path, "rb") as f:
+    """Yield io's with `shard_size` lines each."""
+    with open(path, "rt") as f:
         if shard_size <= 0:
-            yield f.readlines()
+            yield f
         else:
             while True:
-                shard = list(islice(f, shard_size))
+                shard = "\n".join(islice(f, shard_size))
                 if not shard:
                     break
-                yield shard
+                yield StringIO(shard)
 
 
 def aeq(*args):

@@ -462,11 +462,11 @@ class Inference(object):
                 of `n_best` predictions
         """
 
-        self.logger.info("src vocab: {}".format(self.vocabs['src']))
-        self.logger.info("transforms: {}".format(transforms))
+        self._log("src vocab: {}".format(self.vocabs['src']))
+        self._log("transforms: {}".format(transforms))
         corpus = ParallelCorpus(
-            self.src_file_path,
-            self.tgt_file_path,  # may be None
+            src,
+            tgt,
             self.vocabs['src'],
             self.vocabs['tgt'],
             transforms=transforms,  # I suppose you might want *some* transforms

@@ -12,16 +12,19 @@ import importlib
 import torch
 import mammoth.opts
 
+from io import StringIO
 from itertools import islice, zip_longest
 from copy import deepcopy
 
 from mammoth.constants import DefaultTokens
+from mammoth.distributed import TaskSpecs
+from mammoth.distributed.tasks import get_adapter_ids
+from mammoth.translate.translator import build_translator
+from mammoth.transforms import get_transforms_cls, make_transforms, TransformPipe
+from mammoth.utils.alignment import to_word_align
 from mammoth.utils.logging import init_logger
 from mammoth.utils.misc import set_random_seed
-from mammoth.utils.misc import check_model_config
-from mammoth.utils.alignment import to_word_align
 from mammoth.utils.parse import ArgumentParser
-from mammoth.translate.translator import build_translator
 
 
 def critical(func):
@@ -175,7 +178,7 @@ class TranslationServer(object):
                                         parameter for model #%d"""
                         % i
                     )
-            check_model_config(conf, self.models_root)
+            # check_model_config(conf, self.models_root)
             kwargs = {
                 'timeout': conf.get('timeout', None),
                 'load': conf.get('load', None),
@@ -383,7 +386,11 @@ class ServerModel(object):
         prec_argv = sys.argv
         sys.argv = sys.argv[:1]
         parser = ArgumentParser()
-        mammoth.opts.translate_opts(parser)
+
+        parser.translation = True
+
+        mammoth.opts.dynamic_prepare_opts(parser)
+        mammoth.opts.translate_opts(parser, dynamic=True)
 
         models = opts['models']
         if not isinstance(models, (list, tuple)):
@@ -401,7 +408,9 @@ class ServerModel(object):
                 sys.argv += ['-%s' % k, str(v)]
 
         opts = parser.parse_args()
+        ArgumentParser.validate_prepare_opts(opts)
         ArgumentParser.validate_translate_opts(opts)
+        ArgumentParser.validate_translate_opts_dynamic(opts)
         opts.cuda = opts.gpu > -1
 
         sys.argv = prec_argv
@@ -431,9 +440,27 @@ class ServerModel(object):
                     preload=preload,
                 )
             else:
+                task = self.make_task(self.opts)
                 self.translator = build_translator(
-                    self.opts, report_score=False, out_file=codecs.open(os.devnull, "w", "utf-8")
+                    self.opts,
+                    task,
+                    report_score=False,
+                    out_file=codecs.open(os.devnull, "w", "utf-8"),
                 )
+
+                # Build transforms
+                transforms_cls = get_transforms_cls(self.opts._all_transform)
+                transforms = make_transforms(
+                    self.opts,
+                    transforms_cls,
+                    self.translator.vocabs,
+                    task=task
+                )
+                data_transform = [
+                    transforms[name] for name in self.opts.transforms if name in transforms
+                ]
+
+                self.transform = TransformPipe.build_from(data_transform)
         except RuntimeError as e:
             raise ServerModelError("Runtime Error: %s" % str(e))
 
@@ -441,6 +468,36 @@ class ServerModel(object):
         self.load_time = timer.tick()
         self.reset_unload_timer()
         self.loading_lock.set()
+
+    def make_task(self, opts):
+        corpus_id = opts.task_id
+        print(f'opts.tasks {type(opts.tasks)}')
+        corpus_opts = opts.tasks[corpus_id]
+        src_lang, tgt_lang = corpus_opts['src_tgt'].split('-', 1)
+        encoder_id = corpus_opts.get('enc_sharing_group', [src_lang])
+        decoder_id = corpus_opts.get('dec_sharing_group', [tgt_lang])
+        if 'adapters' in corpus_opts:
+            encoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'encoder')
+            decoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'decoder')
+        else:
+            encoder_adapter_ids = None
+            decoder_adapter_ids = None
+        task = TaskSpecs(
+            node_rank=None,
+            local_rank=None,
+            src_lang=src_lang,
+            tgt_lang=tgt_lang,
+            encoder_id=encoder_id,
+            decoder_id=decoder_id,
+            corpus_id=corpus_id,
+            weight=1.0,
+            corpus_opts=corpus_opts,
+            src_vocab=None,
+            tgt_vocab=None,
+            encoder_adapter_ids=encoder_adapter_ids,
+            decoder_adapter_ids=decoder_adapter_ids,
+        )
+        return task
 
     @critical
     def run(self, inputs):
@@ -514,8 +571,9 @@ class ServerModel(object):
 
         if len(texts_to_translate) > 0:
             try:
-                scores, predictions = self.translator.translate(
-                    texts_to_translate,
+                scores, predictions = self.translator.translate_dynamic(
+                    src=StringIO("\n".join(texts_to_translate)),
+                    transform=self.transform,
                     tgt=texts_ref,
                     batch_size=len(texts_to_translate) if self.opts.batch_size == 0 else self.opts.batch_size,
                 )

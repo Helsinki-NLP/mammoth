@@ -3,6 +3,7 @@ from dataclasses import dataclass
 import itertools
 from functools import partial
 import gzip
+from io import IOBase
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -54,12 +55,16 @@ def read_examples_from_files(
             'line_idx': next(line_idx_generator)
         }
 
-    if src_path.endswith('.gz'):
+    if isinstance(src_path, IOBase):
+        src_fh = src_path
+    elif src_path.endswith('.gz'):
         src_fh = gzip.open(src_path, 'rt')
     else:
         src_fh = open(src_path, 'rt')
     if tgt_path is None:
         tgt_fh = itertools.repeat(None)
+    elif isinstance(tgt_path, IOBase):
+        tgt_fh = src_path
     elif tgt_path.endswith('.gz'):
         tgt_fh = gzip.open(tgt_path, 'rt')
     else:

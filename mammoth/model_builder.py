@@ -48,6 +48,7 @@ def build_embeddings(opts, vocab, for_encoder=True):
         word_padding_idx=word_padding_idx,
         word_vocab_size=len(vocab),
         freeze_word_vecs=freeze_word_vecs,
+        embeddingless=opts.embeddingless
     )
     return emb
 

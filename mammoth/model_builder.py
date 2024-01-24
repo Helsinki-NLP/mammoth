@@ -367,12 +367,17 @@ def build_only_enc(model_opts, src_emb, task_queue_manager):
     """Truly only builds encoder: no embeddings"""
     encoder = build_encoder(model_opts, src_emb, task_queue_manager)
     if model_opts.param_init != 0.0:
-        for p in encoder.parameters():
-            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+        for name, module in encoder.named_modules():
+            for p in module.parameters():
+                if not("embedding" in name and model_opts.embeddingless is True):
+                    p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+        
     if model_opts.param_init_glorot:
-        for p in encoder.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+        for name, module in encoder.named_modules():
+            for p in module.parameters():
+                if not("embedding" in name and model_opts.embeddingless is True):
+                    if p.dim() > 1:
+                        xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         encoder.half()
 
@@ -383,12 +388,16 @@ def build_only_dec(model_opts, tgt_emb, task_queue_manager):
     decoder = build_decoder(model_opts, tgt_emb, task_queue_manager)
 
     if model_opts.param_init != 0.0:
-        for p in decoder.parameters():
-            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+        for name, module in decoder.named_modules():
+            for p in module.parameters():
+                if not("embedding" in name and model_opts.embeddingless is True):
+                    p.data.uniform_(-model_opts.param_init, model_opts.param_init)
     if model_opts.param_init_glorot:
-        for p in decoder.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+        for name, module in decoder.named_modules():
+            for p in module.parameters():
+                if not("embedding" in name and model_opts.embeddingless is True):
+                    if p.dim() > 1:
+                        xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
 
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         decoder.half()

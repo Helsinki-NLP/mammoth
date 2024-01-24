@@ -408,7 +408,6 @@ def model_opts(parser):
 
     group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
     group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder')
-    group.add('--enable_embeddingless', '-enable_embeddingless',action='store_true',help='Enable embeddingless architecture')
     group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder')
     group.add(
         '--model_dim',

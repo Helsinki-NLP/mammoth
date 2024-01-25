@@ -334,6 +334,8 @@ def build_task_specific_model(
         logger.info('Creating adapters...')
         create_all_adapters(nmt_model, model_opts, task_queue_manager)
     print('built model:')
+    print(nmt_model)
+
     # register a forward hook to keep track of which parameters have valid gradients.
     # p.grad is None can not be used: grad is None only before first update.
     # zero_grad typically sets the grad to zero, not to None.

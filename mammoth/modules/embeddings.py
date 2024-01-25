@@ -154,15 +154,16 @@ class Embeddings(nn.Module):
             embeddings = [nn.Embedding(vocab, dim, padding_idx=pad) for vocab, dim, pad in emb_params]
 
         else:
-            def create_embeddingless(vocab, dim, padding_idx, sparse):
+            print("CREATING EMBEDDINGLESS")
+            def create_embeddingless(vocab, dim, padding_idx):
                 one_hot_matrix = F.one_hot(torch.arange(vocab)).float()
                 one_hot_embed = torch.cat((one_hot_matrix, torch.zeros((vocab, dim - vocab))),dim=1)
                 one_hot_embed[padding_idx] = torch.zeros(dim).unsqueeze(0)
-                emb = nn.Embedding(vocab, dim, padding_idx=padding_idx, sparse=sparse)
+                emb = nn.Embedding(vocab, dim, padding_idx=padding_idx)
                 emb.weight = torch.nn.parameter.Parameter(one_hot_embed, requires_grad=False)
                 return emb
             embeddings = [
-                create_embeddingless(vocab, dim, padding_idx=pad, sparse=sparse)
+                create_embeddingless(vocab, dim, padding_idx=pad)
                 for vocab, dim, pad in emb_params
             ]
         emb_luts = Elementwise(feat_merge, embeddings)

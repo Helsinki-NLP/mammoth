@@ -40,7 +40,6 @@ def build_embeddings(opts, vocab, for_encoder=True):
     opts.word_padding_idx = word_padding_idx
 
     freeze_word_vecs = opts.freeze_word_vecs_enc if for_encoder else opts.freeze_word_vecs_dec
-
     emb = Embeddings(
         word_vec_size=opts.model_dim,
         position_encoding=opts.position_encoding,
@@ -48,7 +47,7 @@ def build_embeddings(opts, vocab, for_encoder=True):
         word_padding_idx=word_padding_idx,
         word_vocab_size=len(vocab),
         freeze_word_vecs=freeze_word_vecs,
-        embeddingless=opts.embeddingless
+        enable_embeddingless=opts.enable_embeddingless
     )
     return emb
 
@@ -369,13 +368,13 @@ def build_only_enc(model_opts, src_emb, task_queue_manager):
     if model_opts.param_init != 0.0:
         for name, module in encoder.named_modules():
             for p in module.parameters():
-                if not("embedding" in name and model_opts.embeddingless is True):
+                if not("embedding" in name and model_opts.enable_embeddingless is True):
                     p.data.uniform_(-model_opts.param_init, model_opts.param_init)
         
     if model_opts.param_init_glorot:
         for name, module in encoder.named_modules():
             for p in module.parameters():
-                if not("embedding" in name and model_opts.embeddingless is True):
+                if not("embedding" in name and model_opts.enable_embeddingless is True):
                     if p.dim() > 1:
                         xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
@@ -390,12 +389,12 @@ def build_only_dec(model_opts, tgt_emb, task_queue_manager):
     if model_opts.param_init != 0.0:
         for name, module in decoder.named_modules():
             for p in module.parameters():
-                if not("embedding" in name and model_opts.embeddingless is True):
+                if not("embedding" in name and model_opts.embeddenable_embeddinglessingless is True):
                     p.data.uniform_(-model_opts.param_init, model_opts.param_init)
     if model_opts.param_init_glorot:
         for name, module in decoder.named_modules():
             for p in module.parameters():
-                if not("embedding" in name and model_opts.embeddingless is True):
+                if not("embedding" in name and model_opts.enable_embeddingless is True):
                     if p.dim() > 1:
                         xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
 

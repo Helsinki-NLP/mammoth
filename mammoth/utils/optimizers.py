@@ -32,8 +32,9 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 params.append(param)
             if name in suboptimizers:
                 raise Exception(f'Trying to create second optimizer for "{name}"')
-            optimizer = base_optimizer(params)
-            suboptimizers[name] = optimizer
+            if len(params)!=0:
+                optimizer = base_optimizer(params)
+                suboptimizers[name] = optimizer
 
     for generator_id in task_queue_manager.get_generators():
         generator = model.generator[f'generator_{generator_id}']

@@ -32,7 +32,7 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 params.append(param)
             if name in suboptimizers:
                 raise Exception(f'Trying to create second optimizer for "{name}"')
-            if len(params)!=0:
+            if len(params) != 0:
                 optimizer = base_optimizer(params)
                 suboptimizers[name] = optimizer
 

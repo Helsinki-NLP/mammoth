@@ -100,7 +100,6 @@ class DataOptsCheckerMixin(object):
                         " We default it to 0 (start of training) for you."
                     )
                 corpus['introduce_at_training_step'] = 0
-            
             enable_embeddingless = corpus.get('enable_embeddingless', False)
             opts.enable_embeddingless = enable_embeddingless
             # Check sharing groups

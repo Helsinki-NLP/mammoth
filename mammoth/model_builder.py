@@ -300,7 +300,6 @@ def build_task_specific_model(
     for side, lang, _, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
         src_emb = build_src_emb(model_opts, vocab)
         src_embs[lang] = src_emb
-
     pluggable_src_emb = PluggableEmbeddings(src_embs)
     encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager)
 
@@ -335,8 +334,6 @@ def build_task_specific_model(
         logger.info('Creating adapters...')
         create_all_adapters(nmt_model, model_opts, task_queue_manager)
     print('built model:')
-    print(nmt_model)
-
     # register a forward hook to keep track of which parameters have valid gradients.
     # p.grad is None can not be used: grad is None only before first update.
     # zero_grad typically sets the grad to zero, not to None.
@@ -366,15 +363,15 @@ def build_only_enc(model_opts, src_emb, task_queue_manager):
     """Truly only builds encoder: no embeddings"""
     encoder = build_encoder(model_opts, src_emb, task_queue_manager)
     if model_opts.param_init != 0.0:
-        for name, module in encoder.named_modules():
+        for name, module in encoder.named_children():
             for p in module.parameters():
-                if not("embedding" in name and model_opts.enable_embeddingless is True):
+                if not("embedding" in name and "emb_luts" and model_opts.enable_embeddingless is True):
                     p.data.uniform_(-model_opts.param_init, model_opts.param_init)
-        
+
     if model_opts.param_init_glorot:
-        for name, module in encoder.named_modules():
+        for name, module in encoder.named_children():
             for p in module.parameters():
-                if not("embedding" in name and model_opts.enable_embeddingless is True):
+                if not("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
                     if p.dim() > 1:
                         xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
@@ -387,12 +384,12 @@ def build_only_dec(model_opts, tgt_emb, task_queue_manager):
     decoder = build_decoder(model_opts, tgt_emb, task_queue_manager)
 
     if model_opts.param_init != 0.0:
-        for name, module in decoder.named_modules():
+        for name, module in decoder.named_children():
             for p in module.parameters():
                 if not("embedding" in name and model_opts.embeddenable_embeddinglessingless is True):
                     p.data.uniform_(-model_opts.param_init, model_opts.param_init)
     if model_opts.param_init_glorot:
-        for name, module in decoder.named_modules():
+        for name, module in decoder.named_children():
             for p in module.parameters():
                 if not("embedding" in name and model_opts.enable_embeddingless is True):
                     if p.dim() > 1:

@@ -200,7 +200,7 @@ def encode(orig, bpe_codes, bpe_codes_reverse, vocab, separator, version, cache,
                 j = word.index(first, i)
                 new_word.extend(word[i:j])
                 i = j
-            except:
+            except BaseException:
                 new_word.extend(word[i:])
                 break
 
@@ -240,7 +240,7 @@ def recursive_split(segment, bpe_codes, vocab, separator, final=False):
             right = right[:-4]
         else:
             left, right = bpe_codes[segment]
-    except:
+    except BaseException:
         # sys.stderr.write('cannot split {0} further.\n'.format(segment))
         yield segment
         return
@@ -291,7 +291,7 @@ def read_vocabulary(vocab_file, threshold):
     for line in vocab_file:
         word, freq = line.split()
         freq = int(freq)
-        if threshold == None or freq >= threshold:
+        if threshold is None or freq >= threshold:
             vocabulary.add(word)
 
     return vocabulary

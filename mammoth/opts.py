@@ -327,6 +327,12 @@ def model_opts(parser):
         "option.",
     )
     group.add(
+        '--enable_embeddingless',
+        '-enable_embeddingless',
+        action='store_true',
+        help="Enable the use of embeddingless models.",
+    )
+    group.add(
         '--position_encoding',
         '-position_encoding',
         action='store_true',

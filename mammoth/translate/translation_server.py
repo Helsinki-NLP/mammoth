@@ -395,7 +395,7 @@ class ServerModel(object):
             if k == 'models':
                 sys.argv += ['-model']
                 sys.argv += [str(model) for model in v]
-            elif type(v) == bool:
+            elif isinstance(v, bool):
                 sys.argv += ['-%s' % k]
             else:
                 sys.argv += ['-%s' % k, str(v)]
@@ -545,7 +545,7 @@ class ServerModel(object):
         results = flatten_list(predictions)
 
         def maybe_item(x):
-            return x.item() if type(x) is torch.Tensor else x
+            return x.item() if isinstance(x, torch.Tensor) else x
 
         scores = [maybe_item(score_tensor) for score_tensor in flatten_list(scores)]
 
@@ -651,7 +651,7 @@ class ServerModel(object):
     @critical
     def to_cpu(self):
         """Move the model to CPU and clear CUDA cache."""
-        if type(self.translator) == CTranslate2Translator:
+        if isinstance(self.translator, CTranslate2Translator):
             self.translator.to_cpu()
         else:
             self.translator.model.cpu()
@@ -660,7 +660,7 @@ class ServerModel(object):
 
     def to_gpu(self):
         """Move the model to GPU."""
-        if type(self.translator) == CTranslate2Translator:
+        if isinstance(self.translator, CTranslate2Translator):
             self.translator.to_gpu()
         else:
             torch.cuda.set_device(self.opts.gpu)

@@ -56,9 +56,9 @@ class TestLookAheadBucketing(unittest.TestCase):
     def test_reroutes(self):
         stream = MockStream([hashabledict({'src': '_', 'tgt': '_'})] * 10)
         lab = build_dataloader(stream, 2, 'tokens', 4, 2, cycle=True, as_iter=False)
-        self.assertTrue(type(lab) is LookAheadBucketing)
+        self.assertTrue(isinstance(lab, LookAheadBucketing))
         not_lab = build_dataloader(stream, 2, 'tokens', 4, 2, cycle=False, as_iter=False)
-        self.assertTrue(type(not_lab) is InferenceBatcher)
+        self.assertTrue(isinstance(not_lab, InferenceBatcher))
 
     def test_always_continues(self):
         stream = MockStream([hashabledict({'src': '_', 'tgt': '_'})] * 10)

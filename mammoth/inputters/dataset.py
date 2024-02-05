@@ -76,6 +76,7 @@ def read_examples_from_files(
 
 class ParallelCorpus(IterableDataset):
     """Torch-style dataset"""
+
     def __init__(
         self,
         src_file,
@@ -245,12 +246,12 @@ def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
 
     corpora = {
         corpus_id: read_examples_from_files(
-                opts.tasks[corpus_id]["path_src"],
-                opts.tasks[corpus_id]["path_tgt"],
-                # FIXME this is likely not working
-                transforms_fn=TransformPipe(transforms).apply if transforms else lambda x: x,
-            )
-        }
+            opts.tasks[corpus_id]["path_src"],
+            opts.tasks[corpus_id]["path_tgt"],
+            # FIXME this is likely not working
+            transforms_fn=TransformPipe(transforms).apply if transforms else lambda x: x,
+        )
+    }
     counter_src = collections.Counter()
     counter_tgt = collections.Counter()
 

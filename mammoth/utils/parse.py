@@ -102,6 +102,7 @@ class DataOptsCheckerMixin(object):
                 corpus['introduce_at_training_step'] = 0
             enable_embeddingless = corpus.get('enable_embeddingless', False)
             opts.enable_embeddingless = enable_embeddingless
+            print("#############", enable_embeddingless)
             # Check sharing groups
             enc_sharing_group = corpus.get('enc_sharing_group', None)
             assert enc_sharing_group is None or isinstance(enc_sharing_group, list)

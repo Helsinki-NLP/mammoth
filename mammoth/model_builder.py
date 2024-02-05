@@ -228,7 +228,6 @@ def create_bilingual_model(
     src_lang = task.src_lang
     tgt_lang = task.tgt_lang
     generators_md = nn.ModuleDict()
-
     src_emb = build_src_emb(model_opts, vocabs_dict['src'])
     tgt_emb = build_tgt_emb(model_opts, vocabs_dict['tgt'])
     pluggable_src_emb = PluggableEmbeddings({src_lang: src_emb})
@@ -248,14 +247,12 @@ def create_bilingual_model(
         decoder=decoder,
         attention_bridge=attention_bridge
     )
-
     if uses_adapters(model_opts):
         logger.info('Creating adapters...')
         create_bilingual_adapters(nmt_model, model_opts, task)
     else:
         logger.info('Does not use adapters...')
     print('built model:')
-    print(nmt_model)
 
     nmt_model.generator = generators_md
     return nmt_model
@@ -365,14 +362,12 @@ def build_only_enc(model_opts, src_emb, task_queue_manager):
     """Truly only builds encoder: no embeddings"""
     encoder = build_encoder(model_opts, src_emb, task_queue_manager)
     if model_opts.param_init != 0.0:
-        for name, module in encoder.named_children():
-            for p in module.parameters():
-                if not("embedding" in name and "emb_luts" and model_opts.enable_embeddingless is True):
+        for name, p in encoder.named_parameters():
+                if not("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
                     p.data.uniform_(-model_opts.param_init, model_opts.param_init)
 
     if model_opts.param_init_glorot:
-        for name, module in encoder.named_children():
-            for p in module.parameters():
+        for name, p in encoder.named_parameters():
                 if not("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
                     if p.dim() > 1:
                         xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
@@ -384,18 +379,15 @@ def build_only_enc(model_opts, src_emb, task_queue_manager):
 
 def build_only_dec(model_opts, tgt_emb, task_queue_manager):
     decoder = build_decoder(model_opts, tgt_emb, task_queue_manager)
-
     if model_opts.param_init != 0.0:
-        for name, module in decoder.named_children():
-            for p in module.parameters():
-                if not("embedding" in name and model_opts.embeddenable_embeddinglessingless is True):
+        for name, p in decoder.named_parameters():
+                if not("embedding" in name and "pe" not in name  and model_opts.enable_embeddingless is True):
                     p.data.uniform_(-model_opts.param_init, model_opts.param_init)
     if model_opts.param_init_glorot:
-        for name, module in decoder.named_children():
-            for p in module.parameters():
-                if not("embedding" in name and model_opts.enable_embeddingless is True):
+        for name, p in decoder.named_parameters():
+                if not("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
                     if p.dim() > 1:
-                        xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+                        xavier_uniform_(p , gain=nn.init.calculate_gain('relu'))
 
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         decoder.half()

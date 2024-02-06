@@ -129,6 +129,8 @@ class LookAheadBucketing():
             self._is_exhausted = False
         except StopIteration:
             self._is_exhausted = True
+        except KeyError:
+            logger.warning("Error loading buckets with examples : idx not found")
 
     def bucket_is_empty(self, s_idx: int, t_idx: int) -> bool:
         """check if this bucket is empty"""

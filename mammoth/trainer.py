@@ -25,8 +25,8 @@ def iter_on_device(iterator, device_context):
         device = torch.device(f'cuda:{device_context.local_rank}')
     else:
         device = torch.device('cpu')
-    for batch, meta, comm_batch_id in iterator:
-        yield batch.to(device), meta, comm_batch_id
+    for batch, meta, comm_batch_id, states in iterator:
+        yield batch.to(device), meta, comm_batch_id, states
 
 
 def build_trainer(
@@ -386,10 +386,11 @@ class Trainer(object):
                     # If the patience has reached the limit, stop training
                     if self.earlystopper.has_stopped():
                         break
-
+            
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
                 self.model_saver.save(step, moving_average=self.moving_average)
-
+                if device_context.is_distributed():
+                    self.model_saver.data_state = self._gather_data_state(device_context)
             if train_steps > 0 and step >= train_steps:
                 break
 
@@ -454,7 +455,38 @@ class Trainer(object):
                 p.has_grad = False
 
         return stats
+    def _gather_data_state(self, device_context):
+        new_data_state = self.model_saver.data_state.copy()
+        for taskname, idx_n_buckets in self.model_saver.data_state.items():
+            # gather indices
+            tmplist = mammoth.utils.distributed.all_gather_list(idx_n_buckets['indices'])
+            tmplist = [x for x in tmplist if isinstance(x, int)]
+            if device_context.is_master():
+                new_data_state[taskname]['indices'] = max(tmplist)
 
+            # FIXME: Communicationg the buckets is NOT working
+            #        Take "if False: away to debug
+            #        gathering the buckets makes the training just to keep hanging ...
+            #        I THINK IT IS BECAUSE SOME BUCKETS ARE EMPTY LISTS
+            #        gather each bucket separately (object is too big to commuincate)
+            if False:
+                if idx_n_buckets['buckets'] is None:
+                    idx_n_buckets['buckets'] = [[-1]]
+                else:
+                    for i, bucket in enumerate(idx_n_buckets['buckets']):
+                        print(f"DEBUG...GPU{device_context.node_rank}:{device_context.local_rank}", taskname, bucket)
+                        if len(bucket) < 1:
+                            idx_n_buckets['buckets'].append(-1)
+                buckets = []
+                for bucket in idx_n_buckets['buckets']:
+                    tmplist = onmt.utils.distributed.all_gather_list(bucket, max_size=255*255)
+                    buckets.append([x for x in tmplist if x is not None][0])
+
+                new_data_state[taskname]['buckets'] = buckets
+            else:
+                new_data_state[taskname]['buckets'] = None
+
+        return new_data_state
     def _gradient_accumulation_over_lang_pairs(
         self,
         batches_with_meta,
@@ -463,7 +495,7 @@ class Trainer(object):
     ):
         normalization = 0
         seen_comm_batches = set()
-        for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
+        for k, (batch, metadata, comm_batch, data_states) in enumerate(batches_with_meta):
             seen_comm_batches.add(comm_batch)
             if self.norm_method == "tokens":
                 num_tokens = (
@@ -514,7 +546,9 @@ class Trainer(object):
                         trunc_size=trunc_size,
                     )
                     # logger.info(loss)
-
+                if data_states is not None:
+                    for k, v in data_states.items():
+                        self.model_saver.data_state[k] = v
                 try:
                     if loss is not None:
                         self.optim.backward(loss)

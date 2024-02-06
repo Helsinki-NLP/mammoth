@@ -246,15 +246,15 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     logger.info("BATCH PRODUCER")
     logger.info(generator_to_serve)
 
-    for batch, metadata, communication_batch_id in generator_to_serve:
+    for batch, metadata, communication_batch_id, data_states in generator_to_serve:
         semaphore.acquire()
         # Move batch to correspond device_id when consumer iterate
         # hack to dodge unpicklable `dict_keys`
         # batch.fields = list(batch.fields)
-        queue.put((batch, metadata, communication_batch_id))
+        queue.put((batch, metadata, communication_batch_id, data_states))
 
 
-def consumer(process_fn, opts, device_context, error_queue, batch_queue, semaphore, task_queue_manager):
+def consumer(process_fn, opts, device_context, error_queue, batch_queue, semaphore, task_queue_manager, checkpoint):
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
         logger.info(
@@ -271,6 +271,7 @@ def consumer(process_fn, opts, device_context, error_queue, batch_queue, semapho
             batch_queue=batch_queue,
             semaphore=semaphore,
             task_queue_manager=task_queue_manager,
+            checkpoint=checkpoint,
         )
 
     except KeyboardInterrupt:

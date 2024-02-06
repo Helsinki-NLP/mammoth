@@ -459,7 +459,7 @@ class Trainer(object):
         new_data_state = self.model_saver.data_state.copy()
         for taskname, idx_n_buckets in self.model_saver.data_state.items():
             # gather indices
-            tmplist = mammoth.utils.distributed.all_gather_list(idx_n_buckets['indices'])
+            tmplist = mammoth.distributed.all_gather_list(idx_n_buckets['indices'])
             tmplist = [x for x in tmplist if isinstance(x, int)]
             if device_context.is_master():
                 new_data_state[taskname]['indices'] = max(tmplist)

@@ -153,7 +153,6 @@ class Embeddings(nn.Module):
             embeddings = [nn.Embedding(vocab, dim, padding_idx=pad) for vocab, dim, pad in emb_params]
 
         else:
-            print("CREATING EMBEDDINGLESS")
 
             def create_embeddingless(vocab, dim, padding_idx):
                 one_hot_matrix = F.one_hot(torch.arange(vocab)).float()

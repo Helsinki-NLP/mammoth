@@ -49,6 +49,7 @@ def build_embeddings(opts, vocab, for_encoder=True):
         freeze_word_vecs=freeze_word_vecs,
         enable_embeddingless=opts.enable_embeddingless
     )
+    if opts.enable_embeddingless: logger.info("Creating an embeddingless model.")
     return emb
 
 
@@ -253,7 +254,7 @@ def create_bilingual_model(
     else:
         logger.info('Does not use adapters...')
     print('built model:')
-
+    print(nmt_model)
     nmt_model.generator = generators_md
     return nmt_model
 

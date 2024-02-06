@@ -9,7 +9,7 @@ from mammoth.inputters.dataset import get_corpus
 from mammoth.utils.logging import logger
 
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True):
+def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True, data_state=None):
     """Convert an mammoth.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         loader = InferenceBatcher(dataset, batch_size)
@@ -44,8 +44,8 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
                     true_size = len(example_dict['src'])
                 return true_size
 
-        loader = LookAheadBucketing(dataset, pool_size, n_buckets, batch_size, bucket_fn, numel_fn)
-    return iter(loader) if as_iter else loader
+        loader = LookAheadBucketing( dataset, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, data_state)
+    return (iter(loader), loader) if as_iter else loader
 
 
 DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
@@ -71,7 +71,7 @@ class InferenceBatcher():
 
 
 class LookAheadBucketing():
-    def __init__(self, dataset, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn):
+    def __init__(self, dataset, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn, data_state=None):
         self.dataset = dataset
         # actual generator of examples
         self.examples_stream = iter([])
@@ -90,7 +90,16 @@ class LookAheadBucketing():
         self.bucket_fn = bucket_fn
         self.numel_fn = numel_fn
         self.collate_fn = dataset.collate_fn
-        self._init()
+        if data_state is None or (isinstance(data_state, dict) and data_state['buckets'] is None):
+            self.current_file_index = None
+            self._buckets = [[] for _ in range(n_buckets)]
+            self._lens = [0 for _ in range(n_buckets)]
+            self._init()
+        else:
+            self.current_file_index = data_state['indices']
+            logger.info('LookAheadBucketing: relying on pre-computed buckets, no initialization')
+            self._buckets = data_state['buckets']
+            self._lens = list(map(len, data_state['buckets']))
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
@@ -106,6 +115,7 @@ class LookAheadBucketing():
         """try to look up one more example to add to this reservoir."""
         try:
             example = next(self.examples_stream)
+            self.current_file_index = example['idx']
             s_idx, t_idx = self.bucket_fn(example)
             self._buckets[s_idx][t_idx].append(example)
             self._is_exhausted = False
@@ -135,6 +145,9 @@ class LookAheadBucketing():
         """check if all buckets are empty"""
         return all(len(bucket) == 0 for bucket in itertools.chain.from_iterable(self._buckets))
 
+    def get_data_state(self):
+        return {'indices': self.current_file_index, 'buckets': self._buckets}
+    
     def _spiralling(self, s_idx: int, t_idx: int):
         def _seq():
             # from https://math.stackexchange.com/questions/163080/on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361  # noqa: E501
@@ -241,6 +254,7 @@ class DynamicDatasetIter(object):
         pool_size=2048,
         n_buckets=1024,
         skip_empty_level='warning',
+        data_state=None,
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -259,9 +273,10 @@ class DynamicDatasetIter(object):
         if skip_empty_level not in ['silent', 'warning', 'error']:
             raise ValueError(f"Invalid argument skip_empty_level={skip_empty_level}")
         self.skip_empty_level = skip_empty_level
+        self.data_state = data_state
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train):
+    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train,data_state=None):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -282,6 +297,7 @@ class DynamicDatasetIter(object):
             pool_size=opts.pool_size,
             n_buckets=opts.n_buckets,
             skip_empty_level=opts.skip_empty_level,
+            data_state=data_state,
         )
 
     def _init_datasets(self):
@@ -299,18 +315,25 @@ class DynamicDatasetIter(object):
                 if self.task_queue_manager.device_context.is_gpu()
                 else 'cpu'
             )
-
+            # Recover current file index from the data state
+            corpus_datastate = None
+            if self.data_state:
+                corpus_datastate = self.data_state.get(task.corpus_id, {'indices': 0, 'buckets': None})
+                resumeidx = corpus_datastate["indices"]
+                logger.info(
+                    f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {resumeidx} in corpus'
+                    )
             # Case 1: we are training, and the task must contain some path to training data
             # Case 2: we are validation (hence self.is_train := False), we need an iterator
             # if and only the task defines validation data, i.e. if the key `path_valid_src`
             # is defined
             if self.is_train or self.opts.tasks[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
-                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
+                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train,  data_state=corpus_datastate,
                 ).to(device)
 
                 # iterator over minibatches
-                ordered_iter = build_dataloader(
+                ordered_iter,lab = build_dataloader(
                     corpus,
                     self.batch_size,
                     self.batch_type,
@@ -318,9 +341,11 @@ class DynamicDatasetIter(object):
                     n_buckets=self.n_buckets,
                     cycle=self.is_train,
                     as_iter=self.is_train,
+                    data_state=corpus_datastate,
                 )
 
-                self.dataset_iterators[task.corpus_id] = (ordered_iter, metadata)
+                self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)
+                #Comment by Timothee: this also impacts the validation iteration loop, which is missing the lab in its unpacking line 364 of this file
 
         self.init_iterators = True
 
@@ -332,7 +357,7 @@ class DynamicDatasetIter(object):
             # to be absolutely clear: all the validation data is read per validation loop
             all_val_data = [
                 zip(ordered_iter, itertools.repeat(metadata), itertools.repeat(0))
-                for ordered_iter, metadata in self.dataset_iterators.values()
+                for ordered_iter, lab, metadata in self.dataset_iterators.values()
             ]
             yield from itertools.chain.from_iterable(all_val_data)
 
@@ -340,9 +365,10 @@ class DynamicDatasetIter(object):
             # All minibatches with the same communication_batch_id should be trained on
             # before synching gradients between devices
             communication_batch_id = 0
+            total_num_batches = 0
             while True:
                 for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
-                    ordered_iter, metadata = self.dataset_iterators[corpus_id]
+                    ordered_iter, _, metadata = self.dataset_iterators[corpus_id]
                     batch = next(ordered_iter)
                     if communication_batch_id == 0:
                         # De-numericalize a few sentences for debugging
@@ -357,7 +383,17 @@ class DynamicDatasetIter(object):
                             logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
                             toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
-                    yield batch, metadata, communication_batch_id
+                    total_num_batches += 1
+                    # FIXME: make the following compatible with len(accum_count) > 1
+                    final_step = self.opts.train_steps * self.opts.accum_count[0]
+                    real_step = self.opts.save_checkpoint_steps * self.opts.accum_count[0]
+                    if (total_num_batches % real_step == 0) or (total_num_batches == final_step):
+                        data_states = dict()
+                        for taskname, (_, lab, _) in self.dataset_iterators.items():
+                            data_states[taskname] = lab.get_data_state()
+                    else:
+                        data_states = None
+                    yield batch, metadata, communication_batch_id, data_states
 
                 communication_batch_id += 1
                 if communication_batch_id % 1000 == 0:

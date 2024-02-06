@@ -34,10 +34,10 @@ class LayerStackDecoder(DecoderBase):
                     opts.transformer_ff,
                     opts.copy_attn,
                     opts.self_attn_type,
-                    opts.dropout[0] if type(opts.dropout) is list else opts.dropout,
+                    opts.dropout[0] if isinstance(opts.dropout, list) else opts.dropout,
                     (
                         opts.attention_dropout[0]
-                        if type(opts.attention_dropout) is list
+                        if isinstance(opts.attention_dropout, list)
                         else opts.attention_dropout
                     ),
                     None,  # embeddings,
@@ -71,10 +71,10 @@ class LayerStackDecoder(DecoderBase):
                 opts.transformer_ff,
                 opts.copy_attn,
                 opts.self_attn_type,
-                opts.dropout[0] if type(opts.dropout) is list else opts.dropout,
+                opts.dropout[0] if isinstance(opts.dropout, list) else opts.dropout,
                 (
                     opts.attention_dropout[0]
-                    if type(opts.attention_dropout) is list
+                    if isinstance(opts.attention_dropout, list)
                     else opts.attention_dropout
                 ),
                 None,  # embeddings,

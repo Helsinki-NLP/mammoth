@@ -8,6 +8,7 @@ import torch.nn as nn
 from mammoth.modules.util_class import Elementwise
 # from mammoth.utils.logging import logger
 
+import torch.nn.functional as F
 # import bitsandbytes as bnb
 
 
@@ -116,6 +117,7 @@ class Embeddings(nn.Module):
         feat_vocab_sizes=[],
         dropout=0,
         freeze_word_vecs=False,
+        enable_embeddingless=False
     ):
         self._validate_args(feat_merge, feat_vocab_sizes, feat_vec_exponent, feat_vec_size, feat_padding_idx)
 
@@ -145,7 +147,24 @@ class Embeddings(nn.Module):
         # The embedding matrix look-up tables. The first look-up table
         # is for words. Subsequent ones are for features, if any exist.
         emb_params = zip(vocab_sizes, emb_dims, pad_indices)
-        embeddings = [nn.Embedding(vocab, dim, padding_idx=pad) for vocab, dim, pad in emb_params]
+
+        emb_params = zip(vocab_sizes, emb_dims, pad_indices)
+        if enable_embeddingless is False:
+            embeddings = [nn.Embedding(vocab, dim, padding_idx=pad) for vocab, dim, pad in emb_params]
+
+        else:
+
+            def create_embeddingless(vocab, dim, padding_idx):
+                one_hot_matrix = F.one_hot(torch.arange(vocab)).float()
+                one_hot_embed = torch.cat((one_hot_matrix, torch.zeros((vocab, dim - vocab))), dim=1)
+                one_hot_embed[padding_idx] = torch.zeros(dim).unsqueeze(0)
+                emb = nn.Embedding(vocab, dim, padding_idx=padding_idx)
+                emb.weight = torch.nn.parameter.Parameter(one_hot_embed, requires_grad=False)
+                return emb
+            embeddings = [
+                create_embeddingless(vocab, dim, padding_idx=pad)
+                for vocab, dim, pad in emb_params
+            ]
         emb_luts = Elementwise(feat_merge, embeddings)
 
         # The final output size of word + feature vectors. This can vary

@@ -56,10 +56,10 @@ mathjax_config = {
 }
 
 mathjax3_config = {
-  "tex": {
-    "inlineMath": [['\\(', '\\)']],
-    "displayMath": [["\\[", "\\]"]],
-  }
+    "tex": {
+        "inlineMath": [['\\(', '\\)']],
+        "displayMath": [["\\[", "\\]"]],
+    }
 }
 
 bibtex_bibfiles = ['refs.bib']
@@ -144,8 +144,8 @@ html_static_path = ['_static']
 html_context = {
     'css_files': [
         '_static/theme_overrides.css',  # override wide tables in RTD theme
-        ],
-     }
+    ],
+}
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.

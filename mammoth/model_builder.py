@@ -40,15 +40,17 @@ def build_embeddings(opts, vocab, for_encoder=True):
     opts.word_padding_idx = word_padding_idx
 
     freeze_word_vecs = opts.freeze_word_vecs_enc if for_encoder else opts.freeze_word_vecs_dec
-
     emb = Embeddings(
         word_vec_size=opts.model_dim,
         position_encoding=opts.position_encoding,
-        dropout=opts.dropout[0] if type(opts.dropout) is list else opts.dropout,
+        dropout=opts.dropout[0] if isinstance(opts.dropout, list) else opts.dropout,
         word_padding_idx=word_padding_idx,
         word_vocab_size=len(vocab),
         freeze_word_vecs=freeze_word_vecs,
+        enable_embeddingless=opts.enable_embeddingless
     )
+    if opts.enable_embeddingless:
+        logger.info("Creating an embeddingless model.")
     return emb
 
 
@@ -152,7 +154,7 @@ def load_test_multitask_model(opts, task=None, model_path=None):
             task=task,
             model_opts=model_opts,
             vocabs_dict=vocabs_dict
-            )
+        )
         model_params = {name for name, p in model.named_parameters()}
         model_params.update(name for name, p in model.named_buffers())
         for key in set(combined_state_dict.keys()):
@@ -228,7 +230,6 @@ def create_bilingual_model(
     src_lang = task.src_lang
     tgt_lang = task.tgt_lang
     generators_md = nn.ModuleDict()
-
     src_emb = build_src_emb(model_opts, vocabs_dict['src'])
     tgt_emb = build_tgt_emb(model_opts, vocabs_dict['tgt'])
     pluggable_src_emb = PluggableEmbeddings({src_lang: src_emb})
@@ -248,7 +249,6 @@ def create_bilingual_model(
         decoder=decoder,
         attention_bridge=attention_bridge
     )
-
     if uses_adapters(model_opts):
         logger.info('Creating adapters...')
         create_bilingual_adapters(nmt_model, model_opts, task)
@@ -256,7 +256,6 @@ def create_bilingual_model(
         logger.info('Does not use adapters...')
     print('built model:')
     print(nmt_model)
-
     nmt_model.generator = generators_md
     return nmt_model
 
@@ -300,7 +299,6 @@ def build_task_specific_model(
     for side, lang, _, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
         src_emb = build_src_emb(model_opts, vocab)
         src_embs[lang] = src_emb
-
     pluggable_src_emb = PluggableEmbeddings(src_embs)
     encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager)
 
@@ -366,12 +364,15 @@ def build_only_enc(model_opts, src_emb, task_queue_manager):
     """Truly only builds encoder: no embeddings"""
     encoder = build_encoder(model_opts, src_emb, task_queue_manager)
     if model_opts.param_init != 0.0:
-        for p in encoder.parameters():
-            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+        for name, p in encoder.named_parameters():
+            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+                p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+
     if model_opts.param_init_glorot:
-        for p in encoder.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+        for name, p in encoder.named_parameters():
+            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+                if p.dim() > 1:
+                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         encoder.half()
 
@@ -380,14 +381,15 @@ def build_only_enc(model_opts, src_emb, task_queue_manager):
 
 def build_only_dec(model_opts, tgt_emb, task_queue_manager):
     decoder = build_decoder(model_opts, tgt_emb, task_queue_manager)
-
     if model_opts.param_init != 0.0:
-        for p in decoder.parameters():
-            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
+        for name, p in decoder.named_parameters():
+            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+                p.data.uniform_(-model_opts.param_init, model_opts.param_init)
     if model_opts.param_init_glorot:
-        for p in decoder.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+        for name, p in decoder.named_parameters():
+            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+                if p.dim() > 1:
+                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
 
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         decoder.half()

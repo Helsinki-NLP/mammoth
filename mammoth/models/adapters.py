@@ -22,6 +22,7 @@ class AdapterLayer(ABC, nn.Module):
     See also fairseq implementation:
     https://github.com/ahmetustun/fairseq/blob/master/fairseq/modules/adapter_layer.py
     """
+
     def __init__(self, input_dim, hidden_dim, pfeiffer=False, init='small', layernorm='layernorm'):
         super().__init__()
         # Omit LayerCache
@@ -43,8 +44,8 @@ class AdapterLayer(ABC, nn.Module):
 
                 def init_fn(tensor):
                     nn.init.uniform_(
-                       tensor,
-                       almost_zero - delta, almost_zero + delta
+                        tensor,
+                        almost_zero - delta, almost_zero + delta
                     )
             elif init == 'bert':
 
@@ -104,6 +105,7 @@ class Adapter(nn.Module):
     A container for one or several AdapterLayers,
     together with layer indices for injecting into the base network.
     """
+
     def __init__(self, adapter_group: str, sub_id: str):
         super().__init__()
         self.name = self._name(adapter_group, sub_id)
@@ -136,6 +138,7 @@ class TransformerAdapterMixin:
     Mixin to manage one or several Adapters
     for a TransformerEncoder or TransformerDecoder.
     """
+
     def __init__(self, *args, **kwargs):
         # run init of next parallel inheritance class
         super(TransformerAdapterMixin, self).__init__(*args, **kwargs)

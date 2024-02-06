@@ -111,14 +111,15 @@ def update_pair_statistics(pair, changed, stats, indices):
             if i < len(old_word) - 1 and old_word[i + 1] == second:
                 # assuming a symbol sequence "A B C", if "B C" is merged, reduce the frequency of "A B"
                 if i:
-                    prev = old_word[i - 1 : i + 1]
+                    prev = old_word[i - 1: i + 1]
                     stats[prev] -= freq
                     indices[prev][j] -= 1
                 if i < len(old_word) - 2:
                     # assuming a symbol sequence "A B C B", if "B C" is merged, reduce the frequency of "C B".
-                    # however, skip this if the sequence is A B C B C, because the frequency of "C B" will be reduced by the previous code block
+                    # however, skip this if the sequence is A B C B C, because the frequency
+                    # of "C B" will be reduced by the previous code block
                     if old_word[i + 2] != first or i >= len(old_word) - 3 or old_word[i + 3] != second:
-                        nex = old_word[i + 1 : i + 3]
+                        nex = old_word[i + 1: i + 3]
                         stats[nex] -= freq
                         indices[nex][j] -= 1
                 i += 2
@@ -134,13 +135,14 @@ def update_pair_statistics(pair, changed, stats, indices):
                 break
             # assuming a symbol sequence "A BC D", if "B C" is merged, increase the frequency of "A BC"
             if i:
-                prev = word[i - 1 : i + 1]
+                prev = word[i - 1: i + 1]
                 stats[prev] += freq
                 indices[prev][j] += 1
             # assuming a symbol sequence "A BC B", if "B C" is merged, increase the frequency of "BC B"
-            # however, if the sequence is A BC BC, skip this step because the count of "BC BC" will be incremented by the previous code block
+            # however, if the sequence is A BC BC, skip this step because the count of
+            # "BC BC" will be incremented by the previous code block
             if i < len(word) - 1 and word[i + 1] != new_pair:
-                nex = word[i : i + 2]
+                nex = word[i: i + 2]
                 stats[nex] += freq
                 indices[nex][j] += 1
             i += 1

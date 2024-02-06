@@ -327,6 +327,13 @@ def model_opts(parser):
         "option.",
     )
     group.add(
+        '--enable_embeddingless',
+        '-enable_embeddingless',
+        action='store_true',
+        help="Enable the use of byte-based embeddingless models" +
+        "(Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
+    )
+    group.add(
         '--position_encoding',
         '-position_encoding',
         action='store_true',
@@ -1102,7 +1109,7 @@ def _add_decoding_opts(parser):
     )
     # Decoding Length constraint
     group.add('--min_length', '-min_length', type=int, default=0, help='Minimum prediction length')
-    group.add('--max_length', '-max_length', type=int, default=100, help='Maximum prediction length.')
+    group.add('--max_length', '-max_length', type=int, default=5000, help='Maximum prediction length.')
     group.add(
         '--max_sent_length', '-max_sent_length', action=DeprecateAction, help="Deprecated, use `-max_length` instead"
     )

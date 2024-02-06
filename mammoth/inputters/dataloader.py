@@ -53,6 +53,7 @@ DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang e
 
 class InferenceBatcher():
     """Iterator for inference"""
+
     def __init__(self, dataset, batch_size):
         self.examples_stream = dataset
         self.collate_fn = dataset.collate_fn
@@ -346,8 +347,8 @@ class DynamicDatasetIter(object):
                     if communication_batch_id == 0:
                         # De-numericalize a few sentences for debugging
                         logger.warning(
-                                f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
-                                f'batch size: {batch.batch_size}'
+                            f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
+                            f'batch size: {batch.batch_size}'
                         )
                         src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
                         tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]

@@ -480,7 +480,7 @@ class Trainer(object):
                             idx_n_buckets['buckets'].append(-1)
                 buckets = []
                 for bucket in idx_n_buckets['buckets']:
-                    tmplist = onmt.utils.distributed.all_gather_list(bucket, max_size=255 * 255)
+                    tmplist = mammoth.distributed.all_gather_list(bucket, max_size=255 * 255)
                     buckets.append([x for x in tmplist if x is not None][0])
 
                 new_data_state[taskname]['buckets'] = buckets
@@ -523,7 +523,7 @@ class Trainer(object):
 
             # tgt_outer corresponds to the target-side input. The expected
             # decoder output will be read directly from the batch:
-            # cf. `onmt.utils.loss.CommonLossCompute._make_shard_state`
+            # cf. `mammoth.utils.loss.CommonLossCompute._make_shard_state`
             tgt_outer = batch.tgt
 
             bptt = False

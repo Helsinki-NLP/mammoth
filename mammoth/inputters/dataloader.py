@@ -9,7 +9,15 @@ from mammoth.inputters.dataset import get_corpus
 from mammoth.utils.logging import logger
 
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True, data_state=None):
+def build_dataloader(
+        dataset,
+        batch_size,
+        batch_type,
+        pool_size=None,
+        n_buckets=None,
+        cycle=True,
+        as_iter=True,
+        data_state=None):
     """Convert an mammoth.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         loader = InferenceBatcher(dataset, batch_size)
@@ -44,7 +52,7 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
                     true_size = len(example_dict['src'])
                 return true_size
 
-        loader = LookAheadBucketing( dataset, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, data_state)
+        loader = LookAheadBucketing(dataset, pool_size, n_buckets, batch_size, bucket_fn, numel_fn, data_state)
     return (iter(loader), loader) if as_iter else loader
 
 
@@ -147,7 +155,7 @@ class LookAheadBucketing():
 
     def get_data_state(self):
         return {'indices': self.current_file_index, 'buckets': self._buckets}
-    
+
     def _spiralling(self, s_idx: int, t_idx: int):
         def _seq():
             # from https://math.stackexchange.com/questions/163080/on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361  # noqa: E501
@@ -276,7 +284,7 @@ class DynamicDatasetIter(object):
         self.data_state = data_state
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train,data_state=None):
+    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, data_state=None):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -322,18 +330,18 @@ class DynamicDatasetIter(object):
                 resumeidx = corpus_datastate["indices"]
                 logger.info(
                     f'RESUME TRAINING: task {task.corpus_id} to resume form example num. {resumeidx} in corpus'
-                    )
+                )
             # Case 1: we are training, and the task must contain some path to training data
             # Case 2: we are validation (hence self.is_train := False), we need an iterator
             # if and only the task defines validation data, i.e. if the key `path_valid_src`
             # is defined
             if self.is_train or self.opts.tasks[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
-                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train,  data_state=corpus_datastate,
+                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train, data_state=corpus_datastate,
                 ).to(device)
 
                 # iterator over minibatches
-                ordered_iter,lab = build_dataloader(
+                ordered_iter, lab = build_dataloader(
                     corpus,
                     self.batch_size,
                     self.batch_type,
@@ -345,7 +353,8 @@ class DynamicDatasetIter(object):
                 )
 
                 self.dataset_iterators[task.corpus_id] = (ordered_iter, lab, metadata)
-                #Comment by Timothee: this also impacts the validation iteration loop, which is missing the lab in its unpacking line 364 of this file
+                # Comment by Timothee: this also impacts the validation iteration loop,
+                # which is missing the lab in its unpacking line 364 of this file
 
         self.init_iterators = True
 

@@ -137,6 +137,7 @@ class ParallelCorpus(IterableDataset):
         """Read file, produce batches of examples"""
         start_index = self.current_file_index
         self.current_file_index = None
+
         def _cast(example_dict):
             return {
                 k: self._numericalize(v, side=k) if k != 'idx' else v

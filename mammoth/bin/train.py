@@ -178,18 +178,25 @@ def train(opts):
     vocabs_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
+    # initialize data states
+    checkpoint = None
+    if opts.train_from:
+        checkpoint = load_checkpoint(ckpt_path=opts.train_from)
+        data_state = checkpoint.get('data_state', dict())
+        # load vocabs from frame
+        logger.info('Loading vocabs from frame')
+        vocabs_dict = checkpoint.get('vocab')
+        # ToDo: check id there is a new task and create necessary vocabs
+    else:
+        data_state = {task.corpus_id: {'indices': 0, 'buckets': None} for task in global_task_queue_manager.get_tasks()}
+        # initialize vocabs
+        for side in ('src', 'tgt'):
+            for lang in global_task_queue_manager.get_langs(side):
+                vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
+                # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
+                vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
 
-    vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
-    for side in ('src', 'tgt'):
-        for lang in global_task_queue_manager.get_langs(side):
-            vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
-            # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
-            vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
-    # for key, val in fields_dict:
-    #     print(f'{key}:\t{val}')
-
-    train_process = partial(single_main, vocabs_dict=vocabs_dict)
-
+    train_process = partial(single_main, vocabs_dict=vocabs_dict, data_state=data_state)
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")
 
     if world_context.context == DeviceContextEnum.MULTI_GPU:

@@ -1,5 +1,6 @@
 import os
-from collections import deque
+from glob import glob
+from collections import deque, defaultdict
 from mammoth.utils.logging import logger
 
 import torch
@@ -8,13 +9,13 @@ import torch.nn as nn
 from mammoth.utils.module_splitter import explode_model
 
 
-def build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context):
+def build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context, data_state):
     # _check_save_model_path
     save_model_path = os.path.abspath(opts.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opts.save_model, model, model_opts, vocabs_dict, optim, opts.keep_checkpoint, device_context, opts.save_all_gpus
+        opts.save_model, model, model_opts, vocabs_dict, optim, data_state, opts.keep_checkpoint, device_context, opts.save_all_gpus
     )
     return model_saver
 
@@ -23,6 +24,11 @@ def load_checkpoint(ckpt_path):
     """Load checkpoint from `ckpt_path` if any else return `None`."""
     checkpoint = None
     if ckpt_path:
+        if not ckpt_path.endswith('.pt'):
+            # find latest checkpoint to load it
+            frames = glob(os.path.join(ckpt_path+'*frame*pt'))
+            frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
+            ckpt_path = frames[-1]
         logger.info('Loading checkpoint from %s' % ckpt_path)
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
     return checkpoint
@@ -44,6 +50,7 @@ class ModelSaverBase(object):
         vocabs_dict,
         optim,
         keep_checkpoint=-1,
+        data_state=None,
         device_context=None,
         all_gpus=False,
     ):
@@ -59,6 +66,7 @@ class ModelSaverBase(object):
         assert device_context is not None
         self.device_context = device_context
         self.all_gpus = all_gpus
+        self.data_state = data_state if data_state is not None else defaultdict(dict)
 
     def save(self, step, moving_average=None):
         """Main entry point for model saver
@@ -130,8 +138,9 @@ class ModelSaver(ModelSaverBase):
             # 'generator': generator_state_dict,
             "vocab": self.vocabs_dict,
             "opts": self.model_opts,
-            "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
+            "optim": self.optim.state_dict(),
             "whole_model": self.model,
+            "data_state": self.data_state
         }
 
         tmp_checkpoint_paths = []

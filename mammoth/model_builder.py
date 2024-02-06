@@ -310,13 +310,13 @@ def build_task_specific_model(
         generators_md.add_module(f'generator_{lang}', generator)
 
     if checkpoint:
-            trainstep = int(checkpoint['optim']['training_step']) - 1
-            for modname, gen in generators_md.items():
-                mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_{modname}.pt")
-                if mod_path.exists():
-                    module = torch.load(mod_path)
-                    gen.load_state_dict(module)
-                    logger.info(f"Successfully loaded {modname} from the checkpoint.")
+        trainstep = int(checkpoint['optim']['training_step']) - 1
+        for modname, gen in generators_md.items():
+            mod_path = Path(checkpoint['opt'].save_model + f"_step_{trainstep}_{modname}.pt")
+            if mod_path.exists():
+                module = torch.load(mod_path)
+                gen.load_state_dict(module)
+                logger.info(f"Successfully loaded {modname} from the checkpoint.")
 
     pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
     decoder = build_only_dec(model_opts, pluggable_tgt_emb, task_queue_manager, checkpoint)
@@ -336,7 +336,7 @@ def build_task_specific_model(
 
     if checkpoint:
         # trainstep= int(checkpoint['optim']['training_step'])-1 - already recoderd in generators
-        attn_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_attention_bridge.pt")
+        attn_path = Path(checkpoint['opt'].save_model + f"_step_{trainstep}_attention_bridge.pt")
         if attn_path.exists():
             attention_bridge.load_state_dict(torch.load(attn_path))
             logger.info("Successfully loaded the attention bridge  from the checkpoint.")
@@ -410,7 +410,7 @@ def build_only_enc(model_opts, src_emb, task_queue_manager, checkpoint=None):
 
         # load layers
         for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
+            mod_path = Path(checkpoint['opt'].save_model + f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
             if mod_path.exists() and modname in encoder.encoders._modules[str(idx)].keys():
                 module = torch.load(mod_path)
                 encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
@@ -445,13 +445,13 @@ def build_only_dec(model_opts, tgt_emb, task_queue_manager, checkpoint=None):
         # load embs
         for modname in embnames:
             if f'embeddings_{modname}' in decoder.embeddings._modules.keys():
-                module = torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
+                module = torch.load(checkpoint['opt'].save_model + f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
                 decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
                 logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
 
         # load layers
         for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
+            mod_path = Path(checkpoint['opt'].save_model + f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
             if mod_path.exists() and modname in decoder.decoders._modules[str(idx)].keys():
                 module = torch.load(mod_path)
                 decoder.decoders._modules[str(idx)][modname].load_state_dict(module)

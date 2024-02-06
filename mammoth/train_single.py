@@ -197,7 +197,7 @@ def main(
                 semaphore.release()
                 # TODO: confirm that batch-providing corpus has already been to'd to the correct place
                 yield batch, metadata, communication_batch_id, data_states
-                
+
         train_iter = _train_iter()
     # train_iter = iter_on_device(train_iter, device_context)
     logger.info("Device {} - Valid iter".format(device_context.id))

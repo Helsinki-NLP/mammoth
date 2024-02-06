@@ -15,8 +15,15 @@ def build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_contex
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opts.save_model, model, model_opts, vocabs_dict, optim, data_state, opts.keep_checkpoint, device_context, opts.save_all_gpus
-    )
+        opts.save_model,
+        model,
+        model_opts,
+        vocabs_dict,
+        optim,
+        data_state,
+        opts.keep_checkpoint,
+        device_context,
+        opts.save_all_gpus)
     return model_saver
 
 
@@ -26,7 +33,7 @@ def load_checkpoint(ckpt_path):
     if ckpt_path:
         if not ckpt_path.endswith('.pt'):
             # find latest checkpoint to load it
-            frames = glob(os.path.join(ckpt_path+'*frame*pt'))
+            frames = glob(os.path.join(ckpt_path + '*frame*pt'))
             frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
             ckpt_path = frames[-1]
         logger.info('Loading checkpoint from %s' % ckpt_path)

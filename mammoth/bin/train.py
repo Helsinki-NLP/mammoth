@@ -238,10 +238,17 @@ def train(opts):
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
+                    args=(
+                        train_process,
+                        opts,
+                        device_context,
+                        error_queue,
+                        q,
+                        semaphore,
+                        task_queue_manager,
+                        checkpoint),
                     daemon=True,
-                )
-            )
+                ))
             procs[local_rank].start()
             logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
             error_handler.add_child(procs[local_rank].pid)

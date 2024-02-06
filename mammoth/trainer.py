@@ -386,7 +386,7 @@ class Trainer(object):
                     # If the patience has reached the limit, stop training
                     if self.earlystopper.has_stopped():
                         break
-            
+
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
                 self.model_saver.save(step, moving_average=self.moving_average)
                 if device_context.is_distributed():
@@ -455,6 +455,7 @@ class Trainer(object):
                 p.has_grad = False
 
         return stats
+
     def _gather_data_state(self, device_context):
         new_data_state = self.model_saver.data_state.copy()
         for taskname, idx_n_buckets in self.model_saver.data_state.items():
@@ -479,7 +480,7 @@ class Trainer(object):
                             idx_n_buckets['buckets'].append(-1)
                 buckets = []
                 for bucket in idx_n_buckets['buckets']:
-                    tmplist = onmt.utils.distributed.all_gather_list(bucket, max_size=255*255)
+                    tmplist = onmt.utils.distributed.all_gather_list(bucket, max_size=255 * 255)
                     buckets.append([x for x in tmplist if x is not None][0])
 
                 new_data_state[taskname]['buckets'] = buckets
@@ -487,6 +488,7 @@ class Trainer(object):
                 new_data_state[taskname]['buckets'] = None
 
         return new_data_state
+
     def _gradient_accumulation_over_lang_pairs(
         self,
         batches_with_meta,

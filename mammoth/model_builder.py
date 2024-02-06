@@ -49,7 +49,8 @@ def build_embeddings(opts, vocab, for_encoder=True):
         freeze_word_vecs=freeze_word_vecs,
         enable_embeddingless=opts.enable_embeddingless
     )
-    if opts.enable_embeddingless: logger.info("Creating an embeddingless model.")
+    if opts.enable_embeddingless:
+        logger.info("Creating an embeddingless model.")
     return emb
 
 

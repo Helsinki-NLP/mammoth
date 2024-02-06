@@ -330,7 +330,8 @@ def model_opts(parser):
         '--enable_embeddingless',
         '-enable_embeddingless',
         action='store_true',
-        help="Enable the use of byte-based embeddingless models (Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
+        help="Enable the use of byte-based embeddingless models" + \
+            "(Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
     )
     group.add(
         '--position_encoding',

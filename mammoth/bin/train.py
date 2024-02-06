@@ -238,7 +238,7 @@ def train(opts):
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager),
+                    args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
                     daemon=True,
                 )
             )
@@ -253,6 +253,7 @@ def train(opts):
                 vocabs_dict=vocabs_dict,
                 opts=opts,
                 is_train=True,
+                data_state=data_state,
             )
 
             producer = mp.Process(
@@ -281,7 +282,7 @@ def train(opts):
             local_rank=0,
             opts=opts
         )
-        train_process(opts, device_context=device_context, task_queue_manager=task_queue_manager)
+        train_process(opts, device_context=device_context, task_queue_manager=task_queue_manager, checkpoint=checkpoint)
 
 
 def _get_parser():

@@ -111,10 +111,12 @@ def main(
     opts,
     vocabs_dict,
     device_context,
+    data_state,
     error_queue=None,
     batch_queue=None,
     semaphore=None,
     task_queue_manager=None,
+    checkpoint=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opts`` has been validated and updated
@@ -158,8 +160,7 @@ def main(
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context)
-
+    model_saver = build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context, data_state)
     logger.info("{} - Build trainer".format(device_context.id))
     trainer = build_trainer(
         opts,
@@ -180,6 +181,7 @@ def main(
             vocabs_dict=vocabs_dict,
             opts=opts,
             is_train=True,
+            data_state=data_state,
         )
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():
@@ -191,11 +193,11 @@ def main(
 
         def _train_iter():
             while True:
-                batch, metadata, communication_batch_id = batch_queue.get()
+                batch, metadata, communication_batch_id, data_states = batch_queue.get()
                 semaphore.release()
                 # TODO: confirm that batch-providing corpus has already been to'd to the correct place
-                yield batch, metadata, communication_batch_id
-
+                yield batch, metadata, communication_batch_id, data_states
+                
         train_iter = _train_iter()
     # train_iter = iter_on_device(train_iter, device_context)
     logger.info("Device {} - Valid iter".format(device_context.id))

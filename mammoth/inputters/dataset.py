@@ -37,8 +37,10 @@ def read_examples_from_files(
     transforms_fn=lambda x: x,
     stride=None,
     offset=None,
+    start_index=0,
 ):
     """Helper function to read examples"""
+    idaux = itertools.count(start_index)
 
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
@@ -46,6 +48,7 @@ def read_examples_from_files(
         return {
             'src': tokenize_fn(src_str, side='src'),
             'tgt': tokenize_fn(tgt_str, side='tgt') if tgt_str is not None else None,
+            'idx': next(idaux)
             # 'align': None,
         }
 
@@ -61,6 +64,9 @@ def read_examples_from_files(
         tgt_fh = open(tgt_path, 'rt')
 
     examples = zip(src_fh, tgt_fh)
+    if start_index > 0:
+        # ignore 1st start_index examples when we restart training
+        examples = itertools.islice(examples, start_index + 1, None)
     if stride is not None and offset is not None:
         # Start by skipping offset examples. After that return every stride:th example.
         examples = itertools.islice(examples, offset, None, stride)
@@ -89,6 +95,7 @@ class ParallelCorpus(IterableDataset):
         offset=None,
         is_train=False,
         task=None,
+        current_file_index=None,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -102,6 +109,7 @@ class ParallelCorpus(IterableDataset):
         self.offset = offset
         self.is_train = is_train
         self.corpus_id = task.corpus_id
+        self.current_file_index = current_file_index
 
     # FIXME: most likely redundant with mammoth.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -127,10 +135,11 @@ class ParallelCorpus(IterableDataset):
 
     def __iter__(self):
         """Read file, produce batches of examples"""
-
+        start_index = self.current_file_index
+        self.current_file_index = None
         def _cast(example_dict):
             return {
-                k: self._numericalize(v, side=k)
+                k: self._numericalize(v, side=k) if k != 'idx' else v
                 for k, v in example_dict.items()
                 if v is not None
             }
@@ -149,6 +158,7 @@ class ParallelCorpus(IterableDataset):
             ),
             stride=self.stride,
             offset=self.offset,
+            start_index=start_index,
         )
         examples = map(_cast, examples)
         yield from examples
@@ -173,7 +183,7 @@ class ParallelCorpus(IterableDataset):
         return batch
 
 
-def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
+def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False, data_state=None):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
@@ -189,7 +199,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         task=task,
     )
     transforms_to_apply = [transforms_cls[trf_name] for trf_name in transforms_to_apply]
-
+    current_file_index = 0 if not data_state else data_state['indices']
     # build Dataset proper
     dataset = ParallelCorpus(
         corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
@@ -201,6 +211,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         offset=corpus_opts.get('offset', None),
         is_train=is_train,
         task=task,
+        current_file_index=current_file_index,
     )
     return dataset
 

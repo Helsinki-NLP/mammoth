@@ -115,6 +115,7 @@ def main(
     batch_queue=None,
     semaphore=None,
     task_queue_manager=None,
+    checkpoint=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opts`` has been validated and updated

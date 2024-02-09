@@ -312,7 +312,7 @@ def build_task_specific_model(
     if checkpoint:
         trainstep = int(checkpoint['optim']['training_step']) - 1
         for modname, gen in generators_md.items():
-            mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_{modname}.pt")
+            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_{modname}.pt")
             if mod_path.exists():
                 module = torch.load(mod_path)
                 gen.load_state_dict(module)
@@ -331,10 +331,10 @@ def build_task_specific_model(
         for p in attention_bridge.parameters():
             if p.dim() > 1:
                 xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
-    
+
     if checkpoint:
         # trainstep= int(checkpoint['optim']['training_step'])-1 - already recoderd in generators
-        attn_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_attention_bridge.pt")
+        attn_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_attention_bridge.pt")
         if attn_path.exists():
             attention_bridge.load_state_dict(torch.load(attn_path))
             logger.info("Successfully loaded the attention bridge  from the checkpoint.")
@@ -395,24 +395,26 @@ def build_only_enc(model_opts, src_emb, task_queue_manager, checkpoint):
                 if p.dim() > 1:
                     xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if checkpoint:
-        trainstep = int(checkpoint['optim']['training_step']) - 1
-        embnames = [srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opt'].data.values()]
+        logger.info("Loading from checkpoint")
+        trainstep = int(checkpoint['optim']['training_step']) - 1               
+
+        embnames = [srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opts'].tasks.values()]
         embnames = set(embnames)
         groupnames = [
-            (idx, modname) for srctgt in checkpoint['opt'].data.values()
+            (idx, modname) for srctgt in checkpoint['opts'].tasks.values()
             for idx, modname in enumerate(srctgt['enc_sharing_group'])
         ]
         groupnames = set(groupnames)
         # load embs
         for modname in embnames:
-            module = torch.load(checkpoint['opt'].save_model + f"_step_{trainstep}_src_embeddings_{modname}.pt")
+            module = torch.load(checkpoint['opts'].save_model + f"_step_{trainstep}_src_embeddings_{modname}.pt")
             if f'embeddings_{modname}' in encoder.embeddings._modules.keys():
                 encoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
                 logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
 
         # load layers
         for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
+            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
             if mod_path.exists() and modname in encoder.encoders._modules[str(idx)].keys():
                 module = torch.load(mod_path)
                 encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
@@ -436,24 +438,25 @@ def build_only_dec(model_opts, tgt_emb, task_queue_manager, checkpoint):
                     xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
 
     if checkpoint:
+        logger.info("Loading from checkpoint")
         trainstep = int(checkpoint['optim']['training_step']) - 1
-        embnames = [srctgt['src_tgt'].split('-')[1] for srctgt in checkpoint['opt'].data.values()]
+        embnames = [srctgt['src_tgt'].split('-')[1] for srctgt in checkpoint['opts'].tasks.values()]
         embnames = set(embnames)
         groupnames = [
-            (idx, modname) for srctgt in checkpoint['opt'].data.values()
+            (idx, modname) for srctgt in checkpoint['opts'].tasks.values()
             for idx, modname in enumerate(srctgt['dec_sharing_group'])
         ]
         groupnames = set(groupnames)
         # load embs
         for modname in embnames:
             if f'embeddings_{modname}' in decoder.embeddings._modules.keys():
-                module = torch.load(checkpoint['opt'].save_model+f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
+                module = torch.load(checkpoint['opts'].save_model + f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
                 decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
                 logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
 
         # load layers
         for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opt'].save_model+f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
+            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
             if mod_path.exists() and modname in decoder.decoders._modules[str(idx)].keys():
                 module = torch.load(mod_path)
                 decoder.decoders._modules[str(idx)][modname].load_state_dict(module)

@@ -132,7 +132,6 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opts._all_transform)
-    checkpoint = None
     model_opts = _get_model_opts(opts, checkpoint=checkpoint)
 
     # Build model.
@@ -173,7 +172,7 @@ def main(
         generators_md=generators_md,
     )
     logger.info("{} - Trainer built".format(device_context.id))
-
+ 
     if batch_queue is None:
         train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,

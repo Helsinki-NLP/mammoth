@@ -178,7 +178,7 @@ def train(opts):
     vocabs_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
-    
+
     checkpoint = None
     if opts.train_from:
         checkpoint = load_checkpoint(ckpt_path=opts.train_from)
@@ -236,10 +236,17 @@ def train(opts):
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
+                    args=(
+                        train_process,
+                        opts,
+                        device_context,
+                        error_queue,
+                        q,
+                        semaphore,
+                        task_queue_manager,
+                        checkpoint),
                     daemon=True,
-                )
-            )
+                ))
             procs[local_rank].start()
             logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
             error_handler.add_child(procs[local_rank].pid)

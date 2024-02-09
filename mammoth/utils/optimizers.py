@@ -11,6 +11,7 @@ from mammoth.utils.misc import fn_args
 from torch.nn.utils import clip_grad_norm_
 from mammoth.utils.logging import logger
 
+
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     suboptimizers = {}
     my_grouped_components = task_queue_manager.get_grouped_components(model)
@@ -249,6 +250,7 @@ class MultipleOptimizer(object):
             count = self._steps[name]
             result.append(f'Optimizer "{name}" has been stepped {count} times')
         return result
+
     def state_dict(self):
         """Returns the state dictionary"""
         return {
@@ -274,6 +276,7 @@ class MultipleOptimizer(object):
 
         self.multiOptims_Langs = state_dict["multiOptims_Langs"]
         self._steps = state_dict["steps"]
+
 
 class Optimizer(object):
     """

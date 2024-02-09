@@ -25,7 +25,7 @@ def load_checkpoint(ckpt_path):
     checkpoint = None
     if ckpt_path:
         if not ckpt_path.endswith('.pt'):
-            frames = glob(os.path.join(ckpt_path+'*frame*pt'))
+            frames = glob(os.path.join(ckpt_path + '*frame*pt'))
             frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
             ckpt_path = frames[-1]
         logger.info('Loading checkpoint from %s' % ckpt_path)

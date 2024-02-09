@@ -172,7 +172,7 @@ def main(
         generators_md=generators_md,
     )
     logger.info("{} - Trainer built".format(device_context.id))
- 
+
     if batch_queue is None:
         train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,

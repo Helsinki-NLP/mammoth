@@ -57,7 +57,7 @@ def _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager):
 
 
 def init_distributed(model, task_queue_manager):
-    my_component_groups = task_queue_manager.get_distributed_groups()
+    my_component_groups = task_queue_manager.get_my_distributed_groups()
     for (layer_stack_index, encoder_id), (min_rank, group) in my_component_groups['encoder'].items():
         weights = [
             p.data for name, p
@@ -143,7 +143,7 @@ def main(
         init_distributed(model, task_queue_manager)
     else:
         # Initialize some data structures
-        _ = task_queue_manager.get_distributed_groups()
+        _ = task_queue_manager.get_my_distributed_groups()
     enc, dec = model.count_parameters(log=logger.debug)
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
     logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))

@@ -23,7 +23,7 @@ class LayerStackEncoder(EncoderBase):
         for layer_stack_index, n_layers in enumerate(opts.enc_layers):
             stacks = nn.ModuleDict()
             is_on_top = layer_stack_index == len(opts.enc_layers) - 1
-            for module_id in task_queue_manager.get_encoders(layer_stack_index):
+            for module_id in task_queue_manager.get_my_encoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
                     continue

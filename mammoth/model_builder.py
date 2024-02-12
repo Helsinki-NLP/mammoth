@@ -297,13 +297,13 @@ def build_task_specific_model(
     generators_md = nn.ModuleDict()
 
     # FIXME: it's getting late and I just want this to compile
-    for side, lang, _, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
+    for side, lang, _, vocab in task_queue_manager.get_my_vocabs(side='src', vocabs_dict=vocabs_dict):
         src_emb = build_src_emb(model_opts, vocab)
         src_embs[lang] = src_emb
     pluggable_src_emb = PluggableEmbeddings(src_embs)
     encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager, checkpoint)
 
-    for side, lang, _, vocab in task_queue_manager.get_vocabs(side='tgt', vocabs_dict=vocabs_dict):
+    for side, lang, _, vocab in task_queue_manager.get_my_vocabs(side='tgt', vocabs_dict=vocabs_dict):
         tgt_emb = build_tgt_emb(model_opts, vocab)
         tgt_embs[lang] = tgt_emb
         generator = build_generator(model_opts, len(vocab), tgt_emb)
@@ -579,7 +579,7 @@ def create_all_adapters(model, opts, task_queue_manager):
     my_dec_adapter_ids = set()
     adapter_to_encoder_ids = defaultdict(set)
     adapter_to_decoder_ids = defaultdict(set)
-    for task in task_queue_manager.get_tasks():
+    for task in task_queue_manager.get_my_tasks():
         for adapter_id in task.encoder_adapter_ids:
             adapter_id = tuple(adapter_id)
             my_enc_adapter_ids.add(adapter_id)

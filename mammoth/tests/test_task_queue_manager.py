@@ -35,8 +35,6 @@ def test_init_minimal():
         task_queue_manager.local_rank
     assert [task.node_rank for task in task_queue_manager.tasks] == [0, 0]
     assert [task.local_rank for task in task_queue_manager.tasks] == [0, 1]
-    assert task_queue_manager.get_encoders(0) == ['a', 'c']
-    assert task_queue_manager.get_decoders(0) == ['b', 'd']
 
 
 def create_basic_task_queue_manager():
@@ -147,7 +145,7 @@ def test_create_all_distributed_groups():
     }
 
 
-def test_get_distributed_groups():
+def test_get_my_distributed_groups():
     class MockGroup:
         def __init__(self):
             self.group_idx = 0
@@ -159,7 +157,7 @@ def test_get_distributed_groups():
 
     global_task_queue_manager, opts = create_basic_task_queue_manager()
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opts=opts)
-    my_groups = task_queue_manager.get_distributed_groups(new_group_func=MockGroup())
+    my_groups = task_queue_manager.get_my_distributed_groups(new_group_func=MockGroup())
     assert my_groups == {
         'encoder': OrderedDict({
             (0, 'x'): (0, 'Group 2 with GPU ranks [0, 1]'),
@@ -201,7 +199,7 @@ def test_cpu_distributed_groups():
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
     new_group_func = MagicMock().new_group_func
-    my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)
+    my_groups = task_queue_manager.get_my_distributed_groups(new_group_func=new_group_func)
     # No groups should be created when running on CPU
     new_group_func.assert_not_called()
     # The component keys should still exist, but be empty
@@ -253,7 +251,7 @@ def test_distributed_groups_no_encoder_group():
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
     new_group_func = MagicMock().new_group_func
-    my_groups = task_queue_manager.get_distributed_groups(new_group_func=new_group_func)
+    my_groups = task_queue_manager.get_my_distributed_groups(new_group_func=new_group_func)
     # No groups should be created:
     # AB is fully shared (doesn't need a group),
     # and all other components are not shared at all
@@ -292,25 +290,25 @@ def test_distributed_groups_no_encoder_group():
 def test_basic_getters():
     global_task_queue_manager, opts = create_basic_task_queue_manager()
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
-    encoders = list(task_queue_manager.get_encoders(0))
+    encoders = list(task_queue_manager.get_my_encoders(0))
     assert encoders == ['x']
-    decoders = list(task_queue_manager.get_decoders(0))
+    decoders = list(task_queue_manager.get_my_decoders(0))
     assert decoders == ['y']
-    src_langs = list(task_queue_manager.get_src_langs())
+    src_langs = list(task_queue_manager.get_my_src_langs())
     assert src_langs == ['a']
-    tgt_langs = list(task_queue_manager.get_tgt_langs())
+    tgt_langs = list(task_queue_manager.get_my_tgt_langs())
     assert tgt_langs == ['b']
-    generators = list(task_queue_manager.get_generators())
+    generators = list(task_queue_manager.get_my_generators())
     assert generators == ['b']
 
     task_queue_manager = global_task_queue_manager.global_to_local(node_rank=0, local_rank=1, opts=opts)
-    encoders = list(task_queue_manager.get_encoders(0))
+    encoders = list(task_queue_manager.get_my_encoders(0))
     assert encoders == ['xx', 'x']
-    decoders = list(task_queue_manager.get_decoders(0))
+    decoders = list(task_queue_manager.get_my_decoders(0))
     assert decoders == ['yy', 'yy']
-    src_langs = list(task_queue_manager.get_src_langs())
+    src_langs = list(task_queue_manager.get_my_src_langs())
     assert src_langs == ['c', 'a']
-    tgt_langs = list(task_queue_manager.get_tgt_langs())
+    tgt_langs = list(task_queue_manager.get_my_tgt_langs())
     assert tgt_langs == ['d', 'd']
-    generators = list(task_queue_manager.get_generators())
+    generators = list(task_queue_manager.get_my_generators())
     assert generators == ['d', 'd']

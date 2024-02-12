@@ -14,7 +14,7 @@ from mammoth.utils.logging import logger
 
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     suboptimizers = {}
-    my_grouped_components = task_queue_manager.get_grouped_components(model)
+    my_grouped_components = task_queue_manager.get_my_grouped_components(model)
     for component_type in my_grouped_components:
         for component_id, component in my_grouped_components[component_type].items():
             if isinstance(component_id, str):
@@ -37,7 +37,7 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 optimizer = base_optimizer(params)
                 suboptimizers[name] = optimizer
 
-    for generator_id in task_queue_manager.get_generators():
+    for generator_id in task_queue_manager.get_my_generators():
         generator = model.generator[f'generator_{generator_id}']
         params = []
         for name, param in generator.named_parameters():

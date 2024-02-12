@@ -57,7 +57,7 @@ def build_trainer(
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
-    for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_vocabs('tgt', vocabs_dict):
+    for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_my_vocabs('tgt', vocabs_dict):
         generator = generators_md[f'generator_{lang}']
         train_loss_md.add_module(
             f'trainloss{lang}',
@@ -190,7 +190,7 @@ class Trainer(object):
         self.dropout_steps = dropout_steps
 
         self.task_queue_manager = task_queue_manager
-        my_component_groups = self.task_queue_manager.get_distributed_groups()
+        my_component_groups = self.task_queue_manager.get_my_distributed_groups()
         self.my_encoder_groups = my_component_groups['encoder']
         self.my_decoder_groups = my_component_groups['decoder']
         self.my_src_emb_groups = my_component_groups['src_emb']

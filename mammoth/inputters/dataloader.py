@@ -286,7 +286,7 @@ class DynamicDatasetIter(object):
 
     def _init_datasets(self):
         self.dataset_iterators = dict()
-        for task in self.task_queue_manager.get_tasks():
+        for task in self.task_queue_manager.get_my_tasks():
             src_vocab = self.vocabs_dict[('src', task.src_lang)]
             tgt_vocab = self.vocabs_dict[('tgt', task.tgt_lang)]
             # merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}

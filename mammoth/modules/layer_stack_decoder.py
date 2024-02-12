@@ -23,7 +23,7 @@ class LayerStackDecoder(DecoderBase):
         for layer_stack_index, n_layers in enumerate(opts.dec_layers):
             is_on_top = layer_stack_index == len(opts.dec_layers) - 1
             stacks = nn.ModuleDict()
-            for module_id in task_queue_manager.get_decoders(layer_stack_index):
+            for module_id in task_queue_manager.get_my_decoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
                     continue

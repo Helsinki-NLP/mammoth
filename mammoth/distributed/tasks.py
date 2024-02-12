@@ -178,7 +178,6 @@ class TaskQueueManager:
         tasks: List[TaskSpecs],
         accum_count: int,
         world_context: WorldContext,
-        device_context: Optional[DeviceContext] = None,
         components_to_gpus=None,
         components_to_groups=None,
         task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
@@ -200,12 +199,7 @@ class TaskQueueManager:
         self.accum_count = accum_count[0] if isinstance(accum_count, list) else accum_count
         self.task_distribution_strategy = task_distribution_strategy
         self.world_context = world_context
-        self.device_context = device_context
         self.uses_adapters = uses_adapters
-
-        if self.world_context and self.device_context:
-            logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
-            self.device_context.validate(self.world_context)
 
         self.components_to_gpus = components_to_gpus
         self.components_to_groups = components_to_groups
@@ -218,18 +212,6 @@ class TaskQueueManager:
     @property
     def n_nodes(self):
         return self.world_context.n_nodes
-
-    @property
-    def node_rank(self):
-        if not self.device_context:
-            raise Exception('Trying to get node_rank of global TQM')
-        return self.device_context.node_rank
-
-    @property
-    def local_rank(self):
-        if not self.device_context:
-            raise Exception('Trying to get local_rank of global TQM')
-        return self.device_context.local_rank
 
     @classmethod
     def from_opts(cls, opts: Namespace, world_context: WorldContext):
@@ -320,15 +302,15 @@ class TaskQueueManager:
         assert local_rank is not None
         task_distribution_strategy = self._get_strategy(node_rank=node_rank, local_rank=local_rank, opts=opts)
         device_context = self.world_context.global_to_local(node_rank, local_rank)
-        return self.__class__(
+        return LocalTaskQueueManager(
             self.tasks,
             accum_count=self.accum_count,
             world_context=self.world_context,
-            device_context=device_context,
             components_to_gpus=self.components_to_gpus,
             components_to_groups=self.components_to_groups,
             task_distribution_strategy=task_distribution_strategy,
             uses_adapters=self.uses_adapters,
+            device_context=device_context,
         )
 
     def _get_strategy(self, node_rank, local_rank, opts):
@@ -365,12 +347,8 @@ class TaskQueueManager:
     def _tasks_on_device(self, node_rank, local_rank):
         return [task for task in self.tasks if (task.node_rank, task.local_rank) == (node_rank, local_rank)]
 
-    def get_tasks(self):
-        if not self.device_context:
-            # global mode: return all
-            return self.tasks
-        else:
-            return self._tasks_on_device(self.node_rank, self.local_rank)
+    def get_all_tasks(self):
+        return self.tasks
 
     @staticmethod
     def _default_node_gpu(n_tasks, n_nodes, gpus_per_node):
@@ -445,6 +423,11 @@ class TaskQueueManager:
                 continue
             sorted_global_ranks = list(sorted(global_ranks))
             min_rank = sorted_global_ranks[0]
+            # The torch.distributed.new_group function requires that all
+            # processes in the main group (i.e. all processes that are part of
+            # the distributed job) enter the function, even if they are not
+            # going to be members of the group. Additionally, groups should be
+            # created in the same order in all processes.
             group_tpl = (min_rank, new_group_func(sorted_global_ranks))
             component_type = key[0]
             component_id = key[1:]
@@ -452,13 +435,69 @@ class TaskQueueManager:
 
         return self.components_to_groups
 
+    def get_langs(self, side):
+        if side == 'src':
+            return [task.src_lang for task in self.get_all_tasks()]
+        elif side == 'tgt':
+            return [task.tgt_lang for task in self.get_all_tasks()]
+        else:
+            raise ValueError(f'side "{side}" not in {{src, tgt}}')
+
+
+class LocalTaskQueueManager(TaskQueueManager):
+    def __init__(
+        self,
+        tasks: List[TaskSpecs],
+        accum_count: int,
+        world_context: WorldContext,
+        components_to_gpus=None,
+        components_to_groups=None,
+        task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
+        uses_adapters: bool = False,
+        device_context: Optional[DeviceContext] = None,
+    ):
+        """
+        Schedules tasks (language pairs) to devices.
+        Has the responsibility for all resources that need to be
+        consistently assigned to nodes and GPUs.
+        This includes data, parameters, and vocabularies.
+
+        `local_rank` is the local rank of the GPU on this node.
+        When `node_rank` and `local_rank` are given, the methods return only
+        the items needed in the specified process.
+        When set to None, all items are returned.
+        """
+        super().__init__(
+            tasks=tasks,
+            accum_count=accum_count,
+            world_context=world_context,
+            task_distribution_strategy=task_distribution_strategy,
+            uses_adapters=uses_adapters,
+            components_to_gpus=components_to_gpus,
+            components_to_groups=components_to_groups,
+        )
+
+        assert device_context is not None
+        self.device_context = device_context
+
+        logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
+        self.device_context.validate(self.world_context)
+
+        self.sampled_task_counts = Counter()
+
+    @property
+    def node_rank(self):
+        return self.device_context.node_rank
+
+    @property
+    def local_rank(self):
+        return self.device_context.local_rank
+
     @property
     def global_rank(self):
-        assert self.node_rank is not None
-        assert self.local_rank is not None
         return self.node_rank * self.gpus_per_node + self.local_rank
 
-    def get_distributed_groups(
+    def get_my_distributed_groups(
         self,
         new_group_func=torch.distributed.new_group,
     ):
@@ -502,15 +541,15 @@ class TaskQueueManager:
 
         return my_distributed_groups
 
-    def get_grouped_components(self, model):
+    def get_my_grouped_components(self, model):
         """
         Returns nested dict of component_type -> component_id -> nn.Module.
         Only components present on this GPU are returned.
-        Unlike get_distributed_groups, this method also returns components on a single device,
+        Unlike get_my_distributed_groups, this method also returns components on a single device,
         and it does not retrieve communication groups.
         """
         if self.components_to_groups is None:
-            raise Exception('Must call get_distributed_groups first')
+            raise Exception('Must call get_my_distributed_groups first')
 
         my_grouped_components = {
             'encoder': OrderedDict(),
@@ -524,7 +563,7 @@ class TaskQueueManager:
         if not self.world_context.is_distributed():
             tasks = self.tasks
         else:
-            tasks = self.get_tasks()
+            tasks = self.get_my_tasks()
 
         for task in tasks:
             # loop over my tasks, getting all the relevant module ids and modules
@@ -555,40 +594,6 @@ class TaskQueueManager:
 
         return my_grouped_components
 
-    # TODO: soon deprecated by #18 Data pipeline refactoring
-    def get_fields(self, side: str, fields_dict):
-        """Returns a list of tuples: (side, lang, component_id, fields)."""
-        raise RuntimeError
-
-    # FIXME: merge with below
-    def get_vocabularies(self, opts: Namespace, side: str):
-        result = []
-        for task in self.get_tasks():
-            lang = self.src_lang if side == 'src' else self.tgt_lang
-            vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
-            result.append((lang, vocab_path))
-        return result
-
-    def get_vocabs(self, side: str, vocabs_dict):
-        """Returns a list of tuples: (side, lang, component_id, vocabs).
-        side:           Either 'src' or 'tgt'.
-        lang:           The language code. Vocabularies are language specific.
-        component_id:   None
-        vocabs_dict:    The actual vocabs.
-        """
-        seen = set()
-        result = []
-        component_id = None     # for hysterical raisins
-        for task in self.get_tasks():
-            if side == 'src':
-                lang = task.src_lang
-            else:
-                lang = task.tgt_lang
-            if not (side, lang, component_id) in seen:
-                result.append((side, lang, component_id, vocabs_dict[(side, lang)]))
-            seen.add((side, lang, component_id))
-        return result
-
     def sample_corpus_ids(self, communication_batch_id: int):
         corpus_id = self.task_distribution_strategy.sample_corpus_ids(
             1,
@@ -598,27 +603,42 @@ class TaskQueueManager:
         self.sampled_task_counts.update(corpus_ids)
         return corpus_ids
 
-    def get_encoders(self, layer_stack_index: int):
-        my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_tasks()]
+    def get_my_encoders(self, layer_stack_index: int):
+        my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_my_tasks()]
         return my_encoder_ids
 
-    def get_decoders(self, layer_stack_index: int):
-        my_decoder_ids = [task.decoder_id[layer_stack_index] for task in self.get_tasks()]
+    def get_my_decoders(self, layer_stack_index: int):
+        my_decoder_ids = [task.decoder_id[layer_stack_index] for task in self.get_my_tasks()]
         return my_decoder_ids
 
-    def get_src_langs(self):
-        return [task.src_lang for task in self.get_tasks()]
+    def get_my_src_langs(self):
+        return [task.src_lang for task in self.get_my_tasks()]
 
-    def get_tgt_langs(self):
-        return [task.tgt_lang for task in self.get_tasks()]
+    def get_my_tgt_langs(self):
+        return [task.tgt_lang for task in self.get_my_tasks()]
 
-    def get_generators(self):
-        return [task.tgt_lang for task in self.get_tasks()]
+    def get_my_generators(self):
+        return [task.tgt_lang for task in self.get_my_tasks()]
 
-    def get_langs(self, side):
-        if side == 'src':
-            return [task.src_lang for task in self.get_tasks()]
-        elif side == 'tgt':
-            return [task.tgt_lang for task in self.get_tasks()]
-        else:
-            raise ValueError(f'side "{side}" not in {{src, tgt}}')
+    def get_my_vocabs(self, side: str, vocabs_dict):
+        """Returns a list of tuples: (side, lang, component_id, vocabs).
+        side:           Either 'src' or 'tgt'.
+        lang:           The language code. Vocabularies are language specific.
+        component_id:   None
+        vocabs_dict:    The actual vocabs.
+        """
+        seen = set()
+        result = []
+        component_id = None     # for hysterical raisins
+        for task in self.get_my_tasks():
+            if side == 'src':
+                lang = task.src_lang
+            else:
+                lang = task.tgt_lang
+            if not (side, lang, component_id) in seen:
+                result.append((side, lang, component_id, vocabs_dict[(side, lang)]))
+            seen.add((side, lang, component_id))
+        return result
+
+    def get_my_tasks(self):
+        return self._tasks_on_device(self.node_rank, self.local_rank)

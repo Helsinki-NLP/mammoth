@@ -396,8 +396,7 @@ def build_only_enc(model_opts, src_emb, task_queue_manager, checkpoint):
                     xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if checkpoint:
         logger.info("Loading from checkpoint")
-        trainstep = int(checkpoint['optim']['training_step']) - 1               
-
+        trainstep = int(checkpoint['optim']['training_step']) - 1
         embnames = [srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opts'].tasks.values()]
         embnames = set(embnames)
         groupnames = [

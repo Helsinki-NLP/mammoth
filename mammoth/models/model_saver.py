@@ -1,6 +1,6 @@
 import os
 from glob import glob
-from collections import deque, defaultdict
+from collections import deque
 from mammoth.utils.logging import logger
 
 import torch

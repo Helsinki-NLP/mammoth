@@ -290,7 +290,7 @@ class Inference(object):
             ignore_when_blocking=set(opts.ignore_when_blocking),
             replace_unk=opts.replace_unk,
             ban_unk_token=opts.ban_unk_token,
-            tgt_prefix=task.corpus_opts['tgt_prefix'],
+            tgt_prefix=task.corpus_opts.get('tgt_prefix', None),
             phrase_table=opts.phrase_table,
             data_type=opts.data_type,
             verbose=opts.verbose,

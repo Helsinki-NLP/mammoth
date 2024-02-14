@@ -58,6 +58,8 @@ class LayerStackEncoder(EncoderBase):
         for layer_stack_index, n_layers in enumerate(opts.enc_layers):
             stacks = nn.ModuleDict()
             is_on_top = layer_stack_index == len(opts.enc_layers) - 1
+            is_on_top = is_on_top and not opts.ab_layers
+
             module_id = task.encoder_id[layer_stack_index]
             stacks[module_id] = AdaptedTransformerEncoder(
                 n_layers,

@@ -440,7 +440,7 @@ class AttentionBridge(nn.Module):
 
         return cls(layers, layer_norms, residual_connection, pos_encoding, final_norm)
 
-    def forward(self, enc_output, mask, lengths):
+    def forward(self, enc_output, mask, lengths=None):
         """Forward pass for the bridge layers"""
         out = enc_output.transpose(0, 1)
         if self.layers and isinstance(self.layers[0], PerceiverAttentionBridgeLayer):

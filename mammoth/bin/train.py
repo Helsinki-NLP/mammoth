@@ -179,12 +179,17 @@ def train(opts):
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
 
-    vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
-    for side in ('src', 'tgt'):
-        for lang in global_task_queue_manager.get_langs(side):
-            vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
-            # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
-            vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
+    checkpoint = None
+    if opts.train_from:
+        checkpoint = load_checkpoint(ckpt_path=opts.train_from)
+        vocabs_dict = checkpoint.get('vocab')
+    else:
+        vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
+        for side in ('src', 'tgt'):
+            for lang in global_task_queue_manager.get_langs(side):
+                vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
+                # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
+                vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
@@ -231,10 +236,17 @@ def train(opts):
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager),
+                    args=(
+                        train_process,
+                        opts,
+                        device_context,
+                        error_queue,
+                        q,
+                        semaphore,
+                        task_queue_manager,
+                        checkpoint),
                     daemon=True,
-                )
-            )
+                ))
             procs[local_rank].start()
             logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
             error_handler.add_child(procs[local_rank].pid)
@@ -274,7 +286,7 @@ def train(opts):
             local_rank=0,
             opts=opts
         )
-        train_process(opts, device_context=device_context, task_queue_manager=task_queue_manager)
+        train_process(opts, device_context=device_context, task_queue_manager=task_queue_manager, checkpoint=checkpoint)
 
 
 def _get_parser():

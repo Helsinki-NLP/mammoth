@@ -1,4 +1,5 @@
 import os
+from glob import glob
 from collections import deque
 from mammoth.utils.logging import logger
 
@@ -23,6 +24,10 @@ def load_checkpoint(ckpt_path):
     """Load checkpoint from `ckpt_path` if any else return `None`."""
     checkpoint = None
     if ckpt_path:
+        if not ckpt_path.endswith('.pt'):
+            frames = glob(os.path.join(ckpt_path + '*frame*pt'))
+            frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
+            ckpt_path = frames[-1]
         logger.info('Loading checkpoint from %s' % ckpt_path)
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
     return checkpoint
@@ -130,7 +135,7 @@ class ModelSaver(ModelSaverBase):
             # 'generator': generator_state_dict,
             "vocab": self.vocabs_dict,
             "opts": self.model_opts,
-            "optim": {k: v.state_dict() for k, v in self.optim._optimizer.optimizers.items()},
+            "optim": self.optim.state_dict(),
             "whole_model": self.model,
         }
 

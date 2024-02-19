@@ -1,123 +1,32 @@
 """sub-module defining tasks, task specifications and task management objects."""
 from abc import ABC, abstractmethod
 from argparse import Namespace
-from collections import OrderedDict, namedtuple, Counter
+from collections import OrderedDict, namedtuple, defaultdict, Counter
 from dataclasses import dataclass
 from itertools import cycle, islice
 from pprint import pformat
-from typing import Any, Optional, List, Tuple
+from typing import Any, Optional, List, Tuple, Dict
 
 import numpy as np
 import torch
 import torch.distributed
 
 from mammoth.distributed.contexts import DeviceContext, WorldContext
+from mammoth.distributed.components import (
+    Side,
+    DistributedComponentBuilder,
+    DistributedComponent,
+    DistributedEncoder,
+    DistributedDecoder,
+    DistributedEmbedding,
+    DistributedGenerator,
+    DistributedAdapter,
+    DistributedAttentionBridge,
+    DistributedComponentAction,
+    DistributedComponentActionWithGradient,
+)
 from mammoth.utils.logging import logger
 
-
-class TaskDistributionStrategy(ABC):
-    """
-    An abstract task distribution strategy, controls which task will be scheduled next.
-    """
-    @abstractmethod
-    def __init__(self, my_corpus_ids: List[str], **kwargs):
-        pass
-
-    @classmethod
-    @abstractmethod
-    def from_opts(cls, my_corpus_ids: List[str], opts: dict):
-        """Alternative constructor."""
-        pass
-
-    @abstractmethod
-    def sample_corpus_ids(self, n_samples: int, communication_batch_id: int) -> List[str]:
-        """Select corpora to sample from."""
-        pass
-
-
-class WeightedSamplingTaskDistributionStrategy(TaskDistributionStrategy):
-    """
-    Schedules tasks by sampling with replacement from a categorical distribution.
-    The probabilities are found by normalizing the weights of all valid tasks (corpora).
-    Valid tasks are those that are present on this device, and have already reached
-    their curriculum starting point "introduce_at_training_step".
-    """
-
-    def __init__(
-        self,
-        my_corpus_ids: List[str],
-        my_weights: List[float],
-        my_introduce_at_training_step: List[int]
-    ):
-        self.my_corpus_ids = my_corpus_ids
-        self.my_weights = my_weights
-        self.my_introduce_at_training_step = my_introduce_at_training_step
-
-        # Sanity check of weights and curriculum
-        assert len(self.my_corpus_ids) == len(self.my_weights)
-        assert len(self.my_corpus_ids) == len(self.my_introduce_at_training_step)
-        if len(self.my_corpus_ids) == 0:
-            raise ValueError('No corpora on device')
-        if sum(my_weights) <= 0:
-            raise ValueError('Can not set "weight" of all corpora on a device to zero')
-        if all(x > 0 for x in my_introduce_at_training_step):
-            raise ValueError('Can not set "introduce_at_training_step" of all corpora on a device to nonzero')
-        if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_introduce_at_training_step)):
-            raise ValueError('Invalid curriculum: no corpus is ready to start in the first step')
-
-    @classmethod
-    def from_opts(cls, my_corpus_ids: List[str], opts: dict):
-        my_weights = [opts.tasks[corpus_id]['weight'] for corpus_id in my_corpus_ids]
-        my_introduce_at_training_step = [
-            opts.tasks[corpus_id]['introduce_at_training_step'] for corpus_id in my_corpus_ids
-        ]
-        return cls(my_corpus_ids, my_weights, my_introduce_at_training_step)
-
-    def sample_corpus_ids(
-        self,
-        n_samples: int,
-        communication_batch_id: int,
-    ):
-        weights = [
-            weight if introduce_at_training_step <= communication_batch_id else 0
-            for (corpus_id, weight, introduce_at_training_step) in zip(
-                self.my_corpus_ids, self.my_weights, self.my_introduce_at_training_step
-            )
-        ]
-        sum_w = sum(weights)
-        assert sum_w > 0
-        p = [weight / sum_w for weight in weights]
-        # sampling with replacement from weighted corpora (language pairs)
-        sampled_corpus_ids = np.random.choice(self.my_corpus_ids, size=n_samples, p=p)
-        return sampled_corpus_ids
-
-
-class RoundRobinTaskDistributionStrategy(TaskDistributionStrategy):
-    """
-    Schedules tasks (corpora) in a round-robin fashion.
-    Yields a communication batch of n_samples at a time.
-    When reaching the end of the list of tasks, starts over from the beginning.
-    """
-
-    def __init__(self, my_corpus_ids: List[str]):
-        self.infinite_corpus_ids = cycle(my_corpus_ids)
-
-    @classmethod
-    def from_opts(cls, my_corpus_ids: List[str], opts: dict):
-        return cls(my_corpus_ids)
-
-    def sample_corpus_ids(
-        self,
-        n_samples: int,
-        communication_batch_id: int,
-    ):
-        return list(islice(self.infinite_corpus_ids, n_samples))
-
-
-TASK_DISTRIBUTION_STRATEGIES = {
-    'weighted_sampling': WeightedSamplingTaskDistributionStrategy,
-    'roundrobin': RoundRobinTaskDistributionStrategy,
-}
 
 DatasetMetadata = namedtuple(
     'DatasetMetadata',
@@ -135,6 +44,7 @@ class TaskSpecs():
     decoder_id: List[str]
     corpus_id: str
     weight: int
+    introduce_at_training_step: int
     corpus_opts: dict
     src_vocab: Any  # FIXME: type
     tgt_vocab: Any
@@ -156,6 +66,102 @@ class TaskSpecs():
             encoder_adapter_ids=self.encoder_adapter_ids,
             decoder_adapter_ids=self.decoder_adapter_ids,
         )
+
+
+@dataclass
+class BatchTaskSample:
+    """
+    A deterministicly random sample of one task per device, to be trained in a single batch.
+    """
+    # maps from global rank to Task
+    tasks: Dict[int, TaskSpecs]
+    training_step: int
+
+
+class TaskDistributionStrategy(ABC):
+    """
+    An abstract task distribution strategy, controls which tasks will be scheduled next.
+    """
+    def __init__(self):
+        self.training_step = 0
+
+    @abstractmethod
+    def sample_corpus_ids(self, active_tasks: Dict[int, List[TaskSpecs]]) -> BatchTaskSample:
+        """
+        Select one task per device, to train on.
+        active_tasks[global_rank] -> (task_id, weight)
+        """
+        pass
+
+
+#        # Sanity check of weights and curriculum
+#        assert len(self.my_corpus_ids) == len(self.my_weights)
+#        assert len(self.my_corpus_ids) == len(self.my_introduce_at_training_step)
+#        if len(self.my_corpus_ids) == 0:
+#            raise ValueError('No corpora on device')
+#        if sum(my_weights) <= 0:
+#            raise ValueError('Can not set "weight" of all corpora on a device to zero')
+#        if all(x > 0 for x in my_introduce_at_training_step):
+#            raise ValueError('Can not set "introduce_at_training_step" of all corpora on a device to nonzero')
+#        if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_introduce_at_training_step)):
+#            raise ValueError('Invalid curriculum: no corpus is ready to start in the first step')
+
+class WeightedSamplingTaskDistributionStrategy(TaskDistributionStrategy):
+    """
+    Schedules tasks by sampling with replacement from a categorical distribution.
+    The probabilities are found by normalizing the weights of all valid tasks (corpora).
+    Valid tasks are those that are present on this device, and have already reached
+    their curriculum starting point "introduce_at_training_step".
+    """
+
+    def __init__(
+        self,
+        seed: int,
+    ):
+        super().__init__()
+        self.rng = np.random.default_rng(seed=seed)
+
+    def sample_corpus_ids(self, active_tasks: Dict[int, List[TaskSpecs]]) -> BatchTaskSample:
+        result: Dict[int, str] = dict()
+        for global_rank in sorted(active_tasks.keys()):
+            tasks, weights = zip(*active_tasks[global_rank])
+            sum_w = sum(weights)
+            assert sum_w > 0
+            p = [weight / sum_w for weight in weights]
+            # sampling with replacement from weighted corpora (language pairs)
+            sampled_corpus_id = self.rng.choice(tasks, size=1, p=p)[0]
+            result[global_rank] = sampled_corpus_id
+        bts = BatchTaskSample(tasks=result, training_step=self.training_step)
+        self.training_step += 1
+        return bts
+
+
+class RoundRobinTaskDistributionStrategy(TaskDistributionStrategy):
+    """
+    Schedules tasks (corpora) in a round-robin fashion.
+    Yields a communication batch of n_samples at a time.
+    When reaching the end of the list of tasks, starts over from the beginning.
+    """
+
+    def __init__(self, seed: int):
+        super().__init__(seed)
+
+    def sample_corpus_ids(self, active_tasks: Dict[int, List[TaskSpecs]]) -> BatchTaskSample:
+        self.training_step += 1
+        result: Dict[int, str] = dict()
+        for global_rank in sorted(active_tasks.keys()):
+            tasks, _ = zip(*active_tasks[global_rank])
+            sampled_corpus_id = tasks[self.training_step % len(tasks)]
+            result[global_rank] = sampled_corpus_id
+        bts = BatchTaskSample(tasks=result, training_step=self.training_step)
+        self.training_step += 1
+        return bts
+
+
+TASK_DISTRIBUTION_STRATEGIES = {
+    'weighted_sampling': WeightedSamplingTaskDistributionStrategy,
+    'roundrobin': RoundRobinTaskDistributionStrategy,
+}
 
 
 def get_adapter_ids(opts, corpus_opts, side):
@@ -253,6 +259,7 @@ class TaskQueueManager:
             if not len(opts.dec_layers) == 1:
                 raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
 
+        task_distribution_strategy = TASK_DISTRIBUTION_STRATEGIES[opts.task_distribution_strategy]()
         tasks = []
         uses_adapters = False
         for (
@@ -267,6 +274,7 @@ class TaskQueueManager:
             encoder_id = corpus_opts.get('enc_sharing_group', [src_lang])
             decoder_id = corpus_opts.get('dec_sharing_group', [tgt_lang])
             weight = corpus_opts.get('weight', 1.0)
+            introduce_at_training_step = corpus_opts.get('introduce_at_training_step', 0)
             if 'adapters' in corpus_opts:
                 encoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'encoder')
                 decoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'decoder')
@@ -283,6 +291,7 @@ class TaskQueueManager:
                 decoder_id=decoder_id,
                 corpus_id=corpus_id,
                 weight=weight,
+                introduce_at_training_step=introduce_at_training_step,
                 corpus_opts=corpus_opts,
                 src_vocab=None,
                 tgt_vocab=None,
@@ -294,13 +303,13 @@ class TaskQueueManager:
             tasks,
             world_context=world_context,
             accum_count=opts.accum_count,
+            task_distribution_strategy=task_distribution_strategy,
             uses_adapters=uses_adapters,
         )
 
     def global_to_local(self, node_rank, local_rank, opts):
         assert node_rank is not None
         assert local_rank is not None
-        task_distribution_strategy = self._get_strategy(node_rank=node_rank, local_rank=local_rank, opts=opts)
         device_context = self.world_context.global_to_local(node_rank, local_rank)
         return LocalTaskQueueManager(
             self.tasks,
@@ -308,26 +317,10 @@ class TaskQueueManager:
             world_context=self.world_context,
             components_to_gpus=self.components_to_gpus,
             components_to_groups=self.components_to_groups,
-            task_distribution_strategy=task_distribution_strategy,
+            task_distribution_strategy=self.task_distribution_strategy,
             uses_adapters=self.uses_adapters,
             device_context=device_context,
         )
-
-    def _get_strategy(self, node_rank, local_rank, opts):
-        assert node_rank is not None
-        assert local_rank is not None
-        # Global TQM does not have a task distribution strategy, but the local ones do
-        my_corpus_ids = [task.corpus_id for task in self._tasks_on_device(node_rank, local_rank)]
-        try:
-            strategy = TASK_DISTRIBUTION_STRATEGIES[opts.task_distribution_strategy].from_opts(
-                my_corpus_ids=my_corpus_ids,
-                opts=opts,
-            )
-            return strategy
-        except Exception as e:
-            raise Exception(
-                f'Exception when creating task distribution strategy on {node_rank}:{local_rank} {e}'
-            )
 
     def __repr__(self):
         kwargs = ',\n '.join(
@@ -350,6 +343,15 @@ class TaskQueueManager:
     def get_all_tasks(self):
         return self.tasks
 
+    def get_active_tasks(self) -> Dict[int, List[TaskSpecs]]:
+        result = defaultdict(list)
+        for task in self.tasks:
+            # TODO: DRY violation, this computation is implemented in many places
+            global_rank = task.node_rank * self.gpus_per_node + task.local_rank
+            if task.introduce_at_training_step <= self.task_distribution_strategy.training_step:
+                result[global_rank].append(task)
+        return result
+
     @staticmethod
     def _default_node_gpu(n_tasks, n_nodes, gpus_per_node):
         def yield_each_gpu():
@@ -360,80 +362,103 @@ class TaskQueueManager:
         # yield GPUs in rank order, repeat as necessary
         return list(islice(cycle(yield_each_gpu()), n_tasks))
 
-    def create_all_distributed_groups(
+    def create_all_distributed_components(
         self,
+        use_attention_bridge: bool,
         new_group_func=torch.distributed.new_group,
     ):
-        if not self.world_context.is_distributed():
-            self.components_to_gpus = dict()
-            self.components_to_groups = dict()
-            return self.components_to_groups
+        """
+        Creates DistributedComponent objects.
+        For all components that are on more than one device, creats a communication group.
+        """
+        builder = DistributedComponentBuilder()
+        for task in self.tasks:
+            # TODO: DRY violation, this computation is implemented in many places
+            global_rank = task.node_rank * self.gpus_per_node + task.local_rank
+            builder.add(
+                DistributedEmbedding(
+                    global_ranks={global_rank},
+                    group=None,
+                    side=Side.encoder,
+                    lang=task.src_lang,
+                )
+            )
+            builder.add(
+                DistributedEmbedding(
+                    global_ranks={global_rank},
+                    group=None,
+                    side=Side.decoder,
+                    lang=task.tgt_lang,
+                )
+            )
+            builder.add(
+                DistributedGenerator(
+                    global_ranks={global_rank},
+                    group=None,
+                    lang=task.tgt_lang,
+                )
+            )
+            for layer_stack_index, encoder_id in enumerate(task.encoder_id):
+                builder.add(
+                    DistributedEncoder(
+                        global_ranks={global_rank},
+                        group=None,
+                        layer_stack_index=layer_stack_index,
+                        xcoder_id=encoder_id,
+                    )
+                )
+            for layer_stack_index, decoder_id in enumerate(task.decoder_id):
+                builder.add(
+                    DistributedDecoder(
+                        global_ranks={global_rank},
+                        group=None,
+                        layer_stack_index=layer_stack_index,
+                        xcoder_id=decoder_id,
+                    )
+                )
+            if task.encoder_adapter_ids:
+                for layer_stack_index, adapter_group, sub_id in task.encoder_adapter_ids:
+                    builder.add(
+                        DistributedAdapter(
+                            global_ranks={global_rank},
+                            group=None,
+                            side=Side.encoder,
+                            layer_stack_index=layer_stack_index,
+                            adapter_group=adapter_group,
+                            sub_id=sub_id,
+                        )
+                    )
+            if task.decoder_adapter_ids:
+                for layer_stack_index, adapter_group, sub_id in task.decoder_adapter_ids:
+                    builder.add(
+                        DistributedAdapter(
+                            global_ranks={global_rank},
+                            group=None,
+                            side=Side.decoder,
+                            layer_stack_index=layer_stack_index,
+                            adapter_group=adapter_group,
+                            sub_id=sub_id,
+                        )
+                    )
+            if use_attention_bridge:
+                builder.add(DistributedAttentionBridge(global_ranks={global_rank}, group=None))
 
-        # Single OrderedDict contains all components.
-        # Keys are tuples of strings.
-        # The length of the key varies depending on the component:
-        # ('encoder', layer_stack_index, encoder_id)
-        # ('decoder', layer_stack_index, decoder_id)
-        # ('src_emb', lang)
-        # ('tgt_emb', lang)
-        # ('encoder_adapters', layer_stack_index, encoder_id, adapter_group, sub_id)
-        # ('decoder_adapters', layer_stack_index, decoder_id, adapter_group, sub_id)
-        self.components_to_gpus = OrderedDict()
+        # once all DistributedComponents are created, we can initialize communication groups
+        if self.world_context.is_distributed():
+            for component in builder:
+                # do not create communication groups for components on a single device
+                if len(component.global_ranks) > 1:
+                    # The torch.distributed.new_group function requires that all
+                    # processes in the main group (i.e. all processes that are part of
+                    # the distributed job) enter the function, even if they are not
+                    # going to be members of the group. Additionally, groups should be
+                    # created in the same order in all processes.
+                    component.group = new_group_func(sorted(component.global_ranks))
+                else:
+                    logger.info(f'{component.get_name()} is on a single device')
 
-        for node_rank in range(self.n_nodes):
-            for local_rank in range(self.gpus_per_node):
-                global_rank = node_rank * self.gpus_per_node + local_rank
-                tasks = self._tasks_on_device(node_rank, local_rank)
-
-                for task in tasks:
-                    keys = [
-                        ('src_emb', task.src_lang),
-                        ('tgt_emb', task.tgt_lang),
-                    ]
-                    for layer_stack_index, encoder_id in enumerate(task.encoder_id):
-                        keys.append(('encoder', layer_stack_index, encoder_id))
-                    for layer_stack_index, decoder_id in enumerate(task.decoder_id):
-                        keys.append(('decoder', layer_stack_index, decoder_id))
-                    for key in keys:
-                        # Using setdefault to treat OrderedDict as defaultdict
-                        self.components_to_gpus.setdefault(key, set()).add(global_rank)
-
-                    if task.encoder_adapter_ids:
-                        for layer_stack_index, adapter_group, sub_id in task.encoder_adapter_ids:
-                            encoder_id = task.encoder_id[layer_stack_index]
-                            key = ('encoder_adapters', layer_stack_index, encoder_id, adapter_group, sub_id)
-                            self.components_to_gpus.setdefault(key, set()).add(global_rank)
-                    if task.decoder_adapter_ids:
-                        for layer_stack_index, adapter_group, sub_id in task.decoder_adapter_ids:
-                            decoder_id = task.decoder_id[layer_stack_index]
-                            key = ('decoder_adapters', layer_stack_index, decoder_id, adapter_group, sub_id)
-                            self.components_to_gpus.setdefault(key, set()).add(global_rank)
-
-        # Structured, each component in a separate OrderedDict
-        self.components_to_groups = {
-            component_type: OrderedDict() for component_type
-            in ('encoder', 'decoder', 'src_emb', 'tgt_emb')
-        }
-        if self.uses_adapters:
-            self.components_to_groups['encoder_adapters'] = OrderedDict()
-            self.components_to_groups['decoder_adapters'] = OrderedDict()
-        for key, global_ranks in self.components_to_gpus.items():
-            if len(global_ranks) < 2:
-                # only create a process group if the component is on 2 or more gpus
-                continue
-            sorted_global_ranks = list(sorted(global_ranks))
-            min_rank = sorted_global_ranks[0]
-            # The torch.distributed.new_group function requires that all
-            # processes in the main group (i.e. all processes that are part of
-            # the distributed job) enter the function, even if they are not
-            # going to be members of the group. Additionally, groups should be
-            # created in the same order in all processes.
-            group_tpl = (min_rank, new_group_func(sorted_global_ranks))
-            component_type = key[0]
-            component_id = key[1:]
-            self.components_to_groups.setdefault(component_type, OrderedDict())[component_id] = group_tpl
-
-        return self.components_to_groups
+        sorted_components = list(builder)
+        return sorted_components
 
     def get_langs(self, side):
         if side == 'src':
@@ -452,7 +477,7 @@ class LocalTaskQueueManager(TaskQueueManager):
         world_context: WorldContext,
         components_to_gpus=None,
         components_to_groups=None,
-        task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
+        task_distribution_strategy: TaskDistributionStrategy = None,
         uses_adapters: bool = False,
         device_context: Optional[DeviceContext] = None,
     ):
@@ -594,14 +619,10 @@ class LocalTaskQueueManager(TaskQueueManager):
 
         return my_grouped_components
 
-    def sample_corpus_ids(self, communication_batch_id: int):
-        corpus_id = self.task_distribution_strategy.sample_corpus_ids(
-            1,
-            communication_batch_id,
-        )[0]
-        corpus_ids = [corpus_id for _ in range(self.accum_count)]
-        self.sampled_task_counts.update(corpus_ids)
-        return corpus_ids
+    def sample_corpus_ids(self):
+        active_tasks: Dict[int, List[TaskSpecs]] = self.get_active_tasks()
+        batch_task_sample = self.task_distribution_strategy.sample_corpus_ids(active_tasks)
+        return batch_task_sample
 
     def get_my_encoders(self, layer_stack_index: int):
         my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_my_tasks()]

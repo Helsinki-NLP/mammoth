@@ -1,5 +1,5 @@
 from torch import nn
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from mammoth.modules.encoder import EncoderBase
 from mammoth.models.adapters import Adapter, AdaptedTransformerEncoder
@@ -120,9 +120,12 @@ class LayerStackEncoder(EncoderBase):
     def get_submodule(self, layer_stack_index: int, module_id: str):
         return self.encoders[layer_stack_index][module_id]
 
-    def get_adapter(self, module_id: str, adapter_group: str, sub_id: str):
+    def get_adapter(self, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
         layer_stack_index = self._adapter_to_stack[name]
+        # All module_ids in the same slot (should) have the same adapters.
+        # Thus, we can select one arbitrarily.
+        module_id = sorted(self.encoders[layer_stack_index].keys())[0]
         return self.encoders[layer_stack_index][module_id].get_adapter(adapter_group, sub_id)
 
     def add_adapter(

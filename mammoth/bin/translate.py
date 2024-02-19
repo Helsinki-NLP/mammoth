@@ -38,6 +38,7 @@ def translate(opts):
         decoder_id=decoder_id,
         corpus_id=corpus_id,
         weight=1.0,
+        introduce_at_training_step=0,
         corpus_opts=corpus_opts,
         src_vocab=None,
         tgt_vocab=None,

@@ -163,54 +163,17 @@ python3 -u $MAMMOTH/translate.py \
   --batch_size 512
 ```
 
-Follow these steps to translate text with your trained model.
-1. **Initiate Translation Script:**
-   Open your terminal and execute the translation script:
+Follow these configs to translate text with your trained model.
 
-   ```bash
-   python3 -u $MAMMOTH/translate.py
-   ```
+- Provide necessary details using the following options:
+   - Configuration File: `--config "${CONFIG_DIR}/your_config.yml"`
+   - Model Checkpoint: `--model "$model_checkpoint"`
+   - Translation Task: `--task_id "train_$src_lang-$tgt_lang"`
 
-2. **Specify Configuration, Model, and Task:**
-   Provide necessary details using the following options:
-
-   - Configuration File:
-     ```bash
-     --config "${CONFIG_DIR}/your_config.yml"
-     ```
-
-   - Model Checkpoint:
-     ```bash
-     --model "$model_checkpoint"
-     ```
-
-   - Translation Task:
-     ```bash
-     --task_id "train_$src_lang-$tgt_lang"
-     ```
-
-3. **Specify Source Language File and Output Path:**
-   
-   Point to the source language file for translation:
-
-   ```bash
-   --src "$path_to_src_language/$lang_pair.$src_lang.sp"
-   ```
-
-   Define the path for saving the translated output:
-
-   ```bash
-   --output "$out_path/$src_lang-$tgt_lang.hyp.sp"
-   ```
-
-4. **Specify GPU and Batch Size:**
-   Adjust GPU and batch size settings based on your requirements:
-
-   ```bash
-   --gpu 0 --shard_size 0 --batch_size 512
-   ```
-
-Feel free to adjust these commands as needed for your specific use case.
+- Point to the source language file for translation:
+   `--src "$path_to_src_language/$lang_pair.$src_lang.sp"`
+- Define the path for saving the translated output: `--output "$out_path/$src_lang-$tgt_lang.hyp.sp"`
+- Adjust GPU and batch size settings based on your requirements: `--gpu 0 --shard_size 0 --batch_size 512`
 
 Congratulations! You've successfully translated text using your Mammoth model. Adjust the parameters as needed for your specific translation tasks.
 

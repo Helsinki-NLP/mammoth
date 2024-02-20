@@ -24,6 +24,9 @@ We break down mNMT training into a series of smaller “tasks”
 - A task is done on a specific device
 - A task corresponds to a specific (parallel) corpus
 
+In short, a task corresponds to a specific model behavior.
+In translation settings, a task will therefore correspond to a specific translation direction (say translating from Swahili to Catalan):
+All training datapoints for this direction  (i) must involve the same modules (pertaining to Swahili encoding and Catalan decoding); (ii) must be preprocessed with the same tokenizers; and (iii) can be grouped into a single bitext.
 A centralized manager handles tasks synchronization.
 This manager oversees the parallel execution of tasks, coordinating the flow of information between different modules, devices, and corpora to ensure a cohesive and synchronized training process.
 

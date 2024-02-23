@@ -15,7 +15,7 @@ For this tutorial, we will be utilizing the [UNPC](https://opus.nlpl.eu/UNPC/cor
 
 Before diving into the sharing schemes, we need to preprocess the data. You can download the processed data using the following command:
 ```bash
-wget 
+wget https://mammoth-share.a3s.fi/unpc.tar
 ```
 
 Additionally, we require the corresponding vocabularies for the dataset. Download the vocabularies with the following command:

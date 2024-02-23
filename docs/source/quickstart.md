@@ -174,8 +174,12 @@ Follow these configs to translate text with your trained model.
    `--src "$path_to_src_language/$lang_pair.$src_lang.sp"`
 - Define the path for saving the translated output: `--output "$out_path/$src_lang-$tgt_lang.hyp.sp"`
 - Adjust GPU and batch size settings based on your requirements: `--gpu 0 --shard_size 0 --batch_size 512`
+- We provide the model checkpoint trained using the encoder shared scheme described in [this tutorial](examples/sharing_schemes.md).
+    ```bash
+    wget https://mammoth-share.a3s.fi/encoder-shared-models.tar.gz
+    ```
 
 Congratulations! You've successfully translated text using your Mammoth model. Adjust the parameters as needed for your specific translation tasks.
 
 ### Further reading
-A complete example of training on the Europarl dataset is available at [MAMMOTH101](examples/train_mammoth_101.md), and a complete example for configuring different sharing schemes is available at [MAMMOTH sharing schemes](examples/sharing_schemes.md)
+A complete example of training on the Europarl dataset is available at [MAMMOTH101](examples/train_mammoth_101.md), and a complete example for configuring different sharing schemes is available at [MAMMOTH sharing schemes](examples/sharing_schemes.md).

@@ -104,6 +104,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -184,6 +185,7 @@
   <h1>Source code for mammoth.inputters.dataloader</h1><div class="highlight"><pre>
 <span></span><span class="kn">import</span> <span class="nn">collections</span>
 <span class="kn">import</span> <span class="nn">itertools</span>
+<span class="kn">import</span> <span class="nn">math</span>
 <span class="kn">import</span> <span class="nn">random</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
@@ -192,16 +194,11 @@
 <span class="kn">from</span> <span class="nn">mammoth.utils.logging</span> <span class="kn">import</span> <span class="n">logger</span>
 
 
-<span class="k">def</span> <span class="nf">infinite_iterator</span><span class="p">(</span><span class="n">iterable</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="n">itertools</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">iterable</span><span class="p">))</span>
-
-
 <span class="k">def</span> <span class="nf">build_dataloader</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">batch_type</span><span class="p">,</span> <span class="n">pool_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">n_buckets</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">cycle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">as_iter</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an mammoth.inputters.ParallelCorpus into an infinite iterator of batches&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">cycle</span><span class="p">:</span>
         <span class="n">loader</span> <span class="o">=</span> <span class="n">InferenceBatcher</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">examples_stream</span> <span class="o">=</span> <span class="n">infinite_iterator</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">batch_type</span> <span class="o">==</span> <span class="s1">&#39;sents&#39;</span><span class="p">:</span>
             <span class="n">n_buckets</span> <span class="o">=</span> <span class="mi">1</span>
 
@@ -214,23 +211,25 @@
         <span class="k">elif</span> <span class="n">batch_type</span> <span class="o">==</span> <span class="s1">&#39;tokens&#39;</span><span class="p">:</span>
 
             <span class="k">def</span> <span class="nf">bucket_fn</span><span class="p">(</span><span class="n">example_dict</span><span class="p">):</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;map example dict to bucket index&quot;&quot;&quot;</span>
+                <span class="c1"># subtract two for bos/eos</span>
+                <span class="n">src_len</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">]),</span> <span class="n">n_buckets</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span>
                 <span class="k">if</span> <span class="s1">&#39;tgt&#39;</span> <span class="ow">in</span> <span class="n">example_dict</span><span class="p">:</span>
-                    <span class="c1"># subtract four for bos/eos on both sides</span>
-                    <span class="n">true_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;tgt&#39;</span><span class="p">])</span> <span class="o">-</span> <span class="mi">4</span>
+                    <span class="n">tgt_len</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;tgt&#39;</span><span class="p">]),</span> <span class="n">n_buckets</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="n">true_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="mi">2</span>
+                    <span class="n">tgt_len</span> <span class="o">=</span> <span class="n">src_len</span>
                 <span class="c1"># maybe dump it in the last bucket if it&#39;s just too long</span>
-                <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">n_buckets</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="n">true_size</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">src_len</span><span class="p">,</span> <span class="n">tgt_len</span>
 
             <span class="k">def</span> <span class="nf">numel_fn</span><span class="p">(</span><span class="n">example_dict</span><span class="p">):</span>
+<span class="w">                </span><span class="sd">&quot;&quot;&quot;count tokens in example&quot;&quot;&quot;</span>
                 <span class="k">if</span> <span class="s1">&#39;tgt&#39;</span> <span class="ow">in</span> <span class="n">example_dict</span><span class="p">:</span>
                     <span class="n">true_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">])</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;tgt&#39;</span><span class="p">])</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="n">true_size</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">example_dict</span><span class="p">[</span><span class="s1">&#39;src&#39;</span><span class="p">])</span>
                 <span class="k">return</span> <span class="n">true_size</span>
 
-        <span class="n">collate_fn</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">collate_fn</span>
-        <span class="n">loader</span> <span class="o">=</span> <span class="n">LookAheadBucketing</span><span class="p">(</span><span class="n">examples_stream</span><span class="p">,</span> <span class="n">pool_size</span><span class="p">,</span> <span class="n">n_buckets</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">bucket_fn</span><span class="p">,</span> <span class="n">numel_fn</span><span class="p">,</span> <span class="n">collate_fn</span><span class="p">)</span>
+        <span class="n">loader</span> <span class="o">=</span> <span class="n">LookAheadBucketing</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">pool_size</span><span class="p">,</span> <span class="n">n_buckets</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">bucket_fn</span><span class="p">,</span> <span class="n">numel_fn</span><span class="p">)</span>
     <span class="k">return</span> <span class="nb">iter</span><span class="p">(</span><span class="n">loader</span><span class="p">)</span> <span class="k">if</span> <span class="n">as_iter</span> <span class="k">else</span> <span class="n">loader</span>
 
 
@@ -239,6 +238,7 @@
 
 <div class="viewcode-block" id="InferenceBatcher"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataloader.InferenceBatcher">[docs]</a><span class="k">class</span> <span class="nc">InferenceBatcher</span><span class="p">():</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Iterator for inference&quot;&quot;&quot;</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">examples_stream</span> <span class="o">=</span> <span class="n">dataset</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">collate_fn</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">collate_fn</span>
@@ -256,117 +256,136 @@
 
 
 <div class="viewcode-block" id="LookAheadBucketing"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing">[docs]</a><span class="k">class</span> <span class="nc">LookAheadBucketing</span><span class="p">():</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">examples_stream</span><span class="p">,</span> <span class="n">look_ahead_size</span><span class="p">,</span> <span class="n">n_buckets</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">bucket_fn</span><span class="p">,</span> <span class="n">numel_fn</span><span class="p">,</span> <span class="n">collate_fn</span><span class="p">):</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">examples_stream</span> <span class="o">=</span> <span class="n">examples_stream</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_buckets</span><span class="p">)]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_buckets</span><span class="p">)]</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dataset</span><span class="p">,</span> <span class="n">look_ahead_size</span><span class="p">,</span> <span class="n">n_buckets</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">bucket_fn</span><span class="p">,</span> <span class="n">numel_fn</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span>
+        <span class="c1"># actual generator of examples</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">examples_stream</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">([])</span>
+        <span class="c1"># tracks whether the stream needs to be restarted</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_exhausted</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span> <span class="o">=</span> <span class="n">n_buckets</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">[</span>
+                <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_buckets</span><span class="p">)</span>
+            <span class="p">]</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_buckets</span><span class="p">)</span>
+        <span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">look_ahead_size</span> <span class="o">=</span> <span class="n">look_ahead_size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span> <span class="o">=</span> <span class="n">batch_size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">bucket_fn</span> <span class="o">=</span> <span class="n">bucket_fn</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">numel_fn</span> <span class="o">=</span> <span class="n">numel_fn</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">collate_fn</span> <span class="o">=</span> <span class="n">collate_fn</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">collate_fn</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">collate_fn</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_init</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">_init</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;LookAheadBucketing: initialization start&#39;</span><span class="p">)</span>
-        <span class="k">for</span> <span class="n">example</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">islice</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">examples_stream</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">look_ahead_size</span><span class="p">):</span>
-            <span class="n">bucket_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bucket_fn</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">examples_stream</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dataset</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">example</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">look_ahead_size</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">maybe_replenish</span><span class="p">()</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_exhausted</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">assert</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">(),</span> <span class="s1">&#39;Dataset contains no usable example!&#39;</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;LookAheadBucketing: initialization done&#39;</span><span class="p">)</span>
 
-<div class="viewcode-block" id="LookAheadBucketing.maybe_replenish"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing.maybe_replenish">[docs]</a>    <span class="k">def</span> <span class="nf">maybe_replenish</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;look up one more example to add to this reservoir.&quot;&quot;&quot;</span>
+<div class="viewcode-block" id="LookAheadBucketing.maybe_replenish"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing.maybe_replenish">[docs]</a>    <span class="k">def</span> <span class="nf">maybe_replenish</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;try to look up one more example to add to this reservoir.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">example</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">examples_stream</span><span class="p">)</span>
-            <span class="n">bucket_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bucket_fn</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
-            <span class="n">creates_new_bucket</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-            <span class="k">return</span> <span class="n">creates_new_bucket</span>
+            <span class="n">s_idx</span><span class="p">,</span> <span class="n">t_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">bucket_fn</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">s_idx</span><span class="p">][</span><span class="n">t_idx</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_exhausted</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
-            <span class="k">return</span> <span class="kc">None</span></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_exhausted</span> <span class="o">=</span> <span class="kc">True</span></div>
 
-    <span class="k">def</span> <span class="nf">bucket_is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bucket_idx</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+<div class="viewcode-block" id="LookAheadBucketing.bucket_is_empty"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing.bucket_is_empty">[docs]</a>    <span class="k">def</span> <span class="nf">bucket_is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">t_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;check if this bucket is empty&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">s_idx</span><span class="p">][</span><span class="n">t_idx</span><span class="p">])</span> <span class="o">==</span> <span class="mi">0</span></div>
 
-    <span class="k">def</span> <span class="nf">_choose_and_prepare_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bucket_idx</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;pick a bucket (at random unless specified) and prepare examples for iteration&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">bucket_idx</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">bucket_idx</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choices</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">)),</span> <span class="n">weights</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="c1"># if bucket_idx &gt;= len(self._buckets):</span>
-        <span class="c1">#     import pdb; pdb.set_trace()</span>
-        <span class="c1"># if len(self._prefetched[self._buckets[bucket_idx]]) == 0:</span>
-        <span class="c1">#     import pdb; pdb.set_trace()</span>
-        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">])</span>
+    <span class="k">def</span> <span class="nf">_choose_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;pick a bucket at random&quot;&quot;&quot;</span>
+        <span class="n">buckets</span> <span class="o">=</span> <span class="p">[(</span><span class="n">s</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span><span class="p">)]</span>
+        <span class="n">weights</span> <span class="o">=</span> <span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">s</span><span class="p">][</span><span class="n">t</span><span class="p">])</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span><span class="p">)</span> <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span><span class="p">)]</span>
+        <span class="n">bucket_idx</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">choices</span><span class="p">(</span><span class="n">buckets</span><span class="p">,</span> <span class="n">weights</span><span class="o">=</span><span class="n">weights</span><span class="p">,</span> <span class="n">k</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">bucket_idx</span>
 
-    <span class="k">def</span> <span class="nf">is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">size</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">_select_from_bucket</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">t_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">object</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;randomly select an item from a bucket&quot;&quot;&quot;</span>
+        <span class="n">bucket</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">s_idx</span><span class="p">][</span><span class="n">t_idx</span><span class="p">]</span>
+        <span class="n">obj_idx</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="n">randrange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bucket</span><span class="p">))</span>
+        <span class="c1"># swap to last to get O(1) deletion</span>
+        <span class="n">bucket</span><span class="p">[</span><span class="n">obj_idx</span><span class="p">],</span> <span class="n">bucket</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">bucket</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">bucket</span><span class="p">[</span><span class="n">obj_idx</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">bucket</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
+
+<div class="viewcode-block" id="LookAheadBucketing.is_empty"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing.is_empty">[docs]</a>    <span class="k">def</span> <span class="nf">is_empty</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;check if all buckets are empty&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">all</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bucket</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">bucket</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">chain</span><span class="o">.</span><span class="n">from_iterable</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">))</span></div>
+
+    <span class="k">def</span> <span class="nf">_spiralling</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">s_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">t_idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">_seq</span><span class="p">():</span>
+            <span class="c1"># from https://math.stackexchange.com/questions/163080/on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361  # noqa: E501</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="mi">1</span><span class="p">):</span>
+                <span class="n">k</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">((</span><span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
+                <span class="n">t</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="n">m</span> <span class="o">=</span> <span class="n">t</span> <span class="o">**</span> <span class="mi">2</span>
+                <span class="n">t</span> <span class="o">=</span> <span class="n">t</span> <span class="o">-</span> <span class="mi">1</span>
+                <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">t</span><span class="p">:</span>
+                    <span class="k">yield</span> <span class="n">k</span> <span class="o">-</span> <span class="p">(</span><span class="n">m</span> <span class="o">-</span> <span class="n">n</span><span class="p">),</span> <span class="n">k</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">m</span> <span class="o">=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">t</span>
+                    <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">t</span><span class="p">:</span>
+                        <span class="k">yield</span> <span class="o">-</span><span class="n">k</span><span class="p">,</span> <span class="n">k</span> <span class="o">-</span> <span class="p">(</span><span class="n">m</span> <span class="o">-</span> <span class="n">n</span><span class="p">)</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">m</span> <span class="o">=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">t</span>
+                        <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">t</span><span class="p">:</span>
+                            <span class="k">yield</span> <span class="o">-</span><span class="n">k</span> <span class="o">+</span> <span class="p">(</span><span class="n">m</span> <span class="o">-</span> <span class="n">n</span><span class="p">),</span> <span class="o">-</span><span class="n">k</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="k">yield</span> <span class="n">k</span><span class="p">,</span> <span class="o">-</span><span class="n">k</span> <span class="o">+</span> <span class="p">(</span><span class="n">m</span> <span class="o">-</span> <span class="n">n</span> <span class="o">-</span> <span class="n">t</span><span class="p">)</span>
+
+        <span class="n">offsets</span> <span class="o">=</span> <span class="p">((</span><span class="n">s_idx</span> <span class="o">+</span> <span class="n">x</span><span class="p">,</span> <span class="n">t_idx</span> <span class="o">+</span> <span class="n">y</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="ow">in</span> <span class="n">_seq</span><span class="p">())</span>
+        <span class="c1"># offsets = itertools.takewhile(</span>
+        <span class="c1">#     # this far out is obviously too far out</span>
+        <span class="c1">#     lambda tup: (tup[0] &lt; self.n_buckets * 2 + 1) and (tup[1] &lt; self.n_buckets * 2 + 1),</span>
+        <span class="c1">#     offsets,</span>
+        <span class="c1"># )</span>
+        <span class="n">offsets</span> <span class="o">=</span> <span class="nb">filter</span><span class="p">(</span>
+            <span class="k">lambda</span> <span class="n">tup</span><span class="p">:</span> <span class="p">(</span><span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">tup</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">tup</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span><span class="p">),</span>
+            <span class="n">offsets</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="c1"># maybe more brittle than the takewhile a few lines above</span>
+        <span class="n">offsets</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">islice</span><span class="p">(</span><span class="n">offsets</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_buckets</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">yield from</span> <span class="n">offsets</span>
 
     <span class="k">def</span> <span class="fm">__iter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="c1"># 1. maybe we&#39;ve exhausted the stream and the buckets</span>
-            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
-                <span class="k">break</span>
+            <span class="c1"># 1. maybe we&#39;ve exhausted both the stream and the buckets:</span>
+            <span class="c1"># if so, we restart the example stream</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_exhausted</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_init</span><span class="p">()</span>
             <span class="n">accum</span><span class="p">,</span> <span class="n">cur_batch_size</span> <span class="o">=</span> <span class="p">[],</span> <span class="mi">0</span>
             <span class="c1"># 2. pick a length at random</span>
-            <span class="n">smallest_bucket_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_choose_and_prepare_bucket</span><span class="p">()</span>
+            <span class="n">smallest_bucket_idx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_choose_bucket</span><span class="p">()</span>
             <span class="n">current_bucket_idx</span> <span class="o">=</span> <span class="n">smallest_bucket_idx</span>
             <span class="c1"># 3. build batch</span>
             <span class="n">batch_is_complete</span> <span class="o">=</span> <span class="kc">False</span>
-            <span class="k">while</span> <span class="ow">not</span> <span class="n">batch_is_complete</span><span class="p">:</span>
+            <span class="c1"># stop either when batch is built or when it can&#39;t be built</span>
+            <span class="k">while</span> <span class="ow">not</span> <span class="p">(</span><span class="n">batch_is_complete</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">()):</span>
                 <span class="c1"># maybe switch buckets</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">bucket_is_empty</span><span class="p">(</span><span class="n">current_bucket_idx</span><span class="p">):</span>
-                    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_empty</span><span class="p">():</span>
-                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Reached end of stream&#39;</span><span class="p">)</span>  <span class="c1"># should not happen</span>
-                        <span class="k">if</span> <span class="n">accum</span><span class="p">:</span>
-                            <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">collate_fn</span><span class="p">(</span><span class="n">accum</span><span class="p">)</span>
-                        <span class="k">break</span>
-                    <span class="k">try</span><span class="p">:</span>
-                        <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">current_bucket_idx</span><span class="p">:]):</span>
-                            <span class="c1"># this was the largest bucket, so we&#39;ll need to pick the next smallest instead</span>
-                            <span class="n">smallest_bucket_idx</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
-                                <span class="n">bucket_idx</span>
-                                <span class="k">for</span> <span class="n">bucket_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">smallest_bucket_idx</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
-                                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span>
-                            <span class="p">)</span>
-                            <span class="n">current_bucket_idx</span> <span class="o">=</span> <span class="n">smallest_bucket_idx</span>
-                        <span class="k">else</span><span class="p">:</span>
-                            <span class="c1"># there was a larger bucket, shift the index by one</span>
-                            <span class="n">current_bucket_idx</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
-                                <span class="n">bucket_idx</span>
-                                <span class="k">for</span> <span class="n">bucket_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">current_bucket_idx</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
-                                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span>
-                            <span class="p">)</span>
-                    <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
-                        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                            <span class="s1">&#39;StopIteration when trying to pick a bucket in a smart way. &#39;</span>
-                            <span class="s1">&#39;Doing something stupid instead. Please check me.&#39;</span>
-                        <span class="p">)</span>
-                        <span class="n">current_bucket_idx</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
-                            <span class="n">bucket_idx</span>
-                            <span class="k">for</span> <span class="n">bucket_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">))</span>
-                            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">bucket_idx</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span>
-                        <span class="p">)</span>
-                    <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_choose_and_prepare_bucket</span><span class="p">(</span><span class="n">bucket_idx</span><span class="o">=</span><span class="n">current_bucket_idx</span><span class="p">)</span>
+                <span class="n">current_bucket_idx</span> <span class="o">=</span> <span class="n">smallest_bucket_idx</span>
+                <span class="n">next_indices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_spiralling</span><span class="p">(</span><span class="o">*</span><span class="n">current_bucket_idx</span><span class="p">)</span>
+                <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">bucket_is_empty</span><span class="p">(</span><span class="o">*</span><span class="n">current_bucket_idx</span><span class="p">):</span>
+                    <span class="n">current_bucket_idx</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">next_indices</span><span class="p">)</span>
                 <span class="c1"># retrieve and process the example</span>
-                <span class="n">example</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_buckets</span><span class="p">[</span><span class="n">current_bucket_idx</span><span class="p">]</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_lens</span><span class="p">[</span><span class="n">current_bucket_idx</span><span class="p">]</span> <span class="o">-=</span> <span class="mi">1</span>
+                <span class="n">example</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_select_from_bucket</span><span class="p">(</span><span class="o">*</span><span class="n">current_bucket_idx</span><span class="p">)</span>
                 <span class="n">accum</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
                 <span class="n">numel</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">numel_fn</span><span class="p">(</span><span class="n">example</span><span class="p">)</span>
                 <span class="n">cur_batch_size</span> <span class="o">+=</span> <span class="n">numel</span>
                 <span class="n">batch_is_complete</span> <span class="o">=</span> <span class="n">cur_batch_size</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_size</span>
 
                 <span class="c1"># 4. try to replenish reservoir if possible</span>
+                <span class="c1"># if not, this will also update self._is_exhausted</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">maybe_replenish</span><span class="p">()</span>
-                <span class="c1"># if (new_bucket is not None) and (new_bucket &lt;= bucket):</span>
-                <span class="c1">#     assert self._buckets[bucket_idx] != bucket</span>
-                <span class="c1">#     bucket_idx += 1</span>
 
             <span class="k">yield</span> <span class="bp">self</span><span class="o">.</span><span class="n">collate_fn</span><span class="p">(</span><span class="n">accum</span><span class="p">)</span></div>
-            <span class="c1"># if self.bucket_is_empty(bucket_idx):</span>
-            <span class="c1">#     del self._buckets[bucket_idx]</span>
 
 
 <div class="viewcode-block" id="DynamicDatasetIter"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataloader.DynamicDatasetIter">[docs]</a><span class="k">class</span> <span class="nc">DynamicDatasetIter</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
@@ -513,8 +532,8 @@
                     <span class="k">if</span> <span class="n">communication_batch_id</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
                         <span class="c1"># De-numericalize a few sentences for debugging</span>
                         <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-                                <span class="sa">f</span><span class="s1">&#39;src shape: </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">src</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s1"> tgt shape: </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">tgt</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s1"> &#39;</span>
-                                <span class="sa">f</span><span class="s1">&#39;batch size: </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">batch_size</span><span class="si">}</span><span class="s1">&#39;</span>
+                            <span class="sa">f</span><span class="s1">&#39;src shape: </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">src</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s1"> tgt shape: </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">tgt</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s1"> &#39;</span>
+                            <span class="sa">f</span><span class="s1">&#39;batch size: </span><span class="si">{</span><span class="n">batch</span><span class="o">.</span><span class="n">batch_size</span><span class="si">}</span><span class="s1">&#39;</span>
                         <span class="p">)</span>
                         <span class="n">src_vocab</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vocabs_dict</span><span class="p">[(</span><span class="s1">&#39;src&#39;</span><span class="p">,</span> <span class="n">metadata</span><span class="o">.</span><span class="n">src_lang</span><span class="p">)]</span>
                         <span class="n">tgt_vocab</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">vocabs_dict</span><span class="p">[(</span><span class="s1">&#39;tgt&#39;</span><span class="p">,</span> <span class="n">metadata</span><span class="o">.</span><span class="n">tgt_lang</span><span class="p">)]</span>

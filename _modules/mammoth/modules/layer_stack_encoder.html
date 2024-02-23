@@ -104,6 +104,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -216,10 +217,10 @@
                     <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
                     <span class="n">opts</span><span class="o">.</span><span class="n">heads</span><span class="p">,</span>
                     <span class="n">opts</span><span class="o">.</span><span class="n">transformer_ff</span><span class="p">,</span>
-                    <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span> <span class="k">else</span> <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span>
                     <span class="p">(</span>
                         <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-                        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span>
+                        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
                         <span class="k">else</span> <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span>
                     <span class="p">),</span>
                     <span class="kc">None</span><span class="p">,</span>  <span class="c1"># embeddings,</span>
@@ -228,38 +229,39 @@
                     <span class="n">layer_norm_module</span><span class="o">=</span><span class="p">(</span>
                         <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_on_top</span>
                         <span class="k">else</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">()</span>
-                    <span class="p">)</span>
+                    <span class="p">),</span>
+                    <span class="n">is_normformer</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">normformer</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="n">encoders</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stacks</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">encoders</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="LayerStackEncoder.from_trans_opt"><a class="viewcode-back" href="../../../mammoth.modules.html#mammoth.modules.layer_stack_encoder.LayerStackEncoder.from_trans_opt">[docs]</a>    <span class="nd">@classmethod</span>
-    <span class="k">def</span> <span class="nf">from_trans_opt</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">model_opts</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">opt_stack</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Alternate constructor for use during translation.&quot;&quot;&quot;</span>
+    <span class="k">def</span> <span class="nf">from_trans_opt</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">opts</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">,</span> <span class="n">task</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Alternate constructor for use during training.&quot;&quot;&quot;</span>
         <span class="n">encoders</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">layer_stack_index</span><span class="p">,</span> <span class="n">n_layers</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">enc_layers</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">layer_stack_index</span><span class="p">,</span> <span class="n">n_layers</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">enc_layers</span><span class="p">):</span>
             <span class="n">stacks</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleDict</span><span class="p">()</span>
-            <span class="n">module_opts</span> <span class="o">=</span> <span class="n">opt_stack</span><span class="p">[</span><span class="s1">&#39;encoder&#39;</span><span class="p">][</span><span class="n">layer_stack_index</span><span class="p">]</span>
-            <span class="n">module_id</span> <span class="o">=</span> <span class="n">module_opts</span><span class="p">[</span><span class="s1">&#39;id&#39;</span><span class="p">]</span>
-            <span class="n">is_on_top</span> <span class="o">=</span> <span class="n">layer_stack_index</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">enc_layers</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">is_on_top</span> <span class="o">=</span> <span class="n">layer_stack_index</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">enc_layers</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+            <span class="n">module_id</span> <span class="o">=</span> <span class="n">task</span><span class="o">.</span><span class="n">encoder_id</span><span class="p">[</span><span class="n">layer_stack_index</span><span class="p">]</span>
             <span class="n">stacks</span><span class="p">[</span><span class="n">module_id</span><span class="p">]</span> <span class="o">=</span> <span class="n">AdaptedTransformerEncoder</span><span class="p">(</span>
                 <span class="n">n_layers</span><span class="p">,</span>
-                <span class="n">model_opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
-                <span class="n">model_opts</span><span class="o">.</span><span class="n">heads</span><span class="p">,</span>
-                <span class="n">model_opts</span><span class="o">.</span><span class="n">transformer_ff</span><span class="p">,</span>
-                <span class="n">model_opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span> <span class="k">else</span> <span class="n">model_opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">heads</span><span class="p">,</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">transformer_ff</span><span class="p">,</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="n">opts</span><span class="o">.</span><span class="n">dropout</span><span class="p">,</span>
                 <span class="p">(</span>
-                    <span class="n">model_opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-                    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">list</span>
-                    <span class="k">else</span> <span class="n">model_opts</span><span class="o">.</span><span class="n">attention_dropout</span>
+                    <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="n">opts</span><span class="o">.</span><span class="n">attention_dropout</span>
                 <span class="p">),</span>
                 <span class="kc">None</span><span class="p">,</span>  <span class="c1"># embeddings,</span>
-                <span class="n">model_opts</span><span class="o">.</span><span class="n">max_relative_positions</span><span class="p">,</span>
-                <span class="n">pos_ffn_activation_fn</span><span class="o">=</span><span class="n">model_opts</span><span class="o">.</span><span class="n">pos_ffn_activation_fn</span><span class="p">,</span>
+                <span class="n">opts</span><span class="o">.</span><span class="n">max_relative_positions</span><span class="p">,</span>
+                <span class="n">pos_ffn_activation_fn</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">pos_ffn_activation_fn</span><span class="p">,</span>
                 <span class="n">layer_norm_module</span><span class="o">=</span><span class="p">(</span>
-                    <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">model_opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_on_top</span>
+                    <span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">model_dim</span><span class="p">,</span> <span class="n">eps</span><span class="o">=</span><span class="mf">1e-6</span><span class="p">)</span> <span class="k">if</span> <span class="n">is_on_top</span>
                     <span class="k">else</span> <span class="n">nn</span><span class="o">.</span><span class="n">Identity</span><span class="p">()</span>
-                <span class="p">)</span>
+                <span class="p">),</span>
+                <span class="n">is_normformer</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">normformer</span><span class="p">,</span>
             <span class="p">)</span>
             <span class="n">encoders</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stacks</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">embeddings</span><span class="p">,</span> <span class="n">encoders</span><span class="p">)</span></div>

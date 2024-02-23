@@ -96,15 +96,15 @@
 </ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Modular Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Train your MAMMOTH model 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -243,12 +243,24 @@
 
 <dl class="class">
 <dt id="mammoth.inputters.dataloader.LookAheadBucketing">
-<em class="property">class </em><code class="sig-prename descclassname">mammoth.inputters.dataloader.</code><code class="sig-name descname">LookAheadBucketing</code><span class="sig-paren">(</span><em class="sig-param">examples_stream</em>, <em class="sig-param">look_ahead_size</em>, <em class="sig-param">n_buckets</em>, <em class="sig-param">batch_size</em>, <em class="sig-param">bucket_fn</em>, <em class="sig-param">numel_fn</em>, <em class="sig-param">collate_fn</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/inputters/dataloader.html#LookAheadBucketing"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.inputters.dataloader.LookAheadBucketing" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">mammoth.inputters.dataloader.</code><code class="sig-name descname">LookAheadBucketing</code><span class="sig-paren">(</span><em class="sig-param">dataset</em>, <em class="sig-param">look_ahead_size</em>, <em class="sig-param">n_buckets</em>, <em class="sig-param">batch_size</em>, <em class="sig-param">bucket_fn</em>, <em class="sig-param">numel_fn</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/inputters/dataloader.html#LookAheadBucketing"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.inputters.dataloader.LookAheadBucketing" title="Permalink to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <dl class="method">
+<dt id="mammoth.inputters.dataloader.LookAheadBucketing.bucket_is_empty">
+<code class="sig-name descname">bucket_is_empty</code><span class="sig-paren">(</span><em class="sig-param">s_idx: int</em>, <em class="sig-param">t_idx: int</em><span class="sig-paren">)</span> &#x2192; bool<a class="reference internal" href="_modules/mammoth/inputters/dataloader.html#LookAheadBucketing.bucket_is_empty"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.inputters.dataloader.LookAheadBucketing.bucket_is_empty" title="Permalink to this definition">¶</a></dt>
+<dd><p>check if this bucket is empty</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="mammoth.inputters.dataloader.LookAheadBucketing.is_empty">
+<code class="sig-name descname">is_empty</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; bool<a class="reference internal" href="_modules/mammoth/inputters/dataloader.html#LookAheadBucketing.is_empty"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.inputters.dataloader.LookAheadBucketing.is_empty" title="Permalink to this definition">¶</a></dt>
+<dd><p>check if all buckets are empty</p>
+</dd></dl>
+
+<dl class="method">
 <dt id="mammoth.inputters.dataloader.LookAheadBucketing.maybe_replenish">
-<code class="sig-name descname">maybe_replenish</code><span class="sig-paren">(</span><span class="sig-paren">)</span> &#x2192; bool<a class="reference internal" href="_modules/mammoth/inputters/dataloader.html#LookAheadBucketing.maybe_replenish"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.inputters.dataloader.LookAheadBucketing.maybe_replenish" title="Permalink to this definition">¶</a></dt>
-<dd><p>look up one more example to add to this reservoir.</p>
+<code class="sig-name descname">maybe_replenish</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/mammoth/inputters/dataloader.html#LookAheadBucketing.maybe_replenish"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#mammoth.inputters.dataloader.LookAheadBucketing.maybe_replenish" title="Permalink to this definition">¶</a></dt>
+<dd><p>try to look up one more example to add to this reservoir.</p>
 </dd></dl>
 
 </dd></dl>

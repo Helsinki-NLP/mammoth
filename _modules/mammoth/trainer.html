@@ -104,6 +104,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -579,6 +580,8 @@
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_saver</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">model_saver</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">step</span><span class="p">,</span> <span class="n">moving_average</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">moving_average</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">device_context</span><span class="o">.</span><span class="n">is_master</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">report_manager</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">report_manager</span><span class="o">.</span><span class="n">report_end</span><span class="p">(</span><span class="n">step</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">total_stats</span></div>
 
 <div class="viewcode-block" id="Trainer.validate"><a class="viewcode-back" href="../../mammoth.html#mammoth.Trainer.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">valid_iter</span><span class="p">,</span> <span class="n">moving_average</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>

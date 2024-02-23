@@ -114,6 +114,7 @@
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">Configure the sharing schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -218,7 +219,10 @@ We break down mNMT training into a series of smaller “tasks”</p>
 <li><p>A task is done on a specific device</p></li>
 <li><p>A task corresponds to a specific (parallel) corpus</p></li>
 </ul>
-<p>A centralized manager handles tasks synchronization.
+<p>In short, a task corresponds to a specific model behavior.
+In translation settings, a task will therefore correspond to a specific translation direction (say translating from Swahili to Catalan):
+All training datapoints for this direction  (i) must involve the same modules (pertaining to Swahili encoding and Catalan decoding); (ii) must be preprocessed with the same tokenizers; and (iii) can be grouped into a single bitext.
+A centralized manager handles tasks synchronization.
 This manager oversees the parallel execution of tasks, coordinating the flow of information between different modules, devices, and corpora to ensure a cohesive and synchronized training process.</p>
 <div class="section" id="flexible-modularity">
 <h3>Flexible Modularity<a class="headerlink" href="#flexible-modularity" title="Permalink to this headline">¶</a></h3>

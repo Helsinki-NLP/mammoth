@@ -104,6 +104,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -260,6 +261,7 @@
 
 <div class="viewcode-block" id="ParallelCorpus"><a class="viewcode-back" href="../../../mammoth.inputters.html#mammoth.inputters.dataset.ParallelCorpus">[docs]</a><span class="k">class</span> <span class="nc">ParallelCorpus</span><span class="p">(</span><span class="n">IterableDataset</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Torch-style dataset&quot;&quot;&quot;</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">src_file</span><span class="p">,</span>
@@ -429,12 +431,12 @@
 
     <span class="n">corpora</span> <span class="o">=</span> <span class="p">{</span>
         <span class="n">corpus_id</span><span class="p">:</span> <span class="n">read_examples_from_files</span><span class="p">(</span>
-                <span class="n">opts</span><span class="o">.</span><span class="n">tasks</span><span class="p">[</span><span class="n">corpus_id</span><span class="p">][</span><span class="s2">&quot;path_src&quot;</span><span class="p">],</span>
-                <span class="n">opts</span><span class="o">.</span><span class="n">tasks</span><span class="p">[</span><span class="n">corpus_id</span><span class="p">][</span><span class="s2">&quot;path_tgt&quot;</span><span class="p">],</span>
-                <span class="c1"># FIXME this is likely not working</span>
-                <span class="n">transforms_fn</span><span class="o">=</span><span class="n">TransformPipe</span><span class="p">(</span><span class="n">transforms</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span> <span class="k">if</span> <span class="n">transforms</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span>
-            <span class="p">)</span>
-        <span class="p">}</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">tasks</span><span class="p">[</span><span class="n">corpus_id</span><span class="p">][</span><span class="s2">&quot;path_src&quot;</span><span class="p">],</span>
+            <span class="n">opts</span><span class="o">.</span><span class="n">tasks</span><span class="p">[</span><span class="n">corpus_id</span><span class="p">][</span><span class="s2">&quot;path_tgt&quot;</span><span class="p">],</span>
+            <span class="c1"># FIXME this is likely not working</span>
+            <span class="n">transforms_fn</span><span class="o">=</span><span class="n">TransformPipe</span><span class="p">(</span><span class="n">transforms</span><span class="p">)</span><span class="o">.</span><span class="n">apply</span> <span class="k">if</span> <span class="n">transforms</span> <span class="k">else</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">}</span>
     <span class="n">counter_src</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">()</span>
     <span class="n">counter_tgt</span> <span class="o">=</span> <span class="n">collections</span><span class="o">.</span><span class="n">Counter</span><span class="p">()</span>
 

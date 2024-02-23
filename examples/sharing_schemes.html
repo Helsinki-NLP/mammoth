@@ -1,0 +1,408 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>MAMMOTH Sharing Schemes &mdash; MAMMOTH  documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="../_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/theme_overrides.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Build Vocab" href="../options/build_vocab.html" />
+    <link rel="prev" title="Training MAMMOTH 101" href="train_mammoth_101.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> MAMMOTH
+          
+
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../ref.html">References</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../FAQ.html">About MAMMOTH</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+</ul>
+<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config_config.html">Config-config Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">MAMMOTH Sharing Schemes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dataset">Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sharing-schemes-overview">Sharing Schemes Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#fully-unshared">1. <strong>Fully Unshared:</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#shared-encoder-separate-decoder">2. <strong>Shared Encoder, Separate Decoder:</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#separate-encoder-shared-decoder">3. <strong>Separate Encoder, Shared Decoder:</strong></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#fully-shared">4. <strong>Fully Shared:</strong></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#training-modular-systems">Training Modular Systems</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#setup">1. <strong>Setup:</strong></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#training-command">2. <strong>Training Command:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#testing-command">3. <strong>Testing Command:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#notes">Notes:</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../options/build_vocab.html">Build Vocab</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../options/server.html">Server</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">MAMMOTH</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html">Docs</a> &raquo;</li>
+        
+      <li>MAMMOTH Sharing Schemes</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/examples/sharing_schemes.md.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="mammoth-sharing-schemes">
+<h1>MAMMOTH Sharing Schemes<a class="headerlink" href="#mammoth-sharing-schemes" title="Permalink to this headline">¶</a></h1>
+<p>MAMMOTH is designed as a flexible modular system, allowing users to configure, train, and test various sharing schemes. This tutorial will guide you through the process of setting up and experimenting with different sharing schemes, including:</p>
+<ul class="simple">
+<li><p>fully shared</p></li>
+<li><p>fully unshared</p></li>
+<li><p>encoder shared</p></li>
+<li><p>decoder shared</p></li>
+</ul>
+<p>The configuration for each scheme is managed through YAML files, ensuring a seamless and customizable experience.</p>
+<div class="section" id="dataset">
+<h2>Dataset<a class="headerlink" href="#dataset" title="Permalink to this headline">¶</a></h2>
+<p>For this tutorial, we will be utilizing the <a class="reference external" href="https://opus.nlpl.eu/UNPC/corpus/version/UNPC">UNPC</a> dataset, which consists of manually translated UN documents spanning the last 25 years (1990 to 2014) for the six official UN languages: Arabic, Chinese, English, French, Russian, and Spanish.</p>
+<p>Before diving into the sharing schemes, we need to preprocess the data. You can download the processed data using the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth-share.a3s.fi/unpc.tar
+</pre></div>
+</div>
+<p>Additionally, we require the corresponding vocabularies for the dataset. Download the vocabularies with the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth-share.a3s.fi/vocab.tar.gz
+</pre></div>
+</div>
+<p>Now, let’s explore an overview of the sharing schemes to better understand their functionalities.</p>
+</div>
+<div class="section" id="sharing-schemes-overview">
+<h2>Sharing Schemes Overview<a class="headerlink" href="#sharing-schemes-overview" title="Permalink to this headline">¶</a></h2>
+<p>Let’s delve into an overview of the MAMMOTH Sharing Schemes, each offering unique configurations for a flexible modular system.</p>
+<div class="section" id="fully-unshared">
+<h3>1. <strong>Fully Unshared:</strong><a class="headerlink" href="#fully-unshared" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Each language maintains a distinct set of parameters for both encoder and decoder.</p></li>
+<li><p>No parameter sharing occurs between languages.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">train_ar-ar</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ar</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ar</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">train_ar-ar</span></code>: This denotes the training configuration for the Arabic-to-Arabic language pair.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dec_sharing_group</span></code>: Specifies the decoder sharing group, indicating which languages share decoder parameters. In this case, only Arabic (ar) is included, meaning no sharing with other languages for decoding.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">enc_sharing_group</span></code>: Denotes the encoder sharing group, signifying which languages share encoder parameters. Here, it’s also set to only Arabic (ar), indicating no encoder parameter sharing with other languages.</p></li>
+</ul>
+</div>
+<div class="section" id="shared-encoder-separate-decoder">
+<h3>2. <strong>Shared Encoder, Separate Decoder:</strong><a class="headerlink" href="#shared-encoder-separate-decoder" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Encoder parameters are shared across all languages.</p></li>
+<li><p>Each language has a separate set of parameters for the decoder.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">train_ar-ar</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ar</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="separate-encoder-shared-decoder">
+<h3>3. <strong>Separate Encoder, Shared Decoder:</strong><a class="headerlink" href="#separate-encoder-shared-decoder" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Each language has a separate set of parameters for the encoder.</p></li>
+<li><p>Decoder parameters are shared across all languages.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">train_ar-en</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ar</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="fully-shared">
+<h3>4. <strong>Fully Shared:</strong><a class="headerlink" href="#fully-shared" title="Permalink to this headline">¶</a></h3>
+<ul class="simple">
+<li><p>Both encoder and decoder parameters are shared across all languages.</p></li>
+<li><p>The entire model is shared among all language pairs.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">train_ar-ar</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all</span>
+</pre></div>
+</div>
+<p>You can conveniently download the complete configurations using the following command:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth-share.a3s.fi/configs.tar.gz
+</pre></div>
+</div>
+<p>These configurations provide a solid foundation for configuring, training, and testing various sharing schemes in the MAMMOTH framework. Ensure to modify the file paths according to your specific compute device configurations. Feel free to experiment and tailor these settings to suit your specific needs.</p>
+</div>
+</div>
+<div class="section" id="training-modular-systems">
+<h2>Training Modular Systems<a class="headerlink" href="#training-modular-systems" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="setup">
+<h3>1. <strong>Setup:</strong><a class="headerlink" href="#setup" title="Permalink to this headline">¶</a></h3>
+<p>To initiate the training process for MAMMOTH’s modular systems, start by setting up the necessary environment variables:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">MAMMOTH</span><span class="o">=</span>/path/to/mammoth
+<span class="nb">export</span><span class="w"> </span><span class="nv">CONFIG</span><span class="o">=</span>/path/to/configs/config.yaml
+</pre></div>
+</div>
+<div class="section" id="training-command">
+<h4>2. <strong>Training Command:</strong><a class="headerlink" href="#training-command" title="Permalink to this headline">¶</a></h4>
+<p>Execute the following command to commence training:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>srun<span class="w"> </span>/path/to/wrapper.sh<span class="w"> </span><span class="nv">$MAMMOTH</span>/train.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-config<span class="w"> </span><span class="nv">$CONFIG</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-master_ip<span class="w"> </span><span class="nv">$SLURMD_NODENAME</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-master_port<span class="w"> </span><span class="m">9969</span>
+</pre></div>
+</div>
+<p>For the wrapper script, use an example like the one below:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-u<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="w"> </span>--node_rank<span class="w"> </span><span class="nv">$SLURM_NODEID</span>
+</pre></div>
+</div>
+<p>This tutorial utilizes SLURM for job scheduling and parallel computing.
+You can tailor the provided commands for your specific needs, adapting them to alternative job scheduling systems or standalone setups.
+Ensure that the <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code> file specifies the desired sharing scheme.</p>
+</div>
+<div class="section" id="testing-command">
+<h4>3. <strong>Testing Command:</strong><a class="headerlink" href="#testing-command" title="Permalink to this headline">¶</a></h4>
+<p>After training, use the following command to test the model:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-u<span class="w"> </span><span class="nv">$MAMMOTH</span>/translate.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span><span class="nv">$CONFIG</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--model<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$checkpoint</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--task_id<span class="w"> </span>train_<span class="nv">$sl</span>-<span class="nv">$tl</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--src<span class="w"> </span><span class="nv">$processed_data</span>/<span class="nv">$lp</span>/<span class="nv">$lp</span>.<span class="nv">$sl</span>.sp<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span><span class="nv">$out_path</span>/<span class="nv">$sl</span>-<span class="nv">$tl</span>.<span class="si">${</span><span class="nv">base</span><span class="si">}</span>hyp.sp<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--gpu<span class="w"> </span><span class="m">0</span><span class="w"> </span>--shard_size<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--batch_size<span class="w"> </span><span class="m">512</span>
+</pre></div>
+</div>
+<p>Remember to replace <code class="docutils literal notranslate"><span class="pre">$checkpoint</span></code>, <code class="docutils literal notranslate"><span class="pre">$sl</span></code> (source language), <code class="docutils literal notranslate"><span class="pre">$tl</span></code> (target language), <code class="docutils literal notranslate"><span class="pre">$lp</span></code> (language pair), <code class="docutils literal notranslate"><span class="pre">$processed_data</span></code>, and <code class="docutils literal notranslate"><span class="pre">$out_path</span></code> with appropriate values.</p>
+<p>We provide the model checkpoint trained using the aforementioned encoder shared scheme.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth-share.a3s.fi/encoder-shared-models.tar.gz
+</pre></div>
+</div>
+</div>
+<div class="section" id="notes">
+<h4>Notes:<a class="headerlink" href="#notes" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p>Make sure to adapt the paths and variables to your specific directory structure.</p></li>
+<li><p>Adjust the <code class="docutils literal notranslate"><span class="pre">--gpu</span></code> flag in the testing command based on your GPU availability.</p></li>
+<li><p>Ensure that the configuration file (<code class="docutils literal notranslate"><span class="pre">config.yaml</span></code>) contains the correct sharing scheme based on your experiment.</p></li>
+</ul>
+<p>This tutorial serves as a general guide, and it is recommended to refer to the specific configuration file for additional details and customization options. Feel free to explore and adapt the commands to suit your specific training and testing requirements, regardless of the job scheduling system you choose to employ.</p>
+</div>
+</div>
+</div>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="../options/build_vocab.html" class="btn btn-neutral float-right" title="Build Vocab" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="train_mammoth_101.html" class="btn btn-neutral float-left" title="Training MAMMOTH 101" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2023, HelsinkiNLP
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -104,6 +104,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -579,7 +580,7 @@
             <span class="k">if</span> <span class="n">k</span> <span class="o">==</span> <span class="s1">&#39;models&#39;</span><span class="p">:</span>
                 <span class="n">sys</span><span class="o">.</span><span class="n">argv</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">&#39;-model&#39;</span><span class="p">]</span>
                 <span class="n">sys</span><span class="o">.</span><span class="n">argv</span> <span class="o">+=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">model</span><span class="p">)</span> <span class="k">for</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">v</span><span class="p">]</span>
-            <span class="k">elif</span> <span class="nb">type</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="o">==</span> <span class="nb">bool</span><span class="p">:</span>
+            <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
                 <span class="n">sys</span><span class="o">.</span><span class="n">argv</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">&#39;-</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">k</span><span class="p">]</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">sys</span><span class="o">.</span><span class="n">argv</span> <span class="o">+=</span> <span class="p">[</span><span class="s1">&#39;-</span><span class="si">%s</span><span class="s1">&#39;</span> <span class="o">%</span> <span class="n">k</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">v</span><span class="p">)]</span>
@@ -729,7 +730,7 @@
         <span class="n">results</span> <span class="o">=</span> <span class="n">flatten_list</span><span class="p">(</span><span class="n">predictions</span><span class="p">)</span>
 
         <span class="k">def</span> <span class="nf">maybe_item</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">x</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="ow">is</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span> <span class="k">else</span> <span class="n">x</span>
+            <span class="k">return</span> <span class="n">x</span><span class="o">.</span><span class="n">item</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">)</span> <span class="k">else</span> <span class="n">x</span>
 
         <span class="n">scores</span> <span class="o">=</span> <span class="p">[</span><span class="n">maybe_item</span><span class="p">(</span><span class="n">score_tensor</span><span class="p">)</span> <span class="k">for</span> <span class="n">score_tensor</span> <span class="ow">in</span> <span class="n">flatten_list</span><span class="p">(</span><span class="n">scores</span><span class="p">)]</span>
 
@@ -835,7 +836,7 @@
     <span class="nd">@critical</span>
     <span class="k">def</span> <span class="nf">to_cpu</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Move the model to CPU and clear CUDA cache.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">translator</span><span class="p">)</span> <span class="o">==</span> <span class="n">CTranslate2Translator</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">translator</span><span class="p">,</span> <span class="n">CTranslate2Translator</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">translator</span><span class="o">.</span><span class="n">to_cpu</span><span class="p">()</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">translator</span><span class="o">.</span><span class="n">model</span><span class="o">.</span><span class="n">cpu</span><span class="p">()</span>
@@ -844,7 +845,7 @@
 
 <div class="viewcode-block" id="ServerModel.to_gpu"><a class="viewcode-back" href="../../../mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.to_gpu">[docs]</a>    <span class="k">def</span> <span class="nf">to_gpu</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Move the model to GPU.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">translator</span><span class="p">)</span> <span class="o">==</span> <span class="n">CTranslate2Translator</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">translator</span><span class="p">,</span> <span class="n">CTranslate2Translator</span><span class="p">):</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">translator</span><span class="o">.</span><span class="n">to_gpu</span><span class="p">()</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">set_device</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">opts</span><span class="o">.</span><span class="n">gpu</span><span class="p">)</span>

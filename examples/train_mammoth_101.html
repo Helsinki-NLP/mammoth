@@ -38,7 +38,7 @@
   <link rel="stylesheet" href="../_static/theme_overrides.css" type="text/css" />
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="Build Vocab" href="../options/build_vocab.html" />
+    <link rel="next" title="Configure the sharing schemes" href="sharing_schemes.html" />
     <link rel="prev" title="Prepare Data" href="../prepare_data.html" /> 
 </head>
 
@@ -122,6 +122,7 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="sharing_schemes.html">Configure the sharing schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -230,41 +231,7 @@ Here’s a high-level summary of the main processing steps. For each language in
 <li><p>tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.</p></li>
 </ul>
 <p>We use a positional argument ‘lang’ that can accept one or more values, for specifying the languages (e.g., <code class="docutils literal notranslate"><span class="pre">bg</span></code> and <code class="docutils literal notranslate"><span class="pre">cs</span></code> as used in Europarl) to process.</p>
-<p>You’re free to skip this step if you directly download the processed data.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">argparse</span>
-<span class="kn">import</span> <span class="nn">random</span>
-
-<span class="kn">import</span> <span class="nn">tqdm</span>
-<span class="kn">import</span> <span class="nn">sentencepiece</span> <span class="k">as</span> <span class="nn">sp</span>
-
-<span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
-<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">)</span>
-<span class="n">langs</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span><span class="o">.</span><span class="n">lang</span>
-
-<span class="n">sp_path</span> <span class="o">=</span> <span class="s1">&#39;vocab/opusTC.mul.64k.spm&#39;</span>
-<span class="n">spm</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">SentencePieceProcessor</span><span class="p">(</span><span class="n">model_file</span><span class="o">=</span><span class="n">sp_path</span><span class="p">)</span>
-
-<span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">langs</span><span class="p">):</span>
-    <span class="n">en_side_in</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/europarl-v7.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en&#39;</span>
-    <span class="n">xx_side_in</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/europarl-v7.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_in</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_in</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="n">xx_stream</span><span class="p">),</span> <span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="n">en_stream</span><span class="p">))</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="p">[(</span><span class="n">xx</span><span class="p">,</span> <span class="n">en</span><span class="p">)</span> <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;read </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">xx</span> <span class="ow">and</span> <span class="n">en</span><span class="p">]</span> <span class="c1"># drop empty lines</span>
-        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-    <span class="n">en_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/valid.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en.sp&#39;</span>
-    <span class="n">xx_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/valid.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">.sp&#39;</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">[:</span><span class="mi">1000</span><span class="p">],</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;valid </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">):</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">xx_stream</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">en</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">en_stream</span><span class="p">)</span>
-    <span class="n">en_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/train.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en.sp&#39;</span>
-    <span class="n">xx_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/train.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">.sp&#39;</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1000</span><span class="p">:],</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;train </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">):</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">xx_stream</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">en</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">en_stream</span><span class="p">)</span>
-</pre></div>
-</div>
+<p>You’re free to skip this step if you directly download the processed data. For details, see <a class="reference external" href="../prepare_data.md#europarl">this page</a>.</p>
 </div>
 <div class="section" id="step-3-configuration">
 <h2>Step 3: Configuration<a class="headerlink" href="#step-3-configuration" title="Permalink to this headline">¶</a></h2>
@@ -1824,7 +1791,7 @@ python<span class="w"> </span>-u<span class="w"> </span><span class="s2">&quot;<
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="../options/build_vocab.html" class="btn btn-neutral float-right" title="Build Vocab" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="sharing_schemes.html" class="btn btn-neutral float-right" title="Configure the sharing schemes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="../prepare_data.html" class="btn btn-neutral float-left" title="Prepare Data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>

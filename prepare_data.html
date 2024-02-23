@@ -105,6 +105,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Prepare Data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#unpc">UNPC</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#europarl">Europarl</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#step-1-download-the-data">Step 1: Download the data</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#step-2-tokenization">Step 2: Tokenization</a></li>
@@ -120,6 +121,7 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -201,6 +203,16 @@
             
   <div class="section" id="prepare-data">
 <h1>Prepare Data<a class="headerlink" href="#prepare-data" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="unpc">
+<h2>UNPC<a class="headerlink" href="#unpc" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://opus.nlpl.eu/UNPC/corpus/version/UNPC">UNPC</a> consists of manually translated UN documents from the last 25 years (1990 to 2014) for the six official UN languages, Arabic, Chinese, English, French, Russian, and Spanish.
+We preprocess the data. You can download the processed data by:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth-share.a3s.fi/unpc.tar
+</pre></div>
+</div>
+<p>Or you can use the scripts provided by the tarball to process the data yourself.</p>
+<p>For references, please cite this reference: Ziemski, M., Junczys-Dowmunt, M., and Pouliquen, B., (2016), The United Nations Parallel Corpus, Language Resources and Evaluation (LREC’16), Portorož, Slovenia, May 2016.</p>
+</div>
 <div class="section" id="europarl">
 <h2>Europarl<a class="headerlink" href="#europarl" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="step-1-download-the-data">

@@ -91,6 +91,8 @@
 <li class="toctree-l2"><a class="reference internal" href="#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-2-configurations">Step 2: Configurations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#step-3-start-training">Step 3: Start training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-4-translate">Step 4: Translate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
@@ -112,6 +114,7 @@
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -299,7 +302,7 @@ Below is a list of configuration examples:</p>
 </div>
 <div class="section" id="step-3-start-training">
 <h2>Step 3: Start training<a class="headerlink" href="#step-3-start-training" title="Permalink to this headline">¶</a></h2>
-<p>Finally, launch the training script, for example, through the Slurm manager, via:</p>
+<p>Now that you’ve prepared your data and configured the settings, it’s time to initiate the training of your multilingual machine translation model using Mammoth. Follow these steps to launch the training script, for example, through the Slurm manager:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-u<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$@</span><span class="s2">&quot;</span><span class="w"> </span>--node_rank<span class="w"> </span><span class="nv">$SLURM_NODEID</span><span class="w"> </span>-u<span class="w"> </span><span class="si">${</span><span class="nv">PATH_TO_MAMMOTH</span><span class="si">}</span>/train.py<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-config<span class="w"> </span><span class="si">${</span><span class="nv">CONFIG_DIR</span><span class="si">}</span>/your_config.yml<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-save_model<span class="w"> </span><span class="si">${</span><span class="nv">SAVE_DIR</span><span class="si">}</span>/models/<span class="si">${</span><span class="nv">EXP_ID</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
@@ -307,7 +310,55 @@ Below is a list of configuration examples:</p>
 <span class="w">    </span>-tensorboard<span class="w"> </span>-tensorboard_log_dir<span class="w"> </span><span class="si">${</span><span class="nv">LOG_DIR</span><span class="si">}</span>/<span class="si">${</span><span class="nv">EXP_ID</span><span class="si">}</span>
 </pre></div>
 </div>
-<p>A complete example of training on the Europarl dataset is available at <a class="reference internal" href="examples/train_mammoth_101.html"><span class="doc">MAMMOTH101</span></a>.</p>
+<p>Explanation of Command:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">python</span> <span class="pre">-u</span> <span class="pre">&quot;$&#64;&quot;</span></code>: Initiates the training script using Python.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--node_rank</span> <span class="pre">$SLURM_NODEID</span></code>: Specifies the node rank using the environment variable provided by Slurm.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-u</span> <span class="pre">${PATH_TO_MAMMOTH}/train.py</span></code>: Specifies the path to the Mammoth training script.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-config</span> <span class="pre">${CONFIG_DIR}/your_config.yml</span></code>: Specifies the path to your configuration file.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-save_model</span> <span class="pre">${SAVE_DIR}/models/${EXP_ID}</span></code>: Defines the directory to save the trained models, incorporating an experiment identifier (<code class="docutils literal notranslate"><span class="pre">${EXP_ID}</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-master_port</span> <span class="pre">9974</span> <span class="pre">-master_ip</span> <span class="pre">$SLURMD_NODENAME</span></code>: Sets the master port and IP for communication.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-tensorboard</span> <span class="pre">-tensorboard_log_dir</span> <span class="pre">${LOG_DIR}/${EXP_ID}</span></code>: Enables TensorBoard logging, specifying the directory for TensorBoard logs.</p></li>
+</ul>
+<p>Your training process has been initiated through the Slurm manager, leveraging the specified configuration settings. Monitor the progress through the provided logging and visualization tools. Adjust parameters as needed for your specific training requirements. You can also run the command on other workstations by modifying the parameters accordingly.</p>
+</div>
+<div class="section" id="step-4-translate">
+<h2>Step 4: Translate<a class="headerlink" href="#step-4-translate" title="Permalink to this headline">¶</a></h2>
+<p>Now that you have successfully trained your multilingual machine translation model using Mammoth, it’s time to put it to use for translation.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-u<span class="w"> </span><span class="nv">$MAMMOTH</span>/translate.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--config<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">CONFIG_DIR</span><span class="si">}</span><span class="s2">/your_config.yml&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--model<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model_checkpoint</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--task_id<span class="w">  </span><span class="s2">&quot;train_</span><span class="nv">$src_lang</span><span class="s2">-</span><span class="nv">$tgt_lang</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--src<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$path_to_src_language</span><span class="s2">/</span><span class="nv">$lang_pair</span><span class="s2">.</span><span class="nv">$src_lang</span><span class="s2">.sp&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$out_path</span><span class="s2">/</span><span class="nv">$src_lang</span><span class="s2">-</span><span class="nv">$tgt_lang</span><span class="s2">.hyp.sp&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--gpu<span class="w"> </span><span class="m">0</span><span class="w"> </span>--shard_size<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--batch_size<span class="w"> </span><span class="m">512</span>
+</pre></div>
+</div>
+<p>Follow these configs to translate text with your trained model.</p>
+<ul>
+<li><p>Provide necessary details using the following options:</p>
+<ul class="simple">
+<li><p>Configuration File: <code class="docutils literal notranslate"><span class="pre">--config</span> <span class="pre">&quot;${CONFIG_DIR}/your_config.yml&quot;</span></code></p></li>
+<li><p>Model Checkpoint: <code class="docutils literal notranslate"><span class="pre">--model</span> <span class="pre">&quot;$model_checkpoint&quot;</span></code></p></li>
+<li><p>Translation Task: <code class="docutils literal notranslate"><span class="pre">--task_id</span> <span class="pre">&quot;train_$src_lang-$tgt_lang&quot;</span></code></p></li>
+</ul>
+</li>
+<li><p>Point to the source language file for translation:
+<code class="docutils literal notranslate"><span class="pre">--src</span> <span class="pre">&quot;$path_to_src_language/$lang_pair.$src_lang.sp&quot;</span></code></p></li>
+<li><p>Define the path for saving the translated output: <code class="docutils literal notranslate"><span class="pre">--output</span> <span class="pre">&quot;$out_path/$src_lang-$tgt_lang.hyp.sp&quot;</span></code></p></li>
+<li><p>Adjust GPU and batch size settings based on your requirements: <code class="docutils literal notranslate"><span class="pre">--gpu</span> <span class="pre">0</span> <span class="pre">--shard_size</span> <span class="pre">0</span> <span class="pre">--batch_size</span> <span class="pre">512</span></code></p></li>
+<li><p>We provide the model checkpoint trained using the encoder shared scheme described in <a class="reference internal" href="examples/sharing_schemes.html"><span class="doc">this tutorial</span></a>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth-share.a3s.fi/encoder-shared-models.tar.gz
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Congratulations! You’ve successfully translated text using your Mammoth model. Adjust the parameters as needed for your specific translation tasks.</p>
+</div>
+<div class="section" id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Permalink to this headline">¶</a></h2>
+<p>A complete example of training on the Europarl dataset is available at <a class="reference internal" href="examples/train_mammoth_101.html"><span class="doc">MAMMOTH101</span></a>, and a complete example for configuring different sharing schemes is available at <a class="reference internal" href="examples/sharing_schemes.html"><span class="doc">MAMMOTH sharing schemes</span></a>.</p>
 </div>
 </div>
 

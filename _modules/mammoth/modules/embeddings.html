@@ -104,6 +104,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -192,6 +193,7 @@
 <span class="kn">from</span> <span class="nn">mammoth.modules.util_class</span> <span class="kn">import</span> <span class="n">Elementwise</span>
 <span class="c1"># from mammoth.utils.logging import logger</span>
 
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
 <span class="c1"># import bitsandbytes as bnb</span>
 
 
@@ -300,6 +302,7 @@
         <span class="n">feat_vocab_sizes</span><span class="o">=</span><span class="p">[],</span>
         <span class="n">dropout</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
         <span class="n">freeze_word_vecs</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">enable_embeddingless</span><span class="o">=</span><span class="kc">False</span>
     <span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_validate_args</span><span class="p">(</span><span class="n">feat_merge</span><span class="p">,</span> <span class="n">feat_vocab_sizes</span><span class="p">,</span> <span class="n">feat_vec_exponent</span><span class="p">,</span> <span class="n">feat_vec_size</span><span class="p">,</span> <span class="n">feat_padding_idx</span><span class="p">)</span>
 
@@ -329,7 +332,24 @@
         <span class="c1"># The embedding matrix look-up tables. The first look-up table</span>
         <span class="c1"># is for words. Subsequent ones are for features, if any exist.</span>
         <span class="n">emb_params</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">vocab_sizes</span><span class="p">,</span> <span class="n">emb_dims</span><span class="p">,</span> <span class="n">pad_indices</span><span class="p">)</span>
-        <span class="n">embeddings</span> <span class="o">=</span> <span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">padding_idx</span><span class="o">=</span><span class="n">pad</span><span class="p">)</span> <span class="k">for</span> <span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">pad</span> <span class="ow">in</span> <span class="n">emb_params</span><span class="p">]</span>
+
+        <span class="n">emb_params</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="n">vocab_sizes</span><span class="p">,</span> <span class="n">emb_dims</span><span class="p">,</span> <span class="n">pad_indices</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">enable_embeddingless</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+            <span class="n">embeddings</span> <span class="o">=</span> <span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">padding_idx</span><span class="o">=</span><span class="n">pad</span><span class="p">)</span> <span class="k">for</span> <span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">pad</span> <span class="ow">in</span> <span class="n">emb_params</span><span class="p">]</span>
+
+        <span class="k">else</span><span class="p">:</span>
+
+            <span class="k">def</span> <span class="nf">create_embeddingless</span><span class="p">(</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">padding_idx</span><span class="p">):</span>
+                <span class="n">one_hot_matrix</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">one_hot</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">vocab</span><span class="p">))</span><span class="o">.</span><span class="n">float</span><span class="p">()</span>
+                <span class="n">one_hot_embed</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">((</span><span class="n">one_hot_matrix</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span> <span class="o">-</span> <span class="n">vocab</span><span class="p">))),</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+                <span class="n">one_hot_embed</span><span class="p">[</span><span class="n">padding_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dim</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="n">emb</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">padding_idx</span><span class="o">=</span><span class="n">padding_idx</span><span class="p">)</span>
+                <span class="n">emb</span><span class="o">.</span><span class="n">weight</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">parameter</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">one_hot_embed</span><span class="p">,</span> <span class="n">requires_grad</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">emb</span>
+            <span class="n">embeddings</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">create_embeddingless</span><span class="p">(</span><span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">padding_idx</span><span class="o">=</span><span class="n">pad</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">vocab</span><span class="p">,</span> <span class="n">dim</span><span class="p">,</span> <span class="n">pad</span> <span class="ow">in</span> <span class="n">emb_params</span>
+            <span class="p">]</span>
         <span class="n">emb_luts</span> <span class="o">=</span> <span class="n">Elementwise</span><span class="p">(</span><span class="n">feat_merge</span><span class="p">,</span> <span class="n">embeddings</span><span class="p">)</span>
 
         <span class="c1"># The final output size of word + feature vectors. This can vary</span>

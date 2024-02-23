@@ -40,7 +40,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="Train" href="train.html" />
-    <link rel="prev" title="Train your MAMMOTH model 101" href="../examples/train_mammoth_101.html" /> 
+    <link rel="prev" title="Training MAMMOTH 101" href="../examples/train_mammoth_101.html" /> 
 </head>
 
 <body class="wy-body-for-nav">
@@ -98,15 +98,15 @@
 </ul>
 <p class="caption"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../modular_model.html">Modular Model</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../config_config.html">Config-config tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../attention_bridges.html">Attention Bridge</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../prepare_data.html">Prepare Data</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../examples/train_mammoth_101.html">Train your MAMMOTH model 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul class="current">
@@ -209,7 +209,7 @@
 <p><p>build_vocab.py</p>
 </p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">usage</span><span class="p">:</span> <span class="n">build_vocab</span><span class="o">.</span><span class="n">py</span> <span class="p">[</span><span class="o">-</span><span class="n">h</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">config</span> <span class="n">CONFIG</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">save_config</span> <span class="n">SAVE_CONFIG</span><span class="p">]</span> <span class="o">-</span><span class="n">tasks</span> <span class="n">TASKS</span> <span class="p">[</span><span class="o">-</span><span class="n">skip_empty_level</span> <span class="p">{</span><span class="n">silent</span><span class="p">,</span><span class="n">warning</span><span class="p">,</span><span class="n">error</span><span class="p">}]</span>
-                      <span class="p">[</span><span class="o">-</span><span class="n">transforms</span> <span class="p">{</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">}</span> <span class="p">[{</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">}</span> <span class="o">...</span><span class="p">]]</span>
+                      <span class="p">[</span><span class="o">-</span><span class="n">mammoth_transforms</span> <span class="p">{</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">}</span> <span class="p">[{</span><span class="n">prefix</span><span class="p">,</span><span class="n">denoising</span><span class="p">,</span><span class="n">filtertoolong</span><span class="p">,</span><span class="n">filterwordratio</span><span class="p">,</span><span class="n">filterrepetitions</span><span class="p">,</span><span class="n">filterterminalpunct</span><span class="p">,</span><span class="n">filternonzeronumerals</span><span class="p">,</span><span class="n">filterfeats</span><span class="p">,</span><span class="n">inferfeats</span><span class="p">,</span><span class="n">switchout</span><span class="p">,</span><span class="n">tokendrop</span><span class="p">,</span><span class="n">tokenmask</span><span class="p">,</span><span class="n">sentencepiece</span><span class="p">,</span><span class="n">bpe</span><span class="p">,</span><span class="n">onmt_tokenize</span><span class="p">}</span> <span class="o">...</span><span class="p">]]</span>
                       <span class="o">-</span><span class="n">save_data</span> <span class="n">SAVE_DATA</span> <span class="p">[</span><span class="o">-</span><span class="n">overwrite</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">n_sample</span> <span class="n">N_SAMPLE</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">dump_samples</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">num_threads</span> <span class="n">NUM_THREADS</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">vocab_sample_queue_size</span> <span class="n">VOCAB_SAMPLE_QUEUE_SIZE</span><span class="p">]</span> <span class="o">-</span><span class="n">src_vocab</span> <span class="n">SRC_VOCAB</span> <span class="p">[</span><span class="o">-</span><span class="n">tgt_vocab</span> <span class="n">TGT_VOCAB</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">share_vocab</span><span class="p">]</span>
                       <span class="p">[</span><span class="o">-</span><span class="n">vocab_paths</span> <span class="n">VOCAB_PATHS</span><span class="p">]</span> <span class="p">[</span><span class="o">-</span><span class="n">src_feats_vocab</span> <span class="n">SRC_FEATS_VOCAB</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">permute_sent_ratio</span> <span class="n">PERMUTE_SENT_RATIO</span><span class="p">]</span> <span class="p">[</span><span class="o">--</span><span class="n">rotate_ratio</span> <span class="n">ROTATE_RATIO</span><span class="p">]</span>
@@ -248,7 +248,7 @@
 <p>Security level when encounter empty examples.silent: silently ignore/skip empty example;warning: warning when ignore/skip empty example;error: raise error &amp; stop execution when encouter empty.</p>
 <p>Default: “warning”</p>
 </dd>
-<dt><kbd>-transforms, --transforms</kbd></dt>
+<dt><kbd>-mammoth_transforms, --mammoth_transforms</kbd></dt>
 <dd><p>Possible choices: prefix, denoising, filtertoolong, filterwordratio, filterrepetitions, filterterminalpunct, filternonzeronumerals, filterfeats, inferfeats, switchout, tokendrop, tokenmask, sentencepiece, bpe, onmt_tokenize</p>
 <p>Default transform pipeline to apply to data. Can be specified in each corpus of data to override.</p>
 <p>Default: []</p>
@@ -537,7 +537,7 @@
         <a href="train.html" class="btn btn-neutral float-right" title="Train" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
-        <a href="../examples/train_mammoth_101.html" class="btn btn-neutral float-left" title="Train your MAMMOTH model 101" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+        <a href="../examples/train_mammoth_101.html" class="btn btn-neutral float-left" title="Training MAMMOTH 101" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
       
     </div>
   

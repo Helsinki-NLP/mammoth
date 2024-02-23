@@ -104,6 +104,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../../install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -219,7 +220,7 @@
     <span class="p">)</span>
     <span class="k">if</span> <span class="n">logger</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">task</span><span class="p">))</span>
-    <span class="n">vocabs</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">model_opts</span> <span class="o">=</span> <span class="n">load_test_model</span><span class="p">(</span><span class="n">opts</span><span class="p">)</span>
+    <span class="n">vocabs</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="n">model_opts</span> <span class="o">=</span> <span class="n">load_test_model</span><span class="p">(</span><span class="n">opts</span><span class="p">,</span> <span class="n">task</span><span class="p">)</span>
 
     <span class="n">scorer</span> <span class="o">=</span> <span class="n">mammoth</span><span class="o">.</span><span class="n">translate</span><span class="o">.</span><span class="n">GNMTGlobalScorer</span><span class="o">.</span><span class="n">from_opts</span><span class="p">(</span><span class="n">opts</span><span class="p">)</span>
 
@@ -474,7 +475,7 @@
             <span class="n">ignore_when_blocking</span><span class="o">=</span><span class="nb">set</span><span class="p">(</span><span class="n">opts</span><span class="o">.</span><span class="n">ignore_when_blocking</span><span class="p">),</span>
             <span class="n">replace_unk</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">replace_unk</span><span class="p">,</span>
             <span class="n">ban_unk_token</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">ban_unk_token</span><span class="p">,</span>
-            <span class="n">tgt_prefix</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">tgt_prefix</span><span class="p">,</span>
+            <span class="n">tgt_prefix</span><span class="o">=</span><span class="n">task</span><span class="o">.</span><span class="n">corpus_opts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;tgt_prefix&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
             <span class="n">phrase_table</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">phrase_table</span><span class="p">,</span>
             <span class="n">data_type</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">data_type</span><span class="p">,</span>
             <span class="n">verbose</span><span class="o">=</span><span class="n">opts</span><span class="o">.</span><span class="n">verbose</span><span class="p">,</span>

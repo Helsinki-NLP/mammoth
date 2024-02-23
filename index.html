@@ -105,6 +105,7 @@
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
 </ul>
 <p class="caption"><span class="caption-text">Scripts</span></p>
 <ul>
@@ -199,6 +200,8 @@
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-2-configurations">Step 2: Configurations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-3-start-training">Step 3: Start training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#step-4-translate">Step 4: Translate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="quickstart.html#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a><ul>
@@ -261,6 +264,7 @@
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="prepare_data.html#unpc">UNPC</a></li>
 <li class="toctree-l2"><a class="reference internal" href="prepare_data.html#europarl">Europarl</a></li>
 <li class="toctree-l2"><a class="reference internal" href="prepare_data.html#opus-100">OPUS 100</a></li>
 </ul>
@@ -270,6 +274,12 @@
 <li class="toctree-l2"><a class="reference internal" href="examples/train_mammoth_101.html#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/train_mammoth_101.html#step-3-configuration">Step 3: Configuration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="examples/train_mammoth_101.html#step-4-train-your-mammoth-model">Step 4: Train your MAMMOTH model</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/sharing_schemes.html#dataset">Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/sharing_schemes.html#sharing-schemes-overview">Sharing Schemes Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/sharing_schemes.html#training-modular-systems">Training Modular Systems</a></li>
 </ul>
 </li>
 </ul>
@@ -334,15 +344,10 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="options/translate.html#Configuration">Configuration</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Model">Model</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Data">Data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Beam Search">Beam Search</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Random Sampling">Random Sampling</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Reproducibility">Reproducibility</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Penalties">Penalties</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Decoding tricks">Decoding tricks</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Logging">Logging</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Efficiency">Efficiency</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Data/Tasks">Data/Tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Vocab">Vocab</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Pruning">Pruning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Embeddings">Embeddings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="options/translate.html#Transform/Denoising AE">Transform/Denoising AE</a></li>
 <li class="toctree-l2"><a class="reference internal" href="options/translate.html#Transform/Filter">Transform/Filter</a></li>
 <li class="toctree-l2"><a class="reference internal" href="options/translate.html#Transform/Filter_repeat1">Transform/Filter</a></li>
@@ -355,7 +360,15 @@
 <li class="toctree-l2"><a class="reference internal" href="options/translate.html#Transform/Token_Mask">Transform/Token_Mask</a></li>
 <li class="toctree-l2"><a class="reference internal" href="options/translate.html#Transform/Subword/Common">Transform/Subword/Common</a></li>
 <li class="toctree-l2"><a class="reference internal" href="options/translate.html#Transform/Subword/ONMTTOK">Transform/Subword/ONMTTOK</a></li>
-<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Source and Target Languages">Source and Target Languages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Model">Model</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Data">Data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Beam Search">Beam Search</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Random Sampling">Random Sampling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Reproducibility">Reproducibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Penalties">Penalties</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Decoding tricks">Decoding tricks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Logging">Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="options/translate.html#Efficiency">Efficiency</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a><ul>

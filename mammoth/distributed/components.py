@@ -68,6 +68,10 @@ class DistributedComponent(ABC):
     def min_rank(self) -> int:
         return min(self.global_ranks)
 
+    def needs_communication(self) -> bool:
+        # if the component needs communication, a group must be set
+        return self.group is not None
+
 
 @dataclass
 class DistributedXCoder(DistributedComponent, ABC):

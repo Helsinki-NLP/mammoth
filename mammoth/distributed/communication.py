@@ -7,6 +7,7 @@ import signal
 import torch
 import torch.distributed
 
+from mammoth.distributed.contexts import DeviceContextEnum
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
 
@@ -263,7 +264,8 @@ def consumer(process_fn, opts, device_context, error_queue, batch_queue, semapho
             f'local_rank {device_context.local_rank}'
         )
         logger.info(f'opts.gpu_ranks {opts.gpu_ranks}')
-        multi_init(opts, device_context.global_rank)
+        if device_context.context == DeviceContextEnum.MULTI_GPU:
+            multi_init(opts, device_context.global_rank)
         # error_queue not passed (is this intentional?)
         process_fn(
             opts,
@@ -280,4 +282,4 @@ def consumer(process_fn, opts, device_context, error_queue, batch_queue, semapho
         # propagate exception to parent process, keeping original traceback
         import traceback
 
-        error_queue.put((opts.gpu_ranks[device_context.node_rank], traceback.format_exc()))
+        error_queue.put((device_context.node_rank, traceback.format_exc()))

@@ -190,13 +190,6 @@ class Trainer(object):
         self.dropout_steps = dropout_steps
 
         self.task_queue_manager = task_queue_manager
-        my_component_groups = self.task_queue_manager.get_my_distributed_groups()
-        self.my_encoder_groups = my_component_groups['encoder']
-        self.my_decoder_groups = my_component_groups['decoder']
-        self.my_src_emb_groups = my_component_groups['src_emb']
-        self.my_tgt_emb_groups = my_component_groups['tgt_emb']
-        self.my_encoder_adapter_groups = my_component_groups['encoder_adapters']
-        self.my_decoder_adapter_groups = my_component_groups['decoder_adapters']
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -277,6 +270,7 @@ class Trainer(object):
             batches_with_meta = islice(train_iter, self.accum_count)
 
             batch_task_sample = self.task_queue_manager.sample_corpus_ids()
+            logger.info(f'batch_task_sample has {batch_task_sample.training_step}')
             my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
 
             self._gradient_accumulation(
@@ -286,54 +280,17 @@ class Trainer(object):
                 my_task,
             )
 
-            # Note that all group ids are tuples, some with length 1
-            for (layer_stack_index, encoder_id), (_, group) in self.my_encoder_groups.items():
-                params = [
-                    (name, p) for (name, p)
-                    in self.model.encoder.get_submodule(layer_stack_index, encoder_id).named_parameters()
-                    if 'embeddings' not in name and 'adapter' not in name
-                ]
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
+            # All components on device, in consistent order across devices
+            my_components = self.task_queue_manager.get_my_distributed_components()
+            # Omit components not found elsewhere, as these don't need to be communicated
+            components_to_communicate = [
+                component for component in my_components
+                if component.needs_communication()
+            ]
 
-            for (layer_stack_index, decoder_id), (_, group) in self.my_decoder_groups.items():
-                params = [
-                    (name, p) for (name, p)
-                    in self.model.decoder.get_submodule(layer_stack_index, decoder_id).named_parameters()
-                    if 'embeddings' not in name and 'adapter' not in name
-                ]
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
-
-            for (src_lang,), (_, group) in self.my_src_emb_groups.items():
-                embs = self.model.encoder.embeddings[f'embeddings_{src_lang}']
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
-
-            for (tgt_lang,), (_, group) in self.my_tgt_emb_groups.items():
-                embs = self.model.decoder.embeddings[f'embeddings_{tgt_lang}']
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
-
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(
-                    self.model.generator[f'generator_{tgt_lang}'].named_parameters(), group=group
-                )
-
-            for adapter_id, (_, group) in self.my_encoder_adapter_groups.items():
-                layer_stack_index, encoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.encoder.get_submodule(layer_stack_index, encoder_id).get_adapter(
-                    adapter_group, sub_id
-                )
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
-
-            for adapter_id, (_, group) in self.my_decoder_adapter_groups.items():
-                layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(
-                    adapter_group, sub_id
-                )
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
-
-            # a group is not specified: reduce across all devices
-            if device_context.is_distributed():
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(
-                    self.model.attention_bridge.named_parameters()
-                )
+            for component in components_to_communicate:
+                params = component.named_parameters(self.model)
+                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=component.group)
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
@@ -473,8 +430,8 @@ class Trainer(object):
         for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
             if metadata != expected_metadata:
                 raise Exception(
-                    'Mismatch in task sampling. '
-                    f'Received {metadata}, expected {expected_metadata}'
+                    f'Mismatch in task sampling for batch {comm_batch}.\n '
+                    f'Received {metadata},\n expected {expected_metadata}'
                 )
             seen_comm_batches.add(comm_batch)
             if self.norm_method == "tokens":

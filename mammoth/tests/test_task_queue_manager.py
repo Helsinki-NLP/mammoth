@@ -144,15 +144,15 @@ def test_create_all_distributed_components():
         use_attention_bridge=False, new_group_func=MockGroup()
     )
     assert all_components == [
+        DistributedDecoder(
+            global_ranks={0, 2}, group='Group 0 with GPU ranks [0, 2]', layer_stack_index=0, xcoder_id='y'
+        ),
+        DistributedDecoder(global_ranks={1}, group=None, layer_stack_index=0, xcoder_id='yy'),
         DistributedEncoder(
-            global_ranks={0, 1}, group='Group 0 with GPU ranks [0, 1]', layer_stack_index=0, xcoder_id='x'
+            global_ranks={0, 1}, group='Group 1 with GPU ranks [0, 1]', layer_stack_index=0, xcoder_id='x'
         ),
         DistributedEncoder(global_ranks={1}, group=None, layer_stack_index=0, xcoder_id='xx'),
         DistributedEncoder(global_ranks={2}, group=None, layer_stack_index=0, xcoder_id='xxx'),
-        DistributedDecoder(
-            global_ranks={0, 2}, group='Group 1 with GPU ranks [0, 2]', layer_stack_index=0, xcoder_id='y'
-        ),
-        DistributedDecoder(global_ranks={1}, group=None, layer_stack_index=0, xcoder_id='yy'),
         DistributedGenerator(global_ranks={0, 2}, group='Group 2 with GPU ranks [0, 2]', lang='b'),
         DistributedGenerator(global_ranks={1}, group=None, lang='d'),
         DistributedEmbedding(global_ranks={0, 1}, group='Group 3 with GPU ranks [0, 1]', side=Side.encoder, lang='a'),
@@ -183,11 +183,11 @@ def test_get_my_distributed_components():
         if component not in all_components:
             raise Exception(f'my component {component} not in all_components {all_components}')
     assert my_components == [
+        DistributedDecoder(global_ranks={1}, group=None, layer_stack_index=0, xcoder_id='yy'),
         DistributedEncoder(
-            global_ranks={0, 1}, group='Group 0 with GPU ranks [0, 1]', layer_stack_index=0, xcoder_id='x'
+            global_ranks={0, 1}, group='Group 1 with GPU ranks [0, 1]', layer_stack_index=0, xcoder_id='x'
         ),
         DistributedEncoder(global_ranks={1}, group=None, layer_stack_index=0, xcoder_id='xx'),
-        DistributedDecoder(global_ranks={1}, group=None, layer_stack_index=0, xcoder_id='yy'),
         DistributedGenerator(global_ranks={1}, group=None, lang='d'),
         DistributedEmbedding(global_ranks={0, 1}, group='Group 3 with GPU ranks [0, 1]', side=Side.encoder, lang='a'),
         DistributedEmbedding(global_ranks={1}, group=None, side=Side.encoder, lang='c'),

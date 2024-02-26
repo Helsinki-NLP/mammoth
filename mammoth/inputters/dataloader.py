@@ -341,7 +341,7 @@ class DynamicDatasetIter(object):
                 batch_task_sample = self.task_queue_manager.sample_corpus_ids()
                 my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
                 ordered_iter, metadata = self.dataset_iterators[my_task.corpus_id]
-                for _ in self.task_queue_manager.accum_count:
+                for _ in range(self.task_queue_manager.accum_count):
                     batch = next(ordered_iter)
                     if batch_task_sample.training_step == 0:
                         # De-numericalize a few sentences for debugging

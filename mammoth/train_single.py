@@ -57,50 +57,17 @@ def _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager):
 
 
 def init_distributed(model, task_queue_manager):
-    my_component_groups = task_queue_manager.get_my_distributed_groups()
-    for (layer_stack_index, encoder_id), (min_rank, group) in my_component_groups['encoder'].items():
-        weights = [
-            p.data for name, p
-            in model.encoder.get_submodule(layer_stack_index, encoder_id).named_parameters()
-            if 'embeddings' not in name and 'adapter' not in name
-        ]
-        broadcast_tensors(weights, src=min_rank, group=group)
+    # All components on device, in consistent order across devices
+    my_components = task_queue_manager.get_my_distributed_components()
+    # Omit components not found elsewhere, as these don't need to be communicated
+    components_to_communicate = [
+        component for component in my_components
+        if component.needs_communication()
+    ]
 
-    for (layer_stack_index, decoder_id), (min_rank, group) in my_component_groups['decoder'].items():
-        weights = [
-            p.data for name, p
-            in model.decoder.get_submodule(layer_stack_index, decoder_id).named_parameters()
-            if 'embeddings' not in name and 'adapter' not in name
-        ]
-        broadcast_tensors(weights, src=min_rank, group=group)
-
-    for (src_lang,), (min_rank, group) in my_component_groups['src_emb'].items():
-        embs = model.encoder.embeddings[f'embeddings_{src_lang}']
-        weights = [p.data for p in embs.parameters()]
-        broadcast_tensors(weights, src=min_rank, group=group)
-
-    for (tgt_lang,), (min_rank, group) in my_component_groups['tgt_emb'].items():
-        embs = model.decoder.embeddings[f'embeddings_{tgt_lang}']
-        weights = [p.data for p in embs.parameters()]
-        broadcast_tensors(weights, src=min_rank, group=group)
-
-        weights = [p.data for p in model.generator[f'generator_{tgt_lang}'].parameters()]
-        broadcast_tensors(weights, src=min_rank, group=group)
-
-    for adapter_id, (min_rank, group) in my_component_groups['encoder_adapters'].items():
-        layer_stack_index, encoder_id, adapter_group, sub_id = adapter_id
-        adapter = model.encoder.get_submodule(layer_stack_index, encoder_id).get_adapter(adapter_group, sub_id)
-        weights = [p.data for name, p in adapter.named_parameters()]
-        broadcast_tensors(weights, src=min_rank, group=group)
-
-    for adapter_id, (min_rank, group) in my_component_groups['decoder_adapters'].items():
-        layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
-        adapter = model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(adapter_group, sub_id)
-        weights = [p.data for name, p in adapter.named_parameters()]
-        broadcast_tensors(weights, src=min_rank, group=group)
-
-    weights = [p.data for p in model.attention_bridge.parameters()]
-    broadcast_tensors(weights, src=0)
+    for component in components_to_communicate:
+        weights = [p.data for name, p in component.named_parameters(model)]
+        broadcast_tensors(weights, src=component.min_rank, group=component.group)
 
     logger.debug('After init_distributed')
     for name, p in model.named_parameters():
@@ -134,6 +101,8 @@ def main(
     transforms_cls = get_transforms_cls(opts._all_transform)
     model_opts = _get_model_opts(opts, checkpoint=checkpoint)
 
+    task_queue_manager.create_all_distributed_components(use_attention_bridge=model_opts.bridge)
+
     # Build model.
 
     model, generators_md = build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint)
@@ -141,9 +110,6 @@ def main(
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
-    else:
-        # Initialize some data structures
-        _ = task_queue_manager.get_my_distributed_groups()
     enc, dec = model.count_parameters(log=logger.debug)
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
     logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))
@@ -173,30 +139,18 @@ def main(
     )
     logger.info("{} - Trainer built".format(device_context.id))
 
-    if batch_queue is None:
-        train_iter = DynamicDatasetIter.from_opts(
-            task_queue_manager=task_queue_manager,
-            transforms_cls=transforms_cls,
-            vocabs_dict=vocabs_dict,
-            opts=opts,
-            is_train=True,
-        )
-        # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
-        # if device_context.is_gpu():
-        #     train_iter = IterOnDevice(_train_iter, device_context.local_rank)
-        # else:
-        #     train_iter = IterOnDevice(_train_iter, -1)
-    else:
-        assert semaphore is not None, "Using batch_queue requires semaphore as well"
+    # It is no longer possible to train without multiprocessing
+    assert batch_queue is not None
+    assert semaphore is not None
 
-        def _train_iter():
-            while True:
-                batch, metadata, communication_batch_id = batch_queue.get()
-                semaphore.release()
-                # TODO: confirm that batch-providing corpus has already been to'd to the correct place
-                yield batch, metadata, communication_batch_id
+    def _train_iter():
+        while True:
+            batch, metadata, communication_batch_id = batch_queue.get()
+            semaphore.release()
+            # TODO: confirm that batch-providing corpus has already been to'd to the correct place
+            yield batch, metadata, communication_batch_id
 
-        train_iter = _train_iter()
+    train_iter = _train_iter()
     # train_iter = iter_on_device(train_iter, device_context)
     logger.info("Device {} - Valid iter".format(device_context.id))
     valid_iter = _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager)

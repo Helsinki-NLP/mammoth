@@ -270,7 +270,6 @@ class Trainer(object):
             batches_with_meta = islice(train_iter, self.accum_count)
 
             batch_task_sample = self.task_queue_manager.sample_corpus_ids()
-            logger.info(f'batch_task_sample has {batch_task_sample.training_step}')
             my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
 
             self._gradient_accumulation(

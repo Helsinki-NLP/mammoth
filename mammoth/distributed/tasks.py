@@ -172,8 +172,8 @@ class TaskQueueManager:
         tasks: List[TaskSpecs],
         accum_count: int,
         world_context: WorldContext,
+        task_distribution_strategy_cls: type,
         distributed_components=None,
-        task_distribution_strategy: Optional[TaskDistributionStrategy] = None,
         uses_adapters: bool = False,
     ):
         """
@@ -190,7 +190,7 @@ class TaskQueueManager:
         self.tasks = tasks
         # TODO: no support for variable accumulation across training
         self.accum_count = accum_count[0] if isinstance(accum_count, list) else accum_count
-        self.task_distribution_strategy = task_distribution_strategy
+        self.task_distribution_strategy_cls = task_distribution_strategy_cls
         self.world_context = world_context
         self.uses_adapters = uses_adapters
 
@@ -244,9 +244,7 @@ class TaskQueueManager:
             if not len(opts.dec_layers) == 1:
                 raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
 
-        task_distribution_strategy = TASK_DISTRIBUTION_STRATEGIES[opts.task_distribution_strategy](
-            seed=opts.seed,
-        )
+        task_distribution_strategy_cls = TASK_DISTRIBUTION_STRATEGIES[opts.task_distribution_strategy]
         tasks = []
         uses_adapters = False
         for (
@@ -290,7 +288,7 @@ class TaskQueueManager:
             tasks,
             world_context=world_context,
             accum_count=opts.accum_count,
-            task_distribution_strategy=task_distribution_strategy,
+            task_distribution_strategy_cls=task_distribution_strategy_cls,
             uses_adapters=uses_adapters,
         )
 
@@ -298,12 +296,13 @@ class TaskQueueManager:
         assert node_rank is not None
         assert local_rank is not None
         device_context = self.world_context.global_to_local(node_rank, local_rank)
+        task_distribution_strategy = self.task_distribution_strategy_cls(seed=opts.seed)
         return LocalTaskQueueManager(
             self.tasks,
             accum_count=self.accum_count,
             world_context=self.world_context,
             distributed_components=self.distributed_components,
-            task_distribution_strategy=self.task_distribution_strategy,
+            task_distribution_strategy=task_distribution_strategy,
             uses_adapters=self.uses_adapters,
             device_context=device_context,
         )
@@ -482,13 +481,14 @@ class LocalTaskQueueManager(TaskQueueManager):
             tasks=tasks,
             accum_count=accum_count,
             world_context=world_context,
-            task_distribution_strategy=task_distribution_strategy,
+            task_distribution_strategy_cls=task_distribution_strategy.__class__,
             uses_adapters=uses_adapters,
             distributed_components=distributed_components,
         )
 
         assert device_context is not None
         self.device_context = device_context
+        self.task_distribution_strategy = task_distribution_strategy
 
         logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
         self.device_context.validate(self.world_context)

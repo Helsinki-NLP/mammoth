@@ -19,7 +19,8 @@ class DistributedComponentBuilder:
         else:
             # already seen component must be merged
             old_component = self.components[name]
-            assert type(old_component) == type(component)
+            assert type(old_component) == type(component), \
+                f'Unexpected type {name}: {old_component} != {component}'
             assert old_component.group is None
             assert component.group is None
             old_component.global_ranks.update(component.global_ranks)
@@ -103,7 +104,7 @@ class DistributedEncoder(DistributedXCoder):
 class DistributedDecoder(DistributedXCoder):
     @property
     def side(self) -> Side:
-        return Side.encoder
+        return Side.decoder
 
     @property
     def decoder_id(self) -> str:

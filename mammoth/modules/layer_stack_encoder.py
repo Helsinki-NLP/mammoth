@@ -1,5 +1,5 @@
 from torch import nn
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from mammoth.modules.encoder import EncoderBase
 from mammoth.models.adapters import Adapter, AdaptedTransformerEncoder

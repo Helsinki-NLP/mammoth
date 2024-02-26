@@ -273,13 +273,17 @@ class Trainer(object):
             self._maybe_update_dropout(step)
 
             self.accum_count = self._accum_count(self.optim.training_step)
-            self.task_queue_manager.tasks_per_communication_batch = self.accum_count
+            self.task_queue_manager.accum_count = self.accum_count
             batches_with_meta = islice(train_iter, self.accum_count)
 
-            self._gradient_accumulation_over_lang_pairs(
+            batch_task_sample = self.task_queue_manager.sample_corpus_ids()
+            my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
+
+            self._gradient_accumulation(
                 batches_with_meta,
                 total_stats,
                 report_stats,
+                my_task,
             )
 
             # Note that all group ids are tuples, some with length 1
@@ -359,6 +363,7 @@ class Trainer(object):
                 train_steps,
                 self.optim.learning_rate(),
                 report_stats,
+                sampled_task_counts=self.task_queue_manager.sampled_task_counts,
             )
 
             if step % valid_steps == 0 and valid_iter is not None:
@@ -455,15 +460,22 @@ class Trainer(object):
 
         return stats
 
-    def _gradient_accumulation_over_lang_pairs(
+    def _gradient_accumulation(
         self,
         batches_with_meta,
         total_stats,
         report_stats,
+        my_task,
     ):
         normalization = 0
         seen_comm_batches = set()
+        expected_metadata = my_task.get_serializable_metadata()
         for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
+            if metadata != expected_metadata:
+                raise Exception(
+                    'Mismatch in task sampling. '
+                    f'Received {metadata}, expected {expected_metadata}'
+                )
             seen_comm_batches.add(comm_batch)
             if self.norm_method == "tokens":
                 num_tokens = (
@@ -558,7 +570,7 @@ class Trainer(object):
         if self.report_manager is not None and self.report_stats_from_parameters:
             report_stats.update_from_parameters(named_parameters)
 
-    def _maybe_report_training(self, step, num_steps, learning_rate, report_stats):
+    def _maybe_report_training(self, step, num_steps, learning_rate, report_stats, sampled_task_counts):
         """
         Simple function to report training stats (if report_manager is set)
         see `mammoth.utils.ReportManagerBase.report_training` for doc
@@ -571,6 +583,7 @@ class Trainer(object):
                 None if self.earlystopper is None else self.earlystopper.current_tolerance,
                 report_stats,
                 multigpu=self.device_context.is_distributed(),
+                sampled_task_counts=sampled_task_counts,
             )
 
     def _report_step(self, learning_rate, step, train_stats=None, valid_stats=None):

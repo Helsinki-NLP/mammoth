@@ -51,7 +51,16 @@ class ReportMgrBase(object):
     def log(self, *args, **kwargs):
         logger.info(*args, **kwargs)
 
-    def report_training(self, step, num_steps, learning_rate, patience, report_stats, multigpu=False):
+    def report_training(
+        self,
+        step,
+        num_steps,
+        learning_rate,
+        patience,
+        report_stats,
+        multigpu=False,
+        sampled_task_count=None,
+    ):
         """
         This is the user-defined batch-level traing progress
         report function.
@@ -74,7 +83,14 @@ class ReportMgrBase(object):
             # if multigpu:
             #    report_stats = \
             #        mammoth.utils.Statistics.all_gather_stats(report_stats)
-            self._report_training(step, num_steps, learning_rate, patience, report_stats)
+            self._report_training(
+                step,
+                num_steps,
+                learning_rate,
+                patience,
+                report_stats,
+                sampled_task_count=sampled_task_count
+            )
             return mammoth.utils.Statistics()
         else:
             return report_stats
@@ -129,7 +145,7 @@ class ReportMgr(ReportMgrBase):
         if self.tensorboard_writer is not None:
             stats.log_tensorboard(prefix, self.tensorboard_writer, learning_rate, patience, step)
 
-    def _report_training(self, step, num_steps, learning_rate, patience, report_stats):
+    def _report_training(self, step, num_steps, learning_rate, patience, report_stats, sampled_task_count):
         """
         See base class method `ReportMgrBase.report_training`.
         """
@@ -137,6 +153,11 @@ class ReportMgr(ReportMgrBase):
 
         self.maybe_log_tensorboard(report_stats, "progress", learning_rate, patience, step)
         report_stats = mammoth.utils.Statistics()
+
+        total = sum(sampled_task_count.values())
+        logger.info(f'Task sampling distribution: (total {total})')
+        for task, count in sampled_task_count.most_common():
+            logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
 
         return report_stats
 

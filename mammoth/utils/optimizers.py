@@ -14,49 +14,20 @@ from mammoth.utils.logging import logger
 
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     suboptimizers = {}
-    my_grouped_components = task_queue_manager.get_my_grouped_components(model)
-    for component_type in my_grouped_components:
-        for component_id, component in my_grouped_components[component_type].items():
-            if isinstance(component_id, str):
-                name = component_type + '_' + component_id
-            else:
-                name = component_type + '_' + '_'.join([str(x) for x in component_id])
-            params = []
-            for param_name, param in component.named_parameters():
-                if not param.requires_grad:
-                    continue
-                if 'adapter' in param_name and 'adapter' not in component_type:
-                    # omit adapters from base component optimizers
-                    continue
-                if 'embedding' in param_name:
-                    print(f'adding {param_name} to suboptimizer {name}')
-                params.append(param)
-            if name in suboptimizers:
-                raise Exception(f'Trying to create second optimizer for "{name}"')
-            if len(params) != 0:
-                optimizer = base_optimizer(params)
-                suboptimizers[name] = optimizer
-
-    for generator_id in task_queue_manager.get_my_generators():
-        generator = model.generator[f'generator_{generator_id}']
-        params = []
-        for name, param in generator.named_parameters():
-            if not param.requires_grad:
-                continue
-            params.append(param)
-        optimizer = base_optimizer(params)
-        suboptimizers[f'generator_{generator_id}'] = optimizer
-
-    attParam = []
-    for name, param in model.attention_bridge.named_parameters():
-        if not param.requires_grad:
-            continue
-        attParam.append(param)
-
-    # skip AB optimizer if AB is not in use
-    if len(attParam):
-        optimizer = base_optimizer(attParam)
-        suboptimizers["attention_bridge"] = optimizer
+    # All components on device, in consistent order across devices
+    my_components = task_queue_manager.get_my_distributed_components()
+    # Also keeping components that are on a single device
+    for component in my_components:
+        name = component.get_name()
+        params = [
+            param for param_name, param in component.named_parameters(model)
+            if param.requires_grad
+        ]
+        if name in suboptimizers:
+            raise Exception(f'Trying to create second optimizer for "{name}"')
+        if len(params) != 0:
+            optimizer = base_optimizer(params)
+            suboptimizers[name] = optimizer
 
     optimizer = MultipleOptimizer(suboptimizers, None)
     return optimizer

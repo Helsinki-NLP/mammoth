@@ -59,7 +59,7 @@ class ReportMgrBase(object):
         patience,
         report_stats,
         multigpu=False,
-        sampled_task_count=None,
+        sampled_task_counts=None,
     ):
         """
         This is the user-defined batch-level traing progress
@@ -89,7 +89,7 @@ class ReportMgrBase(object):
                 learning_rate,
                 patience,
                 report_stats,
-                sampled_task_count=sampled_task_count
+                sampled_task_counts=sampled_task_counts
             )
             return mammoth.utils.Statistics()
         else:
@@ -145,7 +145,7 @@ class ReportMgr(ReportMgrBase):
         if self.tensorboard_writer is not None:
             stats.log_tensorboard(prefix, self.tensorboard_writer, learning_rate, patience, step)
 
-    def _report_training(self, step, num_steps, learning_rate, patience, report_stats, sampled_task_count):
+    def _report_training(self, step, num_steps, learning_rate, patience, report_stats, sampled_task_counts):
         """
         See base class method `ReportMgrBase.report_training`.
         """
@@ -154,9 +154,9 @@ class ReportMgr(ReportMgrBase):
         self.maybe_log_tensorboard(report_stats, "progress", learning_rate, patience, step)
         report_stats = mammoth.utils.Statistics()
 
-        total = sum(sampled_task_count.values())
+        total = sum(sampled_task_counts.values())
         logger.info(f'Task sampling distribution: (total {total})')
-        for task, count in sampled_task_count.most_common():
+        for task, count in sampled_task_counts.most_common():
             logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
 
         return report_stats

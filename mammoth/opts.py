@@ -93,8 +93,9 @@ def _add_reproducibility_opts(parser):
         '--seed',
         '-seed',
         type=int,
-        default=-1,
-        help="Set random seed used for better reproducibility between experiments.",
+        required=True,
+        help="Set random seed used for better reproducibility between experiments. "
+        "Mandatory for multi-gpu training, and for convenience required for all.",
     )
 
 

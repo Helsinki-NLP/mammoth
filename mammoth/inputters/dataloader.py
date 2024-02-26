@@ -337,14 +337,13 @@ class DynamicDatasetIter(object):
             yield from itertools.chain.from_iterable(all_val_data)
 
         else:
-            # All minibatches with the same communication_batch_id should be trained on
-            # before synching gradients between devices
-            communication_batch_id = 0
             while True:
-                for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
-                    ordered_iter, metadata = self.dataset_iterators[corpus_id]
+                batch_task_sample = self.task_queue_manager.sample_corpus_ids()
+                my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
+                ordered_iter, metadata = self.dataset_iterators[my_task.corpus_id]
+                for _ in self.task_queue_manager.accum_count:
                     batch = next(ordered_iter)
-                    if communication_batch_id == 0:
+                    if batch_task_sample.training_step == 0:
                         # De-numericalize a few sentences for debugging
                         logger.warning(
                             f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
@@ -357,11 +356,4 @@ class DynamicDatasetIter(object):
                             logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
                             toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
-                    yield batch, metadata, communication_batch_id
-
-                communication_batch_id += 1
-                if communication_batch_id % 1000 == 0:
-                    total = sum(self.task_queue_manager.sampled_task_counts.values())
-                    logger.info(f'Task sampling distribution: (total {total})')
-                    for task, count in self.task_queue_manager.sampled_task_counts.most_common():
-                        logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+                    yield batch, metadata, batch_task_sample.training_step

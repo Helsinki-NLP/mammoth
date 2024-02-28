@@ -18,7 +18,7 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
             n_buckets = 1
 
             def bucket_fn(_):
-                return 0
+                return 0, 0
 
             def numel_fn(_):
                 return 1

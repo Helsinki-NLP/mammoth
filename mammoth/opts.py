@@ -794,6 +794,8 @@ def _add_train_general_opts(parser):
         choices=["sents", "tokens"],
         help="Batch grouping for batch_size. Standard is sents. Tokens will do dynamic batching",
     )
+    group.add('--pad_to_max_length', '-pad_to_max_length', action='store_true')
+    group.add('--max_length', '-max_length', type=int, default=100, help='Maximum prediction length.')
     group.add(
         '--normalization',
         '-normalization',

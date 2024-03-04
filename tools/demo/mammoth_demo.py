@@ -3,7 +3,7 @@ import requests
 import streamlit as st
 
 MAMMOTH = '🦣'
-
+FAT_UNDER = '▁'
 
 @dataclass
 class ModelSpecs:
@@ -55,7 +55,12 @@ class Translator:
         except Exception as e:
             print(response.content)
             raise e
-        return data[0][0]['tgt']
+        tokenized = data[0][0]['tgt']
+        return self.detokenize(tokenized)
+
+    def detokenize(self, tokenized):
+        result = tokenized.replace(' ', '').replace(FAT_UNDER, ' ')
+        return result
 
     def get_models(self):
         data = requests.request(

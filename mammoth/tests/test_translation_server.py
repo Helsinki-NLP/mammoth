@@ -13,7 +13,7 @@ TEST_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class TestServerModel(unittest.TestCase):
-    @unittest.skip('Broken in FoTraNMT')  # FIXME
+    @unittest.skip('Broken in MAMMOTH')  # FIXME
     def test_deferred_loading_model_and_unload(self):
         model_id = 0
         opts = {"models": ["test_model.pt"]}
@@ -26,7 +26,7 @@ class TestServerModel(unittest.TestCase):
         sm.unload()
         self.assertFalse(sm.loaded)
 
-    @unittest.skip('Broken in FoTraNMT')  # FIXME
+    @unittest.skip('Broken in MAMMOTH')  # FIXME
     def test_load_model_on_init_and_unload(self):
         model_id = 0
         opts = {"models": ["test_model.pt"]}
@@ -37,7 +37,7 @@ class TestServerModel(unittest.TestCase):
         sm.unload()
         self.assertFalse(sm.loaded)
 
-    @unittest.skip('Broken in FoTraNMT')  # FIXME
+    @unittest.skip('Broken in MAMMOTH')  # FIXME
     def test_tokenizing_with_no_tokenizer_fails(self):
         model_id = 0
         opts = {"models": ["test_model.pt"]}
@@ -46,7 +46,7 @@ class TestServerModel(unittest.TestCase):
         with self.assertRaises(ValueError):
             sm.tokenize("hello world")
 
-    @unittest.skip('Broken in FoTraNMT')  # FIXME
+    @unittest.skip('Broken in MAMMOTH')  # FIXME
     def test_detokenizing_with_no_tokenizer_fails(self):
         model_id = 0
         opts = {"models": ["test_model.pt"]}
@@ -57,7 +57,7 @@ class TestServerModel(unittest.TestCase):
 
     if torch.cuda.is_available():
 
-        @unittest.skip('Broken in FoTraNMT')  # FIXME
+        @unittest.skip('Broken in MAMMOTH')  # FIXME
         def test_moving_to_gpu_and_back(self):
             torch.cuda.set_device(torch.device("cuda", 0))
             model_id = 0
@@ -74,7 +74,7 @@ class TestServerModel(unittest.TestCase):
             for p in sm.translator.model.parameters():
                 self.assertEqual(p.device.type, "cpu")
 
-        @unittest.skip('Broken in FoTraNMT')  # FIXME
+        @unittest.skip('Broken in MAMMOTH')  # FIXME
         def test_initialize_on_gpu_and_move_back(self):
             torch.cuda.set_device(torch.device("cuda", 0))
             model_id = 0
@@ -111,7 +111,7 @@ class TestServerModel(unittest.TestCase):
                 for p in sm.translator.model.parameters():
                     self.assertEqual(p.device.type, "cpu")
 
-    @unittest.skip('Broken in FoTraNMT')  # FIXME
+    @unittest.skip('Broken in MAMMOTH')  # FIXME
     def test_run(self):
         model_id = 0
         opts = {"models": ["test_model.pt"]}

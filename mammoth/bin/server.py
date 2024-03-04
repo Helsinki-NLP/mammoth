@@ -78,10 +78,16 @@ def start(config_file, url_root="./translator", host="0.0.0.0", port=5000, debug
 
     @app.route('/translate', methods=['POST'])
     def translate():
-        inputs = request.get_json(force=True)
+        out = {}
+        inputs = request.get_json(force=True, silent=True)
+        if inputs is None:
+            error = f'Unable to parse {request.data}'
+            logger.warning(error)
+            out['error'] = str(error)
+            out['status'] = STATUS_ERROR
+            return jsonify(out)
         if debug:
             logger.info(inputs)
-        out = {}
         try:
             trans, scores, n_best, _, aligns = translation_server.run(inputs)
             assert len(trans) == len(inputs) * n_best

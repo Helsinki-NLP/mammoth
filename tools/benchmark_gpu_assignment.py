@@ -74,7 +74,7 @@ def dummy_config(langs, tasks, architecture, n_gpus_per_node, n_slots_per_gpu):
         'dec_layers': [6],
     }
     return config
-    
+
 
 @click.command()
 @click.option('--n_langs', type=int, required=True)

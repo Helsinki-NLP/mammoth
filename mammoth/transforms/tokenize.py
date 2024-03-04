@@ -217,6 +217,7 @@ class SentencePieceTransform(TokenizerTransform):
             segmented = sp_model.encode(
                 sentence, out_type=str, enable_sampling=True, alpha=alpha, nbest_size=nbest_size
             )
+        print(f'segmented: {segmented}')
         return segmented
 
     def apply(self, example, is_train=False, stats=None, **kwargs):

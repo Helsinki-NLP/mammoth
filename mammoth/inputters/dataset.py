@@ -115,6 +115,7 @@ class ParallelCorpus(IterableDataset):
 
     def _numericalize(self, tokens, side='src'):
         """Convert list of strings into list of indices"""
+        print(side, tokens)
         vocab = self.vocabs[side]
         bos = vocab[DefaultTokens.BOS]
         eos = vocab[DefaultTokens.EOS]
@@ -124,6 +125,7 @@ class ParallelCorpus(IterableDataset):
             *(vocab.stoi.get(token, unk) for token in tokens),
             eos,
         ], device='cpu')
+        print(indices)
         return indices
 
     def to(self, device):

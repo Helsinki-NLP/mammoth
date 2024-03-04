@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# # # FIXME: Broken in FoTraNMT
+# # # FIXME: Broken in MAMMOTH
 #
 # import copy
 # import unittest

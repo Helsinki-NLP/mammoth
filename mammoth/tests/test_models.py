@@ -138,7 +138,7 @@ TEST PARAMETERS
 '''
 opts.brnn = False
 
-# FIXME: Most tests disabled: FoTraNMT only supports Transformer
+# FIXME: Most tests disabled: MAMMOTH only supports Transformer
 test_embeddings = [
     # [],
     [('decoder_type', 'transformer')]
@@ -147,7 +147,7 @@ test_embeddings = [
 for p in test_embeddings:
     _add_test(p, 'embeddings_forward')
 
-# FIXME: All tests disabled: FoTraNMT only supports Transformer, and the test for Transformer is broken
+# FIXME: All tests disabled: MAMMOTH only supports Transformer, and the test for Transformer is broken
 tests_encoder = [
     # [],
     # [('encoder_type', 'mean')],
@@ -158,7 +158,7 @@ tests_encoder = [
 for p in tests_encoder:
     _add_test(p, 'encoder_forward')
 
-# FIXME: Most tests disabled: FoTraNMT only supports Transformer
+# FIXME: Most tests disabled: MAMMOTH only supports Transformer
 tests_nmtmodel = [
     # [('rnn_type', 'GRU')],
     # [('layers', 10)],
@@ -194,6 +194,6 @@ tests_nmtmodel = [
 ]
 
 
-# ## FIXME: Broken in FoTraNMT
+# ## FIXME: Broken in MAMMOTH
 # for p in tests_nmtmodel:
 #     _add_test(p, 'nmtmodel_forward')

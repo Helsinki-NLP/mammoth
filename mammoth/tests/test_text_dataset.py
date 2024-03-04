@@ -1,4 +1,4 @@
-# FIXME, or rather TODO in FoTran
+# FIXME, or rather TODO in MAMMOTH
 # import unittest
 #
 # import itertools

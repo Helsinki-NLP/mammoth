@@ -2,52 +2,81 @@
 
 # Quickstart
 
+Mammoth is a library for training modular language models supporting multi-node multi-GPU training. 
+
+In the example below, we will show you how to configure Mamooth to train a machine translation model with language-specific encoders and decoders.
+
 ### Step 0: Install mammoth
 
 ```bash
-git clone https://github.com/Helsinki-NLP/mammoth.git
-cd mammoth
-pip3 install -e .
-pip3 install sentencepiece==0.1.97 sacrebleu==2.3.1
+pip install git+https://github.com/Helsinki-NLP/mammoth.git
 ```
 
 Check out the [installation guide](install) to install in specific clusters.
 
 ### Step 1: Prepare the data
 
-Prepare the data for training. You can refer to the data preparation [tutorial](prepare_data) for more details.
+Before running the training, we will download data for chosen pairs of languages and create a sentencepiece tokenizer for the model.
 
+**Refer to the data preparation [tutorial](prepare_data) for more details.**
+
+In the following steps, we assume that you already have an encoded dataset containing `*.sp` file for `europarl` dataset, and languages `cs` and `bg`. Thus, your data directory `europarl_data/encoded` should contain 8 files in a format `{train/valid}.{cs/bg}-en.{cs/bg}.sp`. If you use other datasets, please update the paths in the configurations below.
 
 ### Step 2: Configurations
-You will need to configure your training settings. 
-Below is a list of configuration examples:
+
+Mamooth uses configurations to build a new transformer model and configure your training settings, such as which modules are trained with the data from which languages.
+
+Below are a few examples of training configurations that will work for you out-of-box in a one-node, two-GPU environment.
 
 <details>
 <summary>Task-specific encoders and decoders</summary>
 
+In this example, we create a model with encoders and decoders **shared** for the specified languages. This is defined by `enc_sharing_group` and `enc_sharing_group`.
+
 ```yaml
+# TRAINING CONFIG
+world_size: 2
+gpu_ranks: [0, 1]
+
+batch_type: tokens
+batch_size: 4096
+
+# INPUT/OUTPUT VOCABULARY CONFIG
+
+src_vocab:
+  bg: vocab/opusTC.mul.vocab.onmt
+  cs: vocab/opusTC.mul.vocab.onmt
+  en: vocab/opusTC.mul.vocab.onmt
+tgt_vocab:
+  cs: vocab/opusTC.mul.vocab.onmt
+  en: vocab/opusTC.mul.vocab.onmt
+
+# MODEL CONFIG
+
+model_dim: 512
+
 tasks:
   train_bg-en:
     src_tgt: bg-en
     enc_sharing_group: [bg]
     dec_sharing_group: [en]
     node_gpu: "0:0"
-    path_src: /path/to/train.bg-en.bg
-    path_tgt: /path/to/train.bg-en.en
+    path_src: europarl_data/encoded/train.bg-en.bg.sp
+    path_tgt: europarl_data/encoded/train.bg-en.en.sp
   train_cs-en:
     src_tgt: cs-en
     enc_sharing_group: [cs]
     dec_sharing_group: [en]
     node_gpu: "0:1"
-    path_src: /path/to/train.cs-en.cs
-    path_tgt: /path/to/train.cs-en.en
+    path_src: europarl_data/encoded/train.cs-en.cs.sp
+    path_tgt: europarl_data/encoded/train.cs-en.en.sp
   train_en-cs:
     src_tgt: en-cs
     enc_sharing_group: [en]
     dec_sharing_group: [cs]
     node_gpu: "0:1"
-    path_src: /path/to/train.cs-en.en
-    path_tgt: /path/to/train.cs-en.cs
+    path_src: europarl_data/encoded/train.cs-en.en.sp
+    path_tgt: europarl_data/encoded/train.cs-en.cs.sp
 
 enc_layers: [6]
 dec_layers: [6]
@@ -58,29 +87,52 @@ dec_layers: [6]
 <details>
 <summary>Arbitrarily shared layers in encoders and task-specific decoders</summary>
 
+The training and vocab config is the same as in the previous example.
+
 ```yaml
+# TRAINING CONFIG
+world_size: 2
+gpu_ranks: [0, 1]
+
+batch_type: tokens
+batch_size: 4096
+
+# INPUT/OUTPUT VOCABULARY CONFIG
+
+src_vocab:
+  bg: vocab/opusTC.mul.vocab.onmt
+  cs: vocab/opusTC.mul.vocab.onmt
+  en: vocab/opusTC.mul.vocab.onmt
+tgt_vocab:
+  cs: vocab/opusTC.mul.vocab.onmt
+  en: vocab/opusTC.mul.vocab.onmt
+
+# MODEL CONFIG
+
+model_dim: 512
+
 tasks:
   train_bg-en:
     src_tgt: bg-en
     enc_sharing_group: [bg, all]
     dec_sharing_group: [en]
     node_gpu: "0:0"
-    path_src: /path/to/train.bg-en.bg
-    path_tgt: /path/to/train.bg-en.en
+    path_src: europarl_data/encoded/train.bg-en.bg.sp
+    path_tgt: europarl_data/encoded/train.bg-en.en.sp
   train_cs-en:
     src_tgt: cs-en
     enc_sharing_group: [cs, all]
     dec_sharing_group: [en]
     node_gpu: "0:1"
-    path_src: /path/to/train.cs-en.cs
-    path_tgt: /path/to/train.cs-en.en
+    path_src: europarl_data/encoded/train.cs-en.cs.sp
+    path_tgt: europarl_data/encoded/train.cs-en.en.sp
   train_en-cs:
     src_tgt: en-cs
     enc_sharing_group: [en, all]
     dec_sharing_group: [cs]
     node_gpu: "0:1"
-    path_src: /path/to/train.cs-en.en
-    path_tgt: /path/to/train.cs-en.cs
+    path_src: europarl_data/encoded/train.cs-en.en.sp
+    path_tgt: europarl_data/encoded/train.cs-en.cs.sp
 
 enc_layers: [4, 4]
 dec_layers: [4]
@@ -90,49 +142,88 @@ dec_layers: [4]
 <details>
 <summary>Non-modular multilingual system </summary>
 
+In this example, we share the input/output vocabulary over all languages. Hence, we define a vocabulary for an `all` language, that we use in the definition of the model.
+
 ```yaml
+# TRAINING CONFIG
+world_size: 2
+gpu_ranks: [0, 1]
+
+batch_type: tokens
+batch_size: 4096
+
+# INPUT/OUTPUT VOCABULARY CONFIG
+
+src_vocab:
+  all: vocab/opusTC.mul.vocab.onmt
+tgt_vocab:
+  all: vocab/opusTC.mul.vocab.onmt
+
+# MODEL CONFIG
+
+model_dim: 512
+
 tasks:
   train_bg-en:
     src_tgt: all-all
-    enc_sharing_group: [all]
-    dec_sharing_group: [all]
+    enc_sharing_group: [shared_enc]
+    dec_sharing_group: [shared_dec]
     node_gpu: "0:0"
-    path_src: /path/to/train.bg-en.bg
-    path_tgt: /path/to/train.bg-en.en
+    path_src: europarl_data/encoded/train.bg-en.bg.sp
+    path_tgt: europarl_data/encoded/train.bg-en.en.sp
   train_cs-en:
     src_tgt: all-all
-    enc_sharing_group: [all]
-    dec_sharing_group: [all]
+    enc_sharing_group: [shared_enc]
+    dec_sharing_group: [shared_dec]
     node_gpu: "0:1"
-    path_src: /path/to/train.cs-en.cs
-    path_tgt: /path/to/train.cs-en.en
+    path_src: europarl_data/encoded/train.cs-en.cs.sp
+    path_tgt: europarl_data/encoded/train.cs-en.en.sp
   train_en-cs:
     src_tgt: all-all
-    enc_sharing_group: [all]
-    dec_sharing_group: [all]
+    enc_sharing_group: [shared_enc]
+    dec_sharing_group: [shared_dec]
     node_gpu: "0:1"
-    path_src: /path/to/train.cs-en.en
-    path_tgt: /path/to/train.cs-en.cs
+    path_src: europarl_data/encoded/train.cs-en.en.sp
+    path_tgt: europarl_data/encoded/train.cs-en.cs.sp
 
 enc_layers: [6]
 dec_layers: [6]
 ```
 </details>
 
+**To proceed, copy-paste one of these configurations into a new file named `my_config.yaml`.**
 
-We recommend our [automatic configuration generation tool](config_config) for generating your configurations. 
+For further information, check out the documentation of all parameters in **[train.py](options/train)**.
 
+For more complex scenarios, we recommend our [automatic configuration generation tool](config_config) for generating your configurations. 
 
-### Step 3: Start training
+## Step 3: Start training
 
-Finally, launch the training script, for example, through the Slurm manager, via:
+The running script will slightly differ depending on whether you want to run the training in a single-node (i.e. a single-machine) or multi-node setting:
+
+### Single-node training
+
+If you want to run your training on a single machine, simply run a python script `train.py`, possibly with a definition of your desired GPUs.
+
+```shell
+CUDA_VISIBLE_DEVICES=0,1 python train.py -config my_config.yaml -save_model output_dir -tensorboard -tensorboard_log_dir log_dir -node_rank 0
+```
+
+Note that when running `train.py`, you can use all the parameters from [train.py](options/train) as cmd arguments. In the case of duplicate arguments, the cmd parameters override the ones found in your config.yaml.
+
+### Multi-node training
+
+For the multi-node training, launch the training script, for example, through the Slurm manager, via:
 
 ```bash
-python -u "$@" --node_rank $SLURM_NODEID -u ${PATH_TO_MAMMOTH}/train.py \
-    -config ${CONFIG_DIR}/your_config.yml \
-    -save_model ${SAVE_DIR}/models/${EXP_ID} \
+python -u "$@" --node_rank $SLURM_NODEID -u train.py \
+    -config my_config.yaml \
+    -save_model output_dir \
     -master_port 9974 -master_ip $SLURMD_NODENAME \
     -tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}
 ```
-
+<!---
 A complete example of training on the Europarl dataset is available at [MAMMOTH101](examples/train_mammoth_101.md).
+
+TODO: figure out if there is something missing here from the train_mammoth_101.md
+-->

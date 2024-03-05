@@ -1,6 +1,9 @@
 
 # Prepare Data
 
+Before running these scripts, make sure that you have [installed](quickstart) Mamooth, which includes the dependencies required below.
+
+
 ## Europarl
 
 ### Step 1: Download the data
@@ -8,7 +11,10 @@
 download the processed data by us:
 ```bash
 wget https://mammoth101.a3s.fi/europarl.tar.gz
+mkdir europarl_data
+tar –xvzf europarl.tar.gz.1 -C europarl_data
 ```
+Note that the extracted dataset will require around 30GB of memory.
 
 We use a SentencePiece model trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
 ```bash
@@ -16,6 +22,10 @@ We use a SentencePiece model trained on OPUS Tatoeba Challenge data with 64k voc
 wget https://mammoth101.a3s.fi/opusTC.mul.64k.spm
 # Download the vocabulary
 wget https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt
+
+mkdir vocab
+mv opusTC.mul.64k.spm vocab/.
+mv opusTC.mul.vocab.onmt vocab/.
 ```
 
 
@@ -27,44 +37,46 @@ Here's a high-level summary of the main processing steps. For each language in '
 - shuffle the data randomly.
 - tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.
 
-We use a positional argument 'lang' that can accept one or more values, for specifying the languages (e.g., `bg` and `cs` as used in Europarl) to process.
-
 You're free to skip this step if you directly download the processed data.
 
 ```python
-import argparse
 import random
+import pathlib
 
 import tqdm
 import sentencepiece as sp
 
-parser = argparse.ArgumentParser()
-parser.add_argument('lang', nargs='+')
-langs = parser.parse_args().lang
+langs = ["bg", "cs"]
 
 sp_path = 'vocab/opusTC.mul.64k.spm'
 spm = sp.SentencePieceProcessor(model_file=sp_path)
 
+input_dir = 'europarl_data/europarl'
+output_dir = 'europarl_data/encoded'
+
 for lang in tqdm.tqdm(langs):
-    en_side_in = f'{lang}-en/europarl-v7.{lang}-en.en'
-    xx_side_in = f'{lang}-en/europarl-v7.{lang}-en.{lang}'
+    en_side_in = f'{input_dir}/{lang}-en/europarl-v7.{lang}-en.en'
+    xx_side_in = f'{input_dir}/{lang}-en/europarl-v7.{lang}-en.{lang}'
     with open(xx_side_in) as xx_stream, open(en_side_in) as en_stream:
         data = zip(map(str.strip, xx_stream), map(str.strip, en_stream))
         data = [(xx, en) for xx, en in tqdm.tqdm(data, leave=False, desc=f'read {lang}') if xx and en] # drop empty lines
         random.shuffle(data)
-    en_side_out = f'{lang}-en/valid.{lang}-en.en.sp'
-    xx_side_out = f'{lang}-en/valid.{lang}-en.{lang}.sp'
+    pathlib.Path(output_dir).mkdir(exist_ok=True) 
+    en_side_out = f'{output_dir}/valid.{lang}-en.en.sp'
+    xx_side_out = f'{output_dir}/valid.{lang}-en.{lang}.sp'
     with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
         for xx, en in tqdm.tqdm(data[:1000], leave=False, desc=f'valid {lang}'):
             print(*spm.encode(xx, out_type=str), file=xx_stream)
             print(*spm.encode(en, out_type=str), file=en_stream)
-    en_side_out = f'{lang}-en/train.{lang}-en.en.sp'
-    xx_side_out = f'{lang}-en/train.{lang}-en.{lang}.sp'
+    en_side_out = f'{output_dir}/train.{lang}-en.en.sp'
+    xx_side_out = f'{output_dir}/train.{lang}-en.{lang}.sp'
     with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
         for xx, en in tqdm.tqdm(data[1000:], leave=False, desc=f'train {lang}'):
             print(*spm.encode(xx, out_type=str), file=xx_stream)
             print(*spm.encode(en, out_type=str), file=en_stream)
 ```
+
+The script will produce encoded datasets in `europarl_data/encoded` that you can further use for the training.
 
 
 ## OPUS 100 

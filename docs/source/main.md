@@ -8,10 +8,7 @@ This portal provides a detailed documentation of the **MAMMOTH**: Modular Adapta
 ## Installation
 
 ```bash
-git clone https://github.com/Helsinki-NLP/mammoth.git
-cd mammoth
-pip3 install -e .
-pip3 install sentencepiece==0.1.97 sacrebleu==2.3.1
+pip install git+https://github.com/Helsinki-NLP/mammoth.git
 ```
 
 Check out the [installation guide](install) to install in specific clusters.

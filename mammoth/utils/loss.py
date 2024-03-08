@@ -133,14 +133,10 @@ class LossComputeBase(nn.Module):
         """
         return NotImplementedError
 
-    def __call__(self, batch, output, attns, normalization=1.0, shard_size=0, trunc_start=0, trunc_size=None):
+    def __call__(self, batch, output, attns, normalization=1.0, shard_size=0):
         """Compute the forward loss, possibly in shards in which case this
         method also runs the backward pass and returns ``None`` as the loss
         value.
-
-        Also supports truncated BPTT for long sequences by taking a
-        range in the decoder output sequence to back propagate in.
-        Range is from `(trunc_start, trunc_start + trunc_size)`.
 
         Note sharding is an exact efficiency trick to relieve memory
         required for the generation buffers. Truncation is an
@@ -155,16 +151,15 @@ class LossComputeBase(nn.Module):
               `[tgt_len x batch x src_len]`
           normalization: Optional normalization factor.
           shard_size (int) : maximum number of examples in a shard
-          trunc_start (int) : starting position of truncation window
-          trunc_size (int) : length of truncation window
 
         Returns:
             A tuple with the loss and a :obj:`mammoth.utils.Statistics` instance.
         """
-        if trunc_size is None:
-            trunc_size = batch.tgt.size(0) - trunc_start
-        trunc_range = (trunc_start, trunc_start + trunc_size)
-        shard_state = self._make_shard_state(batch, output, trunc_range, attns)
+        # TODO: keeping a range_ for now, but should be removed, ideally.
+        # Inherited from BPTT implementations
+        size = batch.tgt.size(0)
+        range_ = (0, size)
+        shard_state = self._make_shard_state(batch, output, range_, attns)
         if shard_size == 0:
             loss, stats = self._compute_loss(batch, **shard_state)
             return loss / float(normalization), stats

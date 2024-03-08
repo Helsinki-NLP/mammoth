@@ -301,8 +301,8 @@ def model_opts(parser):
     )
 
     # group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
-    group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder')
-    group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder')
+    group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder module')
+    group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder module')
     group.add(
         '--model_dim',
         '-model_dim',
@@ -327,21 +327,6 @@ def model_opts(parser):
 
     # Attention options
     group = parser.add_argument_group('Model- Attention')
-    # group.add(
-    #     '--global_attention',
-    #     '-global_attention',
-    #     type=str,
-    #     default='general',
-    #     choices=['dot', 'general', 'mlp', 'none'],
-    #     help="The attention type to use: dotprod or general (Luong) or MLP (Bahdanau)",
-    # )
-    # group.add(
-    #     '--global_attention_function',
-    #     '-global_attention_function',
-    #     type=str,
-    #     default="softmax",
-    #     choices=["softmax"],
-    # )
     group.add(
         '--self_attn_type',
         '-self_attn_type',

@@ -288,11 +288,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if hasattr(model_opts, 'fix_word_vecs_dec'):
             model_opts.freeze_word_vecs_dec = model_opts.fix_word_vecs_dec
 
-        # model_opts.brnn = model_opts.encoder_type == "brnn"
-        #
-        # if model_opts.copy_attn_type is None:
-        #    model_opts.copy_attn_type = model_opts.global_attention
-
         if model_opts.alignment_layer is None:
             model_opts.alignment_layer = -2
             model_opts.lambda_align = 0.0
@@ -334,8 +329,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
     def validate_train_opts(cls, opts):
         if opts.epochs:
             raise AssertionError("-epochs is deprecated please use -train_steps.")
-        if opts.truncated_decoder > 0 and max(opts.accum_count) > 1:
-            raise AssertionError("BPTT is not compatible with -accum > 1")
 
         if opts.gpuid:
             raise AssertionError("gpuid is deprecated see world_size and gpu_ranks")

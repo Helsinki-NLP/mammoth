@@ -240,7 +240,6 @@ class DynamicDatasetIter(object):
         data_type="text",
         pool_size=2048,
         n_buckets=1024,
-        skip_empty_level='warning',
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -256,9 +255,6 @@ class DynamicDatasetIter(object):
         self.device = 'cpu'
         self.pool_size = pool_size
         self.n_buckets = n_buckets
-        if skip_empty_level not in ['silent', 'warning', 'error']:
-            raise ValueError(f"Invalid argument skip_empty_level={skip_empty_level}")
-        self.skip_empty_level = skip_empty_level
 
     @classmethod
     def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train):
@@ -281,7 +277,6 @@ class DynamicDatasetIter(object):
             data_type=opts.data_type,
             pool_size=opts.pool_size,
             n_buckets=opts.n_buckets,
-            skip_empty_level=opts.skip_empty_level,
         )
 
     def _init_datasets(self):

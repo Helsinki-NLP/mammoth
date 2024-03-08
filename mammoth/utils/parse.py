@@ -191,16 +191,10 @@ class DataOptsCheckerMixin(object):
                 for feature in corpus["src_feats"].keys():
                     assert feature in opts.src_feats_vocab, f"No vocab file set for feature {feature}"
 
-        if build_vocab_only:
-            if not opts.share_vocab:
-                assert opts.tgt_vocab, "-tgt_vocab is required if not -share_vocab."
-            return
         # validation when train:
         for key, vocab in opts.src_vocab.items():
             cls._validate_file(vocab, info=f'src vocab ({key})')
-        if not opts.share_vocab:
-            for key, vocab in opts.tgt_vocab.items():
-                cls._validate_file(vocab, info=f'tgt vocab ({key})')
+            cls._validate_file(vocab, info=f'tgt vocab ({key})')
 
         # if opts.dump_fields or opts.dump_transforms:
         if opts.dump_transforms:
@@ -227,7 +221,7 @@ class DataOptsCheckerMixin(object):
 
         logger.info("encoder is not used for LM task")
 
-        assert opts.share_vocab and (opts.tgt_vocab is None), "vocab must be shared for LM task"
+        assert opts.tgt_vocab is None, "vocab must be shared for LM task"
 
         assert opts.decoder_type == "transformer", "Only transformer decoder is supported for LM task"
 
@@ -294,13 +288,10 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if hasattr(model_opts, 'fix_word_vecs_dec'):
             model_opts.freeze_word_vecs_dec = model_opts.fix_word_vecs_dec
 
-        if model_opts.layers > 0:
-            raise Exception('--layers is deprecated')
-
-        model_opts.brnn = model_opts.encoder_type == "brnn"
-
-        if model_opts.copy_attn_type is None:
-            model_opts.copy_attn_type = model_opts.global_attention
+        # model_opts.brnn = model_opts.encoder_type == "brnn"
+        #
+        # if model_opts.copy_attn_type is None:
+        #    model_opts.copy_attn_type = model_opts.global_attention
 
         if model_opts.alignment_layer is None:
             model_opts.alignment_layer = -2
@@ -379,4 +370,4 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
     def validate_translate_opts_dynamic(cls, opts):
         # It comes from training
         # TODO: needs to be added as inference opts
-        opts.share_vocab = False
+        pass

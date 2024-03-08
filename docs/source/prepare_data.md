@@ -1,4 +1,4 @@
-![image](https://github.com/stefanik12/mammoth/assets/8227868/4e65b62b-980d-459f-a9bc-ea50e398924f)# Prepare Data
+# Prepare Data
 
 Before running these scripts, make sure that you have [installed](quickstart) Mamooth, which includes the dependencies required below.
 

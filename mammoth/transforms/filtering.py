@@ -29,7 +29,7 @@ class FilterTooLongTransform(Transform):
     @classmethod
     def add_options(cls, parser):
         """Available options relating to this Transform."""
-        group = parser.add_argument_group("Transform/Filter")
+        group = parser.add_argument_group("Transform/Length filter")
         group.add("--src_seq_length", "-src_seq_length", type=int, default=200, help="Maximum source sequence length.")
         group.add("--tgt_seq_length", "-tgt_seq_length", type=int, default=200, help="Maximum target sequence length.")
 
@@ -70,7 +70,7 @@ class FilterWordRatio(Transform):
     @classmethod
     def add_options(cls, parser):
         """Available options relating to this Transform."""
-        group = parser.add_argument_group("Transform/Filter")
+        group = parser.add_argument_group("Transform/Word ratio filter")
         group.add("--word_ratio_threshold", "-word_ratio_threshold", type=int, default=3,
                   help="Threshold for discarding sentences based on word ratio.")
 
@@ -106,7 +106,7 @@ class FilterRepetitions(Transform):
     @classmethod
     def add_options(cls, parser):
         """Available options relating to this Transform."""
-        group = parser.add_argument_group("Transform/Filter")
+        group = parser.add_argument_group("Transform/Repetitions filter")
         group.add("--rep_threshold", "-rep_threshold", type=int, default=2,
                   help="Number of times the substring is repeated.")
         group.add("--rep_min_len", "-rep_min_len", type=int, default=3,
@@ -155,7 +155,7 @@ class FilterTerminalPunctuation(Transform):
     @classmethod
     def add_options(cls, parser):
         """Available options relating to this Transform."""
-        group = parser.add_argument_group("Transform/Filter")
+        group = parser.add_argument_group("Transform/Terminal punctuation filter")
         group.add("--punct_threshold", "-punct_threshold", type=int, default=-2,
                   help="Minimum penalty score for discarding sentences based on their terminal punctuation signs")
 
@@ -194,7 +194,7 @@ class FilterNonZeroNumerals(Transform):
     @classmethod
     def add_options(cls, parser):
         """Available options relating to this Transform."""
-        group = parser.add_argument_group("Transform/Filter")
+        group = parser.add_argument_group("Transform/Non-zero numerals filter")
         group.add("--nonzero_threshold", "-nonzero_threshold", type=float, default=0.5,
                   help="Threshold for discarding sentences based on numerals between the segments with zeros removed")
 

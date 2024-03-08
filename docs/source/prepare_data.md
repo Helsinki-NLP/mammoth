@@ -5,7 +5,7 @@ Before running these scripts, make sure that you have [installed](quickstart) Ma
 
 ## Quickstart: Europarl
 
-In the quickstart tutorial, we have 
+In the [Quickstart tutorial](quickstart), we assume that you will download and preprocess the Europarl data by following the steps below.
 
 ### Step 1: Download the data
 [Europarl parallel corpus](https://www.statmt.org/europarl/) is a multilingual resource extracted from European Parliament proceedings and contains texts in 21 European languages. Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or 

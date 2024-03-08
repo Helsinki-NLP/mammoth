@@ -1,10 +1,11 @@
-
 # Prepare Data
 
 Before running these scripts, make sure that you have [installed](quickstart) Mamooth, which includes the dependencies required below.
 
 
-## Europarl
+## Quickstart: Europarl
+
+In the quickstart tutorial, we have 
 
 ### Step 1: Download the data
 [Europarl parallel corpus](https://www.statmt.org/europarl/) is a multilingual resource extracted from European Parliament proceedings and contains texts in 21 European languages. Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or 
@@ -16,7 +17,7 @@ tar –xvzf europarl.tar.gz.1 -C europarl_data
 ```
 Note that the extracted dataset will require around 30GB of memory.
 
-We use a SentencePiece model trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
+We use a SentencePiece tokenizer trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
 ```bash
 # Download the SentencePiece model
 wget https://mammoth101.a3s.fi/opusTC.mul.64k.spm
@@ -27,10 +28,10 @@ mkdir vocab
 mv opusTC.mul.64k.spm vocab/.
 mv opusTC.mul.vocab.onmt vocab/.
 ```
-
+If you would like to create and use a custom sentencepiece tokenizer, take a look at the OPUS tutorial below.
 
 ### Step 2: Tokenization
-Then, read parallel text data, processes it, and generate output files for training and validation sets. 
+Then, read parallel text data, processes it, and generates output files for training and validation sets. 
 Here's a high-level summary of the main processing steps. For each language in 'langs,' 
 - read parallel data files.
 - clean the data by removing empty lines.
@@ -79,8 +80,14 @@ for lang in tqdm.tqdm(langs):
 The script will produce encoded datasets in `europarl_data/encoded` that you can further use for the training.
 
 
-## OPUS 100 
-To get started, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/opus-100.php)
+## OPUS 100
+
+In this guideline, we will also create our custom sentencepiece tokenizer.
+
+To do that, you will also need to compile a sentencepiece installation in your environment (not just pip install). 
+Follow the instructions on [sentencepiece github](https://github.com/google/sentencepiece?tab=readme-ov-file#build-and-install-sentencepiece-command-line-tools-from-c-source).
+
+After that, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/opus-100.php)
 
 ### Step 1: Set relevant paths, variables and download
 

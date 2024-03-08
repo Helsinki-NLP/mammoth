@@ -79,6 +79,16 @@ for lang in tqdm.tqdm(langs):
 
 The script will produce encoded datasets in `europarl_data/encoded` that you can further use for the training.
 
+## UNPC
+[UNPC](https://opus.nlpl.eu/UNPC/corpus/version/UNPC) consists of manually translated UN documents from the last 25 years (1990 to 2014) for the six official UN languages, Arabic, Chinese, English, French, Russian, and Spanish. 
+We preprocess the data. You can download the processed data by:
+```bash
+wget https://mammoth-share.a3s.fi/unpc.tar
+```
+Or you can use the scripts provided by the tarball to process the data yourself. 
+
+For references, please cite this reference: Ziemski, M., Junczys-Dowmunt, M., and Pouliquen, B., (2016), The United Nations Parallel Corpus, Language Resources and Evaluation (LREC’16), Portorož, Slovenia, May 2016.
+
 
 ## OPUS 100
 

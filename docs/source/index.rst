@@ -31,6 +31,7 @@ Contents
       install.md
       prepare_data.md
       examples/train_mammoth_101.md
+      examples/sharing_schemes.md
 
 .. toctree::
       :caption: Scripts

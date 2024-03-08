@@ -203,7 +203,8 @@ The running script will slightly differ depending on whether you want to run the
 
 ### Single-node training
 
-If you want to run your training on a single machine, simply run a python script `train.py`, possibly with a definition of your desired GPUs.
+If you want to run your training on a single machine, simply run a python script `train.py`, possibly with a definition of your desired GPUs. 
+Note that the example config above assumes two GPUs available on one machine.
 
 ```shell
 CUDA_VISIBLE_DEVICES=0,1 python train.py -config my_config.yaml -save_model output_dir -tensorboard -tensorboard_log_dir log_dir -node_rank 0
@@ -213,7 +214,7 @@ Note that when running `train.py`, you can use all the parameters from [train.py
 
 ### Multi-node training
 
-For the multi-node training, launch the training script, for example, through the Slurm manager, via:
+Now that you've prepared your data and configured the settings, it's time to initiate the training of your multilingual machine translation model using Mammoth. Follow these steps to launch the training script, for example, through the Slurm manager:
 
 ```bash
 python -u "$@" --node_rank $SLURM_NODEID -u train.py \
@@ -222,8 +223,51 @@ python -u "$@" --node_rank $SLURM_NODEID -u train.py \
     -master_port 9974 -master_ip $SLURMD_NODENAME \
     -tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}
 ```
-<!---
-A complete example of training on the Europarl dataset is available at [MAMMOTH101](examples/train_mammoth_101.md).
+Explanation of Command:
+   - `python -u "$@"`: Initiates the training script using Python.
+   - `--node_rank $SLURM_NODEID`: Specifies the node rank using the environment variable provided by Slurm.
+   - `-u ${PATH_TO_MAMMOTH}/train.py`: Specifies the path to the Mammoth training script.
+   - `-config ${CONFIG_DIR}/your_config.yml`: Specifies the path to your configuration file.
+   - `-save_model ${SAVE_DIR}/models/${EXP_ID}`: Defines the directory to save the trained models, incorporating an experiment identifier (`${EXP_ID}`).
+   - `-master_port 9974 -master_ip $SLURMD_NODENAME`: Sets the master port and IP for communication.
+   - `-tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}`: Enables TensorBoard logging, specifying the directory for TensorBoard logs.
 
-TODO: figure out if there is something missing here from the train_mammoth_101.md
--->
+Your training process has been initiated through the Slurm manager, leveraging the specified configuration settings. Monitor the progress through the provided logging and visualization tools. Adjust parameters as needed for your specific training requirements. You can also run the command on other workstations by modifying the parameters accordingly.
+
+
+
+### Step 4: Translate
+
+Now that you have successfully trained your multilingual machine translation model using Mammoth, it's time to put it to use for translation. 
+
+```bash
+python3 -u $MAMMOTH/translate.py \
+  --config "${CONFIG_DIR}/your_config.yml" \
+  --model "$model_checkpoint" \
+  --task_id  "train_$src_lang-$tgt_lang" \
+  --src "$path_to_src_language/$lang_pair.$src_lang.sp" \
+  --output "$out_path/$src_lang-$tgt_lang.hyp.sp" \
+  --gpu 0 --shard_size 0 \
+  --batch_size 512
+```
+
+Follow these configs to translate text with your trained model.
+
+- Provide necessary details using the following options:
+   - Configuration File: `--config "${CONFIG_DIR}/your_config.yml"`
+   - Model Checkpoint: `--model "$model_checkpoint"`
+   - Translation Task: `--task_id "train_$src_lang-$tgt_lang"`
+
+- Point to the source language file for translation:
+   `--src "$path_to_src_language/$lang_pair.$src_lang.sp"`
+- Define the path for saving the translated output: `--output "$out_path/$src_lang-$tgt_lang.hyp.sp"`
+- Adjust GPU and batch size settings based on your requirements: `--gpu 0 --shard_size 0 --batch_size 512`
+- We provide the model checkpoint trained using the encoder shared scheme described in [this tutorial](examples/sharing_schemes.md).
+    ```bash
+    wget https://mammoth-share.a3s.fi/encoder-shared-models.tar.gz
+    ```
+
+Congratulations! You've successfully translated text using your Mammoth model. Adjust the parameters as needed for your specific translation tasks.
+
+### Further reading
+A complete example of training on the Europarl dataset is available at [MAMMOTH101](examples/train_mammoth_101.md), and a complete example for configuring different sharing schemes is available at [MAMMOTH sharing schemes](examples/sharing_schemes.md).

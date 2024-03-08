@@ -1,4 +1,4 @@
-# Prepare Data
+![image](https://github.com/stefanik12/mammoth/assets/8227868/4e65b62b-980d-459f-a9bc-ea50e398924f)# Prepare Data
 
 Before running these scripts, make sure that you have [installed](quickstart) Mamooth, which includes the dependencies required below.
 
@@ -97,7 +97,7 @@ In this guideline, we will also create our custom sentencepiece tokenizer.
 To do that, you will also need to compile a sentencepiece installation in your environment (not just pip install). 
 Follow the instructions on [sentencepiece github](https://github.com/google/sentencepiece?tab=readme-ov-file#build-and-install-sentencepiece-command-line-tools-from-c-source).
 
-After that, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/opus-100.php)
+After that, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/legacy/opus-100.php)
 
 ### Step 1: Set relevant paths, variables and download
 

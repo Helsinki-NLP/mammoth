@@ -1,0 +1,165 @@
+{
+    "models_root": "models/",
+    "models": [
+        {
+            "id": 0,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "defmod_en"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 1,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "defmod_fr"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 2,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "defmod_ru"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 3,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "pargen_en"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 4,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "pargen_fr"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 5,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "pargen_ru"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 6,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "texsim_en"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 7,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "texsim_fr"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 8,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "texsim_ru"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 9,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "texsim_fr"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 10,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "translate_fr-en"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 11,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "translate_ru-en"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 12,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "translate_en-fr"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 13,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "translate_ru-fr"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 14,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "translate_fr-ru"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        },
+        {
+            "id": 15,
+            "opts": {
+                "config": "hydra-L-train-config.yml",
+                "model": "models/hydra-L-ckpt_step_460000",
+                "transforms": "sentencepiece",
+                "task_id": "translate_en-ru"
+            },
+            "models": ["hydra-L-ckpt_step_460000"]
+        }
+    ]
+}

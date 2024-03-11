@@ -9,7 +9,7 @@ In the example below, we will show you how to configure Mamooth to train a machi
 ### Step 0: Install mammoth
 
 ```bash
-pip install git+https://github.com/Helsinki-NLP/mammoth.git
+pip install mammoth-nlp
 ```
 
 Check out the [installation guide](install) to install in specific clusters.

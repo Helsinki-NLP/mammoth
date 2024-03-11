@@ -8,7 +8,7 @@ This portal provides a detailed documentation of the **MAMMOTH**: Modular Adapta
 ## Installation
 
 ```bash
-pip install git+https://github.com/Helsinki-NLP/mammoth.git
+pip install mammoth-nlp
 ```
 
 Check out the [installation guide](install) to install in specific clusters.

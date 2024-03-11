@@ -11,7 +11,7 @@ setup(
     description='Massively Multilingual Modular Open Translation @ Helsinki',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    version='0.1',
+    version='0.1.1',
     packages=find_packages(),
     project_urls={
         "Documentation": "https://helsinki-nlp.github.io/mammoth/",
@@ -32,8 +32,8 @@ setup(
         "pytest==7.0.1",
         "pyyaml",
         "timeout_decorator",
-        "sentencepiece==0.1.97",  # TODO: do we need these fixed?
-        "sacrebleu==2.3.1"
+        "sentencepiece==0.1.97",
+        "sacrebleu==2.3.1",
     ],
     entry_points={
         "console_scripts": [

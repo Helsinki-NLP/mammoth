@@ -215,7 +215,6 @@ class DynamicDatasetIter(object):
         batch_type (str): batching type to count on, choices=[tokens, sents];
         batch_size (int): numbers of examples in a batch;
         batch_size_multiple (int): make batch size multiply of this;
-        data_type (str): input data type, currently only text;
         pool_size (int): accum this number of examples in a dynamic dataset;
         skip_empty_level (str): security level when encouter empty line;
         stride (int): iterate data files with this stride;
@@ -237,7 +236,6 @@ class DynamicDatasetIter(object):
         batch_type,
         batch_size,
         batch_size_multiple,
-        data_type="text",
         pool_size=2048,
         n_buckets=1024,
     ):
@@ -274,7 +272,6 @@ class DynamicDatasetIter(object):
             opts.batch_type,
             batch_size,
             batch_size_multiple,
-            data_type=opts.data_type,
             pool_size=opts.pool_size,
             n_buckets=opts.n_buckets,
         )

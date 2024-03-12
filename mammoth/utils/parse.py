@@ -201,18 +201,6 @@ class DataOptsCheckerMixin(object):
             assert (
                 opts.save_data
             ), "-save_data should be set if set -dump_transforms."
-        # Check embeddings stuff
-        if opts.both_embeddings is not None:
-            assert (
-                opts.src_embeddings is None and opts.tgt_embeddings is None
-            ), "You don't need -src_embeddings or -tgt_embeddings \
-                if -both_embeddings is set."
-
-        if any([opts.both_embeddings is not None, opts.src_embeddings is not None, opts.tgt_embeddings is not None]):
-            assert opts.embeddings_type is not None, "You need to specify an -embedding_type!"
-            assert (
-                opts.save_data
-            ), "-save_data should be set if use pretrained embeddings."
 
     @classmethod
     def _validate_language_model_compatibilities_opts(cls, opts):
@@ -295,14 +283,14 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
     @classmethod
     def validate_model_opts(cls, model_opts):
-        assert model_opts.model_type in ["text"], "Unsupported model type %s" % model_opts.model_type
+        # assert model_opts.model_type in ["text"], "Unsupported model type %s" % model_opts.model_type
 
         # encoder and decoder should be same sizes
         # assert same_size, "The encoder and decoder rnns must be the same size for now"
 
-        if model_opts.share_embeddings:
-            if model_opts.model_type != "text":
-                raise AssertionError("--share_embeddings requires --model_type text.")
+        # if model_opts.share_embeddings:
+        #    if model_opts.model_type != "text":
+        #        raise AssertionError("--share_embeddings requires --model_type text.")
         if model_opts.lambda_align > 0.0:
             assert model_opts.decoder_type == 'transformer', "Only transformer is supported to joint learn alignment."
             assert (
@@ -330,8 +318,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if opts.epochs:
             raise AssertionError("-epochs is deprecated please use -train_steps.")
 
-        if opts.gpuid:
-            raise AssertionError("gpuid is deprecated see world_size and gpu_ranks")
         if torch.cuda.is_available() and not opts.gpu_ranks:
             logger.warn("You have a CUDA device, should run with -gpu_ranks")
         if opts.world_size < len(opts.gpu_ranks):
@@ -351,9 +337,10 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             opts.accum_steps
         ), 'Number of accum_count values must match number of accum_steps'
 
-        if opts.update_vocab:
-            assert opts.train_from, "-update_vocab needs -train_from option"
-            assert opts.reset_optim in ['states', 'all'], '-update_vocab needs -reset_optim "states" or "all"'
+        # TODO: do we want to remove that completely?
+        # if opts.update_vocab:
+        #    assert opts.train_from, "-update_vocab needs -train_from option"
+        #    assert opts.reset_optim in ['states', 'all'], '-update_vocab needs -reset_optim "states" or "all"'
 
     @classmethod
     def validate_translate_opts(cls, opts):

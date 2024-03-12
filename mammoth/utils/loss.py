@@ -56,14 +56,15 @@ def build_loss_compute(model, tgt_vocab, opts, train=True, generator=None):
         else:
             raise ValueError(f"No copy generator loss defined for task {opts.model_task}")
     else:
-        if opts.model_task == ModelTask.SEQ2SEQ:
+        # TODO: keeping this in light of possible encoder-only / decoder-only support
+        if True:  # opts.model_task == ModelTask.SEQ2SEQ:
             compute = NMTLossCompute(
                 criterion,
                 loss_gen,
                 lambda_coverage=opts.lambda_coverage,
                 lambda_align=opts.lambda_align,
             )
-        elif opts.model_task == ModelTask.LANGUAGE_MODEL:
+        elif False:  # elif opts.model_task == ModelTask.LANGUAGE_MODEL:
             assert opts.lambda_align == 0.0, "lamdba_align not supported in LM loss"
             compute = LMLossCompute(
                 criterion,

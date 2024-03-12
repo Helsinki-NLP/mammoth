@@ -32,6 +32,8 @@ setup(
         "pytest==7.0.1",
         "pyyaml",
         "timeout_decorator",
+        "sentencepiece==0.1.97",  # TODO: do we need these fixed?
+        "sacrebleu==2.3.1"
     ],
     entry_points={
         "console_scripts": [

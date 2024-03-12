@@ -2,7 +2,7 @@
 
 # Quickstart
 
-Mammoth is a library for training modular language models supporting multi-node multi-GPU training. 
+MAMMOTH is specifically designed for distributed training of modular systems in multi-GPUs SLURM environments.
 
 In the example below, we will show you how to configure Mamooth to train a machine translation model with language-specific encoders and decoders.
 
@@ -32,6 +32,7 @@ Below are a few examples of training configurations that will work for you out-o
 <summary>Task-specific encoders and decoders</summary>
 
 In this example, we create a model with encoders and decoders **shared** for the specified languages. This is defined by `enc_sharing_group` and `enc_sharing_group`.
+Note that the configs expect you have access to 2 GPUs.
 
 ```yaml
 # TRAINING CONFIG
@@ -207,7 +208,7 @@ If you want to run your training on a single machine, simply run a python script
 Note that the example config above assumes two GPUs available on one machine.
 
 ```shell
-CUDA_VISIBLE_DEVICES=0,1 python train.py -config my_config.yaml -save_model output_dir -tensorboard -tensorboard_log_dir log_dir -node_rank 0
+CUDA_VISIBLE_DEVICES=0,1 python3 train.py -config my_config.yaml -save_model output_dir -tensorboard -tensorboard_log_dir log_dir -node_rank 0
 ```
 
 Note that when running `train.py`, you can use all the parameters from [train.py](options/train) as cmd arguments. In the case of duplicate arguments, the cmd parameters override the ones found in your config.yaml.
@@ -217,7 +218,7 @@ Note that when running `train.py`, you can use all the parameters from [train.py
 Now that you've prepared your data and configured the settings, it's time to initiate the training of your multilingual machine translation model using Mammoth. Follow these steps to launch the training script, for example, through the Slurm manager:
 
 ```bash
-python -u "$@" --node_rank $SLURM_NODEID -u train.py \
+python3 --node_rank $SLURM_NODEID -u train.py \
     -config my_config.yaml \
     -save_model output_dir \
     -master_port 9974 -master_ip $SLURMD_NODENAME \
@@ -226,9 +227,9 @@ python -u "$@" --node_rank $SLURM_NODEID -u train.py \
 Explanation of Command:
    - `python -u "$@"`: Initiates the training script using Python.
    - `--node_rank $SLURM_NODEID`: Specifies the node rank using the environment variable provided by Slurm.
-   - `-u ${PATH_TO_MAMMOTH}/train.py`: Specifies the path to the Mammoth training script.
-   - `-config ${CONFIG_DIR}/your_config.yml`: Specifies the path to your configuration file.
-   - `-save_model ${SAVE_DIR}/models/${EXP_ID}`: Defines the directory to save the trained models, incorporating an experiment identifier (`${EXP_ID}`).
+   - `${PATH_TO_MAMMOTH}/train.py`: Specifies the path to the Mammoth training script.
+   - `-config my_config.yml`: Specifies the configuration file.
+   - `-save_model output_dir`: Defines the directory to save the trained models.
    - `-master_port 9974 -master_ip $SLURMD_NODENAME`: Sets the master port and IP for communication.
    - `-tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}`: Enables TensorBoard logging, specifying the directory for TensorBoard logs.
 

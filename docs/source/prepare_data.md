@@ -13,9 +13,14 @@ download the processed data by us:
 ```bash
 wget https://mammoth101.a3s.fi/europarl.tar.gz
 mkdir europarl_data
-tar –xvzf europarl.tar.gz.1 -C europarl_data
+tar –xvzf europarl.tar.gz -C europarl_data
 ```
-Note that the extracted dataset will require around 30GB of memory.
+Note that the extracted dataset will require around 30GB of memory. Alternatively, you can only download the data for the three example languages (666M).
+```bash
+wget https://mammoth101.a3s.fi/europarl-3langs.tar.gz
+mkdir europarl_data
+tar –xvzf europarl-3langs.tar.gz -C europarl_data
+```
 
 We use a SentencePiece tokenizer trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
 ```bash

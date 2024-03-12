@@ -4,7 +4,7 @@
 
 MAMMOTH is specifically designed for distributed training of modular systems in multi-GPUs SLURM environments.
 
-In the example below, we will show you how to configure Mamooth to train a machine translation model with language-specific encoders and decoders.
+In the example below, we will show you how to configure Mammoth to train a machine translation model with language-specific encoders and decoders.
 
 ### Step 0: Install mammoth
 
@@ -31,7 +31,7 @@ Below are a few examples of training configurations that will work for you out-o
 <details>
 <summary>Task-specific encoders and decoders</summary>
 
-In this example, we create a model with encoders and decoders **shared** for the specified languages. This is defined by `enc_sharing_group` and `enc_sharing_group`.
+In this example, we create a model with encoders and decoders **unshared** for the specified languages. This is defined by `enc_sharing_group` and `enc_sharing_group`.
 Note that the configs expect you have access to 2 GPUs.
 
 ```yaml
@@ -200,40 +200,14 @@ For more complex scenarios, we recommend our [automatic configuration generation
 
 ## Step 3: Start training
 
-The running script will slightly differ depending on whether you want to run the training in a single-node (i.e. a single-machine) or multi-node setting:
-
-### Single-node training
-
-If you want to run your training on a single machine, simply run a python script `train.py`, possibly with a definition of your desired GPUs. 
+You can start your training on a single machine, by simply running a python script `train.py`, possibly with a definition of your desired GPUs. 
 Note that the example config above assumes two GPUs available on one machine.
 
 ```shell
-CUDA_VISIBLE_DEVICES=0,1 python3 train.py -config my_config.yaml -save_model output_dir -tensorboard -tensorboard_log_dir log_dir -node_rank 0
+CUDA_VISIBLE_DEVICES=0,1 python3 train.py -config my_config.yaml -save_model output_dir -tensorboard -tensorboard_log_dir log_dir
 ```
 
 Note that when running `train.py`, you can use all the parameters from [train.py](options/train) as cmd arguments. In the case of duplicate arguments, the cmd parameters override the ones found in your config.yaml.
-
-### Multi-node training
-
-Now that you've prepared your data and configured the settings, it's time to initiate the training of your multilingual machine translation model using Mammoth. Follow these steps to launch the training script, for example, through the Slurm manager:
-
-```bash
-python3 --node_rank $SLURM_NODEID -u train.py \
-    -config my_config.yaml \
-    -save_model output_dir \
-    -master_port 9974 -master_ip $SLURMD_NODENAME \
-    -tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}
-```
-Explanation of Command:
-   - `python -u "$@"`: Initiates the training script using Python.
-   - `--node_rank $SLURM_NODEID`: Specifies the node rank using the environment variable provided by Slurm.
-   - `${PATH_TO_MAMMOTH}/train.py`: Specifies the path to the Mammoth training script.
-   - `-config my_config.yml`: Specifies the configuration file.
-   - `-save_model output_dir`: Defines the directory to save the trained models.
-   - `-master_port 9974 -master_ip $SLURMD_NODENAME`: Sets the master port and IP for communication.
-   - `-tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}`: Enables TensorBoard logging, specifying the directory for TensorBoard logs.
-
-Your training process has been initiated through the Slurm manager, leveraging the specified configuration settings. Monitor the progress through the provided logging and visualization tools. Adjust parameters as needed for your specific training requirements. You can also run the command on other workstations by modifying the parameters accordingly.
 
 
 
@@ -243,7 +217,7 @@ Now that you have successfully trained your multilingual machine translation mod
 
 ```bash
 python3 -u $MAMMOTH/translate.py \
-  --config "${CONFIG_DIR}/your_config.yml" \
+  --config "my_config.yml" \
   --model "$model_checkpoint" \
   --task_id  "train_$src_lang-$tgt_lang" \
   --src "$path_to_src_language/$lang_pair.$src_lang.sp" \
@@ -255,7 +229,7 @@ python3 -u $MAMMOTH/translate.py \
 Follow these configs to translate text with your trained model.
 
 - Provide necessary details using the following options:
-   - Configuration File: `--config "${CONFIG_DIR}/your_config.yml"`
+   - Configuration File: `--config "my_config.yml"`
    - Model Checkpoint: `--model "$model_checkpoint"`
    - Translation Task: `--task_id "train_$src_lang-$tgt_lang"`
 

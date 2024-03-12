@@ -119,7 +119,7 @@ Ensure that the `config.yaml` file specifies the desired sharing scheme.
 
 The training can be run on a single GPU in which case the wrapper wouldn't be necessary. In this case, you can train with the following command. 
 ```bash
-python -u $MAMMOTH/train.py -config $CONFIG -node_rank 0
+python -u $MAMMOTH/train.py -config $CONFIG
 ```
 
 #### 3. **Inference Command:**

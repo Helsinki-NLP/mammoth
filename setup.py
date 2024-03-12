@@ -14,10 +14,10 @@ setup(
     version='0.1',
     packages=find_packages(),
     project_urls={
-        "Documentation": "http://opennmt.net/OpenNMT-py/",
-        "Forum": "http://forum.opennmt.net/",
-        "Gitter": "https://gitter.im/OpenNMT/OpenNMT-py",
-        "Source": "https://github.com/OpenNMT/OpenNMT-py/",
+        "Documentation": "https://helsinki-nlp.github.io/mammoth/",
+        # "Forum": "http://forum.opennmt.net/",
+        # "Gitter": "https://gitter.im/OpenNMT/OpenNMT-py",
+        "Source": "https://github.com/Helsinki-NLP/mammoth",
     },
     python_requires=">=3.5",
     install_requires=[

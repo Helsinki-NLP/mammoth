@@ -117,7 +117,12 @@ This tutorial utilizes SLURM for job scheduling and parallel computing.
 You can tailor the provided commands for your specific needs, adapting them to alternative job scheduling systems or standalone setups.
 Ensure that the `config.yaml` file specifies the desired sharing scheme.
 
-#### 3. **Testing Command:**
+The training can be run on a single GPU in which case the wrapper wouldn't be necessary. In this case, you can train with the following command. 
+```bash
+python -u $MAMMOTH/train.py -config $CONFIG
+```
+
+#### 3. **Inference Command:**
 
 After training, use the following command to test the model:
 ```bash

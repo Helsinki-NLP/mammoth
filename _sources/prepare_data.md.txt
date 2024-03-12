@@ -1,5 +1,88 @@
-
 # Prepare Data
+
+Before running these scripts, make sure that you have [installed](quickstart) Mamooth, which includes the dependencies required below.
+
+
+## Quickstart: Europarl
+
+In the [Quickstart tutorial](quickstart), we assume that you will download and preprocess the Europarl data by following the steps below.
+
+### Step 1: Download the data
+[Europarl parallel corpus](https://www.statmt.org/europarl/) is a multilingual resource extracted from European Parliament proceedings and contains texts in 21 European languages. Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or 
+download the processed data by us:
+```bash
+wget https://mammoth101.a3s.fi/europarl.tar.gz
+mkdir europarl_data
+tar –xvzf europarl.tar.gz -C europarl_data
+```
+Note that the extracted dataset will require around 30GB of memory. Alternatively, you can only download the data for the three example languages (666M).
+```bash
+wget https://mammoth101.a3s.fi/europarl-3langs.tar.gz
+mkdir europarl_data
+tar –xvzf europarl-3langs.tar.gz -C europarl_data
+```
+
+We use a SentencePiece tokenizer trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
+```bash
+# Download the SentencePiece model
+wget https://mammoth101.a3s.fi/opusTC.mul.64k.spm
+# Download the vocabulary
+wget https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt
+
+mkdir vocab
+mv opusTC.mul.64k.spm vocab/.
+mv opusTC.mul.vocab.onmt vocab/.
+```
+If you would like to create and use a custom sentencepiece tokenizer, take a look at the OPUS tutorial below.
+
+### Step 2: Tokenization
+Then, read parallel text data, processes it, and generates output files for training and validation sets. 
+Here's a high-level summary of the main processing steps. For each language in 'langs,' 
+- read parallel data files.
+- clean the data by removing empty lines.
+- shuffle the data randomly.
+- tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.
+
+You're free to skip this step if you directly download the processed data.
+
+```python
+import random
+import pathlib
+
+import tqdm
+import sentencepiece as sp
+
+langs = ["bg", "cs"]
+
+sp_path = 'vocab/opusTC.mul.64k.spm'
+spm = sp.SentencePieceProcessor(model_file=sp_path)
+
+input_dir = 'europarl_data/europarl'
+output_dir = 'europarl_data/encoded'
+
+for lang in tqdm.tqdm(langs):
+    en_side_in = f'{input_dir}/{lang}-en/europarl-v7.{lang}-en.en'
+    xx_side_in = f'{input_dir}/{lang}-en/europarl-v7.{lang}-en.{lang}'
+    with open(xx_side_in) as xx_stream, open(en_side_in) as en_stream:
+        data = zip(map(str.strip, xx_stream), map(str.strip, en_stream))
+        data = [(xx, en) for xx, en in tqdm.tqdm(data, leave=False, desc=f'read {lang}') if xx and en] # drop empty lines
+        random.shuffle(data)
+    pathlib.Path(output_dir).mkdir(exist_ok=True) 
+    en_side_out = f'{output_dir}/valid.{lang}-en.en.sp'
+    xx_side_out = f'{output_dir}/valid.{lang}-en.{lang}.sp'
+    with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
+        for xx, en in tqdm.tqdm(data[:1000], leave=False, desc=f'valid {lang}'):
+            print(*spm.encode(xx, out_type=str), file=xx_stream)
+            print(*spm.encode(en, out_type=str), file=en_stream)
+    en_side_out = f'{output_dir}/train.{lang}-en.en.sp'
+    xx_side_out = f'{output_dir}/train.{lang}-en.{lang}.sp'
+    with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
+        for xx, en in tqdm.tqdm(data[1000:], leave=False, desc=f'train {lang}'):
+            print(*spm.encode(xx, out_type=str), file=xx_stream)
+            print(*spm.encode(en, out_type=str), file=en_stream)
+```
+
+The script will produce encoded datasets in `europarl_data/encoded` that you can further use for the training.
 
 ## UNPC
 [UNPC](https://opus.nlpl.eu/UNPC/corpus/version/UNPC) consists of manually translated UN documents from the last 25 years (1990 to 2014) for the six official UN languages, Arabic, Chinese, English, French, Russian, and Spanish. 
@@ -11,74 +94,15 @@ Or you can use the scripts provided by the tarball to process the data yourself.
 
 For references, please cite this reference: Ziemski, M., Junczys-Dowmunt, M., and Pouliquen, B., (2016), The United Nations Parallel Corpus, Language Resources and Evaluation (LREC’16), Portorož, Slovenia, May 2016.
 
-## Europarl
 
-### Step 1: Download the data
-[Europarl parallel corpus](https://www.statmt.org/europarl/) is a multilingual resource extracted from European Parliament proceedings and contains texts in 21 European languages. Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or 
-download the processed data by us:
-```bash
-wget https://mammoth101.a3s.fi/europarl.tar.gz
-```
+## OPUS 100
 
-We use a SentencePiece model trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
-```bash
-# Download the SentencePiece model
-wget https://mammoth101.a3s.fi/opusTC.mul.64k.spm
-# Download the vocabulary
-wget https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt
-```
+In this guideline, we will also create our custom sentencepiece tokenizer.
 
+To do that, you will also need to compile a sentencepiece installation in your environment (not just pip install). 
+Follow the instructions on [sentencepiece github](https://github.com/google/sentencepiece?tab=readme-ov-file#build-and-install-sentencepiece-command-line-tools-from-c-source).
 
-### Step 2: Tokenization
-Then, read parallel text data, processes it, and generate output files for training and validation sets. 
-Here's a high-level summary of the main processing steps. For each language in 'langs,' 
-- read parallel data files.
-- clean the data by removing empty lines.
-- shuffle the data randomly.
-- tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.
-
-We use a positional argument 'lang' that can accept one or more values, for specifying the languages (e.g., `bg` and `cs` as used in Europarl) to process.
-
-You're free to skip this step if you directly download the processed data.
-
-```python
-import argparse
-import random
-
-import tqdm
-import sentencepiece as sp
-
-parser = argparse.ArgumentParser()
-parser.add_argument('lang', nargs='+')
-langs = parser.parse_args().lang
-
-sp_path = 'vocab/opusTC.mul.64k.spm'
-spm = sp.SentencePieceProcessor(model_file=sp_path)
-
-for lang in tqdm.tqdm(langs):
-    en_side_in = f'{lang}-en/europarl-v7.{lang}-en.en'
-    xx_side_in = f'{lang}-en/europarl-v7.{lang}-en.{lang}'
-    with open(xx_side_in) as xx_stream, open(en_side_in) as en_stream:
-        data = zip(map(str.strip, xx_stream), map(str.strip, en_stream))
-        data = [(xx, en) for xx, en in tqdm.tqdm(data, leave=False, desc=f'read {lang}') if xx and en] # drop empty lines
-        random.shuffle(data)
-    en_side_out = f'{lang}-en/valid.{lang}-en.en.sp'
-    xx_side_out = f'{lang}-en/valid.{lang}-en.{lang}.sp'
-    with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
-        for xx, en in tqdm.tqdm(data[:1000], leave=False, desc=f'valid {lang}'):
-            print(*spm.encode(xx, out_type=str), file=xx_stream)
-            print(*spm.encode(en, out_type=str), file=en_stream)
-    en_side_out = f'{lang}-en/train.{lang}-en.en.sp'
-    xx_side_out = f'{lang}-en/train.{lang}-en.{lang}.sp'
-    with open(xx_side_out, 'w') as xx_stream, open(en_side_out, 'w') as en_stream:
-        for xx, en in tqdm.tqdm(data[1000:], leave=False, desc=f'train {lang}'):
-            print(*spm.encode(xx, out_type=str), file=xx_stream)
-            print(*spm.encode(en, out_type=str), file=en_stream)
-```
-
-
-## OPUS 100 
-To get started, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/opus-100.php)
+After that, download the opus 100 dataset from [OPUS 100](https://opus.nlpl.eu/legacy/opus-100.php)
 
 ### Step 1: Set relevant paths, variables and download
 

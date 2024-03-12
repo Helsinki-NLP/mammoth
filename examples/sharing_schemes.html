@@ -118,7 +118,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#training-modular-systems">Training Modular Systems</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#setup">1. <strong>Setup:</strong></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#training-command">2. <strong>Training Command:</strong></a></li>
-<li class="toctree-l4"><a class="reference internal" href="#testing-command">3. <strong>Testing Command:</strong></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#inference-command">3. <strong>Inference Command:</strong></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#notes">Notes:</a></li>
 </ul>
 </li>
@@ -323,9 +323,13 @@
 <p>This tutorial utilizes SLURM for job scheduling and parallel computing.
 You can tailor the provided commands for your specific needs, adapting them to alternative job scheduling systems or standalone setups.
 Ensure that the <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code> file specifies the desired sharing scheme.</p>
+<p>The training can be run on a single GPU in which case the wrapper wouldn’t be necessary. In this case, you can train with the following command.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-u<span class="w"> </span><span class="nv">$MAMMOTH</span>/train.py<span class="w"> </span>-config<span class="w"> </span><span class="nv">$CONFIG</span>
+</pre></div>
 </div>
-<div class="section" id="testing-command">
-<h4>3. <strong>Testing Command:</strong><a class="headerlink" href="#testing-command" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="inference-command">
+<h4>3. <strong>Inference Command:</strong><a class="headerlink" href="#inference-command" title="Permalink to this headline">¶</a></h4>
 <p>After training, use the following command to test the model:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-u<span class="w"> </span><span class="nv">$MAMMOTH</span>/translate.py<span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>--config<span class="w"> </span><span class="nv">$CONFIG</span><span class="w"> </span><span class="se">\</span>

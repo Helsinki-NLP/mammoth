@@ -105,12 +105,12 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Prepare Data</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#unpc">UNPC</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#europarl">Europarl</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#quickstart-europarl">Quickstart: Europarl</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#step-1-download-the-data">Step 1: Download the data</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#step-2-tokenization">Step 2: Tokenization</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#unpc">UNPC</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#opus-100">OPUS 100</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#step-1-set-relevant-paths-variables-and-download">Step 1: Set relevant paths, variables and download</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#step-2-train-sentencepiece-models-and-get-vocabs">Step 2: Train SentencePiece models and get vocabs</a></li>
@@ -203,6 +203,88 @@
             
   <div class="section" id="prepare-data">
 <h1>Prepare Data<a class="headerlink" href="#prepare-data" title="Permalink to this headline">¶</a></h1>
+<p>Before running these scripts, make sure that you have <a class="reference internal" href="quickstart.html"><span class="doc">installed</span></a> Mamooth, which includes the dependencies required below.</p>
+<div class="section" id="quickstart-europarl">
+<h2>Quickstart: Europarl<a class="headerlink" href="#quickstart-europarl" title="Permalink to this headline">¶</a></h2>
+<p>In the <a class="reference internal" href="quickstart.html"><span class="doc">Quickstart tutorial</span></a>, we assume that you will download and preprocess the Europarl data by following the steps below.</p>
+<div class="section" id="step-1-download-the-data">
+<h3>Step 1: Download the data<a class="headerlink" href="#step-1-download-the-data" title="Permalink to this headline">¶</a></h3>
+<p><a class="reference external" href="https://www.statmt.org/europarl/">Europarl parallel corpus</a> is a multilingual resource extracted from European Parliament proceedings and contains texts in 21 European languages. Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or
+download the processed data by us:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth101.a3s.fi/europarl.tar.gz
+mkdir<span class="w"> </span>europarl_data
+tar<span class="w"> </span>–xvzf<span class="w"> </span>europarl.tar.gz<span class="w"> </span>-C<span class="w"> </span>europarl_data
+</pre></div>
+</div>
+<p>Note that the extracted dataset will require around 30GB of memory. Alternatively, you can only download the data for the three example languages (666M).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth101.a3s.fi/europarl-3langs.tar.gz
+mkdir<span class="w"> </span>europarl_data
+tar<span class="w"> </span>–xvzf<span class="w"> </span>europarl-3langs.tar.gz<span class="w"> </span>-C<span class="w"> </span>europarl_data
+</pre></div>
+</div>
+<p>We use a SentencePiece tokenizer trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Download the SentencePiece model</span>
+wget<span class="w"> </span>https://mammoth101.a3s.fi/opusTC.mul.64k.spm
+<span class="c1"># Download the vocabulary</span>
+wget<span class="w"> </span>https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt
+
+mkdir<span class="w"> </span>vocab
+mv<span class="w"> </span>opusTC.mul.64k.spm<span class="w"> </span>vocab/.
+mv<span class="w"> </span>opusTC.mul.vocab.onmt<span class="w"> </span>vocab/.
+</pre></div>
+</div>
+<p>If you would like to create and use a custom sentencepiece tokenizer, take a look at the OPUS tutorial below.</p>
+</div>
+<div class="section" id="step-2-tokenization">
+<h3>Step 2: Tokenization<a class="headerlink" href="#step-2-tokenization" title="Permalink to this headline">¶</a></h3>
+<p>Then, read parallel text data, processes it, and generates output files for training and validation sets.
+Here’s a high-level summary of the main processing steps. For each language in ‘langs,’</p>
+<ul class="simple">
+<li><p>read parallel data files.</p></li>
+<li><p>clean the data by removing empty lines.</p></li>
+<li><p>shuffle the data randomly.</p></li>
+<li><p>tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.</p></li>
+</ul>
+<p>You’re free to skip this step if you directly download the processed data.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">random</span>
+<span class="kn">import</span> <span class="nn">pathlib</span>
+
+<span class="kn">import</span> <span class="nn">tqdm</span>
+<span class="kn">import</span> <span class="nn">sentencepiece</span> <span class="k">as</span> <span class="nn">sp</span>
+
+<span class="n">langs</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;bg&quot;</span><span class="p">,</span> <span class="s2">&quot;cs&quot;</span><span class="p">]</span>
+
+<span class="n">sp_path</span> <span class="o">=</span> <span class="s1">&#39;vocab/opusTC.mul.64k.spm&#39;</span>
+<span class="n">spm</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">SentencePieceProcessor</span><span class="p">(</span><span class="n">model_file</span><span class="o">=</span><span class="n">sp_path</span><span class="p">)</span>
+
+<span class="n">input_dir</span> <span class="o">=</span> <span class="s1">&#39;europarl_data/europarl&#39;</span>
+<span class="n">output_dir</span> <span class="o">=</span> <span class="s1">&#39;europarl_data/encoded&#39;</span>
+
+<span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">langs</span><span class="p">):</span>
+    <span class="n">en_side_in</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">input_dir</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/europarl-v7.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en&#39;</span>
+    <span class="n">xx_side_in</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">input_dir</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/europarl-v7.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_in</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_in</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="n">xx_stream</span><span class="p">),</span> <span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="n">en_stream</span><span class="p">))</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">[(</span><span class="n">xx</span><span class="p">,</span> <span class="n">en</span><span class="p">)</span> <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;read </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">xx</span> <span class="ow">and</span> <span class="n">en</span><span class="p">]</span> <span class="c1"># drop empty lines</span>
+        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> 
+    <span class="n">en_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s1">/valid.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en.sp&#39;</span>
+    <span class="n">xx_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s1">/valid.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">.sp&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">[:</span><span class="mi">1000</span><span class="p">],</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;valid </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">xx_stream</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">en</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">en_stream</span><span class="p">)</span>
+    <span class="n">en_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s1">/train.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en.sp&#39;</span>
+    <span class="n">xx_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s1">/train.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">.sp&#39;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1000</span><span class="p">:],</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;train </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">):</span>
+            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">xx_stream</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">en</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">en_stream</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The script will produce encoded datasets in <code class="docutils literal notranslate"><span class="pre">europarl_data/encoded</span></code> that you can further use for the training.</p>
+</div>
+</div>
 <div class="section" id="unpc">
 <h2>UNPC<a class="headerlink" href="#unpc" title="Permalink to this headline">¶</a></h2>
 <p><a class="reference external" href="https://opus.nlpl.eu/UNPC/corpus/version/UNPC">UNPC</a> consists of manually translated UN documents from the last 25 years (1990 to 2014) for the six official UN languages, Arabic, Chinese, English, French, Russian, and Spanish.
@@ -213,74 +295,12 @@ We preprocess the data. You can download the processed data by:</p>
 <p>Or you can use the scripts provided by the tarball to process the data yourself.</p>
 <p>For references, please cite this reference: Ziemski, M., Junczys-Dowmunt, M., and Pouliquen, B., (2016), The United Nations Parallel Corpus, Language Resources and Evaluation (LREC’16), Portorož, Slovenia, May 2016.</p>
 </div>
-<div class="section" id="europarl">
-<h2>Europarl<a class="headerlink" href="#europarl" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="step-1-download-the-data">
-<h3>Step 1: Download the data<a class="headerlink" href="#step-1-download-the-data" title="Permalink to this headline">¶</a></h3>
-<p><a class="reference external" href="https://www.statmt.org/europarl/">Europarl parallel corpus</a> is a multilingual resource extracted from European Parliament proceedings and contains texts in 21 European languages. Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or
-download the processed data by us:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth101.a3s.fi/europarl.tar.gz
-</pre></div>
-</div>
-<p>We use a SentencePiece model trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Download the SentencePiece model</span>
-wget<span class="w"> </span>https://mammoth101.a3s.fi/opusTC.mul.64k.spm
-<span class="c1"># Download the vocabulary</span>
-wget<span class="w"> </span>https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt
-</pre></div>
-</div>
-</div>
-<div class="section" id="step-2-tokenization">
-<h3>Step 2: Tokenization<a class="headerlink" href="#step-2-tokenization" title="Permalink to this headline">¶</a></h3>
-<p>Then, read parallel text data, processes it, and generate output files for training and validation sets.
-Here’s a high-level summary of the main processing steps. For each language in ‘langs,’</p>
-<ul class="simple">
-<li><p>read parallel data files.</p></li>
-<li><p>clean the data by removing empty lines.</p></li>
-<li><p>shuffle the data randomly.</p></li>
-<li><p>tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.</p></li>
-</ul>
-<p>We use a positional argument ‘lang’ that can accept one or more values, for specifying the languages (e.g., <code class="docutils literal notranslate"><span class="pre">bg</span></code> and <code class="docutils literal notranslate"><span class="pre">cs</span></code> as used in Europarl) to process.</p>
-<p>You’re free to skip this step if you directly download the processed data.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">argparse</span>
-<span class="kn">import</span> <span class="nn">random</span>
-
-<span class="kn">import</span> <span class="nn">tqdm</span>
-<span class="kn">import</span> <span class="nn">sentencepiece</span> <span class="k">as</span> <span class="nn">sp</span>
-
-<span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">()</span>
-<span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span><span class="s1">&#39;lang&#39;</span><span class="p">,</span> <span class="n">nargs</span><span class="o">=</span><span class="s1">&#39;+&#39;</span><span class="p">)</span>
-<span class="n">langs</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span><span class="o">.</span><span class="n">lang</span>
-
-<span class="n">sp_path</span> <span class="o">=</span> <span class="s1">&#39;vocab/opusTC.mul.64k.spm&#39;</span>
-<span class="n">spm</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">SentencePieceProcessor</span><span class="p">(</span><span class="n">model_file</span><span class="o">=</span><span class="n">sp_path</span><span class="p">)</span>
-
-<span class="k">for</span> <span class="n">lang</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">langs</span><span class="p">):</span>
-    <span class="n">en_side_in</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/europarl-v7.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en&#39;</span>
-    <span class="n">xx_side_in</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/europarl-v7.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_in</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_in</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="n">xx_stream</span><span class="p">),</span> <span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="o">.</span><span class="n">strip</span><span class="p">,</span> <span class="n">en_stream</span><span class="p">))</span>
-        <span class="n">data</span> <span class="o">=</span> <span class="p">[(</span><span class="n">xx</span><span class="p">,</span> <span class="n">en</span><span class="p">)</span> <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;read </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">xx</span> <span class="ow">and</span> <span class="n">en</span><span class="p">]</span> <span class="c1"># drop empty lines</span>
-        <span class="n">random</span><span class="o">.</span><span class="n">shuffle</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
-    <span class="n">en_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/valid.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en.sp&#39;</span>
-    <span class="n">xx_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/valid.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">.sp&#39;</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">[:</span><span class="mi">1000</span><span class="p">],</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;valid </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">):</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">xx_stream</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">en</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">en_stream</span><span class="p">)</span>
-    <span class="n">en_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/train.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.en.sp&#39;</span>
-    <span class="n">xx_side_out</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en/train.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">-en.</span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">.sp&#39;</span>
-    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">xx_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">xx_stream</span><span class="p">,</span> <span class="nb">open</span><span class="p">(</span><span class="n">en_side_out</span><span class="p">,</span> <span class="s1">&#39;w&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">en_stream</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">xx</span><span class="p">,</span> <span class="n">en</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="o">.</span><span class="n">tqdm</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1000</span><span class="p">:],</span> <span class="n">leave</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="sa">f</span><span class="s1">&#39;train </span><span class="si">{</span><span class="n">lang</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">):</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">xx</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">xx_stream</span><span class="p">)</span>
-            <span class="nb">print</span><span class="p">(</span><span class="o">*</span><span class="n">spm</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">en</span><span class="p">,</span> <span class="n">out_type</span><span class="o">=</span><span class="nb">str</span><span class="p">),</span> <span class="n">file</span><span class="o">=</span><span class="n">en_stream</span><span class="p">)</span>
-</pre></div>
-</div>
-</div>
-</div>
 <div class="section" id="opus-100">
 <h2>OPUS 100<a class="headerlink" href="#opus-100" title="Permalink to this headline">¶</a></h2>
-<p>To get started, download the opus 100 dataset from <a class="reference external" href="https://opus.nlpl.eu/opus-100.php">OPUS 100</a></p>
+<p>In this guideline, we will also create our custom sentencepiece tokenizer.</p>
+<p>To do that, you will also need to compile a sentencepiece installation in your environment (not just pip install).
+Follow the instructions on <a class="reference external" href="https://github.com/google/sentencepiece?tab=readme-ov-file#build-and-install-sentencepiece-command-line-tools-from-c-source">sentencepiece github</a>.</p>
+<p>After that, download the opus 100 dataset from <a class="reference external" href="https://opus.nlpl.eu/legacy/opus-100.php">OPUS 100</a></p>
 <div class="section" id="step-1-set-relevant-paths-variables-and-download">
 <h3>Step 1: Set relevant paths, variables and download<a class="headerlink" href="#step-1-set-relevant-paths-variables-and-download" title="Permalink to this headline">¶</a></h3>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>SP_PATH=your/sentencepiece/path/build/src

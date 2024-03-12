@@ -16,7 +16,7 @@ from mammoth.models.adapters import (
     EncoderAdapterLayer,
     DecoderAdapterLayer,
 )
-from mammoth.constants import ModelTask, DefaultTokens
+from mammoth.constants import DefaultTokens
 from mammoth.modules.layer_stack_decoder import LayerStackDecoder
 from mammoth.modules.layer_stack_encoder import LayerStackEncoder
 from mammoth.modules import Embeddings

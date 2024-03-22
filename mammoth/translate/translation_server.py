@@ -404,6 +404,12 @@ class ServerModel(object):
                 sys.argv += [str(model) for model in v]
             elif isinstance(v, bool):
                 sys.argv += ['-%s' % k]
+            elif k == 'transforms':
+                if type(v) is str:
+                    sys.argv += ['-transforms', v]
+                else:
+                   assert type(v) is list
+                   sys.argv += ['-transforms', *v]
             else:
                 sys.argv += ['-%s' % k, str(v)]
 

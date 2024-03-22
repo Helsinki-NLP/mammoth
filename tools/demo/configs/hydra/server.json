@@ -1,10 +1,10 @@
 {
-    "models_root": "models/",
+    "models_root": "tools/demo/configs/hydra/models/",
     "models": [
         {
             "id": 0,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "defmod_en"
@@ -14,7 +14,7 @@
         {
             "id": 1,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "defmod_fr"
@@ -24,7 +24,7 @@
         {
             "id": 2,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "defmod_ru"
@@ -34,7 +34,7 @@
         {
             "id": 3,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "pargen_en"
@@ -44,7 +44,7 @@
         {
             "id": 4,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "pargen_fr"
@@ -54,7 +54,7 @@
         {
             "id": 5,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "pargen_ru"
@@ -64,7 +64,7 @@
         {
             "id": 6,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "texsim_en"
@@ -74,7 +74,7 @@
         {
             "id": 7,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "texsim_fr"
@@ -84,7 +84,7 @@
         {
             "id": 8,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "texsim_ru"
@@ -94,7 +94,7 @@
         {
             "id": 9,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "texsim_fr"
@@ -104,7 +104,7 @@
         {
             "id": 10,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "translate_fr-en"
@@ -114,7 +114,7 @@
         {
             "id": 11,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "translate_ru-en"
@@ -124,7 +124,7 @@
         {
             "id": 12,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "translate_en-fr"
@@ -134,7 +134,7 @@
         {
             "id": 13,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "translate_ru-fr"
@@ -144,7 +144,7 @@
         {
             "id": 14,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "translate_fr-ru"
@@ -154,7 +154,7 @@
         {
             "id": 15,
             "opts": {
-                "config": "hydra-L-train-config.yml",
+                "config": "tools/demo/configs/hydra/hydra-L-train-config.yml",
                 "model": "models/hydra-L-ckpt_step_460000",
                 "transforms": "sentencepiece",
                 "task_id": "translate_en-ru"

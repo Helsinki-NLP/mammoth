@@ -1,0 +1,185 @@
+{
+    "models_root": "tools/demo/configs/ab-neg/models/",
+    "models": [
+        {
+            "id": 0,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_ar>",
+                "tgt_prefix": "<from_en>",
+                "task_id": "train_en-ar"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 1,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_es>",
+                "tgt_prefix": "<from_en>",
+                "task_id": "train_en-es"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 2,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_fr>",
+                "tgt_prefix": "<from_en>",
+                "task_id": "train_en-fr"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 3,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_ru>",
+                "tgt_prefix": "<from_en>",
+                "task_id": "train_en-ru"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 4,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_zh>",
+                "tgt_prefix": "<from_en>",
+                "task_id": "train_en-zh"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 5,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_ar>",
+                "tgt_prefix": "<from_es>",
+                "task_id": "train_es-ar"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 6,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_en>",
+                "tgt_prefix": "<from_es>",
+                "task_id": "train_es-en"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 7,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_fr>",
+                "tgt_prefix": "<from_es>",
+                "task_id": "train_es-fr"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 8,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_ru>",
+                "tgt_prefix": "<from_es>",
+                "task_id": "train_es-ru"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 9,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_zh>",
+                "tgt_prefix": "<from_es>",
+                "task_id": "train_es-zh"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 10,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_ar>",
+                "tgt_prefix": "<from_fr>",
+                "task_id": "train_fr-ar"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 11,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_EN>",
+                "tgt_prefix": "<from_fr>",
+                "task_id": "train_fr-en"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 12,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_es>",
+                "tgt_prefix": "<from_fr>",
+                "task_id": "train_fr-es"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 13,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_ru>",
+                "tgt_prefix": "<from_fr>",
+                "task_id": "train_fr-ru"
+            },
+            "models": ["model_step_15000"]
+        },
+        {
+            "id": 14,
+            "opts": {
+                "config": "tools/demo/configs/ab-neg/config.yaml",
+                "model": "tools/demo/configs/ab-neg/models/model_step_15000",
+                 "transforms": ["sentencepiece", "prefix"],
+                "src_prefix": "<to_zh>",
+                "tgt_prefix": "<from_fr>",
+               "task_id": "train_fr-zh"
+            },
+            "models": ["model_step_15000"]
+        }
+    ]
+}

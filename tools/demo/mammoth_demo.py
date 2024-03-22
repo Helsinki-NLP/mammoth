@@ -7,7 +7,7 @@ st.set_page_config(layout="wide")
 MAMMOTH = '🦣'
 FAT_UNDER = '▁'
 
-ARCHITECTURE_HTML = """
+ARCHITECTURE_HTML_HYDRA = """
 <h3>Decoder</h3>
 <div class="arch">
     <div class="layer langspec">
@@ -73,9 +73,67 @@ ARCHITECTURE_HTML = """
 """
 
 
+
+ARCHITECTURE_HTML_ABNEG = """
+<h3>Decoder</h3>
+<div class="arch">
+    <div class="layer langspec">
+        <div class="compo compo-ar">ar</div>
+        <div class="compo compo-en">en</div>
+        <div class="compo compo-es">es</div>
+        <div class="compo compo-fr">fr</div>
+        <div class="compo compo-ru">ru</div>
+        <div class="compo compo-zh">zh</div>
+    </div>
+</div>
+<h3>Encoder</h3>
+<div class="arch">
+    <div class="layer full">
+        <div class="compo">fully shared</div>
+    </div>
+</div>
+
+<style>
+    .arch {
+        display: grid;
+        row-gap: 5px;
+    }
+    .layer {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        column-gap: 5px;
+    }
+    .taskspec {
+        grid-template-columns: repeat(4, 1fr);
+    }
+    .langspec {
+        grid-template-columns: repeat(6, 1fr);
+    }
+    .full {
+        grid-template-columns: 1fr;
+    }
+    .compo {
+        display: grid;
+        border: 2px solid gray;
+        text-align: center;
+    }
+    .compo-__LANG__ {
+        border: 5px solid green;
+        font-weight: bold;
+    }
+    .compo-__TASK__ {
+        border: 5px solid red;
+        font-weight: bold;
+    }
+    .full div {
+        border: 5px solid blue;
+    }
+</style>
+"""
+
 def render(template, model_task):
     task, lang = model_task.split('_')
-    if task == 'translate':
+    if task == 'translate' or task == 'train':
         _, lang = lang.split('-')
     template = template.replace('__TASK__', task)
     template = template.replace('__LANG__', lang)
@@ -118,8 +176,9 @@ class Translator:
                 height=None,
             )
         with col2:
+            architecture_html = ARCHITECTURE_HTML_HYDRA if not 'train' in model.task else ARCHITECTURE_HTML_ABNEG
             st.markdown(
-                render(ARCHITECTURE_HTML, model.task),
+                render(architecture_html, model.task),
                 unsafe_allow_html=True,
             )
 

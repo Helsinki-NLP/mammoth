@@ -68,7 +68,6 @@ def build_trainer(
             mammoth.utils.loss.build_loss_compute(model, tgt_vocab, opts, train=False, generator=generator),
         )
 
-    trunc_size = opts.truncated_decoder  # Badly named...
     shard_size = opts.max_generator_batches if opts.model_dtype == 'fp32' else 0
     norm_method = opts.normalization
     accum_count = opts.accum_count
@@ -91,7 +90,6 @@ def build_trainer(
         train_loss_md,
         valid_loss_md,
         optim,
-        trunc_size,
         shard_size,
         norm_method,
         accum_count,
@@ -126,7 +124,6 @@ class Trainer(object):
                training loss computation
             optim(:obj:`mammoth.utils.optimizers.Optimizer`):
                the optimizer responsible for update
-            trunc_size(int): length of truncated back propagation through time
             shard_size(int): compute loss in shards of this size for efficiency
             data_type(string): type of the source input: [text]
             norm_method(string): normalization methods: [sents|tokens]
@@ -145,7 +142,6 @@ class Trainer(object):
         train_loss_md,
         valid_loss_md,
         optim,
-        trunc_size=0,
         shard_size=32,
         norm_method="sents",
         accum_count=[1],
@@ -169,7 +165,6 @@ class Trainer(object):
         self.train_loss_md = train_loss_md
         self.valid_loss_md = valid_loss_md
         self.optim = optim
-        self.trunc_size = trunc_size
         self.shard_size = shard_size
         self.norm_method = norm_method
         self.accum_count_l = accum_count
@@ -200,11 +195,6 @@ class Trainer(object):
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
-            if self.accum_count_l[i] > 1:
-                assert (
-                    self.trunc_size == 0
-                ), """To enable accumulated gradients,
-                       you must disable target sequence truncating."""
 
         # Set model in training mode.
         self.model.train()
@@ -476,12 +466,6 @@ class Trainer(object):
             # logger.info(f'batch with metadata {metadata}')
 
             target_size = batch.tgt.size(0)
-            # Truncated BPTT: reminder not compatible with accum > 1
-            if self.trunc_size:
-                raise Exception('Truncated BPTT not supported')
-                trunc_size = self.trunc_size
-            else:
-                trunc_size = target_size
 
             src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
             if src_lengths is not None:
@@ -493,9 +477,10 @@ class Trainer(object):
             tgt_outer = batch.tgt
 
             bptt = False
-            for j in range(0, target_size - 1, trunc_size):
+            # TODO: these loops come from truncation / BPTT implementations which are removed in #60
+            for j in range(0, target_size - 1, target_size):
                 # 1. Create truncated target.
-                tgt = tgt_outer[j:(j + trunc_size)]
+                tgt = tgt_outer[j:(j + target_size)]
                 # TODO: AMP == TRUE If fp16
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     outputs, attns = self.model(
@@ -510,8 +495,6 @@ class Trainer(object):
                         attns,
                         normalization=normalization,
                         shard_size=self.shard_size,
-                        trunc_start=j,
-                        trunc_size=trunc_size,
                     )
                     # logger.info(loss)
 

@@ -180,16 +180,12 @@ tests_nmtmodel = [
     ],
     # [('coverage_attn', True)],
     # [('copy_attn', True)],
-    # [('global_attention', 'mlp')],
     # [('context_gate', 'both')],
     # [('context_gate', 'target')],
     # [('context_gate', 'source')],
     # [('encoder_type', "brnn"), ('brnn_merge', 'sum')],
     # [('encoder_type', "brnn")],
     # [('decoder_type', 'cnn'), ('encoder_type', 'cnn')],
-    # [('encoder_type', 'rnn'), ('global_attention', None)],
-    # [('encoder_type', 'rnn'), ('global_attention', None), ('copy_attn', True), ('copy_attn_type', 'general')],
-    # [('encoder_type', 'rnn'), ('global_attention', 'mlp'), ('copy_attn', True), ('copy_attn_type', 'general')],
     # [],
 ]
 

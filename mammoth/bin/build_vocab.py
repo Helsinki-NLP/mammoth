@@ -67,19 +67,13 @@ def build_vocab_main(opts):
             for tok, count in counter.most_common():
                 fo.write(tok + "\t" + str(count) + "\n")
 
-    if opts.share_vocab:
-        raise Exception('--share_vocab not supported')
-        # src_counter += tgt_counter
-        # tgt_counter = src_counter
-        # logger.info(f"Counters after share:{len(src_counter)}")
-        # save_counter(src_counter, opts.src_vocab)
-
     # TODO: vocab configurability is somewhat limited at the moment.
     # Only language-specific vocabs are possible.
     # Any attempt at vocab sharing between languages will cause the following to fail.
     # Reimplementing --share_vocab may not be optimal
     # (it should mean combining all sources and all targets into one big vocab?).
     # Perhaps we should gracefully handle the setting where several languages point to the same vocab file?
+    # UPDATE: --share_vocab removed from flags (issue #60)
 
     for src_lang, src_counter in src_counters_by_lang.items():
         logger.info(f"=== Source lang: {src_lang}")

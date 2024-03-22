@@ -56,14 +56,15 @@ def build_loss_compute(model, tgt_vocab, opts, train=True, generator=None):
         else:
             raise ValueError(f"No copy generator loss defined for task {opts.model_task}")
     else:
-        if opts.model_task == ModelTask.SEQ2SEQ:
+        # TODO: keeping this in light of possible encoder-only / decoder-only support
+        if True:  # opts.model_task == ModelTask.SEQ2SEQ:
             compute = NMTLossCompute(
                 criterion,
                 loss_gen,
                 lambda_coverage=opts.lambda_coverage,
                 lambda_align=opts.lambda_align,
             )
-        elif opts.model_task == ModelTask.LANGUAGE_MODEL:
+        elif False:  # elif opts.model_task == ModelTask.LANGUAGE_MODEL:
             assert opts.lambda_align == 0.0, "lamdba_align not supported in LM loss"
             compute = LMLossCompute(
                 criterion,
@@ -133,14 +134,10 @@ class LossComputeBase(nn.Module):
         """
         return NotImplementedError
 
-    def __call__(self, batch, output, attns, normalization=1.0, shard_size=0, trunc_start=0, trunc_size=None):
+    def __call__(self, batch, output, attns, normalization=1.0, shard_size=0):
         """Compute the forward loss, possibly in shards in which case this
         method also runs the backward pass and returns ``None`` as the loss
         value.
-
-        Also supports truncated BPTT for long sequences by taking a
-        range in the decoder output sequence to back propagate in.
-        Range is from `(trunc_start, trunc_start + trunc_size)`.
 
         Note sharding is an exact efficiency trick to relieve memory
         required for the generation buffers. Truncation is an
@@ -155,16 +152,15 @@ class LossComputeBase(nn.Module):
               `[tgt_len x batch x src_len]`
           normalization: Optional normalization factor.
           shard_size (int) : maximum number of examples in a shard
-          trunc_start (int) : starting position of truncation window
-          trunc_size (int) : length of truncation window
 
         Returns:
             A tuple with the loss and a :obj:`mammoth.utils.Statistics` instance.
         """
-        if trunc_size is None:
-            trunc_size = batch.tgt.size(0) - trunc_start
-        trunc_range = (trunc_start, trunc_start + trunc_size)
-        shard_state = self._make_shard_state(batch, output, trunc_range, attns)
+        # TODO: keeping a range_ for now, but should be removed, ideally.
+        # Inherited from BPTT implementations
+        size = batch.tgt.size(0)
+        range_ = (0, size)
+        shard_state = self._make_shard_state(batch, output, range_, attns)
         if shard_size == 0:
             loss, stats = self._compute_loss(batch, **shard_state)
             return loss / float(normalization), stats

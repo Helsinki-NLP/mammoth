@@ -98,6 +98,7 @@ class TokenizerTransform(Transform):
             default=0,
             help="Only produce tgt subword in tgt_subword_vocab with frequency >= tgt_vocab_threshold.",
         )
+        group.add('-share_vocab', '--share_vocab', action='store_true', help='use the same model for both sides')
 
     @classmethod
     def _validate_options(cls, opts):

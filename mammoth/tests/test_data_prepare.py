@@ -47,11 +47,6 @@
 #             prepare_fields_transforms(opts)
 #         except SystemExit as err:
 #             print(err)
-#         except IOError as err:
-#             if opts.skip_empty_level != 'error':
-#                 raise err
-#             else:
-#                 print(f"Catched IOError: {err}")
 #         finally:
 #             # Remove the generated *pt files.
 #             for pt in glob.glob(SAVE_DATA_PREFIX + '*.pt'):
@@ -107,12 +102,10 @@
 #                   [('tgt_seq_length_trunc', 1)],
 #                   [('tgt_seq_length_trunc', 5000)],
 #                   [('copy_attn', True)],
-#                   [('share_vocab', True)],
 #                   [('n_sample', 30),
 #                    ('save_data', SAVE_DATA_PREFIX)],
 #                   [('n_sample', 30),
 #                    ('save_data', SAVE_DATA_PREFIX),
-#                    ('skip_empty_level', 'error')]
 #                   ]
 #
 # for p in test_databuild:

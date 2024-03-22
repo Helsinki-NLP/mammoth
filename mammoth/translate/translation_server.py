@@ -408,8 +408,8 @@ class ServerModel(object):
                 if type(v) is str:
                     sys.argv += ['-transforms', v]
                 else:
-                   assert type(v) is list
-                   sys.argv += ['-transforms', *v]
+                    assert type(v) is list
+                    sys.argv += ['-transforms', *v]
             else:
                 sys.argv += ['-%s' % k, str(v)]
 

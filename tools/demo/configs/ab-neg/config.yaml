@@ -1,0 +1,620 @@
+accum_count: 4
+batch_size: 4096
+batch_type: tokens
+dec_layers:
+- 6
+decay_method: none
+decoder_type: transformer
+denoising_objective: bart
+dropout: 0.1
+enc_layers: 6
+encoder_type: transformer
+gpu_ranks:
+- 0
+- 1
+- 2
+- 3
+- 4
+- 5
+heads: 8
+keep_checkpoint: -1
+label_smoothing: 0.1
+learning_rate: 3.0
+mask_ratio: 0.2
+max_generator_batches: 2
+max_grad_norm: 0.0
+model_dim: 512
+model_type: text
+n_nodes: 1
+normalization: tokens
+optim: adafactor
+overwrite: false
+param_init: 0.0
+param_init_glorot: true
+position_encoding: true
+replace_length: 1
+report_every: 50
+save_all_gpus: false
+save_checkpoint_steps: 5000
+save_model: /scratch/project_462000447/members/attiehjo/1.ab-negative-refactored/experiments_tags/unpc/all-centric/encoder-shared/no_bridge/123/models/model
+seed: 123
+skip_empty_level: silent
+src_seq_length: 200
+src_subword_type: sentencepiece
+src_vocab:
+  ar: tools/demo/configs/ab-neg/vocab/opusTC.ar.vocab.onmt
+  en: tools/demo/configs/ab-neg/vocab/opusTC.en.vocab.onmt
+  es: tools/demo/configs/ab-neg/vocab/opusTC.es.vocab.onmt
+  fr: tools/demo/configs/ab-neg/vocab/opusTC.fr.vocab.onmt
+  ru: tools/demo/configs/ab-neg/vocab/opusTC.ru.vocab.onmt
+  zh: tools/demo/configs/ab-neg/vocab/opusTC.zh.vocab.onmt
+src_vocab_size: 100000
+tasks:
+  train_ar-ar:
+    dec_sharing_group:
+    - ar
+    enc_sharing_group:
+    - all
+    node_gpu: 0:0
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/ar/train.ar.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/ar/train.ar.sp
+    src_prefix: <to_ar>
+    src_tgt: ar-ar
+    tgt_prefix: <from_ar>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+    - denoising
+  train_ar-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - all
+    node_gpu: 0:1
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-en/train.ar-en.ar.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-en/train.ar-en.en.sp
+    src_prefix: <to_en>
+    src_tgt: ar-en
+    tgt_prefix: <from_ar>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ar-es:
+    dec_sharing_group:
+    - es
+    enc_sharing_group:
+    - all
+    node_gpu: 0:2
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-es/train.ar-es.ar.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-es/train.ar-es.es.sp
+    src_prefix: <to_es>
+    src_tgt: ar-es
+    tgt_prefix: <from_ar>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ar-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - all
+    node_gpu: 0:3
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-fr/train.ar-fr.ar.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-fr/train.ar-fr.fr.sp
+    src_prefix: <to_fr>
+    src_tgt: ar-fr
+    tgt_prefix: <from_ar>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ar-ru:
+    dec_sharing_group:
+    - ru
+    enc_sharing_group:
+    - all
+    node_gpu: 0:4
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-ru/train.ar-ru.ar.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-ru/train.ar-ru.ru.sp
+    src_prefix: <to_ru>
+    src_tgt: ar-ru
+    tgt_prefix: <from_ar>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ar-zh:
+    dec_sharing_group:
+    - zh
+    enc_sharing_group:
+    - all
+    node_gpu: 0:5
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-zh/train.ar-zh.ar.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-zh/train.ar-zh.zh.sp
+    src_prefix: <to_zh>
+    src_tgt: ar-zh
+    tgt_prefix: <from_ar>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_en-ar:
+    dec_sharing_group:
+    - ar
+    enc_sharing_group:
+    - all
+    node_gpu: 0:0
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-en/train.ar-en.en.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-en/train.ar-en.ar.sp
+    src_prefix: <to_ar>
+    src_tgt: en-ar
+    tgt_prefix: <from_en>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_en-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - all
+    node_gpu: 0:1
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/en/train.en.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/en/train.en.sp
+    src_prefix: <to_en>
+    src_tgt: en-en
+    tgt_prefix: <from_en>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+    - denoising
+  train_en-es:
+    dec_sharing_group:
+    - es
+    enc_sharing_group:
+    - all
+    node_gpu: 0:2
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-es/train.en-es.en.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-es/train.en-es.es.sp
+    src_prefix: <to_es>
+    src_tgt: en-es
+    tgt_prefix: <from_en>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_en-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - all
+    node_gpu: 0:3
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-fr/train.en-fr.en.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-fr/train.en-fr.fr.sp
+    src_prefix: <to_fr>
+    src_tgt: en-fr
+    tgt_prefix: <from_en>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_en-ru:
+    dec_sharing_group:
+    - ru
+    enc_sharing_group:
+    - all
+    node_gpu: 0:4
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-ru/train.en-ru.en.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-ru/train.en-ru.ru.sp
+    src_prefix: <to_ru>
+    src_tgt: en-ru
+    tgt_prefix: <from_ar>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_en-zh:
+    dec_sharing_group:
+    - zh
+    enc_sharing_group:
+    - all
+    node_gpu: 0:5
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-zh/train.en-zh.en.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-zh/train.en-zh.zh.sp
+    src_prefix: <to_zh>
+    src_tgt: en-zh
+    tgt_prefix: <from_en>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_es-ar:
+    dec_sharing_group:
+    - ar
+    enc_sharing_group:
+    - all
+    node_gpu: 0:0
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-es/train.ar-es.es.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-es/train.ar-es.ar.sp
+    src_prefix: <to_ar>
+    src_tgt: es-ar
+    tgt_prefix: <from_es>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_es-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - all
+    node_gpu: 0:1
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-es/train.en-es.es.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-es/train.en-es.en.sp
+    src_prefix: <to_en>
+    src_tgt: es-en
+    tgt_prefix: <from_es>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_es-es:
+    dec_sharing_group:
+    - es
+    enc_sharing_group:
+    - all
+    node_gpu: 0:2
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/es/train.es.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/es/train.es.sp
+    src_prefix: <to_es>
+    src_tgt: es-es
+    tgt_prefix: <from_es>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+    - denoising
+  train_es-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - all
+    node_gpu: 0:3
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-fr/train.es-fr.es.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-fr/train.es-fr.fr.sp
+    src_prefix: <to_fr>
+    src_tgt: es-fr
+    tgt_prefix: <from_es>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_es-ru:
+    dec_sharing_group:
+    - ru
+    enc_sharing_group:
+    - all
+    node_gpu: 0:4
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-ru/train.es-ru.es.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-ru/train.es-ru.ru.sp
+    src_prefix: <to_ru>
+    src_tgt: es-ru
+    tgt_prefix: <from_es>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_es-zh:
+    dec_sharing_group:
+    - zh
+    enc_sharing_group:
+    - all
+    node_gpu: 0:5
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-zh/train.es-zh.es.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-zh/train.es-zh.zh.sp
+    src_prefix: <to_zh>
+    src_tgt: es-zh
+    tgt_prefix: <from_es>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_fr-ar:
+    dec_sharing_group:
+    - ar
+    enc_sharing_group:
+    - all
+    node_gpu: 0:0
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-fr/train.ar-fr.fr.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-fr/train.ar-fr.ar.sp
+    src_prefix: <to_ar>
+    src_tgt: fr-ar
+    tgt_prefix: <from_fr>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_fr-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - all
+    node_gpu: 0:1
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-fr/train.en-fr.fr.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-fr/train.en-fr.en.sp
+    src_prefix: <to_en>
+    src_tgt: fr-en
+    tgt_prefix: <from_fr>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_fr-es:
+    dec_sharing_group:
+    - es
+    enc_sharing_group:
+    - all
+    node_gpu: 0:2
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-fr/train.es-fr.fr.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-fr/train.es-fr.es.sp
+    src_prefix: <to_es>
+    src_tgt: fr-es
+    tgt_prefix: <from_fr>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_fr-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - all
+    node_gpu: 0:3
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/fr/train.fr.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/fr/train.fr.sp
+    src_prefix: <to_fr>
+    src_tgt: fr-fr
+    tgt_prefix: <from_fr>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+    - denoising
+  train_fr-ru:
+    dec_sharing_group:
+    - ru
+    enc_sharing_group:
+    - all
+    node_gpu: 0:4
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-ru/train.fr-ru.fr.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-ru/train.fr-ru.ru.sp
+    src_prefix: <to_ru>
+    src_tgt: fr-ru
+    tgt_prefix: <from_fr>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_fr-zh:
+    dec_sharing_group:
+    - zh
+    enc_sharing_group:
+    - all
+    node_gpu: 0:5
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-zh/train.fr-zh.fr.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-zh/train.fr-zh.zh.sp
+    src_prefix: <to_zh>
+    src_tgt: fr-zh
+    tgt_prefix: <from_fr>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ru-ar:
+    dec_sharing_group:
+    - ar
+    enc_sharing_group:
+    - all
+    node_gpu: 0:0
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-ru/train.ar-ru.ru.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-ru/train.ar-ru.ar.sp
+    src_prefix: <to_ar>
+    src_tgt: ru-ar
+    tgt_prefix: <from_ru>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ru-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - all
+    node_gpu: 0:1
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-ru/train.en-ru.ru.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-ru/train.en-ru.en.sp
+    src_prefix: <to_en>
+    src_tgt: ru-en
+    tgt_prefix: <from_ru>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ru-es:
+    dec_sharing_group:
+    - es
+    enc_sharing_group:
+    - all
+    node_gpu: 0:2
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-ru/train.es-ru.ru.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-ru/train.es-ru.es.sp
+    src_prefix: <to_es>
+    src_tgt: ru-es
+    tgt_prefix: <from_ru>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ru-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - all
+    node_gpu: 0:3
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-ru/train.fr-ru.ru.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-ru/train.fr-ru.fr.sp
+    src_prefix: <to_fr>
+    src_tgt: ru-fr
+    tgt_prefix: <from_ru>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_ru-ru:
+    dec_sharing_group:
+    - ru
+    enc_sharing_group:
+    - all
+    node_gpu: 0:4
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/ru/train.ru.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/ru/train.ru.sp
+    src_prefix: <to_ru>
+    src_tgt: ru-ru
+    tgt_prefix: <from_ru>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+    - denoising
+  train_ru-zh:
+    dec_sharing_group:
+    - zh
+    enc_sharing_group:
+    - all
+    node_gpu: 0:5
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ru-zh/train.ru-zh.ru.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ru-zh/train.ru-zh.zh.sp
+    src_prefix: <to_zh>
+    src_tgt: ru-zh
+    tgt_prefix: <from_ru>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_zh-ar:
+    dec_sharing_group:
+    - ar
+    enc_sharing_group:
+    - all
+    node_gpu: 0:0
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-zh/train.ar-zh.zh.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ar-zh/train.ar-zh.ar.sp
+    src_prefix: <to_ar>
+    src_tgt: zh-ar
+    tgt_prefix: <from_zh>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_zh-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - all
+    node_gpu: 0:1
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-zh/train.en-zh.zh.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/en-zh/train.en-zh.en.sp
+    src_prefix: <to_en>
+    src_tgt: zh-en
+    tgt_prefix: <from_zh>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_zh-es:
+    dec_sharing_group:
+    - es
+    enc_sharing_group:
+    - all
+    node_gpu: 0:2
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-zh/train.es-zh.zh.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/es-zh/train.es-zh.es.sp
+    src_prefix: <to_es>
+    src_tgt: zh-es
+    tgt_prefix: <from_zh>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_zh-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - all
+    node_gpu: 0:3
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-zh/train.fr-zh.zh.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/fr-zh/train.fr-zh.fr.sp
+    src_prefix: <to_fr>
+    src_tgt: zh-fr
+    tgt_prefix: <from_zh>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_zh-ru:
+    dec_sharing_group:
+    - ru
+    enc_sharing_group:
+    - all
+    node_gpu: 0:4
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ru-zh/train.ru-zh.zh.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/ru-zh/train.ru-zh.ru.sp
+    src_prefix: <to_ru>
+    src_tgt: zh-ru
+    tgt_prefix: <from_zh>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+  train_zh-zh:
+    dec_sharing_group:
+    - zh
+    enc_sharing_group:
+    - all
+    node_gpu: 0:5
+    path_src: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/zh/train.zh.sp
+    path_tgt: /scratch/project_462000447/members/attiehjo/data/unpc/generated/monolingual/zh/train.zh.sp
+    src_prefix: <to_zh>
+    src_tgt: zh-zh
+    tgt_prefix: <from_zh>
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - prefix
+    - denoising
+tensorboard: true
+tensorboard_log_dir: /scratch/project_462000447/members/attiehjo/1.ab-negative-refactored/experiments_tags/unpc/all-centric/encoder-shared/no_bridge/123/tb/
+tgt_seq_length: 200
+tgt_subword_type: sentencepiece
+tgt_vocab:
+  ar: tools/demo/configs/ab-neg/vocab/opusTC.ar.vocab.onmt
+  en: tools/demo/configs/ab-neg/vocab/opusTC.en.vocab.onmt
+  es: tools/demo/configs/ab-neg/vocab/opusTC.es.vocab.onmt
+  fr: tools/demo/configs/ab-neg/vocab/opusTC.fr.vocab.onmt
+  ru: tools/demo/configs/ab-neg/vocab/opusTC.ru.vocab.onmt
+  zh: tools/demo/configs/ab-neg/vocab/opusTC.zh.vocab.onmt
+tgt_vocab_size: 100000
+train_steps: 300000
+transformer_ff: 2048
+valid_batch_size: 4096
+valid_steps: 10000
+warmup_steps: 10000
+weight_decay: 0.05
+world_size: 6
+
+src_subword_model: tools/demo/configs/ab-neg/vocab/{src_lang}.spm
+tgt_subword_model: tools/demo/configs/ab-neg/vocab/{tgt_lang}.spm

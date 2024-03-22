@@ -1,11 +1,9 @@
-src_subword_model: vocabs/mammoth-hydra.64k.spm.model
-tgt_subword_model: vocabs/mammoth-hydra.64k.spm.model
 src_vocab:
-  'all': vocabs/mammoth-hydra.64k.spm.vocab
+  'all': tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.vocab
 tgt_vocab:
-  'en': vocabs/mammoth-hydra.64k.spm.vocab
-  'fr': vocabs/mammoth-hydra.64k.spm.vocab
-  'ru': vocabs/mammoth-hydra.64k.spm.vocab
+  'en': tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.vocab
+  'fr': tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.vocab
+  'ru': tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.vocab
 
 overwrite: False
 tasks:
@@ -17,7 +15,7 @@ tasks:
     node_gpu: 0:0
     path_src: /scratch/project_2005099/data/mammoth-hydra/codwoe/en.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/codwoe/en.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   pargen_en:
     src_tgt: all-en
     enc_sharing_group: [all]
@@ -25,7 +23,7 @@ tasks:
     node_gpu: 0:0
     path_src: /scratch/project_2005099/data/mammoth-hydra/tapaco/en.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/tapaco/en.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   texsim_en:
     src_tgt: all-en
     enc_sharing_group: [all]
@@ -33,7 +31,7 @@ tasks:
     node_gpu: 0:0
     path_src: /scratch/project_2005099/data/mammoth-hydra/wikilarge/en.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/wikilarge/en.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   translate_fr-en:
     src_tgt: all-en
     enc_sharing_group: [all]
@@ -41,7 +39,7 @@ tasks:
     node_gpu: 0:0
     path_src: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.fr.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.en.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   translate_ru-en:
     src_tgt: all-en
     enc_sharing_group: [all]
@@ -49,7 +47,7 @@ tasks:
     node_gpu: 0:0
     path_src: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.ru.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.en.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
 
   # GPU 0:1
   defmod_fr:
@@ -59,7 +57,7 @@ tasks:
     node_gpu: 0:1
     path_src: /scratch/project_2005099/data/mammoth-hydra/codwoe/fr.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/codwoe/fr.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   pargen_fr:
     src_tgt: all-fr
     enc_sharing_group: [all]
@@ -67,7 +65,7 @@ tasks:
     node_gpu: 0:1
     path_src: /scratch/project_2005099/data/mammoth-hydra/tapaco/fr.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/tapaco/fr.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   texsim_fr:
     src_tgt: all-fr
     enc_sharing_group: [all]
@@ -75,7 +73,7 @@ tasks:
     node_gpu: 0:1
     path_src: /scratch/project_2005099/data/mammoth-hydra/wikilarge/fr.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/wikilarge/fr.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   translate_en-fr:
     src_tgt: all-fr
     enc_sharing_group: [all]
@@ -83,7 +81,7 @@ tasks:
     node_gpu: 0:1
     path_src: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.en.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.fr.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   translate_ru-fr:
     src_tgt: all-fr
     enc_sharing_group: [all]
@@ -91,7 +89,7 @@ tasks:
     node_gpu: 0:1
     path_src: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.ru.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.fr.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
 
   # GPU 0:2
   defmod_ru:
@@ -101,7 +99,7 @@ tasks:
     node_gpu: 0:2
     path_src: /scratch/project_2005099/data/mammoth-hydra/codwoe/ru.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/codwoe/ru.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   pargen_ru:
     src_tgt: all-ru
     enc_sharing_group: [all]
@@ -109,7 +107,7 @@ tasks:
     node_gpu: 0:2
     path_src: /scratch/project_2005099/data/mammoth-hydra/tapaco/ru.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/tapaco/ru.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   texsim_ru:
     src_tgt: all-ru
     enc_sharing_group: [all]
@@ -117,7 +115,7 @@ tasks:
     node_gpu: 0:2
     path_src: /scratch/project_2005099/data/mammoth-hydra/ruadapt/ru.src.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/ruadapt/ru.tgt.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   translate_fr-ru:
     src_tgt: all-ru
     enc_sharing_group: [all]
@@ -125,7 +123,7 @@ tasks:
     node_gpu: 0:2
     path_src: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.fr.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.ru.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
   translate_en-ru:
     src_tgt: all-ru
     enc_sharing_group: [all]
@@ -133,7 +131,7 @@ tasks:
     node_gpu: 0:1
     path_src: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.en.sp
     path_tgt: /scratch/project_2005099/data/mammoth-hydra/unpc/UNv1.0.6way.ru.sp
-    transforms: [sentencepiece, filtertoolong]
+    transforms: [filtertoolong]
 
         
 ### Transform related opts:
@@ -145,9 +143,6 @@ src_subword_type: sentencepiece
 tgt_subword_type: sentencepiece
 mask_ratio: 0.2
 replace_length: 1
-
-# silently ignore empty lines in the data
-skip_empty_level: silent
 
 batch_size: 4096
 batch_type: tokens
@@ -179,9 +174,11 @@ decay_method: none
 learning_rate: 3.0
 max_grad_norm: 0.0
 seed: 3435
-model_type: text
 save_all_gpus: false
 
 world_size: 3
 gpu_ranks: [0, 1, 2]
 node_rank: 0
+
+src_subword_model: tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.model
+tgt_subword_model: tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.model

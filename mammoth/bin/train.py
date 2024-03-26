@@ -258,6 +258,7 @@ def train(opts):
                 vocabs_dict=vocabs_dict,
                 opts=opts,
                 is_train=True,
+                line_idx_restore=checkpoint['data_state']
             )
 
             producer = mp.Process(

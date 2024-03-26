@@ -198,6 +198,8 @@ class Trainer(object):
         self.my_encoder_adapter_groups = my_component_groups['encoder_adapters']
         self.my_decoder_adapter_groups = my_component_groups['decoder_adapters']
 
+        self._data_state = {}
+
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
             if self.accum_count_l[i] > 1:
@@ -465,6 +467,10 @@ class Trainer(object):
         seen_comm_batches = set()
         for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
             seen_comm_batches.add(comm_batch)
+
+            # update data state
+            self._data_state[metadata.corpus_id] = batch.line_idx
+
             if self.norm_method == "tokens":
                 num_tokens = (
                     batch.labels[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()

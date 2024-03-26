@@ -66,6 +66,7 @@ class ScoredInfiniteExamples():
         self._it = iter(self.dataset)
         self._prev = next(self._it)
         self._score = self.score_fn(self._prev)
+        self._current_line_idx = None
 
     def peek_at_score(self):
         return self._score
@@ -174,7 +175,7 @@ class SentenceMinibatcher():
             for _ in range(self.batch_size):
                 _, example = self._sie.next()
                 minibatch.append(example)
-            yield self.collate_fn(minibatch)
+            yield self.collate_fn(accum, self._sie._current_line_idx)
 
 
 class DynamicDatasetIter(object):
@@ -212,6 +213,7 @@ class DynamicDatasetIter(object):
         batch_size_multiple,
         max_look_ahead_sentences=2048,
         lookahead_minibatches=4,
+        line_idx_restore=None,
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -225,11 +227,10 @@ class DynamicDatasetIter(object):
         self.batch_size = batch_size
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
-        self.max_look_ahead_sentences = max_look_ahead_sentences
-        self.lookahead_minibatches = lookahead_minibatches
+        self.line_idx_restore = dict() if line_idx_restore is None else line_idx_restore
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train):
+    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, line_idx_restore):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -248,6 +249,7 @@ class DynamicDatasetIter(object):
             batch_size_multiple,
             max_look_ahead_sentences=opts.max_look_ahead_sentences,
             lookahead_minibatches=opts.lookahead_minibatches,
+            line_idx_restore=line_idx_restore,
         )
 
     def _init_datasets(self):
@@ -272,7 +274,12 @@ class DynamicDatasetIter(object):
             # is defined
             if self.is_train or self.opts.tasks[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
-                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
+                    self.opts,
+                    task,
+                    src_vocab,
+                    tgt_vocab,
+                    is_train=self.is_train,
+                    line_idx_restore=self.line_idx_restore.get(task.corpus_id, None),
                 ).to(device)
 
                 # iterator over minibatches
@@ -311,6 +318,7 @@ class DynamicDatasetIter(object):
                     batch = next(ordered_iter)
                     if batch_task_sample.training_step == 0 and self.opts.verbose:
                         # De-numericalize a few sentences for debugging
+                        # FIXME should be debug, not warn
                         logger.warning(
                             f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
                             f'batch size: {batch.batch_size}'

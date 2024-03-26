@@ -20,6 +20,7 @@ class Batch():
     tgt: torch.Tensor
     labels: torch.Tensor
     batch_size: int
+    line_idx: int
 
     def to(self, device):
         self.src = (self.src[0].to(device), self.src[1].to(device))
@@ -40,6 +41,8 @@ def read_examples_from_files(
 ):
     """Helper function to read examples"""
 
+    line_idx_generator = itertools.count()
+
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
         src_str, tgt_str = packed
@@ -47,6 +50,7 @@ def read_examples_from_files(
             'src': tokenize_fn(src_str, side='src'),
             'tgt': tokenize_fn(tgt_str, side='tgt') if tgt_str is not None else None,
             # 'align': None,
+            'line_idx': next(line_idx_generator)
         }
 
     if src_path.endswith('.gz'):
@@ -90,6 +94,7 @@ class ParallelCorpus(IterableDataset):
         is_train=False,
         task=None,
         max_length=None,
+        line_idx_restore=None,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -104,6 +109,7 @@ class ParallelCorpus(IterableDataset):
         self.is_train = is_train
         self.corpus_id = task.corpus_id
         self.max_length = max_length
+        self._line_idx_restore = line_idx_restore
 
     # FIXME: most likely redundant with mammoth.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -149,6 +155,17 @@ class ParallelCorpus(IterableDataset):
                 if v is not None
             }
 
+        # ensure we only restore the first time the corpus is restored
+        if self._line_idx_restore is not None:
+            if self.stride is not None:
+                # sanity check
+                assert self._line_idx_restore % self.stride == 0, \
+                    'Stride is inconsistent with data restoration index'
+            offset = self._line_idx_restore
+            self._line_idx_restore = None
+        else:
+            offset = self.offset
+
         examples = read_examples_from_files(
             self.src_file,
             self.tgt_file,
@@ -162,13 +179,13 @@ class ParallelCorpus(IterableDataset):
                 if self.transforms is not None else lambda x: x
             ),
             stride=self.stride,
-            offset=self.offset,
+            offset=offset,
         )
         examples = map(_cast, examples)
         yield from examples
 
     # FIXME: some RNN archs require sorting src's by length
-    def collate_fn(self, examples):
+    def collate_fn(self, examples, line_idx):
         has_tgt = 'tgt' in examples[0].keys()
         src_padidx = self.vocabs['src'][DefaultTokens.PAD]
         tgt_padidx = self.vocabs['tgt'][DefaultTokens.PAD]
@@ -186,11 +203,18 @@ class ParallelCorpus(IterableDataset):
         else:
             tgt = None
             labels = None
-        batch = Batch(src, tgt, labels, len(examples))
+        batch = Batch(src, tgt, labels, len(examples), line_idx)
         return batch
 
 
-def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = False):
+def get_corpus(
+    opts,
+    task,
+    src_vocab: Vocab,
+    tgt_vocab: Vocab,
+    is_train: bool = False,
+    line_idx_restore: int = None,
+):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
@@ -223,6 +247,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         is_train=is_train,
         task=task,
         max_length=max_length,
+        line_idx_restore=line_idx_restore,
     )
     return dataset
 

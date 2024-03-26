@@ -186,6 +186,8 @@ class Trainer(object):
 
         self.task_queue_manager = task_queue_manager
 
+        self._data_state = {}
+
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
 
@@ -421,6 +423,10 @@ class Trainer(object):
                     f'Received {metadata},\n expected {expected_metadata}'
                 )
             seen_comm_batches.add(comm_batch)
+
+            # update data state
+            self._data_state[metadata.corpus_id] = batch.line_idx
+
             if self.norm_method == "tokens":
                 num_tokens = (
                     batch.labels[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()

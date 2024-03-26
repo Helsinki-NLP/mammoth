@@ -72,8 +72,6 @@ ARCHITECTURE_HTML_HYDRA = """
 </style>
 """
 
-
-
 ARCHITECTURE_HTML_ABNEG = """
 <h3>Decoder</h3>
 <div class="arch">
@@ -131,6 +129,7 @@ ARCHITECTURE_HTML_ABNEG = """
 </style>
 """
 
+
 def render(template, model_task):
     task, lang = model_task.split('_')
     if task == 'translate' or task == 'train':
@@ -176,7 +175,7 @@ class Translator:
                 height=None,
             )
         with col2:
-            architecture_html = ARCHITECTURE_HTML_HYDRA if not 'train' in model.task else ARCHITECTURE_HTML_ABNEG
+            architecture_html = ARCHITECTURE_HTML_HYDRA if 'train' not in model.task else ARCHITECTURE_HTML_ABNEG
             st.markdown(
                 render(architecture_html, model.task),
                 unsafe_allow_html=True,

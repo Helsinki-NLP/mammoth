@@ -8,13 +8,14 @@ from mammoth.distributed import DatasetMetadata
 
 
 class LayerStackEncoder(EncoderBase):
-    def __init__(self, embeddings, encoders):
+    def __init__(self, embeddings, encoders, max_length):
         super().__init__()
 
         self.embeddings = embeddings
         self.encoders: nn.ModuleList[nn.ModuleDict] = encoders
         self._adapter_to_stack: Dict[str, int] = dict()
         self._active: List[str] = []
+        self._max_length = max_length
 
     @classmethod
     def from_opts(cls, opts, embeddings, task_queue_manager):
@@ -48,7 +49,7 @@ class LayerStackEncoder(EncoderBase):
                     is_normformer=opts.normformer,
                 )
             encoders.append(stacks)
-        return cls(embeddings, encoders)
+        return cls(embeddings, encoders, opts.max_length)
 
     @classmethod
     def from_trans_opt(cls, opts, embeddings, task):
@@ -91,7 +92,7 @@ class LayerStackEncoder(EncoderBase):
         # wrapper embeds src and creates mask
         emb = self.embeddings(src)
         emb = emb.transpose(0, 1).contiguous()
-        mask = ~sequence_mask(lengths).unsqueeze(1)
+        mask = ~sequence_mask(lengths, max_len=self._max_length).unsqueeze(1)
 
         output = emb
         for active_id, stacks in zip(self._active, self.encoders):

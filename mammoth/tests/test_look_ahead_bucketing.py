@@ -1,5 +1,5 @@
 import pytest
-from itertools import product
+from itertools import product, count
 
 from mammoth.inputters.dataloader import build_dataloader
 
@@ -22,7 +22,7 @@ class MockStream():
     def __iter__(self):
         return iter(self.items)
 
-    def collate_fn(self, items):
+    def collate_fn(self, items, line_idx):
         return items
 
 

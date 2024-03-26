@@ -180,6 +180,7 @@ def main(
             vocabs_dict=vocabs_dict,
             opts=opts,
             is_train=True,
+            line_idx_restore=checkpoint['data_state'],
         )
         # TODO: check that IterOnDevice is unnecessary here; corpora should be already on device
         # if device_context.is_gpu():

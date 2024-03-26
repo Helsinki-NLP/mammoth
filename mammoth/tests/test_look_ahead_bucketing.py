@@ -1,4 +1,4 @@
-from itertools import product
+from itertools import product, count
 
 import unittest
 from mammoth.inputters.dataloader import (
@@ -26,17 +26,19 @@ class MockStream():
     def __iter__(self):
         return iter(self.items)
 
-    def collate_fn(self, items):
+    def collate_fn(self, items, line_idx):
         return items
 
 
 class TestLookAheadBucketing(unittest.TestCase):
 
     def test_all_read(self):
+        line_counter = count()
         stream = MockStream([
             hashabledict({
                 'src': tuple([letter for _ in range(i)]),
                 'tgt': tuple([letter for _ in range(j)]),
+                'line_idx': next(line_counter)
             })
             for letter in 'xyz'
             for i, j in product(range(1, 11), range(1, 11))
@@ -54,14 +56,14 @@ class TestLookAheadBucketing(unittest.TestCase):
         self.assertTrue(sorted_tgt_ref == sorted_tgt_obs)
 
     def test_reroutes(self):
-        stream = MockStream([hashabledict({'src': '_', 'tgt': '_'})] * 10)
+        stream = MockStream([hashabledict({'src': '_', 'tgt': '_', 'line_idx': idx}) for idx in range(10)])
         lab = build_dataloader(stream, 2, 'tokens', 4, 2, cycle=True, as_iter=False)
         self.assertTrue(isinstance(lab, LookAheadBucketing))
         not_lab = build_dataloader(stream, 2, 'tokens', 4, 2, cycle=False, as_iter=False)
         self.assertTrue(isinstance(not_lab, InferenceBatcher))
 
     def test_always_continues(self):
-        stream = MockStream([hashabledict({'src': '_', 'tgt': '_'})] * 10)
+        stream = MockStream([hashabledict({'src': '_', 'tgt': '_', 'line_idx': idx}) for idx in range(10)])
         was_exhausted = False
         stopped_exhaustion = False
         lab = build_dataloader(stream, 2, 'tokens', pool_size=4, n_buckets=4, cycle=True, as_iter=False)

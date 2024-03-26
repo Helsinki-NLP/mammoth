@@ -91,11 +91,12 @@ class LookAheadBucketing():
         self.numel_fn = numel_fn
         self.collate_fn = dataset.collate_fn
         self._init()
+        self._current_line_idx = None
 
     def _init(self):
         logger.info('LookAheadBucketing: initialization start')
         self.examples_stream = iter(self.dataset)
-        for example in range(self.look_ahead_size):
+        for _ in range(self.look_ahead_size):
             self.maybe_replenish()
             if self._is_exhausted:
                 break
@@ -106,6 +107,7 @@ class LookAheadBucketing():
         """try to look up one more example to add to this reservoir."""
         try:
             example = next(self.examples_stream)
+            self._current_line_idx = example['line_idx']
             s_idx, t_idx = self.bucket_fn(example)
             self._buckets[s_idx][t_idx].append(example)
             self._is_exhausted = False
@@ -200,7 +202,7 @@ class LookAheadBucketing():
                 # if not, this will also update self._is_exhausted
                 self.maybe_replenish()
 
-            yield self.collate_fn(accum)
+            yield self.collate_fn(accum, self._current_line_idx)
 
 
 class DynamicDatasetIter(object):
@@ -241,6 +243,7 @@ class DynamicDatasetIter(object):
         pool_size=2048,
         n_buckets=1024,
         skip_empty_level='warning',
+        line_idx_restore=None,
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -259,9 +262,10 @@ class DynamicDatasetIter(object):
         if skip_empty_level not in ['silent', 'warning', 'error']:
             raise ValueError(f"Invalid argument skip_empty_level={skip_empty_level}")
         self.skip_empty_level = skip_empty_level
+        self.line_idx_restore = dict() if line_idx_restore is None else line_idx_restore
 
     @classmethod
-    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train):
+    def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train, line_idx_restore):
         """Initilize `DynamicDatasetIter` with options parsed from `opts`."""
         batch_size = opts.batch_size if is_train else opts.valid_batch_size
         if opts.batch_size_multiple is not None:
@@ -282,6 +286,7 @@ class DynamicDatasetIter(object):
             pool_size=opts.pool_size,
             n_buckets=opts.n_buckets,
             skip_empty_level=opts.skip_empty_level,
+            line_idx_restore=line_idx_restore,
         )
 
     def _init_datasets(self):
@@ -306,7 +311,12 @@ class DynamicDatasetIter(object):
             # is defined
             if self.is_train or self.opts.tasks[task.corpus_id].get('path_valid_src', None) is not None:
                 corpus = get_corpus(
-                    self.opts, task, src_vocab, tgt_vocab, is_train=self.is_train
+                    self.opts,
+                    task,
+                    src_vocab,
+                    tgt_vocab,
+                    is_train=self.is_train,
+                    line_idx_restore=self.line_idx_restore.get(task.corpus_id, None),
                 ).to(device)
 
                 # iterator over minibatches
@@ -344,6 +354,7 @@ class DynamicDatasetIter(object):
                 for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
                     ordered_iter, metadata = self.dataset_iterators[corpus_id]
                     batch = next(ordered_iter)
+                    # FIXME should be debug, not warn
                     if communication_batch_id == 0:
                         # De-numericalize a few sentences for debugging
                         logger.warning(

@@ -4,6 +4,7 @@ from collections import deque
 from mammoth.utils.logging import logger
 
 import torch
+import torch.distributed
 import torch.nn as nn
 
 from mammoth.utils.module_splitter import explode_model
@@ -65,7 +66,7 @@ class ModelSaverBase(object):
         self.device_context = device_context
         self.all_gpus = all_gpus
 
-    def save(self, step, moving_average=None):
+    def save(self, step, data_state, moving_average=None):
         """Main entry point for model saver
 
         It wraps the `_save` method with checks and apply `keep_checkpoint`
@@ -125,7 +126,8 @@ class ModelSaverBase(object):
 class ModelSaver(ModelSaverBase):
     """Simple model saver to filesystem"""
 
-    def _save(self, step, model, device_context):
+    # FIXME does not match the base class signature
+    def _save(self, step, model, device_context, data_state):
         real_model = model.module if isinstance(model, nn.DataParallel) else model
 
         model_state_dict = real_model.state_dict()
@@ -163,6 +165,13 @@ class ModelSaver(ModelSaverBase):
                 torch.save(module, checkpoint_path)
                 tmp_checkpoint_paths.append(checkpoint_path)
 
+        # In a distributed context, aggregate all data states for corpus restoration
+        if device_context.is_distributed():
+            data_states = [None for _ in range(device_context.world_size)]
+            torch.distributed.all_gather_object(data_states, data_state)
+            data_state = {k: v for state in data_states for k, v in state.items()}
+
+        model_frame['data_state'] = data_state
         if device_context.is_master():
             # TODO: not sure how to deal with model_state_dict, fields, model_opts and optim.state_dict() in a multi-gpu
             #  setting. Is it OK to save only from master?

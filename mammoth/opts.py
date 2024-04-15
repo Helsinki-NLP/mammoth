@@ -1014,14 +1014,15 @@ def _add_train_dynamic_data(parser):
         "--pool_size",
         type=int,
         default=2048,
-        help="Number of examples to dynamically pool before batching.",
+        help="(Maximum) number of examples to dynamically pool before batching.",
     )
     group.add(
         "-n_buckets",
         "--n_buckets",
         type=int,
-        default=1024,
-        help="Maximum number of bins for batching.",
+        default=4,
+        help="The number of minibatches that will be yielded once bucketing is complete. "
+        "Recommended value: same as accum_count, or at least a multiple of it."
     )
 
 
@@ -1236,13 +1237,13 @@ def translate_opts(parser, dynamic=False):
     _add_logging_opts(parser, is_train=False)
 
     group = parser.add_argument_group('Efficiency')
-    group.add('--batch_size', '-batch_size', type=int, default=30, help='Batch size')
+    group.add('--batch_size', '-batch_size', type=int, default=300, help='Batch size')
     group.add(
         '--batch_type',
         '-batch_type',
-        default='sents',
+        default='tokens',
         choices=["sents", "tokens"],
-        help="Batch grouping for batch_size. Standard is sents. Tokens will do dynamic batching",
+        help="Batch grouping for batch_size. Standard is tokens (max of src and tgt). Sents is unimplemented.",
     )
     group.add('--gpu', '-gpu', type=int, default=-1, help="Device to run on")
 

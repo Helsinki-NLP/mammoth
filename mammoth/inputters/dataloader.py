@@ -93,14 +93,14 @@ class LookAheadBucketing():
         self._init()
 
     def _init(self):
-        logger.info('LookAheadBucketing: initialization start')
+        # logger.info('LookAheadBucketing: initialization start')
         self.examples_stream = iter(self.dataset)
         for example in range(self.look_ahead_size):
             self.maybe_replenish()
             if self._is_exhausted:
                 break
         assert not self.is_empty(), 'Dataset contains no usable example!'
-        logger.info('LookAheadBucketing: initialization done')
+        # logger.info('LookAheadBucketing: initialization done')
 
     def maybe_replenish(self):
         """try to look up one more example to add to this reservoir."""
@@ -351,7 +351,7 @@ class DynamicDatasetIter(object):
                         )
                         src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
                         tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]
-                        for sent_idx in range(3):
+                        for sent_idx in range(min(3, batch.src[0].shape[2])):
                             toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src[0][:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
                             toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]

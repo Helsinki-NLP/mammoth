@@ -529,22 +529,36 @@ def allocate_devices(opts):
             if adjusted == 0:
                 lps_ready_to_start.append((src_lang, tgt_lang))
 
-    assignment = optimize_gpu_assignment(
-        n_nodes=n_nodes,
-        n_gpus_per_node=n_gpus_per_node,
-        n_slots_per_gpu=n_slots_per_gpu,
-        lang_pairs=lang_pairs,
-        lang_to_group_mapping=cc_opts['groups'],
-        lps_ready_to_start=lps_ready_to_start,
-        log_name=opts.log_name,
-        time_budget_s=opts.time_budget_s,
-    )
+    if n_gpus_tot < 2:
+        print('Assigning all tasks to 0:0')
+        for key in opts.in_config[0]['tasks']:
+            opts.in_config[0]['tasks'][key]['node_gpu'] = '0:0'
+    else:
+        assignment = optimize_gpu_assignment(
+            n_nodes=n_nodes,
+            n_gpus_per_node=n_gpus_per_node,
+            n_slots_per_gpu=n_slots_per_gpu,
+            lang_pairs=lang_pairs,
+            lang_to_group_mapping=cc_opts['groups'],
+            lps_ready_to_start=lps_ready_to_start,
+            log_name=opts.log_name,
+            time_budget_s=opts.time_budget_s,
+        )
 
-    for gpu_slot, lp in assignment.items():
-        if lp is None:
-            continue
-        key = lp_to_key[lp].pop()
-        opts.in_config[0]['tasks'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
+        for gpu_slot, lp in assignment.items():
+            if lp is None:
+                continue
+            key = lp_to_key[lp].pop()
+            opts.in_config[0]['tasks'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
+        total_remaining = 0
+        for lp, keys in lp_to_key.items():
+            if len(keys) > 0:
+                print(f'{lp} remaining keys: {keys}')
+            total_remaining += len(keys)
+        assert total_remaining == 0
+
+    for cname, corpus in opts.in_config[0]['tasks'].items():
+        assert 'node_gpu' in corpus, f'{cname} not assigned to node_gpu: {corpus}'
 
     opts.in_config[0]['n_nodes'] = n_nodes
     opts.in_config[0]['world_size'] = n_gpus_tot

@@ -111,6 +111,7 @@ class DataOptsCheckerMixin(object):
             node_gpu = corpus.get('node_gpu', None)
             if node_gpu is not None:
                 assert RE_NODE_GPU.match(node_gpu)
+            else:
                 n_without_node_gpu += 1
             src_tgt = corpus.get('src_tgt', None)
             assert src_tgt is not None
@@ -139,7 +140,8 @@ class DataOptsCheckerMixin(object):
                     logger.warning(f'offset {offset} stride {stride} is probably not what you want')
 
         # Either all tasks should be assigned to a gpu, or none
-        assert n_without_node_gpu == 0 or n_without_node_gpu == len(corpora)
+        assert n_without_node_gpu == 0 or n_without_node_gpu == len(corpora), \
+            f'n_without_node_gpu: {n_without_node_gpu} not in {{ 0, {len(corpora)} }}'
 
         logger.info(f"Parsed {len(corpora)} corpora from -data.")
         opts.tasks = corpora

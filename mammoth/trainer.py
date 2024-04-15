@@ -460,6 +460,9 @@ class Trainer(object):
             # cf. `onmt.utils.loss.CommonLossCompute._make_shard_state`
             tgt_outer = batch.tgt
 
+            # QUI logging for batch shapes
+            # print(src.shape, src.shape[0] * src.shape[1], tgt_outer.shape, tgt_outer.shape[0] * tgt_outer.shape[1])
+
             bptt = False
             for j in range(0, target_size - 1, trunc_size):
                 # 1. Create truncated target.

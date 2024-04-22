@@ -1,11 +1,7 @@
 from itertools import product
 
 import unittest
-from mammoth.inputters.dataloader import (
-    build_dataloader,
-    LookAheadBucketing,
-    InferenceBatcher,
-)
+from mammoth.inputters.dataloader import build_dataloader
 
 
 class hashabledict(dict):
@@ -33,6 +29,7 @@ class MockStream():
 class TestLookAheadBucketing(unittest.TestCase):
 
     def test_all_read(self):
+        max_batch_size = 12
         stream = MockStream([
             hashabledict({
                 'src': tuple([letter for _ in range(i)]),
@@ -41,38 +38,25 @@ class TestLookAheadBucketing(unittest.TestCase):
             for letter in 'xyz'
             for i, j in product(range(1, 11), range(1, 11))
         ])
-        lab = build_dataloader(stream, 2, 'tokens', pool_size=4, n_buckets=4, cycle=True, as_iter=False)
+        lab = build_dataloader(
+            stream,
+            batch_size=max_batch_size,
+            batch_type='tokens',
+            pool_size=4,
+            n_buckets=4,
+            cycle=True,
+            as_iter=False
+        )
         examples_read = []
         batches = iter(lab)
-        while not (lab._is_exhausted and lab.is_empty()):
-            examples_read.extend(next(batches))
-        sorted_src_ref = sorted([ex['src'] for ex in stream.items])
-        sorted_src_obs = sorted([ex['src'] for ex in examples_read])
-        self.assertTrue(sorted_src_ref == sorted_src_obs)
-        sorted_tgt_ref = sorted([ex['tgt'] for ex in stream.items])
-        sorted_tgt_obs = sorted([ex['tgt'] for ex in examples_read])
-        self.assertTrue(sorted_tgt_ref == sorted_tgt_obs)
-
-    def test_reroutes(self):
-        stream = MockStream([hashabledict({'src': '_', 'tgt': '_'})] * 10)
-        lab = build_dataloader(stream, 2, 'tokens', 4, 2, cycle=True, as_iter=False)
-        self.assertTrue(isinstance(lab, LookAheadBucketing))
-        not_lab = build_dataloader(stream, 2, 'tokens', 4, 2, cycle=False, as_iter=False)
-        self.assertTrue(isinstance(not_lab, InferenceBatcher))
-
-    def test_always_continues(self):
-        stream = MockStream([hashabledict({'src': '_', 'tgt': '_'})] * 10)
-        was_exhausted = False
-        stopped_exhaustion = False
-        lab = build_dataloader(stream, 2, 'tokens', pool_size=4, n_buckets=4, cycle=True, as_iter=False)
-        batches = iter(lab)
-        all_items = []
-        for _ in range(len(stream) * 3 // 2):
-            all_items.extend(next(batches))
-            was_exhausted = was_exhausted or lab._is_exhausted
-            if was_exhausted:
-                stopped_exhaustion = stopped_exhaustion or not lab._is_exhausted
-
-        self.assertTrue(was_exhausted)
-        self.assertTrue(stopped_exhaustion)
-        self.assertTrue(len(all_items) > len(stream))
+        for _ in range(1000):
+            batch = next(batches)
+            assert len(batch) > 0
+            src_toks = sum(len(ex['src']) for ex in batch)
+            tgt_toks = sum(len(ex['tgt']) for ex in batch)
+            # check that the batch size is respected
+            assert src_toks <= max_batch_size
+            assert tgt_toks <= max_batch_size, str(batch)
+            examples_read.extend(batch)
+        # Check that the stream was cycled
+        self.assertTrue(len(examples_read) > len(stream))

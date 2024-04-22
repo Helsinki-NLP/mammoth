@@ -5,7 +5,7 @@ from collections import namedtuple, defaultdict, Counter
 from dataclasses import dataclass
 from itertools import cycle, islice
 from pprint import pformat
-from typing import Any, Optional, List, Tuple, Dict
+from typing import Any, Optional, List, Tuple, Dict, Generator
 
 import numpy as np
 import torch
@@ -22,8 +22,7 @@ from mammoth.distributed.components import (
     DistributedGenerator,
     DistributedAdapter,
     DistributedAttentionBridge,
-    # DistributedComponentAction,
-    # DistributedComponentActionWithGradient,
+    DistributedComponentGradientSync,
 )
 from mammoth.utils.logging import logger
 
@@ -363,6 +362,7 @@ class TaskQueueManager:
             builder.add(
                 DistributedEmbedding(
                     global_ranks={global_rank},
+                    task_ids={task.corpus_id},
                     group=None,
                     side=Side.encoder,
                     lang=task.src_lang,
@@ -371,6 +371,7 @@ class TaskQueueManager:
             builder.add(
                 DistributedEmbedding(
                     global_ranks={global_rank},
+                    task_ids={task.corpus_id},
                     group=None,
                     side=Side.decoder,
                     lang=task.tgt_lang,
@@ -379,6 +380,7 @@ class TaskQueueManager:
             builder.add(
                 DistributedGenerator(
                     global_ranks={global_rank},
+                    task_ids={task.corpus_id},
                     group=None,
                     lang=task.tgt_lang,
                 )
@@ -387,6 +389,7 @@ class TaskQueueManager:
                 builder.add(
                     DistributedEncoder(
                         global_ranks={global_rank},
+                        task_ids={task.corpus_id},
                         group=None,
                         layer_stack_index=layer_stack_index,
                         xcoder_id=encoder_id,
@@ -396,6 +399,7 @@ class TaskQueueManager:
                 builder.add(
                     DistributedDecoder(
                         global_ranks={global_rank},
+                        task_ids={task.corpus_id},
                         group=None,
                         layer_stack_index=layer_stack_index,
                         xcoder_id=decoder_id,
@@ -406,6 +410,7 @@ class TaskQueueManager:
                     builder.add(
                         DistributedAdapter(
                             global_ranks={global_rank},
+                            task_ids={task.corpus_id},
                             group=None,
                             side=Side.encoder,
                             layer_stack_index=layer_stack_index,
@@ -418,6 +423,7 @@ class TaskQueueManager:
                     builder.add(
                         DistributedAdapter(
                             global_ranks={global_rank},
+                            task_ids={task.corpus_id},
                             group=None,
                             side=Side.decoder,
                             layer_stack_index=layer_stack_index,
@@ -426,7 +432,13 @@ class TaskQueueManager:
                         )
                     )
             if use_attention_bridge:
-                builder.add(DistributedAttentionBridge(global_ranks={global_rank}, group=None))
+                builder.add(
+                    DistributedAttentionBridge(
+                        global_ranks={global_rank},
+                        task_ids={task.corpus_id},
+                        group=None
+                    )
+                )
 
         # once all DistributedComponents are created, we can initialize communication groups
         if self.world_context.is_distributed():
@@ -549,6 +561,37 @@ class LocalTaskQueueManager(TaskQueueManager):
                 [task.corpus_id for task in batch_task_sample.tasks.values()]
             )
         return batch_task_sample
+
+    def distributed_component_gradient_sync(
+        self,
+        batch_task_sample: BatchTaskSample,
+    ) -> Generator[DistributedComponentGradientSync, None, None]:
+        # All components on device, in consistent order across devices
+        my_components = self.get_my_distributed_components()
+        my_task = batch_task_sample.tasks[self.global_rank]
+        my_task_id = my_task.corpus_id
+        everyones_tasks = [batch_task_sample.tasks.values()]
+        everyones_task_ids = [task.corpus_id for task in everyones_tasks]
+        for component in my_components:
+            if not component.needs_communication():
+                # Omit components not found elsewhere, as these don't need to be communicated
+                continue
+            # Determine whether we trained this component in this step
+            has_local_gradient = my_task_id in component.task_ids
+            # Determine how many in total trained this component
+            total_gradients = sum(task_id in component.task_ids for task_id in everyones_task_ids)
+            if total_gradients == 0:
+                # Omit component if nobody trained it
+                continue
+            # use as normalization denominator if someone trained it
+            # Note that this normalization can not be token-based,
+            # as we don't have access to the other device's batches, and we don't want to communicate the size.
+            # However, each device can apply token-based normalization before sending the gradient.
+            yield DistributedComponentGradientSync(
+                component=component,
+                has_local_gradient=has_local_gradient,
+                gradient_norm=total_gradients,
+            )
 
     def get_my_encoders(self, layer_stack_index: int):
         my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_my_tasks()]

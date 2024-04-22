@@ -356,28 +356,6 @@ def build_task_specific_model(
     print('built model:')
     print(nmt_model)
 
-    # register a forward hook to keep track of which parameters have valid gradients.
-    # p.grad is None can not be used: grad is None only before first update.
-    # zero_grad typically sets the grad to zero, not to None.
-    # While zero_grad takes a flag set_to_none, it is not reliably forwarded by various optimizers.
-    def has_grad_hook(module, input, output) -> None:
-        for param in module.parameters(recurse=False):
-            if param.requires_grad:
-                # NB: we're looking at whether gradient will/has been computed, which is only the
-                # case when the module is training.
-                param.has_grad = module.training
-
-    for module in nmt_model.modules():
-        module.register_forward_hook(has_grad_hook)
-        for param in module.parameters(recurse=False):
-            if param.requires_grad:
-                param.has_grad = False
-    for module in generators_md.modules():
-        module.register_forward_hook(has_grad_hook)
-        for param in module.parameters(recurse=False):
-            if param.requires_grad:
-                param.has_grad = False
-
     return nmt_model, generators_md
 
 

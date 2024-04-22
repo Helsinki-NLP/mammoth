@@ -5,7 +5,7 @@ from collections import namedtuple, defaultdict, Counter
 from dataclasses import dataclass
 from itertools import cycle, islice
 from pprint import pformat
-from typing import Any, Optional, List, Tuple, Dict, Generator
+from typing import Any, Optional, List, Tuple, Dict
 
 import numpy as np
 import torch
@@ -507,7 +507,7 @@ class LocalTaskQueueManager(TaskQueueManager):
         self._sanity_check_tasks()
 
         self.sampled_task_counts = Counter()
-        self.my_distributed_components = None
+        self.my_distributed_components: Optional[List[DistributedComponent]] = None
 
     def _sanity_check_tasks(self):
         my_corpus_ids = [task.corpus_id for task in self.get_my_tasks()]
@@ -565,33 +565,37 @@ class LocalTaskQueueManager(TaskQueueManager):
     def distributed_component_gradient_sync(
         self,
         batch_task_sample: BatchTaskSample,
-    ) -> Generator[DistributedComponentGradientSync, None, None]:
+    ) -> List[DistributedComponentGradientSync]:
         # All components on device, in consistent order across devices
         my_components = self.get_my_distributed_components()
         my_task = batch_task_sample.tasks[self.global_rank]
         my_task_id = my_task.corpus_id
-        everyones_tasks = [batch_task_sample.tasks.values()]
+        everyones_tasks = list(batch_task_sample.tasks.values())
         everyones_task_ids = [task.corpus_id for task in everyones_tasks]
+        # logger.warning(f'my_task_id: {my_task_id} everyones_task_ids: {everyones_task_ids}')   # DEBUG
+        result = []
         for component in my_components:
-            if not component.needs_communication():
-                # Omit components not found elsewhere, as these don't need to be communicated
-                continue
+            # Note: Omitting components on a single device is left to the caller
+            # These don't need to be communicated, but the optimizer should be stepped
+
             # Determine whether we trained this component in this step
             has_local_gradient = my_task_id in component.task_ids
             # Determine how many in total trained this component
             total_gradients = sum(task_id in component.task_ids for task_id in everyones_task_ids)
             if total_gradients == 0:
                 # Omit component if nobody trained it
+                # logger.warning(f'Omitting (nobody trained) {component.get_name()}')   # DEBUG
                 continue
             # use as normalization denominator if someone trained it
             # Note that this normalization can not be token-based,
             # as we don't have access to the other device's batches, and we don't want to communicate the size.
             # However, each device can apply token-based normalization before sending the gradient.
-            yield DistributedComponentGradientSync(
+            result.append(DistributedComponentGradientSync(
                 component=component,
                 has_local_gradient=has_local_gradient,
                 gradient_norm=total_gradients,
-            )
+            ))
+        return result
 
     def get_my_encoders(self, layer_stack_index: int):
         my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_my_tasks()]

@@ -54,55 +54,63 @@ def build_torch_optimizer(model, opts, task_queue_manager):
     Returns:
       A ``torch.optim.Optimizer`` instance.
     """
-    params = [p for p in model.parameters() if p.requires_grad]
     betas = [opts.adam_beta1, opts.adam_beta2]
     if opts.optim == 'sgd':
-        optimizer = optim.SGD(params, lr=opts.learning_rate)
+        base_optimizer = functools.partial(optim.SGD, lr=opts.learning_rate)
     elif opts.optim == 'adagrad':
-        optimizer = optim.Adagrad(
-            params,
+        base_optimizer = functools.partial(
+            optim.Adagrad,
             lr=opts.learning_rate,
             initial_accumulator_value=opts.adagrad_accumulator_init,
         )
     elif opts.optim == 'adadelta':
-        optimizer = optim.Adadelta(params, lr=opts.learning_rate)
+        base_optimizer = functools.partial(
+            optim.Adadelta,
+            lr=opts.learning_rate,
+        )
     elif opts.optim == 'adafactor':
-        optimizer = attention_bridge_optimizer(
-            model,
-            task_queue_manager,
-            lambda params: AdaFactorFairSeq(params, weight_decay=opts.weight_decay),
+        base_optimizer = functools.partial(
+            AdaFactorFairSeq,
+            weight_decay=opts.weight_decay,
         )
     elif opts.optim == 'adam':
-        optimizer = attention_bridge_optimizer(
-            model,
-            task_queue_manager,
-            lambda params: optim.Adam(
-                params, lr=opts.learning_rate, betas=betas, eps=1e-9, weight_decay=opts.weight_decay
-            )
+        base_optimizer = functools.partial(
+            optim.Adam,
+            lr=opts.learning_rate,
+            betas=betas,
+            eps=1e-9,
+            weight_decay=opts.weight_decay,
         )
     elif opts.optim == 'adamw':
-        optimizer = attention_bridge_optimizer(
-            model,
-            task_queue_manager,
-            lambda params: optim.AdamW(
-                params, lr=opts.learning_rate, betas=betas, eps=1e-9, weight_decay=opts.weight_decay
-            )
+        base_optimizer = functools.partial(
+            optim.AdamW,
+            lr=opts.learning_rate,
+            betas=betas,
+            eps=1e-9,
+            weight_decay=opts.weight_decay,
         )
     elif opts.optim == 'fusedadam':
-        # we use here a FusedAdam() copy of an old Apex repo
-        optimizer = FusedAdam(params, lr=opts.learning_rate, betas=betas)
-        if opts.model_dtype == 'fp16':
-            import apex
+        raise NotImplementedError()
+        # # we use here a FusedAdam() copy of an old Apex repo
+        # optimizer = FusedAdam(params, lr=opts.learning_rate, betas=betas)
+        # if opts.model_dtype == 'fp16':
+        #     import apex
 
-            # In this case use the old FusedAdam with FP16_optimizer wrapper
-            static_loss_scale = opts.loss_scale
-            dynamic_loss_scale = opts.loss_scale == 0
-            optimizer = apex.contrib.optimizers.FP16_Optimizer(
-                optimizer, static_loss_scale=static_loss_scale, dynamic_loss_scale=dynamic_loss_scale
-            )
+        #     # In this case use the old FusedAdam with FP16_optimizer wrapper
+        #     static_loss_scale = opts.loss_scale
+        #     dynamic_loss_scale = opts.loss_scale == 0
+        #     base_optimizer = functools.partial(
+        #         apex.contrib.optimizers.FP16_Optimizer
+        #         optimizer, static_loss_scale=static_loss_scale, dynamic_loss_scale=dynamic_loss_scale
+        #     )
     else:
         raise ValueError('Invalid optimizer type: ' + opts.optim)
 
+    optimizer = attention_bridge_optimizer(
+        model,
+        task_queue_manager,
+        base_optimizer,
+    )
     return optimizer
 
 
@@ -194,26 +202,16 @@ class MultipleOptimizer(object):
         for name in self.optimizers:
             self.optimizers[name].zero_grad()
 
-    def step(self, grad_scaler=None):
-        """Step through all the suboptimizers"""
+    def managed_step(self, gradient_syncs, grad_scaler=None):
+        """Step through only the trained suboptimizers"""
+        trained_components = {
+            gradient_sync.component.get_name() for gradient_sync in gradient_syncs
+        }
         for name in self.optimizers:
-            if self._any_param_has_grad(self.optimizers[name], name):
+            if name in trained_components:
+                # logger.warning(f'Stepping {name}')   # DEBUG
                 self._steps[name] += 1
                 self.optimizers[name].step()
-
-    @staticmethod
-    def _any_param_has_grad(optimizer, name):
-        for group in optimizer.param_groups:
-            for param in group['params']:
-                if not param.requires_grad:
-                    continue
-                if not hasattr(param, 'has_grad'):
-                    # if there are parameters not tracked by the hook,
-                    # then always perform the step
-                    raise Exception(f'At least one parameter in {name} did not have the hook')
-                if param.has_grad:
-                    return True
-        return False
 
     def report_steps(self):
         result = []
@@ -389,7 +387,7 @@ class Optimizer(object):
         else:
             loss.backward()
 
-    def step(self):
+    def managed_step(self, *args, **kwargs):
         """Update the model parameters based on current gradients.
 
         Optionally, will employ gradient modification or update learning
@@ -417,7 +415,7 @@ class Optimizer(object):
             # Updates the scale for next iteration.
             self._scaler.update()
         else:
-            self._optimizer.step()
+            self._optimizer.managed_step(*args, **kwargs)
         self._decay_step += 1
         self._training_step += 1
 

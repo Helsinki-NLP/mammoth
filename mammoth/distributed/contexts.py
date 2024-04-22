@@ -29,7 +29,7 @@ class WorldContext:
         """Data tensors must be moved to the GPU for compute"""
         return self.context != DeviceContextEnum.CPU
 
-    def global_to_local(self, node_rank, local_rank):
+    def global_to_local(self, node_rank: int, local_rank: int) -> "DeviceContext":
         assert node_rank is not None
         assert local_rank is not None
         return DeviceContext(
@@ -41,7 +41,7 @@ class WorldContext:
         )
 
     @classmethod
-    def from_opts(cls, opts):
+    def from_opts(cls, opts) -> "WorldContext":
         gpus_per_node = len(opts.gpu_ranks)
         world_size = int(opts.world_size) if gpus_per_node > 0 else 0
         multinode = gpus_per_node != world_size

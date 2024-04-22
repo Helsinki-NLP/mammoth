@@ -240,6 +240,9 @@ def train(opts):
             local_rank=local_rank,
             opts=opts
         )
+        if device_context.is_master():
+            # Enough to log this once
+            logger.info(f'TaskQueueManager: {global_task_queue_manager}')
 
         q = mp.Queue(opts.queue_size)
         semaphore = mp.Semaphore(opts.queue_size)

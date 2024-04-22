@@ -68,6 +68,7 @@ class DistributedComponent(ABC):
         module = self.get_module(model)
         yield from module.named_parameters()
 
+    @property
     def min_rank(self) -> int:
         return min(self.global_ranks)
 

@@ -1,7 +1,6 @@
 import collections
 import itertools
 import math
-import random
 
 import torch
 
@@ -87,6 +86,8 @@ class SimpleLookAheadBucketing():
             minibatch and ends with the largest just before accumulation ends.
         batch_size:
             The maximum size of each minibatch in tokens.
+            Note that the maximum batch size can not be guaranteed if the data contains examples
+            that exceed the limit on their own. Use filtertoolong to avoid such examples.
         score_fn:
             Compute the size estimate (single integer) for sorting examples.
     """
@@ -114,7 +115,11 @@ class SimpleLookAheadBucketing():
             for i in range(self.max_look_ahead_size):
                 score = self._sie.peek_at_score()
                 # Decide whether to add it or not
-                still_fits = (max(max_score, score) * (len(multibatch) + 1)) < (self.multi_batch_size)
+                if len(multibatch) <= self.n_buckets:
+                    # Always add at least one example per minibatch
+                    still_fits = True
+                else:
+                    still_fits = (max(max_score, score) * (len(multibatch) + 1)) < (self.multi_batch_size)
                 if still_fits:
                     score, example = self._sie.next()
                     multibatch.append((score, example))

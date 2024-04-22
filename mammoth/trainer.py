@@ -279,17 +279,14 @@ class Trainer(object):
                 my_task,
             )
 
-            # All components on device, in consistent order across devices
-            my_components = self.task_queue_manager.get_my_distributed_components()
-            # Omit components not found elsewhere, as these don't need to be communicated
-            components_to_communicate = [
-                component for component in my_components
-                if component.needs_communication()
-            ]
-
-            for component in components_to_communicate:
-                params = component.named_parameters(self.model)
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=component.group)
+            for gradient_sync in self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample):
+                params = gradient_sync.component.named_parameters(self.model)
+                mammoth.distributed.managed_reduce_and_rescale_grads(
+                    named_parameters=params,
+                    has_local_gradient=gradient_sync.has_local_gradient,
+                    gradient_norm=gradient_sync.gradient_norm,
+                    group=gradient_sync.component.group,
+                )
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 

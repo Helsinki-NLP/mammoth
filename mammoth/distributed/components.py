@@ -23,7 +23,9 @@ class DistributedComponentBuilder:
                 f'Unexpected type {name}: {old_component} != {component}'
             assert old_component.group is None
             assert component.group is None
+            # Merge the sets of new component into the old component
             old_component.global_ranks.update(component.global_ranks)
+            old_component.task_ids.update(component.task_ids)
 
     def __iter__(self):
         result = []
@@ -50,6 +52,7 @@ class DistributedComponent(ABC):
     # creating the Modules that the model consists of.
 
     global_ranks: Set[int]
+    task_ids: Set[str]
     # distributed communication group object, or None if on a single device
     group: Optional[Any]
 
@@ -174,17 +177,15 @@ class DistributedAttentionBridge(DistributedComponent):
 
 
 @dataclass
-class DistributedComponentAction:
+class DistributedComponentGradientSync:
     """
-    Represents an action to be performed on a particular model component.
-    Actions include init broadcast, gradient communication, optimizer step, checkpoint saving.
+    Represents a gradient communication action to be performed on a particular model component.
+    Other actions (init broadcast, optimizer step, checkpoint saving) do not need additional metadata,
+    and can be represented by just the DistributedComponent.
     """
     component: DistributedComponent
-
-
-@dataclass
-class DistributedComponentActionWithGradient(DistributedComponentAction):
     # True: has a real gradient that needs to be communicated
-    # False: send a zero dummy gradient, receive gradient from others
+    # False: send a zero dummy gradient, receive and apply gradient from others
     has_local_gradient: bool
+    # Normalization denominator
     gradient_norm: int

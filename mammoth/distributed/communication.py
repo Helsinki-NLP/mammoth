@@ -36,8 +36,53 @@ def broadcast_tensors(tensors, src=0, group=None):
             torch.distributed.broadcast(t, src, group=group)
 
 
+def managed_reduce_and_rescale_grads(
+    named_parameters,
+    has_local_gradient: bool,
+    gradient_norm: int,
+    group=None,
+):
+    """
+    Gradient synch tolerant to missing grads.
+
+    Missing grads occur when some parameters are trained on some devices in
+    a communication group but not on others, between two gradient synchs.
+
+    The "managed" implementation relies on a deterministic sampling of tasks
+    known to all devices. This allows a device to figure out that even though
+    it didn't train some parameters itself, some other device did. In this case
+    the device must send a dummy gradient of all zeros.
+
+    Only if no device trains some parameters (or if the parameters exist on
+    exactly one device) is it possible to skip communication entirely.
+
+    The "managed" implementation does not require the forward hook 'has_grad_hook'.
+
+    Args:
+        named_parameters: tuples of (str, Parameter) defining the parameters to consider
+        group: torch.distributed communication group
+    """
+    require_grad = [(name, p) for (name, p) in named_parameters if p.requires_grad]
+    if not require_grad:
+        # Exit early if the component has no parameters that require a gradient
+        return
+    # Set missing gradients to zero
+    for name, p in require_grad:
+        if p.grad is None or not has_local_gradient:
+            p.grad = torch.zeros_like(p)
+
+    grads = [p.grad.data for p in require_grad]
+
+    # All devices communicate either a real gradient or a dummy zeros of the same size
+    all_reduce_and_rescale_tensors(grads, rescale_denom=gradient_norm, group=group)
+
+    # Note: p.has_grad is not used in the "managed" implementation:
+    # the optimizer can not use it to prevent the untrained components from being stepped
+
+
 def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
     """
+    (obsolete)
     Gradient synch tolerant to missing grads.
 
     Missing grads occur when some parameters are not trained between two

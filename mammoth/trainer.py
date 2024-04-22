@@ -279,22 +279,27 @@ class Trainer(object):
                 my_task,
             )
 
-            for gradient_sync in self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample):
-                params = gradient_sync.component.named_parameters(self.model)
+            gradient_syncs = self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample)
+            for gradient_sync in gradient_syncs:
+                component = gradient_sync.component
+                if not component.needs_communication():
+                    # Omit components not found elsewhere, as these don't need to be communicated
+                    # logger.warning(f'Omitting (single device) {component.get_name()}')   # DEBUG
+                    continue
+                # logger.warning(f'Syncing {component.get_name()}')   # DEBUG
+                params = component.named_parameters(self.model)
                 mammoth.distributed.managed_reduce_and_rescale_grads(
                     named_parameters=params,
                     has_local_gradient=gradient_sync.has_local_gradient,
                     gradient_norm=gradient_sync.gradient_norm,
-                    group=gradient_sync.component.group,
+                    group=component.group,
                 )
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
-            self.optim.step()
+            # Including single-device components
+            self.optim.managed_step(gradient_syncs)
             self.optim.zero_grad()
-            for p in self.model.parameters():
-                if hasattr(p, 'has_grad'):
-                    p.has_grad = False
 
             if step % 1000 == 0 and step > 0:
                 # TODO: if you are going to uncomment that block, please make it optional
@@ -406,10 +411,6 @@ class Trainer(object):
 
         # Set model back to training mode.
         valid_model.train()
-
-        for p in self.model.parameters():
-            if hasattr(p, 'has_grad'):
-                p.has_grad = False
 
         return stats
 

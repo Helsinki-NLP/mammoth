@@ -287,7 +287,7 @@ def build_task_specific_model(
     task_queue_manager,
     checkpoint,
 ):
-    logger.info(f'TaskQueueManager: {task_queue_manager}')
+    # logger.info(f'TaskQueueManager: {task_queue_manager}')
     if not model_opts.model_task == ModelTask.SEQ2SEQ:
         raise ValueError(f"Only ModelTask.SEQ2SEQ works - {model_opts.model_task} task")
 

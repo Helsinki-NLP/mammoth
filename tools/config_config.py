@@ -321,6 +321,9 @@ def corpora_schedule(opts):
         if use_weight:
             multiplier = ae_weight if src_lang == tgt_lang else 1.0
             corpus['weight'] = weight * multiplier
+        else:
+            # Log spam if weight is unset
+            corpus['weight'] = 1
         if use_introduce_at_training_step:
             # TODO: ensure this default always matches with opts.py
             total_steps = opts.in_config[0].get('train_steps', 100_000)
@@ -333,6 +336,9 @@ def corpora_schedule(opts):
                 introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
             min_introduce_at_training_step = min(min_introduce_at_training_step, introduce_at_training_step)
+        else:
+            # Log spam if introduce_at_training_step is unset
+            corpus['introduce_at_training_step'] = 0
     if use_introduce_at_training_step and min_introduce_at_training_step > 0:
         # With a single very large task that gets split, it is possible that no task can start
         for cname, corpus in opts.in_config[0]['tasks'].items():

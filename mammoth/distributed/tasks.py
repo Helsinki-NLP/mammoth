@@ -1,31 +1,30 @@
 """sub-module defining tasks, task specifications and task management objects."""
 from abc import ABC, abstractmethod
 from argparse import Namespace
-from collections import namedtuple, defaultdict, Counter
+from collections import Counter, defaultdict, namedtuple
 from dataclasses import dataclass
 from itertools import cycle, islice
 from pprint import pformat
-from typing import Any, Optional, List, Tuple, Dict
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
 import torch.distributed
 
-from mammoth.distributed.contexts import DeviceContext, WorldContext
 from mammoth.distributed.components import (
-    Side,
-    DistributedComponentBuilder,
-    DistributedComponent,
-    DistributedEncoder,
-    DistributedDecoder,
-    DistributedEmbedding,
-    DistributedGenerator,
     DistributedAdapter,
     DistributedAttentionBridge,
+    DistributedComponent,
+    DistributedComponentBuilder,
     DistributedComponentGradientSync,
+    DistributedDecoder,
+    DistributedEmbedding,
+    DistributedEncoder,
+    DistributedGenerator,
+    Side,
 )
+from mammoth.distributed.contexts import DeviceContext, WorldContext
 from mammoth.utils.logging import logger
-
 
 DatasetMetadata = namedtuple(
     'DatasetMetadata',
@@ -180,11 +179,6 @@ class TaskQueueManager:
         Has the responsibility for all resources that need to be
         consistently assigned to nodes and GPUs.
         This includes data, parameters, and vocabularies.
-
-        `local_rank` is the local rank of the GPU on this node.
-        When `node_rank` and `local_rank` are given, the methods return only
-        the items needed in the specified process.
-        When set to None, all items are returned.
         """
         self.tasks = tasks
         # TODO: no support for variable accumulation across training
@@ -311,11 +305,7 @@ class TaskQueueManager:
             f'{key}={pformat(self.__getattribute__(key))}'
             for key in [
                 'tasks',
-                'gpus_per_node',
-                'n_nodes',
-                'node_rank',
-                'local_rank',
-                'task_distribution_strategy',
+                'world_context',
                 'uses_adapters',
             ]
         )
@@ -485,9 +475,8 @@ class LocalTaskQueueManager(TaskQueueManager):
         This includes data, parameters, and vocabularies.
 
         `local_rank` is the local rank of the GPU on this node.
-        When `node_rank` and `local_rank` are given, the methods return only
-        the items needed in the specified process.
-        When set to None, all items are returned.
+        The methods return only the items needed in the specified process,
+        based on `node_rank` and `local_rank`
         """
         super().__init__(
             tasks=tasks,
@@ -508,6 +497,20 @@ class LocalTaskQueueManager(TaskQueueManager):
 
         self.sampled_task_counts = Counter()
         self.my_distributed_components: Optional[List[DistributedComponent]] = None
+
+    def __repr__(self):
+        kwargs = ',\n '.join(
+            f'{key}={pformat(self.__getattribute__(key))}'
+            for key in [
+                'tasks',
+                'gpus_per_node',
+                'n_nodes',
+                'device_context',
+                'task_distribution_strategy',
+                'uses_adapters',
+            ]
+        )
+        return f'{self.__class__.__name__}(\n{kwargs}\n)'
 
     def _sanity_check_tasks(self):
         my_corpus_ids = [task.corpus_id for task in self.get_my_tasks()]

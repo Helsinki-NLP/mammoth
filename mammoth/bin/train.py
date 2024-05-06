@@ -144,7 +144,11 @@ def validate_slurm_node_opts(current_env, world_context, opts):
 
 
 def train(opts):
-    init_logger(opts.log_file, structured_log_file=opts.structured_log_file)
+    init_logger(
+        opts.log_file,
+        log_file_level=opts.log_file_level,
+        structured_log_file=opts.structured_log_file
+    )
     ArgumentParser.validate_train_opts(opts)
     ArgumentParser.update_model_opts(opts)
     ArgumentParser.validate_model_opts(opts)
@@ -226,6 +230,7 @@ def train(opts):
             current_env["RANK"] = str(device_context.global_rank)
             current_env["LOCAL_RANK"] = str(device_context.local_rank)
         else:
+            # Running in a non-distributed context: either single GPU or CPU
             node_rank = 0
             local_rank = 0
             device_context: DeviceContext = world_context.global_to_local(

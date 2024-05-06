@@ -1,6 +1,7 @@
 import collections
 import itertools
 import math
+import logging
 
 import torch
 
@@ -280,7 +281,7 @@ class DynamicDatasetIter(object):
                 ordered_iter, metadata = self.dataset_iterators[my_task.corpus_id]
                 for _ in range(self.task_queue_manager.accum_count):
                     batch = next(ordered_iter)
-                    if batch_task_sample.training_step == 0:
+                    if batch_task_sample.training_step == 0 and self.opts.verbose:
                         # De-numericalize a few sentences for debugging
                         logger.warning(
                             f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '

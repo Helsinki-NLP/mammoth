@@ -56,8 +56,6 @@ def managed_reduce_and_rescale_grads(
     Only if no device trains some parameters (or if the parameters exist on
     exactly one device) is it possible to skip communication entirely.
 
-    The "managed" implementation does not require the forward hook 'has_grad_hook'.
-
     Args:
         named_parameters: tuples of (str, Parameter) defining the parameters to consider
         group: torch.distributed communication group

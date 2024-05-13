@@ -3,6 +3,7 @@ import math
 import os
 import pickle
 import signal
+import time
 
 import torch
 import torch.distributed
@@ -213,11 +214,17 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     logger.info(generator_to_serve)
 
     for batch, metadata, communication_batch_id in generator_to_serve:
+        start = time.time()
         semaphore.acquire()
+        duration = time.time() - start
+        logger.warning(f'QUEUE_PERF;producer_semaphore;{duration}')
         # Move batch to correspond device_id when consumer iterate
         # hack to dodge unpicklable `dict_keys`
         # batch.fields = list(batch.fields)
+        start = time.time()
         queue.put((batch, metadata, communication_batch_id))
+        duration = time.time() - start
+        logger.warning(f'QUEUE_PERF;producer_put;{duration}')
 
 
 def consumer(process_fn, opts, device_context, error_queue, batch_queue, semaphore, task_queue_manager, checkpoint):

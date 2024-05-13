@@ -148,8 +148,14 @@ def main(
 
     def _train_iter():
         while True:
+            start = time.time()
             batch, metadata, communication_batch_id = batch_queue.get()
+            duration = time.time() - start
+            logger.warning(f'QUEUE_PERF;consumer_get;{duration}')
+            start = time.time()
             semaphore.release()
+            duration = time.time() - start
+            logger.warning(f'QUEUE_PERF;consumer_semaphore;{duration}')
             # TODO: confirm that batch-providing corpus has already been to'd to the correct place
             yield batch, metadata, communication_batch_id
 

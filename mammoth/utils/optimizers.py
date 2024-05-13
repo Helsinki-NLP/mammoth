@@ -202,7 +202,7 @@ class MultipleOptimizer(object):
         for name in self.optimizers:
             self.optimizers[name].zero_grad()
 
-    def managed_step(self, gradient_syncs, grad_scaler=None):
+    def externally_managed_step(self, gradient_syncs, grad_scaler=None):
         """Step through only the trained suboptimizers"""
         trained_components = {
             gradient_sync.component.get_name() for gradient_sync in gradient_syncs
@@ -387,7 +387,7 @@ class Optimizer(object):
         else:
             loss.backward()
 
-    def managed_step(self, *args, **kwargs):
+    def externally_managed_step(self, *args, **kwargs):
         """Update the model parameters based on current gradients.
 
         Optionally, will employ gradient modification or update learning
@@ -415,7 +415,7 @@ class Optimizer(object):
             # Updates the scale for next iteration.
             self._scaler.update()
         else:
-            self._optimizer.managed_step(*args, **kwargs)
+            self._optimizer.externally_managed_step(*args, **kwargs)
         self._decay_step += 1
         self._training_step += 1
 

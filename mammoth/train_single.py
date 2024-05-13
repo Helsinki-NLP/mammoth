@@ -101,7 +101,9 @@ def main(
     transforms_cls = get_transforms_cls(opts._all_transform)
     model_opts = _get_model_opts(opts, checkpoint=checkpoint)
 
-    task_queue_manager.create_all_distributed_components(use_attention_bridge=model_opts.bridge)
+    task_queue_manager.create_all_distributed_components(
+        use_attention_bridge=(model_opts.ab_layers is not None and len(model_opts.ab_layers) != 0),
+    )
 
     # Build model.
 

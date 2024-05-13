@@ -8,7 +8,15 @@ from mammoth.inputters.dataset import get_corpus
 from mammoth.utils.logging import logger
 
 
-def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=None, cycle=True, as_iter=True):
+def build_dataloader(
+    dataset,
+    batch_size,
+    batch_type,
+    max_look_ahead_sentences=None,
+    lookahead_minibatches=None,
+    cycle=True,
+    as_iter=True
+):
     """Convert an mammoth.inputters.ParallelCorpus into an infinite iterator of batches"""
     if not cycle:
         loader = InferenceBatcher(dataset, batch_size)
@@ -18,8 +26,8 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
         elif batch_type == 'tokens':
             loader = SimpleLookAheadBucketing(
                 dataset=dataset,
-                max_look_ahead_size=pool_size,
-                n_buckets=n_buckets,
+                max_look_ahead_sentences=max_look_ahead_sentences,
+                lookahead_minibatches=lookahead_minibatches,
                 batch_size=batch_size,
                 score_fn=SimpleLookAheadBucketing.max_of_lens,
             )
@@ -75,13 +83,13 @@ class SimpleLookAheadBucketing():
     """
     Arguments:
         dataset: mammoth.inputters.ParallelCorpus
-        max_look_ahead_size:
+        max_look_ahead_sentences:
             The maximum number of sentence pairs to read before yielding minibatches.
             Limits the time spent looping if there is a corpus with unexpectedly short sentences.
-        n_buckets:
+        lookahead_minibatches:
             The number of minibatches that will be yielded once bucketing is complete.
             Recommended value: same as accum_count, or at least a multiple of it.
-            Setting n_buckets == accum_count means that each accumulated batch uses up the whole buffer.
+            Setting lookahead_minibatches == accum_count means that each accumulated batch uses up the whole buffer.
             All tasks stay in sync concerning the length sorting: each task begins with the smallest
             minibatch and ends with the largest just before accumulation ends.
         batch_size:
@@ -91,13 +99,12 @@ class SimpleLookAheadBucketing():
         score_fn:
             Compute the size estimate (single integer) for sorting examples.
     """
-    def __init__(self, dataset, max_look_ahead_size, n_buckets, batch_size, score_fn=None):
+    def __init__(self, dataset, max_look_ahead_sentences, lookahead_minibatches, batch_size, score_fn=None):
         score_fn = score_fn if score_fn else self.max_of_lens
         self._sie = ScoredInfiniteExamples(dataset, score_fn)
-        self.max_look_ahead_size = max_look_ahead_size
+        self.max_look_ahead_sentences = max_look_ahead_sentences
         self.batch_size = batch_size
-        self.n_buckets = n_buckets
-        self.multi_batch_size = n_buckets * batch_size
+        self.lookahead_minibatches = lookahead_minibatches
         self.collate_fn = dataset.collate_fn
 
     @staticmethod
@@ -110,32 +117,38 @@ class SimpleLookAheadBucketing():
 
     def __iter__(self):
         while True:
-            multibatch = []
+            maxi_batch = []
             max_score = 0
-            for i in range(self.max_look_ahead_size):
+            for i in range(self.max_look_ahead_sentences):
                 score = self._sie.peek_at_score()
                 # Decide whether to add it or not
-                if len(multibatch) <= self.n_buckets:
+                if len(maxi_batch) < self.lookahead_minibatches:
                     # Always add at least one example per minibatch
                     still_fits = True
                 else:
-                    still_fits = (max(max_score, score) * (len(multibatch) + 1)) < (self.multi_batch_size)
+                    estimated_minibatch_size = math.ceil((len(maxi_batch) + 1) / self.lookahead_minibatches)
+                    still_fits = (max(max_score, score) * estimated_minibatch_size) < (self.batch_size)
                 if still_fits:
                     score, example = self._sie.next()
-                    multibatch.append((score, example))
+                    maxi_batch.append((score, example))
                     max_score = max(max_score, score)
                 else:
                     break
             # Sort by score to reduce padding
-            multibatch = list(sorted(multibatch, key=lambda x: x[0]))
+            maxi_batch = list(sorted(maxi_batch, key=lambda x: x[0]))
             # Split into minibatches and yield
-            examples_per_batch = math.ceil(len(multibatch) / self.n_buckets)
-            multibatch_it = iter(multibatch)
-            for _ in range(self.n_buckets):
+            floor_examples_per_batch = math.floor(len(maxi_batch) / self.lookahead_minibatches)
+            examples_per_batch = [floor_examples_per_batch] * self.lookahead_minibatches
+            for i in range(len(maxi_batch) % self.lookahead_minibatches):
+                examples_per_batch[i] += 1
+            assert all(epb > 0 for epb in examples_per_batch)
+            assert sum(examples_per_batch) == len(maxi_batch)
+            maxi_batch_it = iter(maxi_batch)
+            for epb in examples_per_batch:
                 yield self.collate_fn(
                     [
                         example_dict for _, example_dict
-                        in itertools.islice(multibatch_it, examples_per_batch)
+                        in itertools.islice(maxi_batch_it, epb)
                     ]
                 )
 
@@ -152,7 +165,7 @@ class DynamicDatasetIter(object):
         batch_type (str): batching type to count on, choices=[tokens, sents];
         batch_size (int): numbers of examples in a batch;
         batch_size_multiple (int): make batch size multiply of this;
-        pool_size (int): accum this number of examples in a dynamic dataset;
+        max_look_ahead_sentences (int): accum this number of examples in a dynamic dataset;
         skip_empty_level (str): security level when encouter empty line;
         stride (int): iterate data files with this stride;
         offset (int): iterate data files with this offset.
@@ -173,8 +186,8 @@ class DynamicDatasetIter(object):
         batch_type,
         batch_size,
         batch_size_multiple,
-        pool_size=2048,
-        n_buckets=1024,
+        max_look_ahead_sentences=2048,
+        lookahead_minibatches=4,
     ):
         self.task_queue_manager = task_queue_manager
         self.opts = opts
@@ -188,8 +201,8 @@ class DynamicDatasetIter(object):
         self.batch_size = batch_size
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
-        self.pool_size = pool_size
-        self.n_buckets = n_buckets
+        self.max_look_ahead_sentences = max_look_ahead_sentences
+        self.lookahead_minibatches = lookahead_minibatches
 
     @classmethod
     def from_opts(cls, task_queue_manager, transforms_cls, vocabs_dict, opts, is_train):
@@ -209,8 +222,8 @@ class DynamicDatasetIter(object):
             opts.batch_type,
             batch_size,
             batch_size_multiple,
-            pool_size=opts.pool_size,
-            n_buckets=opts.n_buckets,
+            max_look_ahead_sentences=opts.max_look_ahead_sentences,
+            lookahead_minibatches=opts.lookahead_minibatches,
         )
 
     def _init_datasets(self):
@@ -243,8 +256,8 @@ class DynamicDatasetIter(object):
                     corpus,
                     self.batch_size,
                     self.batch_type,
-                    self.pool_size,
-                    n_buckets=self.n_buckets,
+                    self.max_look_ahead_sentences,
+                    lookahead_minibatches=self.lookahead_minibatches,
                     cycle=self.is_train,
                     as_iter=self.is_train,
                 )

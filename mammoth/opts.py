@@ -278,6 +278,13 @@ def model_opts(parser):
 
     # Encoder-Decoder Options
     group = parser.add_argument_group('Model- Encoder-Decoder')
+    group.add(
+        '--model_type',
+        '-model_type',
+        default='text',
+        choices=['text'],
+        help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
+    )
     group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
 
     group.add(
@@ -627,22 +634,23 @@ def _add_train_general_opts(parser):
         "uses more memory. Set to 0 to disable.",
     )
     group.add(
-        "-pool_size",
-        "--pool_size",
-        type=int,
-        default=2048,
-        help="(Maximum) number of examples to dynamically pool before batching.",
-    )
-    group.add(
-        "-n_buckets",
-        "--n_buckets",
+        "-lookahead_minibatches",
+        "--lookahead_minibatches",
         type=int,
         default=4,
-        help="The number of minibatches that will be yielded once bucketing is complete. "
+        help="The number of minibatches that SimpleLookAheadBucketing will read into a maxibatch, "
+        "pessimisticly sort by length, split into minibatches, and yield in one go. "
         "Recommended value: same as accum_count, or at least a multiple of it."
     )
+    group.add(
+        "-max_look_ahead_sentences",
+        "--max_look_ahead_sentences",
+        type=int,
+        default=2048,
+        help="(Maximum) number of sentence pairs that SimpleLookAheadBucketing can attempt to add to the maxibatch. "
+        "This is mainly a failsafe in case some corpus contains very short examples.",
+    )
 
-    group = parser.add_argument_group('Optimization')
     group.add(
         '--optim',
         '-optim',

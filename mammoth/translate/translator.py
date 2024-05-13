@@ -479,8 +479,8 @@ class Inference(object):
             corpus,
             batch_size=batch_size,
             batch_type=batch_type,
-            pool_size=512,
-            n_buckets=512,
+            max_look_ahead_sentences=512,
+            lookahead_minibatches=512,
             cycle=False,
         )
 

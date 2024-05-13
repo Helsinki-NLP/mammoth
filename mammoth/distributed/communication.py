@@ -36,7 +36,7 @@ def broadcast_tensors(tensors, src=0, group=None):
             torch.distributed.broadcast(t, src, group=group)
 
 
-def managed_reduce_and_rescale_grads(
+def externally_managed_reduce_and_rescale_grads(
     named_parameters,
     has_local_gradient: bool,
     gradient_norm: int,

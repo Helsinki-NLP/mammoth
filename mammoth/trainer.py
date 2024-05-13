@@ -278,7 +278,7 @@ class Trainer(object):
                     continue
                 # logger.warning(f'Syncing {component.get_name()}')   # DEBUG
                 params = component.named_parameters(self.model)
-                mammoth.distributed.managed_reduce_and_rescale_grads(
+                mammoth.distributed.externally_managed_reduce_and_rescale_grads(
                     named_parameters=params,
                     has_local_gradient=gradient_sync.has_local_gradient,
                     gradient_norm=gradient_sync.gradient_norm,
@@ -288,7 +288,7 @@ class Trainer(object):
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
             # Including single-device components
-            self.optim.managed_step(gradient_syncs)
+            self.optim.externally_managed_step(gradient_syncs)
             self.optim.zero_grad()
 
             if step % 1000 == 0 and step > 0:

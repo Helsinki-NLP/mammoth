@@ -161,10 +161,6 @@ def main(
     else:
         logger.info('Starting training on CPU, could be very slow')
     train_steps = opts.train_steps
-    if opts.single_pass and train_steps > 0:
-        if device_context.is_master():
-            logger.warning("Option single_pass is enabled, ignoring train_steps.")
-        train_steps = 0
     logger.info("{} - Starting training".format(device_context.id))
     trainer.train(
         train_iter,

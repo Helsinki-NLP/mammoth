@@ -16,7 +16,7 @@ from mammoth.models.adapters import (
     EncoderAdapterLayer,
     DecoderAdapterLayer,
 )
-from mammoth.constants import ModelTask, DefaultTokens
+from mammoth.constants import DefaultTokens
 from mammoth.modules.layer_stack_decoder import LayerStackDecoder
 from mammoth.modules.layer_stack_encoder import LayerStackEncoder
 from mammoth.modules import Embeddings
@@ -263,10 +263,7 @@ def create_bilingual_model(
 
 def build_src_emb(model_opts, src_vocab):
     # Build embeddings.
-    if model_opts.model_type == "text":
-        src_emb = build_embeddings(model_opts, src_vocab)
-    else:
-        src_emb = None
+    src_emb = build_embeddings(model_opts, src_vocab)
     return src_emb
 
 
@@ -287,9 +284,6 @@ def build_task_specific_model(
     task_queue_manager,
     checkpoint,
 ):
-    # logger.info(f'TaskQueueManager: {task_queue_manager}')
-    if not model_opts.model_task == ModelTask.SEQ2SEQ:
-        raise ValueError(f"Only ModelTask.SEQ2SEQ works - {model_opts.model_task} task")
 
     src_embs = dict()
     tgt_embs = dict()

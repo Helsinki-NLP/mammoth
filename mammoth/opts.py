@@ -1,7 +1,6 @@
 """ Implementation of all available options """
 import configargparse
 
-from mammoth.constants import ModelTask
 from mammoth.modules.position_ffn import ACTIVATION_FUNCTIONS
 from mammoth.modules.position_ffn import ActivationFunction
 from mammoth.transforms import AVAILABLE_TRANSFORMS
@@ -67,7 +66,7 @@ def _add_logging_opts(parser, is_train=True):
         )
         group.add(
             '--report_stats_from_parameters',
-            '-report_stats_from_parameters=',
+            '-report_stats_from_parameters',
             action="store_true",
             help="Report parameter-level statistics in tensorboard. "
             "This has a huge impact on performance: only use for debugging.",
@@ -107,16 +106,6 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         "--tasks",
         required=True,
         help="List of datasets and their specifications. See examples/*.yaml for further details.",
-    )
-    group.add(
-        "-skip_empty_level",
-        "--skip_empty_level",
-        default="warning",
-        choices=["silent", "warning", "error"],
-        help="Security level when encounter empty examples."
-        "silent: silently ignore/skip empty example;"
-        "warning: warning when ignore/skip empty example;"
-        "error: raise error & stop execution when encouter empty.",
     )
     group.add(
         "-transforms",
@@ -197,84 +186,38 @@ def _add_dynamic_vocabs_opts(parser, build_vocab_only=False):
         help=("Path to save" if build_vocab_only else "Path to") + " tgt vocabulary file. "
         "Format: one <word> or <word>\t<count> per line.",
     )
-    group.add("-share_vocab", "--share_vocab", action="store_true", help="Share source and target vocabulary.")
 
-    group.add(
-        "-vocab_paths",
-        "--vocab_paths",
-        default=None,
-        help="file name with ENCorDEC TAB language name TAB path of the vocab.",
-    )
-
-    group.add(
-        "-src_feats_vocab",
-        "--src_feats_vocab",
-        help=("List of paths to save" if build_vocab_only else "List of paths to") + " src features vocabulary files. "
-        "Files format: one <word> or <word>\t<count> per line.",
-    )
+    # Moved to transform
+    # group.add("-share_vocab", "--share_vocab", action="store_true", help="Share source and target vocabulary.")
 
     if not build_vocab_only:
         group.add(
             "-src_vocab_size",
             "--src_vocab_size",
             type=int,
-            default=50000,
-            help="Maximum size of the source vocabulary.",
+            default=None,
+            help="Maximum size of the source vocabulary; will silently truncate your vocab file if longer.",
         )
         group.add(
-            "-tgt_vocab_size", "--tgt_vocab_size", type=int, default=50000, help="Maximum size of the target vocabulary"
-        )
-        group.add(
-            "-vocab_size_multiple",
-            "--vocab_size_multiple",
-            type=int,
-            default=1,
-            help="Make the vocabulary size a multiple of this value.",
-        )
-
-        group.add(
-            "-src_words_min_frequency",
-            "--src_words_min_frequency",
-            type=int,
-            default=0,
-            help="Discard source words with lower frequency.",
-        )
-        group.add(
-            "-tgt_words_min_frequency",
-            "--tgt_words_min_frequency",
-            type=int,
-            default=0,
-            help="Discard target words with lower frequency.",
-        )
-
-        # Truncation options, for text corpus
-        group = parser.add_argument_group("Pruning")
-        group.add(
-            "--src_seq_length_trunc",
-            "-src_seq_length_trunc",
+            "-tgt_vocab_size",
+            "--tgt_vocab_size",
             type=int,
             default=None,
-            help="Truncate source sequence length.",
-        )
-        group.add(
-            "--tgt_seq_length_trunc",
-            "-tgt_seq_length_trunc",
-            type=int,
-            default=None,
-            help="Truncate target sequence length.",
+            help="Maximum size of the target vocabulary; will silently truncate your vocab file if longer."
         )
 
-        group = parser.add_argument_group('Embeddings')
-        group.add(
-            '-both_embeddings',
-            '--both_embeddings',
-            help="Path to the embeddings file to use for both source and target tokens.",
-        )
-        group.add('-src_embeddings', '--src_embeddings', help="Path to the embeddings file to use for source tokens.")
-        group.add('-tgt_embeddings', '--tgt_embeddings', help="Path to the embeddings file to use for target tokens.")
-        group.add(
-            '-embeddings_type', '--embeddings_type', choices=["GloVe", "word2vec"], help="Type of embeddings file."
-        )
+        # FIXME: nuked in the great refactor. Commenting out for now (issue #60)
+        # group = parser.add_argument_group('Embeddings')
+        # group.add(
+        #     '-both_embeddings',
+        #     '--both_embeddings',
+        #     help="Path to the embeddings file to use for both source and target tokens.",
+        # )
+        # group.add('-src_embeddings', '--src_embeddings', help="Path to the embeddings file to use for source tokens.")
+        # group.add('-tgt_embeddings', '--tgt_embeddings', help="Path to the embeddings file to use for target tokens.")
+        # group.add(
+        #     '-embeddings_type', '--embeddings_type', choices=["GloVe", "word2vec"], help="Type of embeddings file."
+        # )
 
 
 def _add_dynamic_transform_opts(parser):
@@ -311,21 +254,13 @@ def model_opts(parser):
     """
 
     # Embedding Options
-    group = parser.add_argument_group('Model-Embeddings')
+    group = parser.add_argument_group('Model- Embeddings')
 
     group.add(
         '--share_decoder_embeddings',
         '-share_decoder_embeddings',
         action='store_true',
         help="Use a shared weight matrix for the input and output word  embeddings in the decoder.",
-    )
-    group.add(
-        '--share_embeddings',
-        '-share_embeddings',
-        action='store_true',
-        help="Share the word embeddings between encoder "
-        "and decoder. Need to use shared dictionary for this "
-        "option.",
     )
     group.add(
         '--enable_embeddingless',
@@ -340,57 +275,9 @@ def model_opts(parser):
         action='store_true',
         help="Use a sin to mark relative words positions. Necessary for non-RNN style models.",
     )
-    group.add(
-        "-update_vocab", "--update_vocab", action="store_true", help="Update source and target existing vocabularies"
-    )
-
-    group = parser.add_argument_group('Model-Embedding Features')
-    group.add(
-        '--feat_merge',
-        '-feat_merge',
-        type=str,
-        default='concat',
-        choices=['concat', 'sum', 'mlp'],
-        help="Merge action for incorporating features embeddings. Options [concat|sum|mlp].",
-    )
-    group.add(
-        '--feat_vec_size',
-        '-feat_vec_size',
-        type=int,
-        default=-1,
-        help="If specified, feature embedding sizes "
-        "will be set to this. Otherwise, feat_vec_exponent "
-        "will be used.",
-    )
-    group.add(
-        '--feat_vec_exponent',
-        '-feat_vec_exponent',
-        type=float,
-        default=0.7,
-        help="If -feat_merge_size is not set, feature "
-        "embedding sizes will be set to N^feat_vec_exponent "
-        "where N is the number of values the feature takes.",
-    )
-
-    # Model Task Options
-    group = parser.add_argument_group("Model- Task")
-    group.add(
-        "-model_task",
-        "--model_task",
-        default=ModelTask.SEQ2SEQ,
-        choices=[ModelTask.SEQ2SEQ, ModelTask.LANGUAGE_MODEL],
-        help="Type of task for the model either seq2seq or lm",
-    )
 
     # Encoder-Decoder Options
     group = parser.add_argument_group('Model- Encoder-Decoder')
-    group.add(
-        '--model_type',
-        '-model_type',
-        default='text',
-        choices=['text'],
-        help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
-    )
     group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
 
     group.add(
@@ -398,10 +285,8 @@ def model_opts(parser):
         '-encoder_type',
         type=str,
         default='transformer',
-        choices=['mean', 'transformer'],
-        help="Type of encoder layer to use. Non-RNN layers "
-        "are experimental. Options are "
-        "[mean|transformer].",
+        choices=['transformer'],
+        help="In deprecation. Only transformers are supported."
     )
     group.add(
         '--decoder_type',
@@ -409,14 +294,12 @@ def model_opts(parser):
         type=str,
         default='transformer',
         choices=['transformer'],
-        help="Type of decoder layer to use. Non-RNN layers "
-        "are experimental. Options are "
-        "[transformer].",
+        help="In deprecation. Only transformers are supported."
     )
 
-    group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
-    group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder')
-    group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder')
+    # group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
+    group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder module')
+    group.add('--dec_layers', '-dec_layers', nargs='+', type=int, help='Number of layers in each decoder module')
     group.add(
         '--model_dim',
         '-model_dim',
@@ -424,14 +307,6 @@ def model_opts(parser):
         default=-1,
         help="Size of rnn hidden states.",
     )
-
-    # group.add(
-    #     '--cnn_kernel_width',
-    #     '-cnn_kernel_width',
-    #     type=int,
-    #     default=3,
-    #     help="Size of windows in the cnn, the kernel_size is (cnn_kernel_width, 1) in conv layer",
-    # )
 
     group.add(
         '--pos_ffn_activation_fn',
@@ -447,76 +322,8 @@ def model_opts(parser):
 
     group.add('-normformer', '--normformer', action='store_true', help='NormFormer-style normalization')
 
-    # group.add(
-    #     '--input_feed',
-    #     '-input_feed',
-    #     type=int,
-    #     default=1,
-    #     help="Feed the context vector at each time step as "
-    #     "additional input (via concatenation with the word "
-    #     "embeddings) to the decoder.",
-    # )
-    group.add(
-        '--bridge',
-        '-bridge',
-        action="store_true",
-        help="Have an additional layer between the last encoder state and the first decoder state",
-    )
-    # group.add('--residual', '-residual',   action="store_true",
-    #                     help="Add residual connections between RNN layers.")
-
-    # group.add(
-    #     '--context_gate',
-    #     '-context_gate',
-    #     type=str,
-    #     default=None,
-    #     choices=['source', 'target', 'both'],
-    #     help="Type of context gate to use. Do not select for no context gate.",
-    # )
-
-    # The following options (bridge_extra_node to n_steps) are used
-    # for training with --encoder_type ggnn (Gated Graph Neural Network).
-    group.add(
-        '--bridge_extra_node',
-        '-bridge_extra_node',
-        type=bool,
-        default=True,
-        help='Graph encoder bridges only extra node to decoder as input',
-    )
-    group.add(
-        '--bidir_edges', '-bidir_edges', type=bool, default=True, help='Graph encoder autogenerates bidirectional edges'
-    )
-    group.add(
-        '--state_dim', '-state_dim', type=int, default=512, help='Number of state dimensions in the graph encoder'
-    )
-    group.add('--n_edge_types', '-n_edge_types', type=int, default=2, help='Number of edge types in the graph encoder')
-    group.add('--n_node', '-n_node', type=int, default=2, help='Number of nodes in the graph encoder')
-    group.add('--n_steps', '-n_steps', type=int, default=2, help='Number of steps to advance graph encoder')
-    group.add(
-        '--src_ggnn_size',
-        '-src_ggnn_size',
-        type=int,
-        default=0,
-        help='Vocab size plus feature space for embedding input',
-    )
-
     # Attention options
     group = parser.add_argument_group('Model- Attention')
-    group.add(
-        '--global_attention',
-        '-global_attention',
-        type=str,
-        default='general',
-        choices=['dot', 'general', 'mlp', 'none'],
-        help="The attention type to use: dotprod or general (Luong) or MLP (Bahdanau)",
-    )
-    group.add(
-        '--global_attention_function',
-        '-global_attention_function',
-        type=str,
-        default="softmax",
-        choices=["softmax"],
-    )
     group.add(
         '--self_attn_type',
         '-self_attn_type',
@@ -524,6 +331,8 @@ def model_opts(parser):
         default="scaled-dot",
         help='Self attention type in Transformer decoder layer -- currently "scaled-dot" or "average" ',
     )
+
+    # TODO is this actually in use?
     group.add(
         '--max_relative_positions',
         '-max_relative_positions',
@@ -538,10 +347,12 @@ def model_opts(parser):
     group.add(
         '--transformer_ff', '-transformer_ff', type=int, default=2048, help='Size of hidden transformer feed-forward'
     )
+    # TODO is this actually in use?
     group.add('--aan_useffn', '-aan_useffn', action="store_true", help='Turn on the FFN layer in the AAN decoder')
 
     # Alignement options
-    group = parser.add_argument_group('Model - Alignement')
+    # TODO is this actually in use?
+    group = parser.add_argument_group('Model - Alignment')
     group.add(
         '--lambda_align',
         '-lambda_align',
@@ -570,6 +381,7 @@ def model_opts(parser):
 
     # Generator and loss options.
     group = parser.add_argument_group('Generator')
+    # FIXME likely broken, should be removed
     group.add('--copy_attn', '-copy_attn', action="store_true", help='Train copy attention layer.')
     group.add(
         '--copy_attn_type',
@@ -658,7 +470,8 @@ def model_opts(parser):
 def _add_train_general_opts(parser):
     """General options for training"""
     group = parser.add_argument_group('General')
-    group.add('--data_type', '-data_type', default="text", help="Type of the source input. Options are [text].")
+    # TODO maybe relevant for issue #53
+    # group.add('--data_type', '-data_type', default="text", help="Type of the source input. Options are [text].")
 
     group.add(
         '--save_model',
@@ -666,12 +479,14 @@ def _add_train_general_opts(parser):
         default='model',
         help="Model filename (the model will be saved as <save_model>_N.pt where N is the number of steps",
     )
+
     group.add(
         "--save_all_gpus",
         "-save_all_gpus",
         action="store_true",
-        help="Whether to store a model from every gpu (in addition to the modules)",
+        help="Deprecated.",
     )
+
     group.add(
         '--save_checkpoint_steps',
         '-save_checkpoint_steps',
@@ -682,9 +497,22 @@ def _add_train_general_opts(parser):
     group.add(
         '--keep_checkpoint', '-keep_checkpoint', type=int, default=-1, help="Keep X checkpoints (negative: keep all)"
     )
+    group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
+    group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')
+    group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
+    group.add(
+        '--early_stopping', '-early_stopping', type=int, default=0, help='Number of validation steps without improving.'
+    )
+    group.add(
+        '--early_stopping_criteria',
+        '-early_stopping_criteria',
+        nargs="*",
+        default=None,
+        help='Criteria to use for early stopping.',
+    )
 
     # GPU
-    group.add('--gpuid', '-gpuid', default=[], nargs='*', type=int, help="Deprecated see world_size and gpu_ranks.")
+    group = parser.add_argument_group('Computation Environment')
     group.add('--gpu_ranks', '-gpu_ranks', default=[], nargs='*', type=int, help="list of ranks of each process.")
     group.add('--n_nodes', '-n_nodes', default=1, type=int, help="total number of training nodes.")
     group.add(
@@ -696,6 +524,7 @@ def _add_train_general_opts(parser):
              "When using non-distributed training (CPU, single-GPU), set to 0"
     )
     group.add('--world_size', '-world_size', default=1, type=int, help="total number of distributed processes.")
+    # TODO is gpu_backend actually in use?
     group.add('--gpu_backend', '-gpu_backend', default="nccl", type=str, help="Type of torch distributed backend")
     group.add(
         '--gpu_verbose_level',
@@ -749,21 +578,6 @@ def _add_train_general_opts(parser):
         help="Optimization resetter when train_from.",
     )
 
-    # Pretrained word vectors
-    group.add(
-        '--pre_word_vecs_enc',
-        '-pre_word_vecs_enc',
-        help="If a valid path is specified, then this will load "
-        "pretrained word embeddings on the encoder side. "
-        "See README for specific formatting instructions.",
-    )
-    group.add(
-        '--pre_word_vecs_dec',
-        '-pre_word_vecs_dec',
-        help="If a valid path is specified, then this will load "
-        "pretrained word embeddings on the decoder side. "
-        "See README for specific formatting instructions.",
-    )
     # Freeze word vectors
     group.add(
         '--freeze_word_vecs_enc',
@@ -779,8 +593,9 @@ def _add_train_general_opts(parser):
     )
 
     # Optimization options
-    group = parser.add_argument_group('Optimization- Type')
+    group = parser.add_argument_group('Batching')
     group.add('--batch_size', '-batch_size', type=int, default=64, help='Maximum batch size for training')
+    group.add('--valid_batch_size', '-valid_batch_size', type=int, default=32, help='Maximum batch size for validation')
     group.add(
         '--batch_size_multiple',
         '-batch_size_multiple',
@@ -796,40 +611,12 @@ def _add_train_general_opts(parser):
         help="Batch grouping for batch_size. Standard is sents. Tokens will do dynamic batching",
     )
     group.add(
-        '--normalization',
-        '-normalization',
-        default='sents',
-        choices=["sents", "tokens"],
-        help='Normalization method of the gradient.',
-    )
-    group.add(
-        '--accum_count',
-        '-accum_count',
-        type=int,
-        nargs='+',
-        default=[1],
-        help="Accumulate gradient this many times. "
-        "Approximately equivalent to updating "
-        "batch_size * accum_count batches at once. "
-        "Recommended for Transformer.",
-    )
-    group.add(
-        '--accum_steps',
-        '-accum_steps',
-        type=int,
-        nargs='+',
-        default=[0],
-        help="Steps at which accum_count values change",
-    )
-    group.add(
         '--task_distribution_strategy',
         '-task_distribution_strategy',
         choices=TASK_DISTRIBUTION_STRATEGIES.keys(),
         default='weighted_sampling',
         help="Strategy for the order in which tasks (e.g. language pairs) are scheduled for training"
     )
-    group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
-    group.add('--valid_batch_size', '-valid_batch_size', type=int, default=32, help='Maximum batch size for validation')
     group.add(
         '--max_generator_batches',
         '-max_generator_batches',
@@ -839,21 +626,23 @@ def _add_train_general_opts(parser):
         "the generator on in parallel. Higher is faster, but "
         "uses more memory. Set to 0 to disable.",
     )
-    group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
     group.add(
-        '--single_pass', '-single_pass', action='store_true', help="Make a single pass over the training dataset."
+        "-pool_size",
+        "--pool_size",
+        type=int,
+        default=2048,
+        help="(Maximum) number of examples to dynamically pool before batching.",
     )
-    group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')
     group.add(
-        '--early_stopping', '-early_stopping', type=int, default=0, help='Number of validation steps without improving.'
+        "-n_buckets",
+        "--n_buckets",
+        type=int,
+        default=4,
+        help="The number of minibatches that will be yielded once bucketing is complete. "
+        "Recommended value: same as accum_count, or at least a multiple of it."
     )
-    group.add(
-        '--early_stopping_criteria',
-        '-early_stopping_criteria',
-        nargs="*",
-        default=None,
-        help='Criteria to use for early stopping.',
-    )
+
+    group = parser.add_argument_group('Optimization')
     group.add(
         '--optim',
         '-optim',
@@ -886,6 +675,7 @@ def _add_train_general_opts(parser):
         default=0,
         help="L2 penalty (weight decay) regularizer",
     )
+    # FIXME, mentions LSTM
     group.add(
         '--dropout',
         '-dropout',
@@ -905,7 +695,6 @@ def _add_train_general_opts(parser):
     group.add(
         '--dropout_steps', '-dropout_steps', type=int, nargs='+', default=[0], help="Steps at which dropout changes."
     )
-    group.add('--truncated_decoder', '-truncated_decoder', type=int, default=0, help="""Truncated bptt.""")
     group.add(
         '--adam_beta1',
         '-adam_beta1',
@@ -965,9 +754,33 @@ def _add_train_general_opts(parser):
         default=1,
         help="Step for moving average. Default is every update, if -average_decay is set.",
     )
+    group.add(
+        '--normalization',
+        '-normalization',
+        default='sents',
+        choices=["sents", "tokens"],
+        help='Normalization method of the gradient.',
+    )
+    group.add(
+        '--accum_count',
+        '-accum_count',
+        type=int,
+        nargs='+',
+        default=[1],
+        help="Accumulate gradient this many times. "
+        "Approximately equivalent to updating "
+        "batch_size * accum_count batches at once. "
+        "Recommended for Transformer.",
+    )
+    group.add(
+        '--accum_steps',
+        '-accum_steps',
+        type=int,
+        nargs='+',
+        default=[0],
+        help="Steps at which accum_count values change",
+    )
 
-    # learning rate
-    group = parser.add_argument_group('Optimization- Rate')
     group.add(
         '--learning_rate',
         '-learning_rate',
@@ -1007,25 +820,6 @@ def _add_train_general_opts(parser):
     _add_logging_opts(parser, is_train=True)
 
 
-def _add_train_dynamic_data(parser):
-    group = parser.add_argument_group("Dynamic data")
-    group.add(
-        "-pool_size",
-        "--pool_size",
-        type=int,
-        default=2048,
-        help="(Maximum) number of examples to dynamically pool before batching.",
-    )
-    group.add(
-        "-n_buckets",
-        "--n_buckets",
-        type=int,
-        default=4,
-        help="The number of minibatches that will be yielded once bucketing is complete. "
-        "Recommended value: same as accum_count, or at least a multiple of it."
-    )
-
-
 def train_opts(parser):
     """All options used in train."""
     # options relate to data preprare
@@ -1033,7 +827,6 @@ def train_opts(parser):
     # options relate to train
     model_opts(parser)
     _add_train_general_opts(parser)
-    _add_train_dynamic_data(parser)
 
 
 def _add_decoding_opts(parser):

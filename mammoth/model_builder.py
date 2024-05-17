@@ -284,7 +284,7 @@ def build_task_specific_model(
     task_queue_manager,
     checkpoint,
 ):
-    
+
     src_embs = dict()
     tgt_embs = dict()
 

@@ -649,7 +649,6 @@ def _add_train_general_opts(parser):
         "Recommended value: same as accum_count, or at least a multiple of it."
     )
 
-
     group = parser.add_argument_group('Optimization')
     group.add(
         '--optim',

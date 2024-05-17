@@ -285,10 +285,8 @@ def model_opts(parser):
         '-encoder_type',
         type=str,
         default='transformer',
-        choices=['mean', 'transformer'],  # TODO is this mean actually supported?
-        help="Type of encoder layer to use. Non-RNN layers "
-        "are experimental. Options are "
-        "[mean|transformer].",
+        choices=['transformer'],
+        help="In deprecation. Only transformers are supported."
     )
     group.add(
         '--decoder_type',
@@ -296,9 +294,7 @@ def model_opts(parser):
         type=str,
         default='transformer',
         choices=['transformer'],
-        help="Type of decoder layer to use. Non-RNN layers "
-        "are experimental. Options are "
-        "[transformer].",
+        help="In deprecation. Only transformers are supported."
     )
 
     # group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
@@ -502,9 +498,6 @@ def _add_train_general_opts(parser):
         '--keep_checkpoint', '-keep_checkpoint', type=int, default=-1, help="Keep X checkpoints (negative: keep all)"
     )
     group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
-    group.add(
-        '--single_pass', '-single_pass', action='store_true', help="Make a single pass over the training dataset."
-    )
     group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
     group.add(

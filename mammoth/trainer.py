@@ -57,7 +57,7 @@ def build_trainer(
     valid_loss_md = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
-    for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_vocabs('tgt', vocabs_dict):
+    for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_my_vocabs('tgt', vocabs_dict):
         generator = generators_md[f'generator_{lang}']
         train_loss_md.add_module(
             f'trainloss{lang}',
@@ -185,13 +185,6 @@ class Trainer(object):
         self.dropout_steps = dropout_steps
 
         self.task_queue_manager = task_queue_manager
-        my_component_groups = self.task_queue_manager.get_distributed_groups()
-        self.my_encoder_groups = my_component_groups['encoder']
-        self.my_decoder_groups = my_component_groups['decoder']
-        self.my_src_emb_groups = my_component_groups['src_emb']
-        self.my_tgt_emb_groups = my_component_groups['tgt_emb']
-        self.my_encoder_adapter_groups = my_component_groups['encoder_adapters']
-        self.my_decoder_adapter_groups = my_component_groups['decoder_adapters']
 
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
@@ -263,71 +256,40 @@ class Trainer(object):
             self._maybe_update_dropout(step)
 
             self.accum_count = self._accum_count(self.optim.training_step)
-            self.task_queue_manager.tasks_per_communication_batch = self.accum_count
+            self.task_queue_manager.accum_count = self.accum_count
             batches_with_meta = islice(train_iter, self.accum_count)
 
-            self._gradient_accumulation_over_lang_pairs(
+            batch_task_sample = self.task_queue_manager.sample_corpus_ids()
+            my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
+
+            self._gradient_accumulation(
                 batches_with_meta,
                 total_stats,
                 report_stats,
+                my_task,
             )
 
-            # Note that all group ids are tuples, some with length 1
-            for (layer_stack_index, encoder_id), (_, group) in self.my_encoder_groups.items():
-                params = [
-                    (name, p) for (name, p)
-                    in self.model.encoder.get_submodule(layer_stack_index, encoder_id).named_parameters()
-                    if 'embeddings' not in name and 'adapter' not in name
-                ]
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
-
-            for (layer_stack_index, decoder_id), (_, group) in self.my_decoder_groups.items():
-                params = [
-                    (name, p) for (name, p)
-                    in self.model.decoder.get_submodule(layer_stack_index, decoder_id).named_parameters()
-                    if 'embeddings' not in name and 'adapter' not in name
-                ]
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(params, group=group)
-
-            for (src_lang,), (_, group) in self.my_src_emb_groups.items():
-                embs = self.model.encoder.embeddings[f'embeddings_{src_lang}']
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
-
-            for (tgt_lang,), (_, group) in self.my_tgt_emb_groups.items():
-                embs = self.model.decoder.embeddings[f'embeddings_{tgt_lang}']
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(embs.named_parameters(), group=group)
-
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(
-                    self.model.generator[f'generator_{tgt_lang}'].named_parameters(), group=group
-                )
-
-            for adapter_id, (_, group) in self.my_encoder_adapter_groups.items():
-                layer_stack_index, encoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.encoder.get_submodule(layer_stack_index, encoder_id).get_adapter(
-                    adapter_group, sub_id
-                )
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
-
-            for adapter_id, (_, group) in self.my_decoder_adapter_groups.items():
-                layer_stack_index, decoder_id, adapter_group, sub_id = adapter_id
-                adapter = self.model.decoder.get_submodule(layer_stack_index, decoder_id).get_adapter(
-                    adapter_group, sub_id
-                )
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(adapter.named_parameters(), group=group)
-
-            # a group is not specified: reduce across all devices
-            if device_context.is_distributed():
-                mammoth.distributed.only_ready_reduce_and_rescale_grads(
-                    self.model.attention_bridge.named_parameters()
+            gradient_syncs = self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample)
+            for gradient_sync in gradient_syncs:
+                component = gradient_sync.component
+                if not component.needs_communication():
+                    # Omit components not found elsewhere, as these don't need to be communicated
+                    # logger.warning(f'Omitting (single device) {component.get_name()}')   # DEBUG
+                    continue
+                # logger.warning(f'Syncing {component.get_name()}')   # DEBUG
+                params = component.named_parameters(self.model)
+                mammoth.distributed.managed_reduce_and_rescale_grads(
+                    named_parameters=params,
+                    has_local_gradient=gradient_sync.has_local_gradient,
+                    gradient_norm=gradient_sync.gradient_norm,
+                    group=component.group,
                 )
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
-            self.optim.step()
+            # Including single-device components
+            self.optim.managed_step(gradient_syncs)
             self.optim.zero_grad()
-            for p in self.model.parameters():
-                if hasattr(p, 'has_grad'):
-                    p.has_grad = False
 
             if step % 1000 == 0 and step > 0:
                 # TODO: if you are going to uncomment that block, please make it optional
@@ -349,6 +311,7 @@ class Trainer(object):
                 train_steps,
                 self.optim.learning_rate(),
                 report_stats,
+                sampled_task_counts=self.task_queue_manager.sampled_task_counts,
             )
 
             if step % valid_steps == 0 and valid_iter is not None:
@@ -439,21 +402,24 @@ class Trainer(object):
         # Set model back to training mode.
         valid_model.train()
 
-        for p in self.model.parameters():
-            if hasattr(p, 'has_grad'):
-                p.has_grad = False
-
         return stats
 
-    def _gradient_accumulation_over_lang_pairs(
+    def _gradient_accumulation(
         self,
         batches_with_meta,
         total_stats,
         report_stats,
+        my_task,
     ):
         normalization = 0
         seen_comm_batches = set()
+        expected_metadata = my_task.get_serializable_metadata()
         for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
+            if metadata != expected_metadata:
+                raise Exception(
+                    f'Mismatch in task sampling for batch {comm_batch}.\n '
+                    f'Received {metadata},\n expected {expected_metadata}'
+                )
             seen_comm_batches.add(comm_batch)
             if self.norm_method == "tokens":
                 num_tokens = (
@@ -475,6 +441,9 @@ class Trainer(object):
             # decoder output will be read directly from the batch:
             # cf. `onmt.utils.loss.CommonLossCompute._make_shard_state`
             tgt_outer = batch.tgt
+
+            # QUI logging for batch shapes
+            # print(src.shape, src.shape[0] * src.shape[1], tgt_outer.shape, tgt_outer.shape[0] * tgt_outer.shape[1])
 
             bptt = False
             # TODO: these loops come from truncation / BPTT implementations which are removed in #60
@@ -541,7 +510,7 @@ class Trainer(object):
         if self.report_manager is not None and self.report_stats_from_parameters:
             report_stats.update_from_parameters(named_parameters)
 
-    def _maybe_report_training(self, step, num_steps, learning_rate, report_stats):
+    def _maybe_report_training(self, step, num_steps, learning_rate, report_stats, sampled_task_counts):
         """
         Simple function to report training stats (if report_manager is set)
         see `mammoth.utils.ReportManagerBase.report_training` for doc
@@ -554,6 +523,7 @@ class Trainer(object):
                 None if self.earlystopper is None else self.earlystopper.current_tolerance,
                 report_stats,
                 multigpu=self.device_context.is_distributed(),
+                sampled_task_counts=sampled_task_counts,
             )
 
     def _report_step(self, learning_rate, step, train_stats=None, valid_stats=None):

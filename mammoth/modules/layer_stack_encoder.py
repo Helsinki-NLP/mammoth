@@ -23,7 +23,7 @@ class LayerStackEncoder(EncoderBase):
         for layer_stack_index, n_layers in enumerate(opts.enc_layers):
             stacks = nn.ModuleDict()
             is_on_top = layer_stack_index == len(opts.enc_layers) - 1
-            for module_id in task_queue_manager.get_encoders(layer_stack_index):
+            for module_id in task_queue_manager.get_my_encoders(layer_stack_index):
                 if module_id in stacks:
                     # several tasks using the same layer stack
                     continue
@@ -120,9 +120,12 @@ class LayerStackEncoder(EncoderBase):
     def get_submodule(self, layer_stack_index: int, module_id: str):
         return self.encoders[layer_stack_index][module_id]
 
-    def get_adapter(self, module_id: str, adapter_group: str, sub_id: str):
+    def get_adapter(self, adapter_group: str, sub_id: str):
         name = Adapter._name(adapter_group, sub_id)
         layer_stack_index = self._adapter_to_stack[name]
+        # All module_ids in the same slot (should) have the same adapters.
+        # Thus, we can select one arbitrarily.
+        module_id = sorted(self.encoders[layer_stack_index].keys())[0]
         return self.encoders[layer_stack_index][module_id].get_adapter(adapter_group, sub_id)
 
     def add_adapter(

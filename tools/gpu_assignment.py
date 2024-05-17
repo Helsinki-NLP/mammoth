@@ -1,7 +1,12 @@
+import itertools
+import json
+import numpy as np
 import random
+import time
 from collections import defaultdict, Counter, namedtuple
 from functools import lru_cache
 from typing import Set, Dict, Tuple, Optional, Callable, List
+from tqdm import tqdm
 
 INTER_NODE_COST = 5
 INTRA_NODE_COST = 1
@@ -124,6 +129,62 @@ class Assignment:
     def get_gpus(gpus: Counter):
         return tuple(key for key, val in gpus.items() if val > 0)
 
+    def get_least_favorite_slots(self, ao):
+        """
+        Returns one slot per GPU.
+        The selected slot is the one that is locally optimal to get rid of:
+        i.e. not considering the destination of the swap.
+        """
+        def sort_func(slot):
+            return (slot.node * ao.n_gpus_per_node) + slot.gpu
+        sorted_slots = list(sorted(self.assignment.keys(), key=sort_func))
+        result = []
+        for _, group in itertools.groupby(sorted_slots, sort_func):
+            result.append(self._least_favorite_slot_single(group, ao))
+        return result
+
+    def _least_favorite_slot_single(self, gpu_slots, ao):
+        gpu_slots = list(gpu_slots)
+        # compute local statistics
+        component_counts = Counter()
+        n_ready = 0
+        for gpu_slot in gpu_slots:
+            lp = self.assignment[gpu_slot]
+            if lp is None:
+                continue
+            src_lang, tgt_lang = lp
+            components = ao.get_components(src_lang, tgt_lang)
+            for component in components:
+                component_counts[component] += 1
+            if ao._is_ready_to_start(lp):
+                n_ready += 1
+        # use local stats to sort the slots
+        weighted_slots = []
+        for gpu_slot in gpu_slots:
+            lp = self.assignment[gpu_slot]
+            if lp is None:
+                weighted_slots.append((0, gpu_slot))
+                continue
+            cost = 0
+            src_lang, tgt_lang = lp
+            components = ao.get_components(src_lang, tgt_lang)
+            for component in components:
+                if component_counts[component] == 1:
+                    # solo components are good choices to get rid of
+                    cost -= 5
+                else:
+                    cost += component_counts[component]
+            if ao._is_ready_to_start(lp):
+                if n_ready == 1:
+                    # don't get rid of the last ready task
+                    cost += VERY_BAD
+            else:
+                # prefer moving non-ready tasks
+                cost -= 1
+            weighted_slots.append((cost, gpu_slot))
+        _, gpu_slot = sorted(weighted_slots)[0]
+        return gpu_slot
+
 
 class AssignmentOptimizer:
     def __init__(
@@ -150,13 +211,24 @@ class AssignmentOptimizer:
 
     def initial_assignment(self, lang_pairs: List[Tuple[str, str]]):
         lang_pairs = list(lang_pairs)
-        random.shuffle(lang_pairs)
         if len(lang_pairs) > len(self.gpu_slots):
             raise Exception(f'More lang pairs {len(lang_pairs)} than gpu slots {len(self.gpu_slots)}')
         if len(self.gpu_slots) > len(lang_pairs):
             # Add empty slots
             lang_pairs.extend([None] * (len(self.gpu_slots) - len(lang_pairs)))
-        assignment_dict = {gpu_slot: lp for gpu_slot, lp in zip(self.gpu_slots, lang_pairs)}
+        # Start by assigning a ready task to the first slot of each GPU
+        shuffled_ready = list(self.ready_to_start)
+        random.shuffle(shuffled_ready)
+        shuffled_ready = shuffled_ready[:(self.n_nodes * self.n_gpus_per_node)]
+        first_slots = [gpu_slot for gpu_slot in self.gpu_slots if gpu_slot.slot == 0]
+        assignment_dict = {gpu_slot: lp for gpu_slot, lp in zip(first_slots, shuffled_ready)}
+        # Assign the rest randomly
+        seen = set(assignment_dict.values())
+        lang_pairs = [lp for lp in lang_pairs if lp not in seen]
+        gpu_slots = [gpu_slot for gpu_slot in self.gpu_slots if gpu_slot not in assignment_dict.keys()]
+        random.shuffle(lang_pairs)
+        for gpu_slot, lp in zip(gpu_slots, lang_pairs):
+            assignment_dict[gpu_slot] = lp
         return Assignment.new(assignment_dict, self)
 
     def cost(self, assignment: Assignment) -> float:
@@ -243,9 +315,10 @@ class AssignmentOptimizer:
             else:
                 # also populate gpus with zero count
                 filled[gpu] += 0
+        n_empty = sum(1 for x in filled.values() if x == 0)
         min_filled = min(filled.values())
         max_filled = max(filled.values())
-        penalty = extra_empty_penalty if min_filled == 0 else 0
+        penalty = n_empty * extra_empty_penalty
         if filled[(0, 0)] > min_filled:
             # There are unassigned slots, but more of them on some other device than master (0:0)
             # Master has some extra duties, so it is the optimal place for empty slots
@@ -270,35 +343,56 @@ class AssignmentOptimizer:
                 result += VERY_BAD * count
         return result
 
-    def best_swap_for(self, slot_a: GpuSlot, assignment, current_cost):
+    def best_swap_for(self, slot_a: GpuSlot, assignment, current_cost, slot_subset=None):
+        slot_subset = self.gpu_slots if slot_subset is None else slot_subset
         costs = [(current_cost, slot_a)]
-        for i, slot_b in enumerate(self.gpu_slots):
+        for i, slot_b in enumerate(slot_subset):
             if slot_a.node == slot_b.node and slot_a.gpu == slot_b.gpu:
                 # No point swapping pairs already on the same device
                 continue
             proposal = assignment.swap(slot_a, slot_b, self)
             costs.append((self.cost(proposal), slot_b))
-            if i > 0 and i % 100 == 0:
-                print('.', end='', flush=True)
         costs = sorted(costs)
         best_cost, slot_b = costs[0]
         best_assignment = assignment.swap(slot_a, slot_b, self)
         return best_cost, best_assignment
 
-    def swap_all_slots_once(self, assignment, current_cost):
-        for i, slot_a in enumerate(self.gpu_slots):
-            current_cost, assignment = self.best_swap_for(slot_a, assignment, current_cost)
-            print('o', end='', flush=True)
+    def swap_all_slots_once(self, assignment, current_cost, slot_subset=None):
+        slot_subset = self.gpu_slots if slot_subset is None else slot_subset
+        for i, slot_a in enumerate(tqdm(slot_subset, desc='swap_all_slots_once', leave=False)):
+            current_cost, assignment = self.best_swap_for(slot_a, assignment, current_cost, slot_subset)
+            if self.deadline and time.time() > self.deadline:
+                print('Time budget exceeded, finishing early mid-iteration', flush=True)
+                break
         return current_cost, assignment
 
-    def optimize(self, assignment, current_cost, iterations=10, patience=1):
+    def optimize(self, assignment, current_cost, iterations=10, patience=1, time_budget_s=None):
+        self.deadline = time.time() + time_budget_s if time_budget_s else None
         prev_cost = None
         stalled = 0
         print(f'initial cost: {current_cost}', flush=True)
-        for i in range(iterations):
+        for i in tqdm(range(iterations), desc='iterations'):
             prev_cost = current_cost
-            current_cost, assignment = self.swap_all_slots_once(assignment, current_cost)
-            print(f'iteration {i} cost: {current_cost}', flush=True)
+            # Subset consisting of least favorite tasks
+            slot_subset = assignment.get_least_favorite_slots(self)
+            current_cost, assignment = self.swap_all_slots_once(
+                assignment,
+                current_cost,
+                slot_subset
+            )
+            if self.deadline and time.time() > self.deadline:
+                print('Time budget exceeded, finishing early', flush=True)
+                break
+            print(f'\niteration {i} least_favorite cost: {current_cost}', flush=True)
+            # Random subsets
+            slot_subsets = self.slot_subsets(self.gpu_slots, n=100)
+            for slot_subset in tqdm(slot_subsets, desc='subset'):
+                current_cost, assignment = self.swap_all_slots_once(
+                    assignment,
+                    current_cost,
+                    slot_subset
+                )
+            print(f'\niteration {i} random cost: {current_cost}', flush=True)
             if prev_cost == current_cost:
                 stalled += 1
             else:
@@ -306,7 +400,23 @@ class AssignmentOptimizer:
             if stalled > patience:
                 print('No improvement, finishing early', flush=True)
                 break
-        return current_cost, assignment
+            if self.deadline and time.time() > self.deadline:
+                print('Time budget exceeded, finishing early', flush=True)
+                break
+        return current_cost, assignment, i
+
+    def slot_subsets(self, slots, n=100):
+        if len(slots) <= n:
+            return [slots]
+        slots = list(slots)
+        random.shuffle(slots)
+        n_chunks = int(np.ceil(len(slots) / n))
+        chunk_len = int(np.ceil(len(slots) / n_chunks))
+        chunks = []
+        islots = iter(slots)
+        for _ in range(n_chunks):
+            chunks.append(list(itertools.islice(islots, chunk_len)))
+        return chunks
 
 
 def print_assignment(assignment, group_mapping, ready_to_start=None):
@@ -334,6 +444,8 @@ def optimize_gpu_assignment(
     lang_pairs: List[Tuple[str, str]],
     lang_to_group_mapping: Dict[str, str],
     lps_ready_to_start: Optional[Set[Tuple[str, str]]],
+    log_name: Optional[str] = None,
+    time_budget_s: Optional[int] = None,
 ):
     optimizer = AssignmentOptimizer(
         n_nodes=n_nodes,
@@ -345,9 +457,32 @@ def optimize_gpu_assignment(
 
     initial = optimizer.initial_assignment(lang_pairs)
     initial_cost = optimizer.cost(initial)
-    best_cost, assignment = optimizer.optimize(initial, initial_cost)
+    start = time.time()
+    best_cost, assignment, iterations = optimizer.optimize(
+        initial,
+        initial_cost,
+        time_budget_s=time_budget_s
+    )
+    duration_s = time.time() - start
     print_assignment(assignment, lang_to_group_mapping, ready_to_start=lps_ready_to_start)
     print(f'assignment cost {best_cost}', flush=True)
+
+    if log_name:
+        with open('gpu_assignment_cost_log.jsonl', 'a') as fout:
+            record = {
+                'method': 'least_favorite_slot',
+                'name': log_name,
+                'n_nodes': n_nodes,
+                'n_gpus_per_node': n_gpus_per_node,
+                'n_slots_per_gpu': n_slots_per_gpu,
+                'n_lps': len(lang_pairs),
+                'initial_cost': initial_cost,
+                'best_cost': best_cost,
+                'iterations': iterations,
+                'duration_s': duration_s,
+            }
+            json.dump(record, fout)
+            fout.write('\n')
     return assignment
 
 

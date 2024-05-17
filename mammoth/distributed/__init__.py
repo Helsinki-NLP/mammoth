@@ -4,7 +4,7 @@ from mammoth.distributed.communication import (
     batch_producer,
     consumer,
     broadcast_tensors,
-    only_ready_reduce_and_rescale_grads,
+    managed_reduce_and_rescale_grads,
     ErrorHandler,
 )
 from mammoth.distributed.contexts import DeviceContext, WorldContext, DeviceContextEnum
@@ -20,7 +20,7 @@ __all__ = [
     "batch_producer",
     "broadcast_tensors",
     "consumer",
-    "only_ready_reduce_and_rescale_grads",
+    "managed_reduce_and_rescale_grads",
     "ErrorHandler",
     "DeviceContext",
     "WorldContext",

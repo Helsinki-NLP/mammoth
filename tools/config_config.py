@@ -166,6 +166,11 @@ def add_allocate_device_args(parser):
     parser.add_argument('--n_nodes', type=int)
     parser.add_argument('--n_gpus_per_node', type=int)
     parser.add_argument('--n_slots_per_gpu', type=int)
+    parser.add_argument('--log_name', type=str)
+    parser.add_argument(
+        '--time_budget_s', type=int,
+        help='time budget for GPU assignment, in seconds',
+    )
 
 
 def add_set_transforms_args(parser):
@@ -316,6 +321,9 @@ def corpora_schedule(opts):
         if use_weight:
             multiplier = ae_weight if src_lang == tgt_lang else 1.0
             corpus['weight'] = weight * multiplier
+        else:
+            # Log spam if weight is unset
+            corpus['weight'] = 1
         if use_introduce_at_training_step:
             # TODO: ensure this default always matches with opts.py
             total_steps = opts.in_config[0].get('train_steps', 100_000)
@@ -328,6 +336,9 @@ def corpora_schedule(opts):
                 introduce_at_training_step = round(total_steps * (1 - weight))
             corpus['introduce_at_training_step'] = introduce_at_training_step
             min_introduce_at_training_step = min(min_introduce_at_training_step, introduce_at_training_step)
+        else:
+            # Log spam if introduce_at_training_step is unset
+            corpus['introduce_at_training_step'] = 0
     if use_introduce_at_training_step and min_introduce_at_training_step > 0:
         # With a single very large task that gets split, it is possible that no task can start
         for cname, corpus in opts.in_config[0]['tasks'].items():
@@ -505,20 +516,55 @@ def allocate_devices(opts):
     logger.info(f'total slots:      {n_nodes * n_gpus_per_node * n_slots_per_gpu}')
     logger.info(f'lang_pairs:       {len(lang_pairs)}')
 
-    assignment = optimize_gpu_assignment(
-        n_nodes=n_nodes,
-        n_gpus_per_node=n_gpus_per_node,
-        n_slots_per_gpu=n_slots_per_gpu,
-        lang_pairs=lang_pairs,
-        lang_to_group_mapping=cc_opts['groups'],
-        lps_ready_to_start=lps_ready_to_start,
-    )
+    # If there are fewer ready tasks than GPUs: adjust the curriculum
+    if len(lps_ready_to_start) < (n_nodes * n_gpus_per_node):
+        iats = [
+            corpus.get('introduce_at_training_step', 0)
+            for _, corpus in opts.in_config[0]['tasks'].items()
+        ]
+        iats = sorted(iats)
+        iats_at_last_gpu = iats[n_nodes * n_gpus_per_node]
+        lps_ready_to_start = []
+        for cname, corpus in opts.in_config[0]['tasks'].items():
+            src_lang, tgt_lang = corpus['src_tgt'].split('-')
+            if 'introduce_at_training_step' not in corpus:
+                lps_ready_to_start.append((src_lang, tgt_lang))
+                continue
+            adjusted = max(0, corpus.get('introduce_at_training_step', 0) - iats_at_last_gpu)
+            corpus['introduce_at_training_step'] = adjusted
+            if adjusted == 0:
+                lps_ready_to_start.append((src_lang, tgt_lang))
 
-    for gpu_slot, lp in assignment.items():
-        if lp is None:
-            continue
-        key = lp_to_key[lp].pop()
-        opts.in_config[0]['tasks'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
+    if n_gpus_tot < 2:
+        print('Assigning all tasks to 0:0')
+        for key in opts.in_config[0]['tasks']:
+            opts.in_config[0]['tasks'][key]['node_gpu'] = '0:0'
+    else:
+        assignment = optimize_gpu_assignment(
+            n_nodes=n_nodes,
+            n_gpus_per_node=n_gpus_per_node,
+            n_slots_per_gpu=n_slots_per_gpu,
+            lang_pairs=lang_pairs,
+            lang_to_group_mapping=cc_opts['groups'],
+            lps_ready_to_start=lps_ready_to_start,
+            log_name=opts.log_name,
+            time_budget_s=opts.time_budget_s,
+        )
+
+        for gpu_slot, lp in assignment.items():
+            if lp is None:
+                continue
+            key = lp_to_key[lp].pop()
+            opts.in_config[0]['tasks'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
+        total_remaining = 0
+        for lp, keys in lp_to_key.items():
+            if len(keys) > 0:
+                print(f'{lp} remaining keys: {keys}')
+            total_remaining += len(keys)
+        assert total_remaining == 0
+
+    for cname, corpus in opts.in_config[0]['tasks'].items():
+        assert 'node_gpu' in corpus, f'{cname} not assigned to node_gpu: {corpus}'
 
     opts.in_config[0]['n_nodes'] = n_nodes
     opts.in_config[0]['world_size'] = n_gpus_tot
@@ -800,7 +846,8 @@ def extra_cpu(opts):
     del opts.in_config[0]['world_size']
     opts.in_config[0]['n_nodes'] = 1
     for task_opts in opts.in_config[0]['tasks'].values():
-        del task_opts['node_gpu']
+        if 'node_gpu' in task_opts:
+            del task_opts['node_gpu']
 
 
 def extra_fully_shared_hack(opts):

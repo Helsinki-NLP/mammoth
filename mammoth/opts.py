@@ -92,8 +92,9 @@ def _add_reproducibility_opts(parser):
         '--seed',
         '-seed',
         type=int,
-        default=-1,
-        help="Set random seed used for better reproducibility between experiments.",
+        required=True,
+        help="Set random seed used for better reproducibility between experiments. "
+        "Mandatory for multi-gpu training, and for convenience required for all.",
     )
 
 
@@ -637,15 +638,17 @@ def _add_train_general_opts(parser):
         "--pool_size",
         type=int,
         default=2048,
-        help="Number of examples to dynamically pool before batching.",
+        help="(Maximum) number of examples to dynamically pool before batching.",
     )
     group.add(
         "-n_buckets",
         "--n_buckets",
         type=int,
-        default=1024,
-        help="When batch_type=tokens, maximum number of bins for batching.",
+        default=4,
+        help="The number of minibatches that will be yielded once bucketing is complete. "
+        "Recommended value: same as accum_count, or at least a multiple of it."
     )
+
 
     group = parser.add_argument_group('Optimization')
     group.add(
@@ -1035,13 +1038,13 @@ def translate_opts(parser, dynamic=False):
     _add_logging_opts(parser, is_train=False)
 
     group = parser.add_argument_group('Efficiency')
-    group.add('--batch_size', '-batch_size', type=int, default=30, help='Batch size')
+    group.add('--batch_size', '-batch_size', type=int, default=300, help='Batch size')
     group.add(
         '--batch_type',
         '-batch_type',
-        default='sents',
+        default='tokens',
         choices=["sents", "tokens"],
-        help="Batch grouping for batch_size. Standard is sents. Tokens will do dynamic batching",
+        help="Batch grouping for batch_size. Standard is tokens (max of src and tgt). Sents is unimplemented.",
     )
     group.add('--gpu', '-gpu', type=int, default=-1, help="Device to run on")
 

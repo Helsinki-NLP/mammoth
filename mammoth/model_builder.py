@@ -284,21 +284,20 @@ def build_task_specific_model(
     task_queue_manager,
     checkpoint,
 ):
-    logger.info(f'TaskQueueManager: {task_queue_manager}')
-
+    
     src_embs = dict()
     tgt_embs = dict()
 
     generators_md = nn.ModuleDict()
 
     # FIXME: it's getting late and I just want this to compile
-    for side, lang, _, vocab in task_queue_manager.get_vocabs(side='src', vocabs_dict=vocabs_dict):
+    for side, lang, _, vocab in task_queue_manager.get_my_vocabs(side='src', vocabs_dict=vocabs_dict):
         src_emb = build_src_emb(model_opts, vocab)
         src_embs[lang] = src_emb
     pluggable_src_emb = PluggableEmbeddings(src_embs)
     encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager, checkpoint)
 
-    for side, lang, _, vocab in task_queue_manager.get_vocabs(side='tgt', vocabs_dict=vocabs_dict):
+    for side, lang, _, vocab in task_queue_manager.get_my_vocabs(side='tgt', vocabs_dict=vocabs_dict):
         tgt_emb = build_tgt_emb(model_opts, vocab)
         tgt_embs[lang] = tgt_emb
         generator = build_generator(model_opts, len(vocab), tgt_emb)
@@ -350,28 +349,6 @@ def build_task_specific_model(
             logger.warning("Adapters' parameters are NOT being loaded from the checkpoint.")
     print('built model:')
     print(nmt_model)
-
-    # register a forward hook to keep track of which parameters have valid gradients.
-    # p.grad is None can not be used: grad is None only before first update.
-    # zero_grad typically sets the grad to zero, not to None.
-    # While zero_grad takes a flag set_to_none, it is not reliably forwarded by various optimizers.
-    def has_grad_hook(module, input, output) -> None:
-        for param in module.parameters(recurse=False):
-            if param.requires_grad:
-                # NB: we're looking at whether gradient will/has been computed, which is only the
-                # case when the module is training.
-                param.has_grad = module.training
-
-    for module in nmt_model.modules():
-        module.register_forward_hook(has_grad_hook)
-        for param in module.parameters(recurse=False):
-            if param.requires_grad:
-                param.has_grad = False
-    for module in generators_md.modules():
-        module.register_forward_hook(has_grad_hook)
-        for param in module.parameters(recurse=False):
-            if param.requires_grad:
-                param.has_grad = False
 
     return nmt_model, generators_md
 
@@ -574,7 +551,7 @@ def create_all_adapters(model, opts, task_queue_manager):
     my_dec_adapter_ids = set()
     adapter_to_encoder_ids = defaultdict(set)
     adapter_to_decoder_ids = defaultdict(set)
-    for task in task_queue_manager.get_tasks():
+    for task in task_queue_manager.get_my_tasks():
         for adapter_id in task.encoder_adapter_ids:
             adapter_id = tuple(adapter_id)
             my_enc_adapter_ids.add(adapter_id)

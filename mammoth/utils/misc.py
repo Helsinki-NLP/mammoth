@@ -96,7 +96,7 @@ def set_random_seed(seed, is_cuda):
         # some cudnn methods can be random even after fixing the seed
         # unless you tell it to be deterministic
         torch.backends.cudnn.deterministic = True
-        # This one is needed for various tranfroms
+        # This one is needed for various transforms
         np.random.seed(seed)
 
     if is_cuda and seed > 0:

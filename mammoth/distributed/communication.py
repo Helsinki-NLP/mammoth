@@ -7,6 +7,7 @@ import signal
 import torch
 import torch.distributed
 
+from mammoth.distributed.contexts import DeviceContextEnum
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
 
@@ -35,81 +36,46 @@ def broadcast_tensors(tensors, src=0, group=None):
             torch.distributed.broadcast(t, src, group=group)
 
 
-def only_ready_reduce_and_rescale_grads(named_parameters, group=None):
+def managed_reduce_and_rescale_grads(
+    named_parameters,
+    has_local_gradient: bool,
+    gradient_norm: int,
+    group=None,
+):
     """
     Gradient synch tolerant to missing grads.
 
-    Missing grads occur when some parameters are not trained between two
-    gradient synchs, e.g. the embeddings of a low-resource language with low
-    sampling weight.
+    Missing grads occur when some parameters are trained on some devices in
+    a communication group but not on others, between two gradient synchs.
 
-    The algorithm first uses the 'has_grad' attribute set by the forward hook
-    'has_grad_hook'. This hook ensures that all parameters of the modules
-    selected for use during the current training computation have 'has_grad'
-    set to True. This gives the list of parameters that have been trained on
-    this device ("ready").
+    The "managed" implementation relies on a deterministic sampling of tasks
+    known to all devices. This allows a device to figure out that even though
+    it didn't train some parameters itself, some other device did. In this case
+    the device must send a dummy gradient of all zeros.
 
-    A bit mask covering the parameters that are ready on this device is
-    communicated to the other devices in the group. The bit masks are reduced
-    using summation. The sum gives the number of real gradients for that
-    parameter, and can be used for normalization.
-
-    If a parameter is ready on any device, all devices communicate a value.
-    Devices on which the parameter is ready communicate the actual gradient,
-    while devices on which it is not ready communicate a dummy zero tensor
-        instead. The sum computed previously is used for normalization.
+    Only if no device trains some parameters (or if the parameters exist on
+    exactly one device) is it possible to skip communication entirely.
 
     Args:
         named_parameters: tuples of (str, Parameter) defining the parameters to consider
         group: torch.distributed communication group
     """
-    # Set missing gradients to zero, keeping track of true gradients
     require_grad = [(name, p) for (name, p) in named_parameters if p.requires_grad]
     if not require_grad:
         # Exit early if the component has no parameters that require a gradient
         return
-    device = require_grad[0][1].device
-    ready_list = []
+    # Set missing gradients to zero
     for name, p in require_grad:
-        if hasattr(p, 'has_grad') and p.has_grad:
-            ready_list.append(1.0)
-        else:
-            ready_list.append(0.0)
-            if p.grad is None:
-                p.grad = torch.zeros_like(p)
+        if p.grad is None or not has_local_gradient:
+            p.grad = torch.zeros_like(p)
 
-    # Communicate the ready bits, and reduce them using summation.
-    # This gives the number of non-dummy gradients participating, for normalization
-    ready_t = torch.tensor(ready_list).to(device)
-    if group is None:
-        torch.distributed.all_reduce(ready_t)
-    else:
-        torch.distributed.all_reduce(ready_t, group=group)
-    rescale_denoms = ready_t  # after reduction
-
-    # Omit if all nodes sent a zero ready bit
-    denoms_mask = (rescale_denoms > 0).cpu()
-    params_with_grad = [p for ((name, p), m) in zip(require_grad, denoms_mask) if m]
-    grads = [p.grad.data for p in params_with_grad]
-    rescale_denoms = [denom for (denom, m) in zip(rescale_denoms, denoms_mask) if m]
-    assert len(grads) == len(rescale_denoms)
-    if len(grads) == 0:
-        return
-
-    # If not, then set has_grad also on devices that did not train the parameter themselves.
-    # They now have a grad that they received from the other devices.
-    for name, p in require_grad:
-        p.has_grad = True
+    grads = [p.grad.data for name, p in require_grad]
 
     # All devices communicate either a real gradient or a dummy zeros of the same size
-    # Can not use rescale_denom, as each grad may have its own denominator
-    all_reduce_and_rescale_tensors(grads, rescale_denom=1, group=group)
+    all_reduce_and_rescale_tensors(grads, rescale_denom=gradient_norm, group=group)
 
-    # Normalize using the previously computed values
-    for grad, denom in zip(grads, rescale_denoms):
-        if denom > 1:
-            grad.div_(denom)
-    # Note: p.has_grad is reused in the optimizer to prevent the untrained components from being stepped
+    # Note: p.has_grad is not used in the "managed" implementation:
+    # the optimizer can not use it to prevent the untrained components from being stepped
 
 
 def all_reduce_and_rescale_tensors(tensors, rescale_denom, group=None, buffer_size=10485760):
@@ -263,7 +229,8 @@ def consumer(process_fn, opts, device_context, error_queue, batch_queue, semapho
             f'local_rank {device_context.local_rank}'
         )
         logger.info(f'opts.gpu_ranks {opts.gpu_ranks}')
-        multi_init(opts, device_context.global_rank)
+        if device_context.context == DeviceContextEnum.MULTI_GPU:
+            multi_init(opts, device_context.global_rank)
         # error_queue not passed (is this intentional?)
         process_fn(
             opts,
@@ -280,4 +247,4 @@ def consumer(process_fn, opts, device_context, error_queue, batch_queue, semapho
         # propagate exception to parent process, keeping original traceback
         import traceback
 
-        error_queue.put((opts.gpu_ranks[device_context.node_rank], traceback.format_exc()))
+        error_queue.put((device_context.node_rank, traceback.format_exc()))

@@ -1,7 +1,6 @@
 import collections
 import itertools
 import math
-import random
 
 import torch
 
@@ -15,36 +14,15 @@ def build_dataloader(dataset, batch_size, batch_type, pool_size=None, n_buckets=
         loader = InferenceBatcher(dataset, batch_size)
     else:
         if batch_type == 'sents':
-            n_buckets = 1
-
-            def bucket_fn(_):
-                return 0
-
-            def numel_fn(_):
-                return 1
-
+            raise NotImplementedError()
         elif batch_type == 'tokens':
-
-            def bucket_fn(example_dict):
-                """map example dict to bucket index"""
-                # subtract two for bos/eos
-                src_len = min(len(example_dict['src']), n_buckets) - 2
-                if 'tgt' in example_dict:
-                    tgt_len = min(len(example_dict['tgt']), n_buckets) - 2
-                else:
-                    tgt_len = src_len
-                # maybe dump it in the last bucket if it's just too long
-                return src_len, tgt_len
-
-            def numel_fn(example_dict):
-                """count tokens in example"""
-                if 'tgt' in example_dict:
-                    true_size = len(example_dict['src']) + len(example_dict['tgt'])
-                else:
-                    true_size = len(example_dict['src'])
-                return true_size
-
-        loader = LookAheadBucketing(dataset, pool_size, n_buckets, batch_size, bucket_fn, numel_fn)
+            loader = SimpleLookAheadBucketing(
+                dataset=dataset,
+                max_look_ahead_size=pool_size,
+                n_buckets=n_buckets,
+                batch_size=batch_size,
+                score_fn=SimpleLookAheadBucketing.max_of_lens,
+            )
     return iter(loader) if as_iter else loader
 
 
@@ -70,137 +48,96 @@ class InferenceBatcher():
             yield self.collate_fn(accum)
 
 
-class LookAheadBucketing():
-    def __init__(self, dataset, look_ahead_size, n_buckets, batch_size, bucket_fn, numel_fn):
+class ScoredInfiniteExamples():
+    def __init__(self, dataset, score_fn):
+        self.score_fn = score_fn if score_fn else self.max_of_lens
         self.dataset = dataset
-        # actual generator of examples
-        self.examples_stream = iter([])
-        # tracks whether the stream needs to be restarted
-        self._is_exhausted = True
-        self.n_buckets = n_buckets
-        self._buckets = [
-            [
-                []
-                for _ in range(n_buckets)
-            ]
-            for _ in range(n_buckets)
-        ]
-        self.look_ahead_size = look_ahead_size
-        self.batch_size = batch_size
-        self.bucket_fn = bucket_fn
-        self.numel_fn = numel_fn
-        self.collate_fn = dataset.collate_fn
-        self._init()
+        self._it = iter(self.dataset)
+        self._prev = next(self._it)
+        self._score = self.score_fn(self._prev)
 
-    def _init(self):
-        logger.info('LookAheadBucketing: initialization start')
-        self.examples_stream = iter(self.dataset)
-        for example in range(self.look_ahead_size):
-            self.maybe_replenish()
-            if self._is_exhausted:
-                break
-        assert not self.is_empty(), 'Dataset contains no usable example!'
-        logger.info('LookAheadBucketing: initialization done')
+    def peek_at_score(self):
+        return self._score
 
-    def maybe_replenish(self):
-        """try to look up one more example to add to this reservoir."""
+    def next(self):
         try:
-            example = next(self.examples_stream)
-            s_idx, t_idx = self.bucket_fn(example)
-            self._buckets[s_idx][t_idx].append(example)
-            self._is_exhausted = False
+            example = next(self._it)
         except StopIteration:
-            self._is_exhausted = True
+            self._it = iter(self.dataset)
+            example = next(self._it)
+        score_out, example_out = self._score, self._prev
+        self._score = self.score_fn(example)
+        self._prev = example
+        return score_out, example_out
 
-    def bucket_is_empty(self, s_idx: int, t_idx: int) -> bool:
-        """check if this bucket is empty"""
-        return len(self._buckets[s_idx][t_idx]) == 0
 
-    def _choose_bucket(self):
-        """pick a bucket at random"""
-        buckets = [(s, t) for s in range(self.n_buckets) for t in range(self.n_buckets)]
-        weights = [len(self._buckets[s][t]) for s in range(self.n_buckets) for t in range(self.n_buckets)]
-        bucket_idx = random.choices(buckets, weights=weights, k=1)[0]
-        return bucket_idx
+class SimpleLookAheadBucketing():
+    """
+    Arguments:
+        dataset: mammoth.inputters.ParallelCorpus
+        max_look_ahead_size:
+            The maximum number of sentence pairs to read before yielding minibatches.
+            Limits the time spent looping if there is a corpus with unexpectedly short sentences.
+        n_buckets:
+            The number of minibatches that will be yielded once bucketing is complete.
+            Recommended value: same as accum_count, or at least a multiple of it.
+            Setting n_buckets == accum_count means that each accumulated batch uses up the whole buffer.
+            All tasks stay in sync concerning the length sorting: each task begins with the smallest
+            minibatch and ends with the largest just before accumulation ends.
+        batch_size:
+            The maximum size of each minibatch in tokens.
+            Note that the maximum batch size can not be guaranteed if the data contains examples
+            that exceed the limit on their own. Use filtertoolong to avoid such examples.
+        score_fn:
+            Compute the size estimate (single integer) for sorting examples.
+    """
+    def __init__(self, dataset, max_look_ahead_size, n_buckets, batch_size, score_fn=None):
+        score_fn = score_fn if score_fn else self.max_of_lens
+        self._sie = ScoredInfiniteExamples(dataset, score_fn)
+        self.max_look_ahead_size = max_look_ahead_size
+        self.batch_size = batch_size
+        self.n_buckets = n_buckets
+        self.multi_batch_size = n_buckets * batch_size
+        self.collate_fn = dataset.collate_fn
 
-    def _select_from_bucket(self, s_idx: int, t_idx: int) -> object:
-        """randomly select an item from a bucket"""
-        bucket = self._buckets[s_idx][t_idx]
-        obj_idx = random.randrange(len(bucket))
-        # swap to last to get O(1) deletion
-        bucket[obj_idx], bucket[-1] = bucket[-1], bucket[obj_idx]
-        return bucket.pop()
-
-    def is_empty(self) -> bool:
-        """check if all buckets are empty"""
-        return all(len(bucket) == 0 for bucket in itertools.chain.from_iterable(self._buckets))
-
-    def _spiralling(self, s_idx: int, t_idx: int):
-        def _seq():
-            # from https://math.stackexchange.com/questions/163080/on-a-two-dimensional-grid-is-there-a-formula-i-can-use-to-spiral-coordinates-in#answer-3448361  # noqa: E501
-            for n in itertools.count(1):
-                k = math.ceil((math.sqrt(n) - 1) / 2.0)
-                t = 2 * k + 1
-                m = t ** 2
-                t = t - 1
-                if n >= m - t:
-                    yield k - (m - n), k
-                else:
-                    m = m - t
-                    if n >= m - t:
-                        yield -k, k - (m - n)
-                    else:
-                        m = m - t
-                        if n >= m - t:
-                            yield -k + (m - n), -k
-                        else:
-                            yield k, -k + (m - n - t)
-
-        offsets = ((s_idx + x, t_idx + y) for x, y in _seq())
-        # offsets = itertools.takewhile(
-        #     # this far out is obviously too far out
-        #     lambda tup: (tup[0] < self.n_buckets * 2 + 1) and (tup[1] < self.n_buckets * 2 + 1),
-        #     offsets,
-        # )
-        offsets = filter(
-            lambda tup: (0 <= tup[0] < self.n_buckets) and (0 <= tup[1] < self.n_buckets),
-            offsets,
-        )
-        # maybe more brittle than the takewhile a few lines above
-        offsets = itertools.islice(offsets, self.n_buckets ** 2)
-        yield from offsets
+    @staticmethod
+    def max_of_lens(example_dict) -> int:
+        if 'tgt' in example_dict:
+            score = max(len(example_dict['src']), len(example_dict['tgt']))
+        else:
+            score = len(example_dict['src'])
+        return score
 
     def __iter__(self):
         while True:
-            # 1. maybe we've exhausted both the stream and the buckets:
-            # if so, we restart the example stream
-            if self.is_empty() and self._is_exhausted:
-                self._init()
-            accum, cur_batch_size = [], 0
-            # 2. pick a length at random
-            smallest_bucket_idx = self._choose_bucket()
-            current_bucket_idx = smallest_bucket_idx
-            # 3. build batch
-            batch_is_complete = False
-            # stop either when batch is built or when it can't be built
-            while not (batch_is_complete or self.is_empty()):
-                # maybe switch buckets
-                current_bucket_idx = smallest_bucket_idx
-                next_indices = self._spiralling(*current_bucket_idx)
-                while self.bucket_is_empty(*current_bucket_idx):
-                    current_bucket_idx = next(next_indices)
-                # retrieve and process the example
-                example = self._select_from_bucket(*current_bucket_idx)
-                accum.append(example)
-                numel = self.numel_fn(example)
-                cur_batch_size += numel
-                batch_is_complete = cur_batch_size >= self.batch_size
-
-                # 4. try to replenish reservoir if possible
-                # if not, this will also update self._is_exhausted
-                self.maybe_replenish()
-
-            yield self.collate_fn(accum)
+            multibatch = []
+            max_score = 0
+            for i in range(self.max_look_ahead_size):
+                score = self._sie.peek_at_score()
+                # Decide whether to add it or not
+                if len(multibatch) <= self.n_buckets:
+                    # Always add at least one example per minibatch
+                    still_fits = True
+                else:
+                    still_fits = (max(max_score, score) * (len(multibatch) + 1)) < (self.multi_batch_size)
+                if still_fits:
+                    score, example = self._sie.next()
+                    multibatch.append((score, example))
+                    max_score = max(max_score, score)
+                else:
+                    break
+            # Sort by score to reduce padding
+            multibatch = list(sorted(multibatch, key=lambda x: x[0]))
+            # Split into minibatches and yield
+            examples_per_batch = math.ceil(len(multibatch) / self.n_buckets)
+            multibatch_it = iter(multibatch)
+            for _ in range(self.n_buckets):
+                yield self.collate_fn(
+                    [
+                        example_dict for _, example_dict
+                        in itertools.islice(multibatch_it, examples_per_batch)
+                    ]
+                )
 
 
 class DynamicDatasetIter(object):
@@ -278,7 +215,7 @@ class DynamicDatasetIter(object):
 
     def _init_datasets(self):
         self.dataset_iterators = dict()
-        for task in self.task_queue_manager.get_tasks():
+        for task in self.task_queue_manager.get_my_tasks():
             src_vocab = self.vocabs_dict[('src', task.src_lang)]
             tgt_vocab = self.vocabs_dict[('tgt', task.tgt_lang)]
             # merged_fields = {'src': src_fields['src'], 'tgt': tgt_fields['tgt']}
@@ -329,14 +266,13 @@ class DynamicDatasetIter(object):
             yield from itertools.chain.from_iterable(all_val_data)
 
         else:
-            # All minibatches with the same communication_batch_id should be trained on
-            # before synching gradients between devices
-            communication_batch_id = 0
             while True:
-                for corpus_id in self.task_queue_manager.sample_corpus_ids(communication_batch_id):
-                    ordered_iter, metadata = self.dataset_iterators[corpus_id]
+                batch_task_sample = self.task_queue_manager.sample_corpus_ids()
+                my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
+                ordered_iter, metadata = self.dataset_iterators[my_task.corpus_id]
+                for _ in range(self.task_queue_manager.accum_count):
                     batch = next(ordered_iter)
-                    if communication_batch_id == 0:
+                    if batch_task_sample.training_step == 0 and self.opts.verbose:
                         # De-numericalize a few sentences for debugging
                         logger.warning(
                             f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
@@ -344,16 +280,9 @@ class DynamicDatasetIter(object):
                         )
                         src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
                         tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]
-                        for sent_idx in range(3):
+                        for sent_idx in range(min(3, batch.src[0].shape[2])):
                             toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src[0][:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
                             toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
-                    yield batch, metadata, communication_batch_id
-
-                communication_batch_id += 1
-                if communication_batch_id % 1000 == 0:
-                    total = sum(self.task_queue_manager.sampled_task_counts.values())
-                    logger.info(f'Task sampling distribution: (total {total})')
-                    for task, count in self.task_queue_manager.sampled_task_counts.most_common():
-                        logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+                    yield batch, metadata, batch_task_sample.training_step

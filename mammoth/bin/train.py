@@ -144,7 +144,11 @@ def validate_slurm_node_opts(current_env, world_context, opts):
 
 
 def train(opts):
-    init_logger(opts.log_file, structured_log_file=opts.structured_log_file)
+    init_logger(
+        opts.log_file,
+        log_file_level=opts.log_file_level,
+        structured_log_file=opts.structured_log_file
+    )
     ArgumentParser.validate_train_opts(opts)
     ArgumentParser.update_model_opts(opts)
     ArgumentParser.validate_model_opts(opts)
@@ -201,92 +205,95 @@ def train(opts):
         current_env["MASTER_ADDR"] = opts.master_ip
         current_env["MASTER_PORT"] = str(opts.master_port)
         node_rank = opts.node_rank
+        n_local_ranks = world_context.gpus_per_node
+    else:
+        n_local_ranks = 1
 
-        queues = []
-        semaphores = []
-        mp = torch.multiprocessing.get_context('spawn')
-        logger.info("world_size = {}, queue_size = {}".format(opts.world_size, opts.queue_size))
-        # Create a thread to listen for errors in the child processes.
-        error_queue = mp.SimpleQueue()
-        error_handler = ErrorHandler(error_queue)
-        # Train with multiprocessing.
-        procs = []
-        producers = []
+    queues = []
+    semaphores = []
+    mp = torch.multiprocessing.get_context('spawn')
+    logger.info("world_size = {}, queue_size = {}".format(opts.world_size, opts.queue_size))
+    # Create a thread to listen for errors in the child processes.
+    error_queue = mp.SimpleQueue()
+    error_handler = ErrorHandler(error_queue)
+    # Train with multiprocessing.
+    procs = []
+    producers = []
 
-        for local_rank in range(world_context.gpus_per_node):
+    for local_rank in range(n_local_ranks):
+        if world_context.context == DeviceContextEnum.MULTI_GPU:
             device_context: DeviceContext = world_context.global_to_local(
                 node_rank=node_rank,
                 local_rank=local_rank,
             )
-            # This task_queue_manager will only yield the items that are active on this gpu
-            task_queue_manager = global_task_queue_manager.global_to_local(
-                node_rank=node_rank,
-                local_rank=local_rank,
-                opts=opts
-            )
-
             # store rank in env (FIXME: is this obsolete?)
             current_env["RANK"] = str(device_context.global_rank)
             current_env["LOCAL_RANK"] = str(device_context.local_rank)
-
-            q = mp.Queue(opts.queue_size)
-            semaphore = mp.Semaphore(opts.queue_size)
-            queues.append(q)
-            semaphores.append(semaphore)
-            procs.append(
-                mp.Process(
-                    target=consumer,
-                    args=(
-                        train_process,
-                        opts,
-                        device_context,
-                        error_queue,
-                        q,
-                        semaphore,
-                        task_queue_manager,
-                        checkpoint),
-                    daemon=True,
-                ))
-            procs[local_rank].start()
-            logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
-            error_handler.add_child(procs[local_rank].pid)
-
-            # Get the iterator to generate from
-            train_iter = DynamicDatasetIter.from_opts(
-                task_queue_manager=task_queue_manager,
-                transforms_cls=transforms_cls,
-                vocabs_dict=vocabs_dict,
-                opts=opts,
-                is_train=True,
+        else:
+            # Running in a non-distributed context: either single GPU or CPU
+            node_rank = 0
+            local_rank = 0
+            device_context: DeviceContext = world_context.global_to_local(
+                node_rank=0,
+                local_rank=0,
             )
 
-            producer = mp.Process(
-                target=batch_producer, args=(train_iter, q, semaphore, opts, local_rank), daemon=True
-            )
-            producers.append(producer)
-            producers[local_rank].start()
-            logger.info(" Starting producer process pid: {}  ".format(producers[local_rank].pid))
-            error_handler.add_child(producers[local_rank].pid)
-
-        for p in procs:
-            logger.info("DD logger")
-            p.join()
-        # Once training is done, we can terminate the producers
-        for p in producers:
-            p.terminate()
-
-    else:
-        # SINGLE_GPU or CPU
-        device_context: DeviceContext = world_context.global_to_local(
-            node_rank=0,
-            local_rank=0,
-        )
+        # This task_queue_manager will only yield the items that are active on this gpu
+        # for the consumer (trainer process)
         task_queue_manager = global_task_queue_manager.global_to_local(
-            node_rank=0,
-            local_rank=0,
+            node_rank=node_rank,
+            local_rank=local_rank,
             opts=opts
         )
-        train_process(opts, device_context=device_context, task_queue_manager=task_queue_manager, checkpoint=checkpoint)
+        if device_context.is_master():
+            # Enough to log this once
+            logger.info(f'TaskQueueManager: {global_task_queue_manager}')
+
+        q = mp.Queue(opts.queue_size)
+        semaphore = mp.Semaphore(opts.queue_size)
+        queues.append(q)
+        semaphores.append(semaphore)
+        procs.append(
+            mp.Process(
+                target=consumer,
+                args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
+                daemon=True,
+            )
+        )
+        procs[local_rank].start()
+        logger.info(" Starting process pid: %d  " % procs[local_rank].pid)
+        error_handler.add_child(procs[local_rank].pid)
+
+        # This task_queue_manager will only yield the items that are active on this gpu
+        # for the producer (dataloader process)
+        task_queue_manager = global_task_queue_manager.global_to_local(
+            node_rank=node_rank,
+            local_rank=local_rank,
+            opts=opts
+        )
+        # Get the iterator to generate from
+        train_iter = DynamicDatasetIter.from_opts(
+            task_queue_manager=task_queue_manager,
+            transforms_cls=transforms_cls,
+            vocabs_dict=vocabs_dict,
+            opts=opts,
+            is_train=True,
+        )
+
+        producer = mp.Process(
+            target=batch_producer, args=(train_iter, q, semaphore, opts, local_rank), daemon=True
+        )
+        producers.append(producer)
+        producers[local_rank].start()
+        logger.info(" Starting producer process pid: {}  ".format(producers[local_rank].pid))
+        error_handler.add_child(producers[local_rank].pid)
+
+    for p in procs:
+        logger.info("DD logger")
+        p.join()
+    # Once training is done, we can terminate the producers
+    for p in producers:
+        p.terminate()
 
 
 def _get_parser():

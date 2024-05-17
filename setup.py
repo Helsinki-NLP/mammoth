@@ -7,17 +7,17 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='mammoth',
+    name='mammoth-nlp',
     description='Massively Multilingual Modular Open Translation @ Helsinki',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    version='0.1',
+    version='0.1.1',
     packages=find_packages(),
     project_urls={
-        "Documentation": "http://opennmt.net/OpenNMT-py/",
-        "Forum": "http://forum.opennmt.net/",
-        "Gitter": "https://gitter.im/OpenNMT/OpenNMT-py",
-        "Source": "https://github.com/OpenNMT/OpenNMT-py/",
+        "Documentation": "https://helsinki-nlp.github.io/mammoth/",
+        # "Forum": "http://forum.opennmt.net/",
+        # "Gitter": "https://gitter.im/OpenNMT/OpenNMT-py",
+        "Source": "https://github.com/Helsinki-NLP/mammoth",
     },
     python_requires=">=3.5",
     install_requires=[
@@ -32,6 +32,8 @@ setup(
         "pytest==7.0.1",
         "pyyaml",
         "timeout_decorator",
+        "sentencepiece==0.1.97",
+        "sacrebleu==2.3.1",
     ],
     entry_points={
         "console_scripts": [

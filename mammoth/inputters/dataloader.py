@@ -22,7 +22,10 @@ def build_dataloader(
         loader = InferenceBatcher(dataset, batch_size)
     else:
         if batch_type == 'sents':
-            raise NotImplementedError()
+            loader = SentenceMinibatcher(
+                dataset=dataset,
+                batch_size=batch_size,
+            )
         elif batch_type == 'tokens':
             loader = SimpleLookAheadBucketing(
                 dataset=dataset,
@@ -151,6 +154,27 @@ class SimpleLookAheadBucketing():
                         in itertools.islice(maxi_batch_it, epb)
                     ]
                 )
+
+
+class SentenceMinibatcher():
+    """
+    Arguments:
+        dataset: mammoth.inputters.ParallelCorpus
+        batch_size:
+            The maximum size of each minibatch in sentence.
+    """
+    def __init__(self, dataset, batch_size):
+        self.batch_size = batch_size
+        self.collate_fn = dataset.collate_fn
+        self._sie = ScoredInfiniteExamples(dataset, score_fn=lambda x: 1)
+
+    def __iter__(self):
+        while True:
+            minibatch = []
+            for _ in range(self.batch_size):
+                _, example = self._sie.next()
+                minibatch.append(example)
+            yield self.collate_fn(minibatch)
 
 
 class DynamicDatasetIter(object):

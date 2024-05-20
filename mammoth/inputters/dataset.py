@@ -89,6 +89,7 @@ class ParallelCorpus(IterableDataset):
         offset=None,
         is_train=False,
         task=None,
+        max_length=None,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -102,6 +103,7 @@ class ParallelCorpus(IterableDataset):
         self.offset = offset
         self.is_train = is_train
         self.corpus_id = task.corpus_id
+        self.max_length = max_length
 
     # FIXME: most likely redundant with mammoth.transforms.tokenize
     def _tokenize(self, string, side='src'):
@@ -120,6 +122,18 @@ class ParallelCorpus(IterableDataset):
             eos,
         ], device='cpu')
         return indices
+
+    def _pad_sequence(self, tensors: list, padding_value: int = 0):
+        padded = None
+        if self.max_length is not None:
+            padded = torch.full((self.max_length, len(tensors)), padding_value, device='cpu')
+            for idx, tensor in enumerate(tensors):
+                if tensor.numel() > self.max_length:
+                    tensor = tensor[:self.max_length]
+                padded[:tensor.numel(), idx] = tensor
+        else:
+            padded = pad_sequence(tensors, padding_value=padding_value)
+        return padded.unsqueeze(-1)
 
     def to(self, device):
         self.device = device
@@ -158,14 +172,17 @@ class ParallelCorpus(IterableDataset):
         has_tgt = 'tgt' in examples[0].keys()
         src_padidx = self.vocabs['src'][DefaultTokens.PAD]
         tgt_padidx = self.vocabs['tgt'][DefaultTokens.PAD]
-        src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
-        src = (pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx).unsqueeze(-1), src_lengths)
+        if self.max_length is None:
+            src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
+        else:
+            src_lengths = torch.tensor([min(ex['src'].numel(), self.max_length) for ex in examples], device='cpu')
+        src = (self._pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx), src_lengths)
         if has_tgt:
-            tgt = pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1)
+            tgt = self._pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx)
             if 'labels' not in examples[0].keys():
                 labels = tgt
             else:
-                labels = pad_sequence([ex['labels'] for ex in examples], padding_value=tgt_padidx).unsqueeze(-1)
+                labels = self._pad_sequence([ex['labels'] for ex in examples], padding_value=tgt_padidx)
         else:
             tgt = None
             labels = None
@@ -190,6 +207,10 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
     )
     transforms_to_apply = [transforms_cls[trf_name] for trf_name in transforms_to_apply]
 
+    max_length = None
+    if opts.pad_to_max_length:
+        assert opts.max_length is not None and opts.max_length > 0, 'Please provide a --max_length'
+        max_length = opts.max_length
     # build Dataset proper
     dataset = ParallelCorpus(
         corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
@@ -201,6 +222,7 @@ def get_corpus(opts, task, src_vocab: Vocab, tgt_vocab: Vocab, is_train: bool = 
         offset=corpus_opts.get('offset', None),
         is_train=is_train,
         task=task,
+        max_length=max_length,
     )
     return dataset
 

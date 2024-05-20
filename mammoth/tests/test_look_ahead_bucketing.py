@@ -71,3 +71,34 @@ def test_simple_lookeahead_bucketing(max_batch_size, lookahead_minibatches):
         examples_read.extend(batch)
     # Check that the stream was cycled
     assert len(examples_read) > len(stream)
+
+
+@pytest.mark.parametrize(
+    'batch_size',
+    [1, 5, 12, 2048],
+)
+def test_sentence_minibatcher(batch_size):
+    stream = MockStream([
+        hashabledict({
+            'src': tuple([letter for _ in range(i)]),
+            'tgt': tuple([letter for _ in range(j)]),
+        })
+        for letter in 'xyz'
+        for i, j in product(range(1, 11), range(1, 11))
+    ])
+    lab = build_dataloader(
+        stream,
+        batch_size=batch_size,
+        batch_type='sents',
+        cycle=True,
+        as_iter=False
+    )
+    examples_read = []
+    batches = iter(lab)
+    for _ in range(1000):
+        batch = next(batches)
+        print(batch)
+        assert len(batch) == batch_size
+        examples_read.extend(batch)
+    # Check that the stream was cycled
+    assert len(examples_read) > len(stream)

@@ -287,9 +287,9 @@ def corpora_schedule(opts):
     corpora_lens_cache = read_cached_linecounts(corpora_lens_cache_file)
     logger.info('cached corpora_lens:')
     for path, len in corpora_lens_cache.items():
-        logger.info(f'{path}:\t{len}')
+        logger.info(f'CACHED:\t{path}:\t{len}')
     corpora_lens = {}
-    for cname, corpus in opts.in_config[0]['tasks'].items():
+    for cname, corpus in sorted(opts.in_config[0]['tasks'].items(), key=lambda x: x[0]):
         if corpus['path_src'] in corpora_lens_cache:
             length = corpora_lens_cache[corpus['path_src']]
             corpora_lens[cname] = length
@@ -298,7 +298,7 @@ def corpora_schedule(opts):
             corpora_lens[cname] = length
             with open(corpora_lens_cache_file, 'a') as cache_out:
                 print(f'{length}\t{corpus["path_src"]}', file=cache_out)
-                logger.info(f'{length}\t{corpus["path_src"]}')
+                logger.info(f'NEW:\t{corpus["path_src"]}\t{length}')
     logger.info('final corpora_lens:')
     for cname, len in corpora_lens.items():
         logger.info(f'{cname}:\t{len}')

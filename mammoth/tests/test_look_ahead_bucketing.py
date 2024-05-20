@@ -1,5 +1,5 @@
 import pytest
-from itertools import product, count
+from itertools import product
 
 from mammoth.inputters.dataloader import build_dataloader
 

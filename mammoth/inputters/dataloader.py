@@ -53,10 +53,10 @@ class InferenceBatcher():
         for example in iter(self.examples_stream):
             accum.append(example)
             if len(accum) >= self.batch_size:
-                yield self.collate_fn(accum)
+                yield self.collate_fn(accum, 0)
                 accum = []
         if accum:
-            yield self.collate_fn(accum)
+            yield self.collate_fn(accum, 0)
 
 
 class ScoredInfiniteExamples():
@@ -153,7 +153,8 @@ class SimpleLookAheadBucketing():
                     [
                         example_dict for _, example_dict
                         in itertools.islice(maxi_batch_it, epb)
-                    ]
+                    ],
+                    self._sie._current_line_idx,
                 )
 
 
@@ -175,7 +176,7 @@ class SentenceMinibatcher():
             for _ in range(self.batch_size):
                 _, example = self._sie.next()
                 minibatch.append(example)
-            yield self.collate_fn(accum, self._sie._current_line_idx)
+            yield self.collate_fn(minibatch, self._sie._current_line_idx)
 
 
 class DynamicDatasetIter(object):

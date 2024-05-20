@@ -228,6 +228,8 @@ class DynamicDatasetIter(object):
         self.batch_size = batch_size
         self.batch_size_multiple = batch_size_multiple
         self.device = 'cpu'
+        self.max_look_ahead_sentences = max_look_ahead_sentences
+        self.lookahead_minibatches = lookahead_minibatches
         self.line_idx_restore = dict() if line_idx_restore is None else line_idx_restore
 
     @classmethod

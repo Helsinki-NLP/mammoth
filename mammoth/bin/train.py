@@ -272,12 +272,16 @@ def train(opts):
             opts=opts
         )
         # Get the iterator to generate from
+        line_idx_restore = None
+        if checkpoint is not None:
+            line_idx_restore = checkpoint['data_state']
         train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,
             transforms_cls=transforms_cls,
             vocabs_dict=vocabs_dict,
             opts=opts,
             is_train=True,
+            line_idx_restore=line_idx_restore,
         )
 
         producer = mp.Process(

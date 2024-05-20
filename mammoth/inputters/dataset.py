@@ -116,8 +116,11 @@ class ParallelCorpus(IterableDataset):
         """Split string, accompanied by a drumroll"""
         return string.split()
 
-    def _numericalize(self, tokens, side='src'):
+    def _maybe_numericalize(self, key, value):
         """Convert list of strings into list of indices"""
+        if key not in ('src', 'tgt'):
+            return value
+        tokens, side = value, key
         vocab = self.vocabs[side]
         bos = vocab[DefaultTokens.BOS]
         eos = vocab[DefaultTokens.EOS]
@@ -150,7 +153,7 @@ class ParallelCorpus(IterableDataset):
 
         def _cast(example_dict):
             return {
-                k: self._numericalize(v, side=k)
+                k: self._maybe_numericalize(k, v)
                 for k, v in example_dict.items()
                 if v is not None
             }

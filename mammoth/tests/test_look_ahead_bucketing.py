@@ -1,5 +1,5 @@
 import pytest
-from itertools import product
+from itertools import product, count
 
 from mammoth.inputters.dataloader import build_dataloader
 
@@ -40,10 +40,12 @@ class MockStream():
     ],
 )
 def test_simple_lookeahead_bucketing(max_batch_size, lookahead_minibatches):
+    index_gen = count()
     stream = MockStream([
         hashabledict({
             'src': tuple([letter for _ in range(i)]),
             'tgt': tuple([letter for _ in range(j)]),
+            'line_idx': next(index_gen)
         })
         for letter in 'xyz'
         for i, j in product(range(1, 11), range(1, 11))
@@ -78,10 +80,12 @@ def test_simple_lookeahead_bucketing(max_batch_size, lookahead_minibatches):
     [1, 5, 12, 2048],
 )
 def test_sentence_minibatcher(batch_size):
+    index_gen = count()
     stream = MockStream([
         hashabledict({
             'src': tuple([letter for _ in range(i)]),
             'tgt': tuple([letter for _ in range(j)]),
+            'line_idx': next(index_gen)
         })
         for letter in 'xyz'
         for i, j in product(range(1, 11), range(1, 11))

@@ -53,6 +53,7 @@ class InferenceBatcher():
         for example in iter(self.examples_stream):
             accum.append(example)
             if len(accum) >= self.batch_size:
+                # line idx == 0 during inference
                 yield self.collate_fn(accum, 0)
                 accum = []
         if accum:
@@ -66,7 +67,7 @@ class ScoredInfiniteExamples():
         self._it = iter(self.dataset)
         self._prev = next(self._it)
         self._score = self.score_fn(self._prev)
-        self._current_line_idx = None
+        self._current_line_idx = self._prev['line_idx']
 
     def peek_at_score(self):
         return self._score
@@ -80,6 +81,7 @@ class ScoredInfiniteExamples():
         score_out, example_out = self._score, self._prev
         self._score = self.score_fn(example)
         self._prev = example
+        self._current_line_idx = self._prev['line_idx']
         return score_out, example_out
 
 

@@ -343,13 +343,13 @@ class Trainer(object):
                         break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                self.model_saver.save(step, moving_average=self.moving_average)
+                self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
                 break
 
         if self.model_saver is not None:
-            self.model_saver.save(step, moving_average=self.moving_average)
+            self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
         if device_context.is_master() and self.report_manager is not None:
             self.report_manager.report_end(step)
         return total_stats

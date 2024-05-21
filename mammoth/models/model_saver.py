@@ -83,7 +83,7 @@ class ModelSaverBase(object):
                 model_params_data.append(param.data)
                 param.data = avg.data
 
-        chkpt_names = self._save(step, save_model, self.device_context)
+        chkpt_names = self._save(step, save_model, data_state, self.device_context)
         self.last_saved_step = step
 
         if moving_average:
@@ -96,12 +96,14 @@ class ModelSaverBase(object):
                 self._rm_checkpoint(todel)
             self.checkpoint_queue.append(chkpt_names)
 
-    def _save(self, step):
+    def _save(self, step, save_model, data_state, device_context):
         """Save a resumable checkpoint.
 
         Args:
             step (int): step number
             model (nn.Module): torch model to save
+            data_state (dict): data streaming info
+            device_context: runtime info
 
         Returns:
             (object, str):
@@ -126,8 +128,7 @@ class ModelSaverBase(object):
 class ModelSaver(ModelSaverBase):
     """Simple model saver to filesystem"""
 
-    # FIXME does not match the base class signature
-    def _save(self, step, model, device_context, data_state):
+    def _save(self, step, model, data_state, device_context):
         real_model = model.module if isinstance(model, nn.DataParallel) else model
 
         model_state_dict = real_model.state_dict()

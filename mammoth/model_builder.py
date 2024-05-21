@@ -150,7 +150,7 @@ def load_test_multitask_model(opts, task=None, model_path=None):
 
         model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
         # Avoid functionality on inference
-        model_opts.update_vocab = False
+        # model_opts.update_vocab = False
         model = create_bilingual_model(
             task=task,
             model_opts=model_opts,
@@ -211,7 +211,7 @@ def load_test_model(opts, model_path=None):
     # fields["indices"] = indices
 
     # Avoid functionality on inference
-    model_opts.update_vocab = False
+    # model_opts.update_vocab = False
 
     if opts.fp32:
         model.float()

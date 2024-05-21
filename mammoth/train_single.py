@@ -35,7 +35,7 @@ def _get_model_opts(opts, checkpoint=None):
             # of previous checkpoints
             opts.tensorboard_log_dir_dated = model_opts.tensorboard_log_dir_dated
         # Override checkpoint's update_embeddings as it defaults to false
-        model_opts.update_vocab = opts.update_vocab
+        # model_opts.update_vocab = opts.update_vocab
     else:
         model_opts = opts
     return model_opts

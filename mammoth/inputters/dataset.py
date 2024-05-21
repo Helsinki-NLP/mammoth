@@ -41,7 +41,8 @@ def read_examples_from_files(
 ):
     """Helper function to read examples"""
 
-    line_idx_generator = itertools.count()
+    # match starting line with offset
+    line_idx_generator = itertools.count(offset if offset is not None else 0)
 
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
@@ -160,6 +161,7 @@ class ParallelCorpus(IterableDataset):
 
         # ensure we only restore the first time the corpus is restored
         if self._line_idx_restore is not None:
+            logger.info(f'restoring to line: {self._line_idx_restore}')
             if self.stride is not None:
                 # sanity check
                 assert self._line_idx_restore % self.stride == 0, \

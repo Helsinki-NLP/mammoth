@@ -39,31 +39,18 @@ def build_translator(opts, task, report_score=True, logger=None, out_file=None):
 
     scorer = mammoth.translate.GNMTGlobalScorer.from_opts(opts)
 
-    if model_opts.model_task == ModelTask.LANGUAGE_MODEL:
-        translator = GeneratorLM.from_opts(
-            model,
-            vocabs,
-            opts,
-            model_opts,
-            global_scorer=scorer,
-            out_file=out_file,
-            report_align=opts.report_align,
-            report_score=report_score,
-            logger=logger,
-        )
-    else:
-        translator = Translator.from_opts(
-            model,
-            vocabs,
-            opts,
-            model_opts,
-            global_scorer=scorer,
-            out_file=out_file,
-            report_align=opts.report_align,
-            report_score=report_score,
-            logger=logger,
-            task=task,
-        )
+    translator = Translator.from_opts(
+        model,
+        vocabs,
+        opts,
+        model_opts,
+        global_scorer=scorer,
+        out_file=out_file,
+        report_align=opts.report_align,
+        report_score=report_score,
+        logger=logger,
+        task=task,
+    )
     return translator
 
 
@@ -268,7 +255,7 @@ class Inference(object):
         """
         assert task is not None
         # TODO: maybe add dynamic part
-        cls.validate_task(model_opts.model_task)
+        # cls.validate_task(model_opts.model_task)
 
         return cls(
             model,
@@ -715,10 +702,6 @@ class Inference(object):
 
 
 class Translator(Inference):
-    @classmethod
-    def validate_task(cls, task):
-        if task != ModelTask.SEQ2SEQ:
-            raise ValueError(f"Translator does not support task {task}. Tasks supported: {ModelTask.SEQ2SEQ}")
 
     def _align_forward(self, batch, predictions):
         """
@@ -943,6 +926,7 @@ class Translator(Inference):
         return gold_scores
 
 
+# TODO remove
 class GeneratorLM(Inference):
     @classmethod
     def validate_task(cls, task):

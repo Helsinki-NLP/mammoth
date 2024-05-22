@@ -101,7 +101,7 @@ class ModelSaverBase(object):
 
         Args:
             step (int): step number
-            model (nn.Module): torch model to save
+            save_model (nn.Module): torch model to save
             data_state (dict): data streaming info
             device_context: runtime info
 

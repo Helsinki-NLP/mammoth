@@ -189,7 +189,6 @@ class ParallelCorpus(IterableDataset):
         examples = map(_cast, examples)
         yield from examples
 
-    # FIXME: some RNN archs require sorting src's by length
     def collate_fn(self, examples, line_idx):
         has_tgt = 'tgt' in examples[0].keys()
         src_padidx = self.vocabs['src'][DefaultTokens.PAD]

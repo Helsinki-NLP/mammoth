@@ -186,6 +186,8 @@ class Trainer(object):
 
         self.task_queue_manager = task_queue_manager
 
+        self._data_state = {}
+
         for i in range(len(self.accum_count_l)):
             assert self.accum_count_l[i] > 0
 
@@ -341,13 +343,13 @@ class Trainer(object):
                         break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                self.model_saver.save(step, moving_average=self.moving_average)
+                self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
                 break
 
         if self.model_saver is not None:
-            self.model_saver.save(step, moving_average=self.moving_average)
+            self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
         if device_context.is_master() and self.report_manager is not None:
             self.report_manager.report_end(step)
         return total_stats
@@ -421,6 +423,10 @@ class Trainer(object):
                     f'Received {metadata},\n expected {expected_metadata}'
                 )
             seen_comm_batches.add(comm_batch)
+
+            # update data state
+            self._data_state[metadata.corpus_id] = batch.line_idx
+
             if self.norm_method == "tokens":
                 num_tokens = (
                     batch.labels[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()

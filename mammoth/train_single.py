@@ -52,6 +52,7 @@ def _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager):
         vocabs_dict=vocabs_dict,
         opts=opts,
         is_train=False,
+        line_idx_restore=None,
     )
     return valid_iter
 

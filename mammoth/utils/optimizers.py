@@ -1,13 +1,10 @@
 """ Optimizers class """
 import functools
-import importlib
 import math
 import torch
 import torch.optim as optim
-import types
 from collections import Counter
 from math import sqrt
-from mammoth.utils.misc import fn_args
 from torch.nn.utils import clip_grad_norm_
 from mammoth.utils.logging import logger
 
@@ -170,11 +167,10 @@ def linear_warmup_decay(step, warmup_steps, rate, train_steps):
 
 
 class MultipleOptimizer(object):
-    """Implement multiple optimizers"""
+    """Separate optimizers for each distributed component"""
 
-    def __init__(self, op, multiOptims_Langs=None):
+    def __init__(self, op):
         self.optimizers = op
-        self.multiOptims_Langs = multiOptims_Langs
         self._steps = Counter()
 
     @property
@@ -212,7 +208,6 @@ class MultipleOptimizer(object):
         """Returns the state dictionary"""
         return {
             'optimizers': {k: v.state_dict() for k, v in self.optimizers.items()},
-            'multiOptims_Langs': self.multiOptims_Langs,
             'steps': self._steps,
         }
 
@@ -231,7 +226,6 @@ class MultipleOptimizer(object):
         else:
             logger.info("Some components do not match. Do not load optimizer from checkpoint.")
 
-        self.multiOptims_Langs = state_dict["multiOptims_Langs"]
         self._steps = state_dict["steps"]
 
 

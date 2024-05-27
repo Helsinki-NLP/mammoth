@@ -60,6 +60,7 @@ class ReportMgrBase(object):
         report_stats,
         multigpu=False,
         sampled_task_counts=None,
+        optimizer=None,
     ):
         """
         This is the user-defined batch-level traing progress
@@ -91,6 +92,9 @@ class ReportMgrBase(object):
                 report_stats,
                 sampled_task_counts=sampled_task_counts
             )
+            if optimizer is not None:
+                for line in optimizer.report_steps():
+                    logger.info(line)
             return mammoth.utils.Statistics()
         else:
             return report_stats

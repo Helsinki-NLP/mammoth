@@ -149,14 +149,14 @@ class Statistics(object):
         if num_steps > 0:
             step_fmt = "%s/%5d" % (step_fmt, num_steps)
         logger.info(
-            ("%s: Step %s; acc: %6.2f; ppl: %5.2f; xent: %4.2f; " + "lr: %7.5f; %3.0f/%3.0f tok/s; %6.0f sec")
+            ("%s: Step %s; acc: %6.2f; ppl: %5.2f; xent: %4.2f; %3.0f/%3.0f tok/s; %6.0f sec")
             % (
                 meta_str,
                 step_fmt,
                 self.accuracy(),
                 self.ppl(),
                 self.xent(),
-                learning_rate,
+                # learning_rate,    # was "lr: %7.5f;"
                 self.n_src_words / (t + 1e-5),
                 self.n_words / (t + 1e-5),
                 time.time() - start,
@@ -174,7 +174,7 @@ class Statistics(object):
         writer.add_scalar(prefix + "/ppl", self.ppl(), step)
         writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
         writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)
-        writer.add_scalar(prefix + "/lr", learning_rate, step)
+        # writer.add_scalar(prefix + "/lr", learning_rate, step)
         if patience is not None:
             writer.add_scalar(prefix + "/patience", patience, step)
 

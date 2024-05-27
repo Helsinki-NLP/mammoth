@@ -4,7 +4,7 @@ import torch
 import time
 
 from mammoth.model_builder import build_model
-from mammoth.utils.optimizers import Optimizer
+from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.misc import set_random_seed
 from mammoth.trainer import build_trainer
 from mammoth.models import build_model_saver
@@ -119,7 +119,7 @@ def main(
 
     # Build optimizer.
     logger.info("{} - Build optimizer".format(device_context.id))
-    optim = Optimizer.from_opts(
+    optim = MultipleOptimizer.from_opts(
         model,
         opts,
         task_queue_manager=task_queue_manager,

@@ -195,6 +195,8 @@ class Trainer(object):
         self.model.train()
 
     def _accum_count(self, step):
+        if step == 0:
+            _accum = self.accum_count_l[0]
         for i in range(len(self.accum_steps)):
             if step > self.accum_steps[i]:
                 _accum = self.accum_count_l[i]
@@ -254,6 +256,7 @@ class Trainer(object):
         while True:
             i += 1
 
+            # global training step
             step = self.optim.training_step
             self._maybe_update_dropout(step)
 
@@ -264,14 +267,16 @@ class Trainer(object):
             batch_task_sample = self.task_queue_manager.sample_corpus_ids()
             my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
 
+            gradient_syncs = self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample)
+
             self._gradient_accumulation(
                 batches_with_meta,
                 total_stats,
                 report_stats,
                 my_task,
+                gradient_syncs,
             )
 
-            gradient_syncs = self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample)
             for gradient_sync in gradient_syncs:
                 component = gradient_sync.component
                 if not component.needs_communication():
@@ -293,25 +298,25 @@ class Trainer(object):
             self.optim.externally_managed_step(gradient_syncs)
             self.optim.zero_grad()
 
-            if step % 1000 == 0 and step > 0:
-                # TODO: if you are going to uncomment that block, please make it optional
-                # logger.info(f'After gradient sync {step}')
-                # for name, p in self.model.named_parameters():
-                #     logger.info(
-                #         f'{device_context.node_rank}:{device_context.local_rank}'
-                #         f' {name}: {p.flatten()[:10]}'
-                #     )
-                if hasattr(self.optim._optimizer, 'report_steps'):
-                    for line in self.optim._optimizer.report_steps():
-                        logger.info(f'{device_context.node_rank}:{device_context.local_rank} {line}')
+            # if step % 1000 == 0 and step > 0:
+            #     TODO: if you are going to uncomment that block, please make it optional
+            #     logger.info(f'After gradient sync {step}')
+            #     for name, p in self.model.named_parameters():
+            #         logger.info(
+            #             f'{device_context.node_rank}:{device_context.local_rank}'
+            #             f' {name}: {p.flatten()[:10]}'
+            #         )
 
             if self.average_decay > 0 and i % self.average_every == 0:
                 self._update_average(step)
 
+            # Learning rate used to be retrieved with: self.optim.learning_rate()
+            # However, as each optimizer has its own learning rate, it is not obvious what to log here.
+            # We might log the mean or the range of learning rates, but the simplest thing is to log nothing.
             report_stats = self._maybe_report_training(
                 step,
                 train_steps,
-                self.optim.learning_rate(),
+                None,
                 report_stats,
                 sampled_task_counts=self.task_queue_manager.sampled_task_counts,
             )
@@ -330,7 +335,7 @@ class Trainer(object):
                     logger.info(f'{device_context.node_rank}:{device_context.local_rank} report stat step {step}')
                 if device_context.is_master():
                     self._report_step(
-                        self.optim.learning_rate(),  # learning_rate_to_show, #self.optim.learning_rate(),
+                        None,
                         step,
                         valid_stats=valid_stats,
                     )
@@ -412,6 +417,7 @@ class Trainer(object):
         total_stats,
         report_stats,
         my_task,
+        gradient_syncs,
     ):
         normalization = 0
         seen_comm_batches = set()
@@ -483,7 +489,7 @@ class Trainer(object):
 
                 except Exception:
                     traceback.print_exc()
-                    logger.info("At step %d, we removed a batch - accum %d", self.training_step_all, k)
+                    logger.info("At step %d, we removed a batch - accum %d", self.optim.training_step, k)
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')
 
@@ -530,6 +536,7 @@ class Trainer(object):
                 report_stats,
                 multigpu=self.device_context.is_distributed(),
                 sampled_task_counts=sampled_task_counts,
+                optimizer=self.optim,
             )
 
     def _report_step(self, learning_rate, step, train_stats=None, valid_stats=None):

@@ -354,7 +354,7 @@ class MultipleOptimizer(object):
         """Returns the state dictionary"""
         return {
             'optimizers': {k: v.state_dict() for k, v in self.suboptimizers.items()},
-            'steps': self._steps,
+            # 'steps': self._steps,
         }
 
     def load_state_dict(self, state_dict):
@@ -372,7 +372,7 @@ class MultipleOptimizer(object):
         else:
             logger.info("Some components do not match. Do not load optimizer from checkpoint.")
 
-        self._steps = state_dict["steps"]
+        # self._steps = state_dict["steps"]
 
     @property
     def training_step(self):

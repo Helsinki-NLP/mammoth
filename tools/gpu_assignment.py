@@ -72,7 +72,7 @@ class Assignment:
         a_ready_to_start = None
         b_ready_to_start = None
         if lp_a is not None:
-            src_lang_a, tgt_lang_a = lp_a
+            src_lang_a, tgt_lang_a, offset_a = lp_a
             components_a = ao.get_components(src_lang_a, tgt_lang_a)
             for component in components_a:
                 # remove from a
@@ -81,7 +81,7 @@ class Assignment:
                 component_to_gpus[component][gpu_b] += 1
             a_ready_to_start = ao._is_ready_to_start(lp_a)
         if lp_b is not None:
-            src_lang_b, tgt_lang_b = lp_b
+            src_lang_b, tgt_lang_b, offset_b = lp_b
             components_b = ao.get_components(src_lang_b, tgt_lang_b)
             for component in components_b:
                 # remove from b
@@ -102,7 +102,7 @@ class Assignment:
         for gpu_slot, lp in assignment.items():
             if lp is None:
                 continue
-            src_lang, tgt_lang = lp
+            src_lang, tgt_lang, offset = lp
             gpu = (gpu_slot.node, gpu_slot.gpu)
             components = ao.get_components(src_lang, tgt_lang)
             for component in components:
@@ -152,7 +152,7 @@ class Assignment:
             lp = self.assignment[gpu_slot]
             if lp is None:
                 continue
-            src_lang, tgt_lang = lp
+            src_lang, tgt_lang, offset = lp
             components = ao.get_components(src_lang, tgt_lang)
             for component in components:
                 component_counts[component] += 1
@@ -166,7 +166,7 @@ class Assignment:
                 weighted_slots.append((0, gpu_slot))
                 continue
             cost = 0
-            src_lang, tgt_lang = lp
+            src_lang, tgt_lang, offset = lp
             components = ao.get_components(src_lang, tgt_lang)
             for component in components:
                 if component_counts[component] == 1:
@@ -193,7 +193,7 @@ class AssignmentOptimizer:
         n_gpus_per_node: int,
         n_slots_per_gpu: int,
         get_components: Callable[[str, str], Set[str]],
-        ready_to_start: Optional[Set[Tuple[str, str]]] = None,
+        ready_to_start: Optional[Set[Tuple[str, str, int]]] = None,
     ):
         self.n_nodes = n_nodes
         self.n_gpus_per_node = n_gpus_per_node
@@ -209,8 +209,10 @@ class AssignmentOptimizer:
                 for slot in range(n_slots_per_gpu):
                     yield GpuSlot(node, gpu, slot)
 
-    def initial_assignment(self, lang_pairs: List[Tuple[str, str]]):
+    def initial_assignment(self, lang_pairs: List[Tuple[str, str, int]]):
         lang_pairs = list(lang_pairs)
+        if self.ready_to_start:
+            assert all(lp in lang_pairs for lp in self.ready_to_start), 'ready_to_Start must be subset of lang_pairs'
         if len(lang_pairs) > len(self.gpu_slots):
             raise Exception(f'More lang pairs {len(lang_pairs)} than gpu slots {len(self.gpu_slots)}')
         if len(self.gpu_slots) > len(lang_pairs):
@@ -335,7 +337,7 @@ class AssignmentOptimizer:
         for gpu_slot, lp in assignment.items():
             if lp is None:
                 continue
-            src_lang, tgt_lang = lp
+            src_lang, tgt_lang, offset = lp
             lps[(gpu_slot.node, gpu_slot.gpu, src_lang, tgt_lang)] += 1
         result = 0
         for count in lps.values():
@@ -428,12 +430,12 @@ def print_assignment(assignment, group_mapping, ready_to_start=None):
                 f'{slot_str}: UNASSIGNED', flush=True
             )
             continue
-        src_lang, tgt_lang = lp
+        src_lang, tgt_lang, offset = lp
         src_group = group_mapping[src_lang]
         tgt_group = group_mapping[tgt_lang]
         ready = 'ready to start' if lp in ready_to_start else ''
         print(
-            f'{slot_str}: {src_lang}-{tgt_lang}\t({src_group}, {tgt_group})\t{ready}', flush=True
+            f'{slot_str}: {src_lang}-{tgt_lang}\tsplit{offset}\t({src_group}, {tgt_group})\t{ready}', flush=True
         )
 
 
@@ -441,7 +443,7 @@ def optimize_gpu_assignment(
     n_nodes: int,
     n_gpus_per_node: int,
     n_slots_per_gpu: int,
-    lang_pairs: List[Tuple[str, str]],
+    lang_pairs: List[Tuple[str, str, int]],
     lang_to_group_mapping: Dict[str, str],
     lps_ready_to_start: Optional[Set[Tuple[str, str]]],
     log_name: Optional[str] = None,
@@ -498,15 +500,15 @@ def example():
 
     # LPs ready to start at timestep 0
     READY_TO_START = {
-        ('en', 'de'),
-        ('de', 'en'),
-        ('en', 'en'),
-        ('de', 'de'),
-        ('sv', 'no'),
-        ('no', 'sv'),
-        ('sv', 'de'),
-        ('de', 'sv'),
-        ('fi', 'fi'),
+        ('en', 'de', 0),
+        ('de', 'en', 0),
+        ('en', 'en', 0),
+        ('de', 'de', 0),
+        ('sv', 'no', 0),
+        ('no', 'sv', 0),
+        ('sv', 'de', 0),
+        ('de', 'sv', 0),
+        ('fi', 'fi', 0),
     }
 
     lang_pairs = []
@@ -514,7 +516,9 @@ def example():
         for tgt_lang in LANGS.keys():
             if LANGS[src_lang] != LANGS[tgt_lang]:
                 continue
-            lang_pairs.append((src_lang, tgt_lang))
+            lang_pairs.append((src_lang, tgt_lang, 0))
+    # One split LP
+    lang_pairs.append(('en', 'de', 1))
 
     optimize_gpu_assignment(
         n_nodes=2,

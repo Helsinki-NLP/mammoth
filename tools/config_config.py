@@ -495,12 +495,13 @@ def allocate_devices(opts):
     lp_to_key = defaultdict(list)
     for key, tasks_config in opts.in_config[0]['tasks'].items():
         src_lang, tgt_lang = tasks_config['src_tgt'].split('-')
+        offset = tasks_config.get('offset', 0)
         ready_to_start = tasks_config.get('introduce_at_training_step', 0) == 0
 
-        lang_pairs.append((src_lang, tgt_lang))
+        lang_pairs.append((src_lang, tgt_lang, offset))
         if ready_to_start:
-            lps_ready_to_start.append((src_lang, tgt_lang))
-        lp_to_key[(src_lang, tgt_lang)].append(key)
+            lps_ready_to_start.append((src_lang, tgt_lang, offset))
+        lp_to_key[(src_lang, tgt_lang, offset)].append(key)
 
     if n_nodes is None and n_slots_per_gpu is None:
         raise Exception('You must specify either n_nodes or n_slots_per_gpu')
@@ -527,13 +528,14 @@ def allocate_devices(opts):
         lps_ready_to_start = []
         for cname, corpus in opts.in_config[0]['tasks'].items():
             src_lang, tgt_lang = corpus['src_tgt'].split('-')
+            offset = corpus.get('offset', 0)
             if 'introduce_at_training_step' not in corpus:
-                lps_ready_to_start.append((src_lang, tgt_lang))
+                lps_ready_to_start.append((src_lang, tgt_lang, offset))
                 continue
             adjusted = max(0, corpus.get('introduce_at_training_step', 0) - iats_at_last_gpu)
             corpus['introduce_at_training_step'] = adjusted
             if adjusted == 0:
-                lps_ready_to_start.append((src_lang, tgt_lang))
+                lps_ready_to_start.append((src_lang, tgt_lang, offset))
 
     if n_gpus_tot < 2:
         print('Assigning all tasks to 0:0')

@@ -4,24 +4,28 @@ and creates each encoder and decoder accordingly.
 """
 import torch
 import torch.nn as nn
-from torch.nn.init import xavier_uniform_
-from pathlib import Path
-
 from collections import defaultdict
+from functools import partial
+from pathlib import Path
+from torch.nn.init import xavier_uniform_
+from typing import Optional, List
+from x_transformers import TransformerWrapper
 
-import mammoth.modules
-
-from mammoth.models.adapters import (
-    Adapter,
-    EncoderAdapterLayer,
-    DecoderAdapterLayer,
+from mammoth.distributed.components import (
+    DistributedAdapter,
+    DistributedComponent,
+    DistributedDecoder,
+    DistributedEncoder,
+    Side,
 )
-from mammoth.constants import DefaultTokens
-from mammoth.modules.layer_stack_decoder import LayerStackDecoder
-from mammoth.modules.layer_stack_encoder import LayerStackEncoder
-from mammoth.modules import Embeddings
-from mammoth.modules.embeddings import PluggableEmbeddings
-from mammoth.modules.util_class import Cast
+from mammoth.models import NMTModel
+from mammoth.modules.adapters import (
+    AdaptedAttentionLayers,
+    Adapter,
+    FeedForwardAdapterLayer,
+    LoraAdapterLayer,
+)
+from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
 from mammoth.utils.module_splitter import _combine_ordered_dicts
@@ -30,292 +34,362 @@ from mammoth.utils.parse import ArgumentParser
 from mammoth.modules.attention_bridge import AttentionBridge
 
 
-def build_embeddings(opts, vocab, for_encoder=True):
-    """
-    Args:
-        opts: the option in current environment.
-        vocab: stoi-ish object.
-        for_encoder(bool): build Embeddings for encoder or decoder?
-    """
-    word_padding_idx = vocab.stoi[DefaultTokens.PAD]
-    opts.word_padding_idx = word_padding_idx
-
-    freeze_word_vecs = opts.freeze_word_vecs_enc if for_encoder else opts.freeze_word_vecs_dec
-    emb = Embeddings(
-        word_vec_size=opts.model_dim,
-        position_encoding=opts.position_encoding,
-        dropout=opts.dropout[0] if isinstance(opts.dropout, list) else opts.dropout,
-        word_padding_idx=word_padding_idx,
-        word_vocab_size=len(vocab),
-        freeze_word_vecs=freeze_word_vecs,
-        enable_embeddingless=opts.enable_embeddingless
-    )
-    if opts.enable_embeddingless:
-        logger.info("Creating an embeddingless model.")
-    return emb
+def uses_adapters(opts):
+    return 'adapters' in opts and opts.adapters
 
 
-def build_encoder(opts, embeddings, task_queue_manager):
-    """
-    Various encoder dispatcher function.
-    Args:
-        opts: the option in current environment.
-        embeddings (Embeddings): vocab embeddings for this encoder.
-    """
-    assert opts.encoder_type == 'transformer', 'Only Transformer is supported'
-    return LayerStackEncoder.from_opts(opts, embeddings, task_queue_manager)
-
-
-def build_decoder(opts, embeddings, task_queue_manager):
-    """
-    Various decoder dispatcher function.
-    Args:
-        opts: the option in current environment.
-        embeddings (Embeddings): vocab embeddings for this decoder.
-    """
-    assert opts.decoder_type == 'transformer', 'Only Transformer is supported'
-    return LayerStackDecoder.from_opts(opts, embeddings, task_queue_manager)
-
-
-def load_test_multitask_model(opts, task=None, model_path=None):
-    """If a checkpoint ending with ".pt" returns a full model
-    otherwise it builds a bilingual model"""
+def load_test_multitask_model(opts, task_queue_manager, task=None, model_path=None):
     if task is None:
         raise ValueError('Must set task')
     if model_path is None:
         model_path = opts.models[0]
 
-    if model_path.endswith('.pt'):
-        return load_test_model(opts, model_path)
-    else:
-        checkpoint_modules = [
-            (f'encoder.embeddings.embeddings_{task.src_lang}.', f'src_embeddings_{task.src_lang}'),
-            (f'decoder.embeddings.embeddings_{task.tgt_lang}.', f'tgt_embeddings_{task.tgt_lang}'),
-            (f'generator.generator_{task.tgt_lang}.', f'generator_{task.tgt_lang}'),
-            ('attention_bridge.', 'attention_bridge'),
-        ]
+    checkpoint_modules = [
+        (f'encoder.embeddings.embeddings_{task.src_lang}.', f'src_embeddings_{task.src_lang}'),
+        (f'decoder.embeddings.embeddings_{task.tgt_lang}.', f'tgt_embeddings_{task.tgt_lang}'),
+        (f'generator.generator_{task.tgt_lang}.', f'generator_{task.tgt_lang}'),
+        ('attention_bridge.', 'attention_bridge'),
+    ]
 
-        for layer_stack_idx, layer_stack_key in enumerate(task.encoder_id):
-            checkpoint_modules.append(
-                (
-                    f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.',
-                    f'encoder_{layer_stack_idx}_{layer_stack_key}'
-                )
+    for layer_stack_idx, layer_stack_key in enumerate(task.encoder_id):
+        checkpoint_modules.append(
+            (
+                f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.',
+                f'encoder_{layer_stack_idx}_{layer_stack_key}'
             )
-        if task.encoder_adapter_ids:
-            for layer_stack_idx, adapter_group, sub_id in task.encoder_adapter_ids:
-                checkpoint_modules.append(
-                    (
-                        f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
-                        f'encoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
-                    )
-                )
-        for layer_stack_idx, layer_stack_key in enumerate(task.decoder_id):
-            checkpoint_modules.append(
-                (
-                    f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.',
-                    f'decoder_{layer_stack_idx}_{layer_stack_key}'
-                )
-            )
-        if task.decoder_adapter_ids:
-            for layer_stack_idx, adapter_group, sub_id in task.decoder_adapter_ids:
-                checkpoint_modules.append(
-                    (
-                        f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
-                        f'decoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
-                    )
-                )
-
-        model_path = model_path.rstrip('_')
-        checkpoint_paths = [
-            (prefix, f'{model_path}_{key}.pt') for (prefix, key) in checkpoint_modules
-        ]
-
-        opts.model_frame = model_path + '_frame.pt'
-        frame = torch.load(opts.model_frame, map_location=lambda storage, loc: storage)
-
-        checkpoint_state_dicts = {
-            prefix: torch.load(path, map_location=lambda storage, loc: storage)
-            for prefix, path in checkpoint_paths
-        }
-
-        combined_state_dict = _combine_ordered_dicts(checkpoint_state_dicts)
-
-        vocabs_dict = {
-            'src': frame["vocab"].get(('src', task.src_lang)),
-            'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
-        }
-        # FIXME
-        # fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
-
-        model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
-        # Avoid functionality on inference
-        # model_opts.update_vocab = False
-        model = create_bilingual_model(
-            task=task,
-            model_opts=model_opts,
-            vocabs_dict=vocabs_dict
         )
-        model_params = {name for name, p in model.named_parameters()}
-        model_params.update(name for name, p in model.named_buffers())
-        for key in set(combined_state_dict.keys()):
-            if key not in model_params:
-                print(f'Deleting unnecessary key: {key}')
-                del combined_state_dict[key]
-        for key in model_params:
-            if key not in combined_state_dict:
-                print(f'Key missing {key}')
-        model.load_state_dict(combined_state_dict)
-        device = torch.device("cuda" if use_gpu(opts) else "cpu")
-        model.to(device)
+    if task.encoder_adapter_ids:
+        for layer_stack_idx, adapter_group, sub_id in task.encoder_adapter_ids:
+            checkpoint_modules.append(
+                (
+                    f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
+                    f'encoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+                )
+            )
+    for layer_stack_idx, layer_stack_key in enumerate(task.decoder_id):
+        checkpoint_modules.append(
+            (
+                f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.',
+                f'decoder_{layer_stack_idx}_{layer_stack_key}'
+            )
+        )
+    if task.decoder_adapter_ids:
+        for layer_stack_idx, adapter_group, sub_id in task.decoder_adapter_ids:
+            checkpoint_modules.append(
+                (
+                    f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
+                    f'decoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
+                )
+            )
 
-        model.eval()
+    model_path = model_path.rstrip('_')
+    checkpoint_paths = [
+        (prefix, f'{model_path}_{key}.pt') for (prefix, key) in checkpoint_modules
+    ]
 
-        return vocabs_dict, model, model_opts
+    opts.model_frame = model_path + '_frame.pt'
+    frame = torch.load(opts.model_frame, map_location=lambda storage, loc: storage)
 
+    checkpoint_state_dicts = {
+        prefix: torch.load(path, map_location=lambda storage, loc: storage)
+        for prefix, path in checkpoint_paths
+    }
 
-def load_test_model(opts, model_path=None):
-    if model_path is None:
-        model_path = opts.models[0]
+    combined_state_dict = _combine_ordered_dicts(checkpoint_state_dicts)
 
-    if len(opts.models) > 1:
-        model_path_enc = opts.models[0]
-        checkpoint = torch.load(model_path_enc, map_location=lambda storage, loc: storage)
-        model = checkpoint['whole_model']
-
-        model_path_dec = opts.models[1]
-        model_dec = torch.load(model_path_dec, map_location=lambda storage, loc: storage)['whole_model']
-        model.decoder = model_dec.decoder
-        model.generator = model_dec.generator
-    else:
-        checkpoint = torch.load(model_path, map_location=lambda storage, loc: storage)
-        model = checkpoint['whole_model']
-
-    model_opts = ArgumentParser.ckpt_model_opts(checkpoint['opts'])
-    ArgumentParser.update_model_opts(model_opts)
-    ArgumentParser.validate_model_opts(model_opts)
-    vocabs = checkpoint['vocab']
-    print("VOCABS")
-    print(vocabs)
-    if opts.gpu != -1:
-        device = torch.device("cuda")
-        model.to(device)
-
-    lang_pair = opts.lang_pair
-    src_lang, tgt_lang = lang_pair.split("-")
+    vocabs_dict = {
+        'src': frame["vocab"].get(('src', task.src_lang)),
+        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
+    }
     # FIXME
-    vocabs_dict = {}
-    vocabs_dict['src'] = vocabs[('src', src_lang)]
-    vocabs_dict['tgt'] = vocabs[('tgt', tgt_lang)]
-    # indices = None  # Field(use_vocab=False, dtype=torch.long, sequential=False)
-    # fields["indices"] = indices
+    # fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
 
+    model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
     # Avoid functionality on inference
     # model_opts.update_vocab = False
+    model = build_model(
+        model_opts,
+        opts,
+        vocabs_dict,
+        task_queue_manager,
+        checkpoint=None,
+        single_task=task.corpus_id,
+    )
+    model_params = {name for name, p in model.named_parameters()}
+    model_params.update(name for name, p in model.named_buffers())
+    for key in set(combined_state_dict.keys()):
+        if key not in model_params:
+            print(f'Deleting unnecessary key: {key}')
+            del combined_state_dict[key]
+    for key in model_params:
+        if key not in combined_state_dict:
+            print(f'Key missing {key}')
+    model.load_state_dict(combined_state_dict)
+    device = torch.device("cuda" if use_gpu(opts) else "cpu")
+    model.to(device)
 
-    if opts.fp32:
-        model.float()
-    elif opts.int8:
-        if opts.gpu >= 0:
-            raise ValueError("Dynamic 8-bit quantization is not supported on GPU")
-        torch.quantization.quantize_dynamic(model, inplace=True)
     model.eval()
-    model.generator.eval()
+
     return vocabs_dict, model, model_opts
 
 
-def create_bilingual_model(
-    task, model_opts, vocabs_dict
+def get_attention_layers_kwargs(
+    side: Side,
+    layer_stack_index,
+    xcoder_id,
+    model_opts,
 ):
-    """For translation."""
-    src_lang = task.src_lang
-    tgt_lang = task.tgt_lang
-    generators_md = nn.ModuleDict()
-    src_emb = build_src_emb(model_opts, vocabs_dict['src'])
-    tgt_emb = build_tgt_emb(model_opts, vocabs_dict['tgt'])
-    pluggable_src_emb = PluggableEmbeddings({src_lang: src_emb})
-    pluggable_tgt_emb = PluggableEmbeddings({tgt_lang: tgt_emb})
+    """Return arguments for x_transformers.AttentionLayers"""
+    depths = model_opts.enc_layers if side == Side.decoder else model_opts.dec_layers
+    depth = depths[layer_stack_index]
+    causal = side == Side.decoder
+    cross_attend = side == Side.decoder
+    is_last = layer_stack_index == len(depths) - 1
+    # changed from default
+    use_simple_rmsnorm = True
+    attn_flash = True
+    ff_glu = True
+    pre_norm_has_final_norm = is_last
+    # Mostly x_transformers defaults. Make (some of this) configurable.
+    return {
+        'dim': model_opts.model_dim,
+        'depth': depth,
+        'heads': model_opts.heads,
+        'causal': causal,
+        'cross_attend': cross_attend,
+        'only_cross': False,
+        'use_scalenorm': False,
+        'use_rmsnorm': False,
+        'use_simple_rmsnorm': use_simple_rmsnorm,
+        'use_adaptive_layernorm': False,
+        'use_adaptive_rmsnorm': False,
+        'use_adaptive_layerscale': False,
+        'norm_add_unit_offset': True,
+        'dim_condition': None,
+        'adaptive_condition_mlp': False,
+        'adaptive_condition_mlp_expansion': 4,
+        'alibi_pos_bias': False,
+        'alibi_num_heads': None,
+        'rel_pos_bias': False,
+        'rel_pos_num_buckets': 32,
+        'rel_pos_max_distance': 128,
+        'dynamic_pos_bias': False,
+        'dynamic_pos_bias_log_distance': False,
+        'dynamic_pos_bias_mlp_depth': 2,
+        'dynamic_pos_bias_norm': False,
+        'rotary_pos_emb': False,
+        'rotary_emb_dim': None,
+        'rotary_xpos': False,
+        'rotary_interpolation_factor': 1.,
+        'rotary_xpos_scale_base': 512,
+        'rotary_base_rescale_factor': 1.,
+        'weight_tie_layers': False,
+        'custom_layers': None,
+        'layers_execute_order': None,
+        # 'sandwich_coef': None,    # Sandwich would be very unintuitive with multiple layerstacks
+        'par_ratio': None,
+        'residual_attn': False,
+        'cross_residual_attn': False,
+        # 'macaron': False,         # Can not support macaron and inject adapters at each 'f' layer
+        'pre_norm': True,
+        'pre_norm_has_final_norm': pre_norm_has_final_norm,
+        'gate_residual': False,
+        'scale_residual': False,
+        'scale_residual_constant': 1.,
+        'shift_tokens': 0,
+        'sandwich_norm': False,
+        'softclamp_output': False,
+        'softclamp_output_value': 30.,
+        'resi_dual': False,
+        'resi_dual_scale': 1.,
+        'zero_init_branch_output': False,
+        'layer_dropout': 0.,
+        'cross_attn_tokens_dropout': 0.,
+        'disable_abs_pos_emb': None,
+        'use_layerscale': False,
+        'layerscale_init_value': 0.,
 
-    pluggable_src_emb.activate(src_lang)
-    pluggable_tgt_emb.activate(tgt_lang)
-    encoder = LayerStackEncoder.from_trans_opt(model_opts, pluggable_src_emb, task=task)
-    decoder = LayerStackDecoder.from_trans_opt(model_opts, pluggable_tgt_emb, task=task)
-    generator = build_generator(model_opts, len(vocabs_dict['tgt']), tgt_emb)
-    generators_md.add_module(f'generator_{tgt_lang}', generator)
+        'ff_dim_out': None,
+        'ff_mult': model_opts.ff_mult,
+        'ff_glu': ff_glu,
+        'ff_glu_mult_bias': False,
+        'ff_swish': False,
+        'ff_relu_squared': False,
+        'ff_post_act_ln': False,
+        'ff_dropout': 0.,
+        'ff_no_bias': False,
+        'ff_zero_init_output': False,
 
-    attention_bridge = AttentionBridge.from_opts(model_opts)
+        'attn_dim_context': None,
+        'attn_flash': attn_flash,
+        'attn_talking_heads': False,
+        'attn_head_scale': False,
+        'attn_sparse_topk': None,
+        'attn_num_mem_kv': 0,
+        'attn_dropout': 0.,
+        'attn_on_attn': False,
+        'attn_gate_value_heads': False,
+        'attn_swiglu_values': False,
+        'attn_gate_values': False,
+        'attn_zero_init_output': False,
+        'attn_max_attend_past': None,
+        'attn_qk_norm': False,
+        'attn_qk_norm_groups': 1,
+        'attn_qk_norm_scale': 10,
+        'attn_qk_norm_dim_scale': False,
+        'attn_one_kv_head': False,
+        'attn_kv_heads': None,
+        'attn_shared_kv': False,
+        'attn_value_dim_head': None,
+        'attn_tensor_product': False,      # https://arxiv.org/abs/2208.06061
+        'attn_add_zero_kv': False,         # same as add_zero_attn in pytorch
+        'attn_rotary_embed_values': False,
+        'attn_use_cope': False,
+        'attn_cope_max_pos': 16,
+        'attn_cope_soft_onehot_pos': False,
+        'attn_cope_talking_heads': False,
+        'attn_softclamp_logits': False,
+        'attn_logit_softclamp_value': 50.,
+        'attn_onnxable': False,
+    }
 
-    nmt_model = mammoth.models.NMTModel(
-        encoder=encoder,
-        decoder=decoder,
-        attention_bridge=attention_bridge
-    )
-    if uses_adapters(model_opts):
-        logger.info('Creating adapters...')
-        create_bilingual_adapters(nmt_model, model_opts, task)
-    else:
-        logger.info('Does not use adapters...')
-    print('built model:')
-    print(nmt_model)
-    nmt_model.generator = generators_md
-    return nmt_model
 
-
-def build_src_emb(model_opts, src_vocab):
-    # Build embeddings.
-    src_emb = build_embeddings(model_opts, src_vocab)
-    return src_emb
-
-
-def build_tgt_emb(model_opts, tgt_vocab):
-    # Build embeddings.
-    tgt_emb = build_embeddings(model_opts, tgt_vocab, for_encoder=False)
-
-    # if share_embeddings:
-    #     tgt_emb.word_lut.weight = src_emb.word_lut.weight
-
-    return tgt_emb
-
-
-def build_task_specific_model(
+def build_xcoder(
+    side: Side,
     model_opts,
     vocabs_dict,
     device,
     task_queue_manager,
-    checkpoint,
+    single_task: Optional[str] = None,
 ):
+    my_components: List[DistributedComponent] = task_queue_manager.get_my_distributed_components()
+    my_components = [
+        component for component in my_components
+        if hasattr(component, 'side') and component.side == side
+    ]
+    distributed_xcoder_class: type
+    if side == Side.encoder:
+        distributed_xcoder_class = DistributedEncoder
+        side_str = 'encoder'
+    else:
+        distributed_xcoder_class = DistributedDecoder
+        side_str = 'decoder'
+    if single_task:
+        my_components = [
+            component for component in my_components
+            if single_task in component.task_ids
+        ]
 
-    src_embs = dict()
-    tgt_embs = dict()
+    # Create AdaptedAttentionLayers objects (an extension of an x_transformers.AttentionLayers block)
+    attention_layers_components = [
+        component for component in my_components
+        if isinstance(component, distributed_xcoder_class)
+    ]
+    attention_layer_blocks = defaultdict(dict)
+    for component in attention_layers_components:
+        layer_stack_index = component.layer_stack_index
+        xcoder_id = component.xcoder_id
+        attention_layers_kwargs = get_attention_layers_kwargs(
+            side=side,
+            layer_stack_index=layer_stack_index,
+            xcoder_id=xcoder_id,
+            model_opts=model_opts,
+        )
+        attention_layer_blocks[layer_stack_index][xcoder_id] = AdaptedAttentionLayers(**attention_layers_kwargs)
 
-    generators_md = nn.ModuleDict()
+    # Create AdapterLayer objects and Adapter objects
+    if uses_adapters(model_opts):
+        adapter_components = [
+            component for component in my_components
+            if isinstance(component, DistributedAdapter) and component.side == side
+        ]
+        adapter_params_by_group = dict()
+        for adapter_group, adapter_opts in model_opts.adapters[side_str].items():
+            adapter_params_by_group[adapter_group] = {
+                'layer_stack_index': adapter_opts['layer_stack_index'],
+                'hidden_dim': adapter_opts['hidden_dim'],
+                'layers': adapter_opts['layers'],
+                'sub_ids': adapter_opts['ids'],
+            }
+        for component in adapter_components:
+            adapter_params = adapter_params_by_group[component.adapter_group]
+            if model_opts.adapter_type.lower() == 'lora':
+                adapter_layer_func = partial(
+                        LoraAdapterLayer,
+                        dim=model_opts.model_dim,
+                        r=adapter_params['hidden_dim'],
+                    )
+            elif model_opts.adapter_type.lower() == 'ff':
+                mult = adapter_params['hidden_dim'] / model_opts.model_dim
+                # TODO: make norm locations and glu configurable
+                adapter_layer_func = partial(
+                    FeedForwardAdapterLayer,
+                    dim=model_opts.model_dim,
+                    mult=mult,
+                    pre_norm=True,
+                    sandwich_norm=False,
+                    glu=True,
+                )
+            else:
+                raise ValueError(f'Unrecognized adapter_type {model_opts.adapter_type}')
+            for sub_id in adapter_params['sub_ids']:
+                for layer_idx in adapter_params['layers']:
+                    adapter_layer = adapter_layer_func()
+                    adapter = Adapter(
+                        adapter_group=component.adapter_group,
+                        sub_id=sub_id,
+                    )
+                    adapter.add_layer(layer_idx, adapter_layer)
+                    layer_stack_index = adapter_params['layer_stack_index']
+                    for attention_layers in attention_layer_blocks[layer_stack_index]:
+                        attention_layers.add_adapter(adapter)
 
-    # FIXME: it's getting late and I just want this to compile
-    for side, lang, _, vocab in task_queue_manager.get_my_vocabs(side='src', vocabs_dict=vocabs_dict):
-        src_emb = build_src_emb(model_opts, vocab)
-        src_embs[lang] = src_emb
-    pluggable_src_emb = PluggableEmbeddings(src_embs)
-    encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager, checkpoint)
+    # Create AdaptedAttentionLayersStack objects and TransformerWrapper objects
+    tasks = task_queue_manager.get_my_tasks()
+    if single_task:
+        tasks = [task for task in tasks if task.corpus_id == single_task]
+    transformer_wrappers = dict()
+    for task in tasks:
+        if side == Side.encoder:
+            xcoder_ids = task.encoder_id
+        else:
+            xcoder_ids = task.decoder_id
+        attention_layers_stack = [
+            attention_layer_blocks[layer_stack_index][xcoder_id]
+            for layer_stack_index, xcoder_id in enumerate(xcoder_ids)
+        ]
+        adapted_attention_layers_stack = AdaptedAttentionLayersStack(
+            attention_layers_stack=attention_layers_stack
+        )
 
-    for side, lang, _, vocab in task_queue_manager.get_my_vocabs(side='tgt', vocabs_dict=vocabs_dict):
-        tgt_emb = build_tgt_emb(model_opts, vocab)
-        tgt_embs[lang] = tgt_emb
-        generator = build_generator(model_opts, len(vocab), tgt_emb)
-        generators_md.add_module(f'generator_{lang}', generator)
+        side_alt_str = 'src' if side == Side.encoder else 'tgt'
+        lang = task.src_lang if side == Side.encoder else task.tgt_lang
+        vocab = vocabs_dict[(side_alt_str, lang)]
+        max_seq_len = 0 if model_opts.max_length is None else model_opts.max_length
+        post_emb_norm = True
+        tie_embedding = True
+        use_abs_pos_emb = True
+        emb_frac_gradient = 1.
+        # FIXME: this won't work: creates embeddings for each task, not for each language
+        # Have to reimplement TransformerWrapper to allow passing in an embedding
+        transformer_wrapper = TransformerWrapper(
+            num_tokens=len(vocab),
+            max_seq_len=max_seq_len,
+            attn_layers=adapted_attention_layers_stack,
+            emb_dim=model_opts.model_dim,
+            post_emb_norm=post_emb_norm,
+            tie_embedding=tie_embedding,
+            use_abs_pos_emb=use_abs_pos_emb,
+            emb_frac_gradient=emb_frac_gradient,
+        )
+        transformer_wrappers[task.corpus_id] = transformer_wrapper
 
-    if checkpoint:
-        trainstep = int(checkpoint['optim']['training_step']) - 1
-        for modname, gen in generators_md.items():
-            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_{modname}.pt")
-            if mod_path.exists():
-                module = torch.load(mod_path)
-                gen.load_state_dict(module)
-                logger.info(f"Successfully loaded {modname} from the checkpoint.")
+    # Create a StackXcoder
+    stack_xcoder = StackXcoder(transformer_wrappers)
+    return stack_xcoder
 
-    pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
-    decoder = build_only_dec(model_opts, pluggable_tgt_emb, task_queue_manager, checkpoint)
 
-    # TODO: implement hierarchical approach to layer sharing
+def build_attention_bridge(model_opts):
     attention_bridge = AttentionBridge.from_opts(model_opts)
 
     if model_opts.param_init != 0.0:
@@ -325,6 +399,24 @@ def build_task_specific_model(
         for p in attention_bridge.parameters():
             if p.dim() > 1:
                 xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
+    return attention_bridge
+
+
+def restore_from_checkpoint(stack_xcoder, checkpoint):
+    # FIXME: saving and loading are broken
+    trainstep = int(checkpoint['optim']['training_step']) - 1
+    for modname, gen in generators_md.items():
+        mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_{modname}.pt")
+        if mod_path.exists():
+            module = torch.load(mod_path)
+            gen.load_state_dict(module)
+            logger.info(f"Successfully loaded {modname} from the checkpoint.")
+
+    pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
+    decoder = build_only_dec(model_opts, pluggable_tgt_emb, task_queue_manager, checkpoint)
+
+    # TODO: implement hierarchical approach to layer sharing
+    attention_bridge = build_attention_bridge(model_opts)
 
     if checkpoint:
         # trainstep= int(checkpoint['optim']['training_step'])-1 - already recoderd in generators
@@ -336,11 +428,6 @@ def build_task_specific_model(
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         attention_bridge.half()
 
-    nmt_model = mammoth.models.NMTModel(
-        encoder=encoder,
-        decoder=decoder,
-        attention_bridge=attention_bridge
-    )
     if uses_adapters(model_opts):
         logger.info('Creating adapters...')
         create_all_adapters(nmt_model, model_opts, task_queue_manager)
@@ -353,150 +440,13 @@ def build_task_specific_model(
     return nmt_model, generators_md
 
 
-def build_only_enc(model_opts, src_emb, task_queue_manager, checkpoint):
-    """Truly only builds encoder: no embeddings"""
-    encoder = build_encoder(model_opts, src_emb, task_queue_manager)
-    if model_opts.param_init != 0.0:
-        for name, p in encoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
-                p.data.uniform_(-model_opts.param_init, model_opts.param_init)
-
-    if model_opts.param_init_glorot:
-        for name, p in encoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
-                if p.dim() > 1:
-                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
-    if checkpoint:
-        logger.info("Loading from checkpoint")
-        trainstep = int(checkpoint['optim']['training_step']) - 1
-        embnames = [srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opts'].tasks.values()]
-        embnames = set(embnames)
-        groupnames = [
-            (idx, modname) for srctgt in checkpoint['opts'].tasks.values()
-            for idx, modname in enumerate(srctgt['enc_sharing_group'])
-        ]
-        groupnames = set(groupnames)
-        # load embs
-        for modname in embnames:
-            module = torch.load(checkpoint['opts'].save_model + f"_step_{trainstep}_src_embeddings_{modname}.pt")
-            if f'embeddings_{modname}' in encoder.embeddings._modules.keys():
-                encoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
-                logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
-
-        # load layers
-        for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
-            if mod_path.exists() and modname in encoder.encoders._modules[str(idx)].keys():
-                module = torch.load(mod_path)
-                encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
-                logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
-    if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
-        encoder.half()
-
-    return encoder
-
-
-def build_only_dec(model_opts, tgt_emb, task_queue_manager, checkpoint):
-    decoder = build_decoder(model_opts, tgt_emb, task_queue_manager)
-    if model_opts.param_init != 0.0:
-        for name, p in decoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
-                p.data.uniform_(-model_opts.param_init, model_opts.param_init)
-    if model_opts.param_init_glorot:
-        for name, p in decoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
-                if p.dim() > 1:
-                    xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
-
-    if checkpoint:
-        logger.info("Loading from checkpoint")
-        trainstep = int(checkpoint['optim']['training_step']) - 1
-        embnames = [srctgt['src_tgt'].split('-')[1] for srctgt in checkpoint['opts'].tasks.values()]
-        embnames = set(embnames)
-        groupnames = [
-            (idx, modname) for srctgt in checkpoint['opts'].tasks.values()
-            for idx, modname in enumerate(srctgt['dec_sharing_group'])
-        ]
-        groupnames = set(groupnames)
-        # load embs
-        for modname in embnames:
-            if f'embeddings_{modname}' in decoder.embeddings._modules.keys():
-                module = torch.load(checkpoint['opts'].save_model + f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
-                decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
-                logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
-
-        # load layers
-        for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
-            if mod_path.exists() and modname in decoder.decoders._modules[str(idx)].keys():
-                module = torch.load(mod_path)
-                decoder.decoders._modules[str(idx)][modname].load_state_dict(module)
-                logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
-    if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
-        decoder.half()
-
-    return decoder
-
-
-def build_generator(model_opts, n_tgts, tgt_emb):
-    # Build Generator.
-    assert not model_opts.copy_attn, 'copy_attn not supported'
-    gen_func = nn.LogSoftmax(dim=-1)
-    generator = nn.Sequential(
-        nn.Linear(model_opts.model_dim, n_tgts), Cast(torch.float32), gen_func
-    )
-
-    if model_opts.share_decoder_embeddings:
-        generator[0].weight = tgt_emb.word_lut.weight
-
-    if model_opts.param_init != 0.0:
-        for p in generator.parameters():
-            p.data.uniform_(-model_opts.param_init, model_opts.param_init)
-    if model_opts.param_init_glorot:
-        for p in generator.parameters():
-            if p.dim() > 1:
-                xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
-
-    return generator
-
-
-# TODO: confirm this was dead code
-# def use_embeddings_from_checkpoint(fields, model, generator, checkpoint):
-#     # Update vocabulary embeddings with checkpoint embeddings
-#     logger.info("Updating vocabulary embeddings with checkpoint embeddings")
-#     # Embedding layers
-#     enc_emb_name = "encoder.embeddings.make_embedding.emb_luts.0.weight"
-#     dec_emb_name = "decoder.embeddings.make_embedding.emb_luts.0.weight"
-#
-#     for field_name, emb_name in [("src", enc_emb_name), ("tgt", dec_emb_name)]:
-#         if emb_name not in checkpoint["model"]:
-#             continue
-#         multifield = fields[field_name]
-#         checkpoint_multifield = checkpoint["vocab"][field_name]
-#         for (name, field), (checkpoint_name, checkpoint_field) in zip(multifield, checkpoint_multifield):
-#             new_tokens = []
-#             for i, tok in enumerate(field.vocab.itos):
-#                 if tok in checkpoint_field.vocab.stoi:
-#                     old_i = checkpoint_field.vocab.stoi[tok]
-#                     model.state_dict()[emb_name][i] = checkpoint["model"][emb_name][old_i]
-#                     if field_name == "tgt":
-#                         generator.state_dict()["0.weight"][i] = checkpoint["generator"]["0.weight"][old_i]
-#                         generator.state_dict()["0.bias"][i] = checkpoint["generator"]["0.bias"][old_i]
-#                 else:
-#                     # Just for debugging purposes
-#                     new_tokens.append(tok)
-#             logger.info("%s: %d new tokens" % (name, len(new_tokens)))
-#         # Remove old vocabulary associated embeddings
-#         del checkpoint["model"][emb_name]
-#     del checkpoint["generator"]["0.weight"], checkpoint["generator"]["0.bias"]
-
-
-def build_base_model_langspec(
+def build_model(
     model_opts,
+    opts,
     vocabs_dict,
-    gpu,
     task_queue_manager,
     checkpoint=None,
+    single_task=None,
 ):
     """Build a model from opts.
 
@@ -504,174 +454,49 @@ def build_base_model_langspec(
         model_opts: the option loaded from checkpoint. It's important that
             the opts have been updated and validated. See
             :class:`mammoth.utils.parse.ArgumentParser`.
+        opts: overriding options.
         vocabs_dict (dict[str, mammoth.inputters.Vocab]):
             `Vocab` objects for the model.
-        gpu (bool): whether to use gpu.
-        checkpoint: the model gnerated by train phase, or a resumed snapshot
+        task_queue_manager: TaskQueueManager
+        checkpoint: the model generated by train phase, or a resumed snapshot
                     model from a stopped training.
-        gpu_id (int or NoneType): Which GPU to use.
+        single_task: corpus_id of task, to create a single-task model
 
     Returns:
         the NMTModel.
     """
-
-    # for back compat when attention_dropout was not defined
-    try:
-        model_opts.attention_dropout
-    except AttributeError:
-        model_opts.attention_dropout = model_opts.dropout
-
-    # Build Model
-    logger.info("MODEL BUILDER")
+    logger.info('Building model...')
+    gpu = use_gpu(opts)
     if gpu:
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
     logger.info(device)
-    model, generators_md = build_task_specific_model(
+
+    encoder = build_xcoder(
+        side=Side.encoder,
         model_opts=model_opts,
         vocabs_dict=vocabs_dict,
         device=device,
         task_queue_manager=task_queue_manager,
-        checkpoint=checkpoint,
+        single_task=single_task,
     )
-
-    model.generator = generators_md
-    model.to(device)
-
-    return model, generators_md
-
-
-def uses_adapters(opts):
-    return 'adapters' in opts and opts.adapters
-
-
-def create_all_adapters(model, opts, task_queue_manager):
-    my_enc_adapter_ids = set()
-    my_dec_adapter_ids = set()
-    adapter_to_encoder_ids = defaultdict(set)
-    adapter_to_decoder_ids = defaultdict(set)
-    for task in task_queue_manager.get_my_tasks():
-        for adapter_id in task.encoder_adapter_ids:
-            adapter_id = tuple(adapter_id)
-            my_enc_adapter_ids.add(adapter_id)
-            adapter_to_encoder_ids[adapter_id].add(tuple(task.encoder_id))
-        for adapter_id in task.decoder_adapter_ids:
-            adapter_id = tuple(adapter_id)
-            my_dec_adapter_ids.add(adapter_id)
-            adapter_to_decoder_ids[adapter_id].add(tuple(task.decoder_id))
-    _create_adapters(
-        model,
-        opts,
-        my_enc_adapter_ids,
-        adapter_to_encoder_ids,
-        my_dec_adapter_ids,
-        adapter_to_decoder_ids,
-    )
-
-
-def create_bilingual_adapters(model, opts, task):
-    my_enc_adapter_ids = []
-    my_dec_adapter_ids = []
-    adapter_to_encoder_ids = {}
-    adapter_to_decoder_ids = {}
-
-    for adapter_id in task.encoder_adapter_ids:
-        adapter_id = tuple(adapter_id)
-        my_enc_adapter_ids.add(adapter_id)
-        # This is a list of list, because in general the adapter could be used in several stacks
-        adapter_to_encoder_ids[adapter_id] = [task.encoder_id]
-    for adapter_id in task.decoder_adapter_ids:
-        adapter_id = tuple(adapter_id)
-        my_dec_adapter_ids.add(adapter_id)
-        adapter_to_decoder_ids[adapter_id] = [task.decoder_id]
-
-    _create_adapters(
-        model,
-        opts,
-        my_enc_adapter_ids,
-        adapter_to_encoder_ids,
-        my_dec_adapter_ids,
-        adapter_to_decoder_ids,
-    )
-
-
-def _create_adapters(
-    model,
-    opts,
-    my_enc_adapter_ids,
-    adapter_to_encoder_ids,
-    my_dec_adapter_ids,
-    adapter_to_decoder_ids,
-):
-    my_enc_adapter_ids = [tuple(item) for item in my_enc_adapter_ids]
-    my_dec_adapter_ids = [tuple(item) for item in my_dec_adapter_ids]
-    for adapter_group, adapter_opts in opts.adapters['encoder'].items():
-        layer_stack_index = adapter_opts['layer_stack_index']
-        for sub_id in adapter_opts['ids']:
-            adapter_id_long = (layer_stack_index, adapter_group, sub_id)
-            if adapter_id_long not in my_enc_adapter_ids:
-                continue
-            adapter = Adapter(adapter_group, sub_id)
-            input_dim = opts.model_dim
-            hidden_dim = adapter_opts['hidden_size']
-
-            # all stacks to which this adapter should be added
-            adapted_stacks = set(
-                stacks[layer_stack_index] for stacks in adapter_to_encoder_ids[adapter_id_long]
-            )
-            adapter_cls = EncoderAdapterLayer
-
-            for layer_idx in adapter_opts['layers']:
-                adapter.add_layer(
-                    layer_idx,
-                    adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
-                )
-            model.encoder.add_adapter(
-                adapter_group=adapter_group,
-                sub_id=sub_id,
-                adapter=adapter,
-                layer_stack_index=layer_stack_index,
-                module_ids=adapted_stacks,
-            )
-    for adapter_group, adapter_opts in opts.adapters['decoder'].items():
-        layer_stack_index = adapter_opts['layer_stack_index']
-        for sub_id in adapter_opts['ids']:
-            adapter_id_long = (layer_stack_index, adapter_group, sub_id)
-            if adapter_id_long not in my_dec_adapter_ids:
-                continue
-            adapter = Adapter(adapter_group, sub_id)
-            input_dim = opts.model_dim
-            hidden_dim = adapter_opts['hidden_size']
-
-            adapted_stacks = set(
-                stacks[layer_stack_index] for stacks in adapter_to_decoder_ids[adapter_id_long]
-            )
-            adapter_cls = DecoderAdapterLayer
-
-            for layer_idx in adapter_opts['layers']:
-                adapter.add_layer(
-                    layer_idx,
-                    adapter_cls(input_dim, hidden_dim, pfeiffer=False, init='small')
-                )
-            model.decoder.add_adapter(
-                adapter_group=adapter_group,
-                sub_id=sub_id,
-                adapter=adapter,
-                layer_stack_index=layer_stack_index,
-                module_ids=adapted_stacks,
-            )
-
-
-def build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint):
-    logger.info('Building model...')
-    model, generators_md = build_base_model_langspec(
+    decoder = build_xcoder(
+        side=Side.decoder,
         model_opts=model_opts,
         vocabs_dict=vocabs_dict,
-        gpu=use_gpu(opts),
+        device=device,
         task_queue_manager=task_queue_manager,
-        checkpoint=checkpoint,
+        single_task=single_task,
     )
+    attention_bridge = build_attention_bridge(model_opts)
+    model = NMTModel(
+        encoder=encoder,
+        decoder=decoder,
+        attention_bridge=attention_bridge
+    )
+
+    model.to(device)
     # logger.info(model)
     logger.info('Building model - done!')
-    return model, generators_md
+    return model

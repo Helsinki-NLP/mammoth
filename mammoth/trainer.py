@@ -37,7 +37,6 @@ def build_trainer(
     optim,
     task_queue_manager,
     model_saver=None,
-    generators_md=None,
 ):
     """
     Simplify `Trainer` creation based on user `opts`s*
@@ -58,6 +57,9 @@ def build_trainer(
     logger.info("BUILD TRAINER")
 
     for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_my_vocabs('tgt', vocabs_dict):
+        # FIXME: OpenNMT losses require a separate generator, which is not available in x_transformers
+        # Just rip it out and use F.cross_entropy? Maybe label smoothing?
+        # Or get the necessary components from the model to create a generator?
         generator = generators_md[f'generator_{lang}']
         train_loss_md.add_module(
             f'trainloss{lang}',

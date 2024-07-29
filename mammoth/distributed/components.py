@@ -77,6 +77,7 @@ class DistributedComponent(ABC):
         return self.group is not None
 
 
+# TODO: This is a misnomer: Not an entire XCoder, but just one AttentionLayers block
 @dataclass
 class DistributedXCoder(DistributedComponent, ABC):
     layer_stack_index: int

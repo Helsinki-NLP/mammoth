@@ -11,6 +11,7 @@ def _combine_ordered_dicts(input_dicts: Dict[str, OrderedDict]) -> OrderedDict:
 
 
 def explode_model(full_ab_model):
+    # FIXME: saving and loading are broken
     encoder = full_ab_model["whole_model"].encoder
     decoder = full_ab_model["whole_model"].decoder
 

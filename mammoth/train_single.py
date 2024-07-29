@@ -108,7 +108,7 @@ def main(
 
     # Build model.
 
-    model, generators_md = build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint)
+    model = build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint)
 
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
@@ -138,7 +138,6 @@ def main(
         optim,
         task_queue_manager=task_queue_manager,
         model_saver=model_saver,
-        generators_md=generators_md,
     )
     logger.info("{} - Trainer built".format(device_context.id))
 

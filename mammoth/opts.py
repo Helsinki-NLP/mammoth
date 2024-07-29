@@ -352,10 +352,9 @@ def model_opts(parser):
     )
     group.add('--heads', '-heads', type=int, default=8, help='Number of heads for transformer self-attention')
     group.add(
-        '--transformer_ff', '-transformer_ff', type=int, default=2048, help='Size of hidden transformer feed-forward'
+        '--ff_mult', '-ff_mult', type=int, default=4,
+        help='Size of hidden transformer feed-forward, as a factor of model_dim'
     )
-    # TODO is this actually in use?
-    group.add('--aan_useffn', '-aan_useffn', action="store_true", help='Turn on the FFN layer in the AAN decoder')
 
     # Alignement options
     # TODO is this actually in use?

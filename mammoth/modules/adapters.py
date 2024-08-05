@@ -7,7 +7,7 @@ or injected into an already trained network to adapt it for a new task.
 import torch
 import torch.nn as nn
 from collections import defaultdict
-from typing import Union, Set
+from typing import Union, Set, Dict
 from functools import partial
 
 from x_transformers.x_transformers import (
@@ -20,7 +20,7 @@ from x_transformers.x_transformers import (
 
 class FeedForwardAdapterLayer(nn.Module):
     """A separate adapter layer injected after a FeedForward. Has its own norms."""
-    def __init__(self, dim, pre_norm=True, sandwich_norm=False, **kwargs):
+    def __init__(self, dim, pre_norm=True, sandwich_norm=False, layer_dropout=0.0, **kwargs):
         super().__init__()
         norm_fn = partial(SimpleRMSNorm, dim)
         self.pre_branch_norm = norm_fn() if pre_norm else None
@@ -28,6 +28,7 @@ class FeedForwardAdapterLayer(nn.Module):
         self.post_main_norm = norm_fn() if not pre_norm else None
         self.ff = FeedForward(dim, **kwargs)
         self.residual = Residual(dim, scale_residual=False)
+        self.layer_dropout = layer_dropout
 
     @property
     def is_wrapper(self):
@@ -43,6 +44,13 @@ class FeedForwardAdapterLayer(nn.Module):
             self.ff,
             self.residual,
         ])
+
+    def apply(tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts):
+        # FeedForwards are injected after the base ff
+        tmp_layer_types.append('f')
+        tmp_layer_structs.append(self.as_layer_struct())
+        tmp_layer_dropouts.append(self.layer_dropout)
+        return tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts
 
 
 class LoraAdapterLayer(nn.Module):
@@ -66,6 +74,11 @@ class LoraAdapterLayer(nn.Module):
     @property
     def is_wrapper(self):
         return True
+
+    def apply(tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts):
+        # LoraAdapterLayer wraps the existing feedforward. No norms are added.
+        tmp_layer_structs[0][1] = self.wrap(tmp_layer_structs[0][1])
+        return tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts
 
     def wrap(self, base_layer):
         self.wrapped_base_layer = base_layer
@@ -123,11 +136,14 @@ class AdaptedAttentionLayers(AttentionLayers):
     with the ability to inject additional layers
     or dymically wrap layers in LoRA wrappers.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, layer_stack_index=None, xcoder_id=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.layer_stack_index = layer_stack_index
+        self.xcoder_id = xcoder_id
         self._base_layer_types = tuple(self.layer_types)
         self._base_layers = nn.ModuleList(self.layers)
         self._base_layer_dropouts = tuple(self.layer_dropouts)
+        self.adapters: Dict[str, Adapter] = nn.ModuleDict()
 
     def freeze_base_model(self, requires_grad=False):
         for name, p in self._base_layers.named_parameters():
@@ -186,23 +202,19 @@ class AdaptedAttentionLayers(AttentionLayers):
             if layer_type == 'f':
                 # Adapters apply to feedforward layers
                 adapter_layers = adapter_layers_by_index[i]
+                tmp_layer_types = [layer_type]
+                tmp_layer_structs = [layer_struct]
+                tmp_layer_dropouts = [layer_dropout]
                 for adapter_layer in adapter_layers:
-                    if adapter_layer.is_wrapper:
-                        # LoRA wraps the base ff
-                        adapted_layer_types.append('f')
-                        adapted_layers.append(adapter_layer.wrap(layer_struct))
-                        adapted_layer_dropouts.append(layer_dropout)
-                    else:
-                        # FeedForwards are injected after the base ff
-                        adapted_layer_types.append('f')
-                        adapted_layer_types.append('f')
-                        adapted_layers.append(layer_struct)
-                        adapted_layers.append(adapter_layer.as_layer_struct())
-                        adapted_layer_dropouts.append(layer_dropout)
-                        adapted_layer_dropouts.append(layer_dropout)
+                    tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts = adapter_layer.apply(
+                        tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts
+                    )
+                adapted_layer_types.extend(tmp_layer_types)
+                adapted_layers.extend(tmp_layer_structs)
+                adapted_layer_dropouts.extend(tmp_layer_dropouts)
                 i += 1
             else:
-                # Attetion layers are unmodified
+                # Attention layers are unmodified
                 adapted_layer_types.append(layer_type)
                 adapted_layers.append(layer_struct)
                 adapted_layer_dropouts.append(layer_dropout)

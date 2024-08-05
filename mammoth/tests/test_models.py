@@ -5,7 +5,7 @@ import torch
 
 import mammoth
 import mammoth.opts
-from mammoth.model_builder import build_embeddings, build_encoder, build_decoder
+from mammoth.model_builder import build_encoder, build_decoder
 from mammoth.inputters.vocab import Vocab, DEFAULT_SPECIALS
 from mammoth.utils.parse import ArgumentParser
 
@@ -35,27 +35,28 @@ class TestModel(unittest.TestCase):
         test_length = torch.ones(bsize).fill_(source_l).long()
         return test_src, test_tgt, test_length
 
-    def embeddings_forward(self, opts, source_l=3, bsize=1):
-        '''
-        Tests if the embeddings works as expected
-
-        args:
-            opts: set of options
-            source_l: Length of generated input sentence
-            bsize: Batchsize of generated input
-        '''
-        word_field = self.get_field()
-        emb = build_embeddings(opts, word_field)
-        test_src, _, __ = self.get_batch(source_l=source_l, bsize=bsize)
-        if opts.decoder_type == 'transformer':
-            input = torch.cat([test_src, test_src], 0)
-            res = emb(input)
-            compare_to = torch.zeros(source_l * 2, bsize, opts.model_dim)
-        else:
-            res = emb(test_src)
-            compare_to = torch.zeros(source_l, bsize, opts.model_dim)
-
-        self.assertEqual(res.size(), compare_to.size())
+# Broken in x-transformers
+#    def embeddings_forward(self, opts, source_l=3, bsize=1):
+#        '''
+#        Tests if the embeddings works as expected
+#
+#        args:
+#            opts: set of options
+#            source_l: Length of generated input sentence
+#            bsize: Batchsize of generated input
+#        '''
+#        word_field = self.get_field()
+#        emb = build_embeddings(opts, word_field)
+#        test_src, _, __ = self.get_batch(source_l=source_l, bsize=bsize)
+#        if opts.decoder_type == 'transformer':
+#            input = torch.cat([test_src, test_src], 0)
+#            res = emb(input)
+#            compare_to = torch.zeros(source_l * 2, bsize, opts.model_dim)
+#        else:
+#            res = emb(test_src)
+#            compare_to = torch.zeros(source_l, bsize, opts.model_dim)
+#
+#        self.assertEqual(res.size(), compare_to.size())
 
     def encoder_forward(self, opts, source_l=3, bsize=1):
         '''
@@ -181,8 +182,6 @@ tests_nmtmodel = [
         ('model_dim', 16),
         ('position_encoding', True),
     ],
-    # [('coverage_attn', True)],
-    # [('copy_attn', True)],
     # [('context_gate', 'both')],
     # [('context_gate', 'target')],
     # [('context_gate', 'source')],

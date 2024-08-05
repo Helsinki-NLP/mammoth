@@ -105,7 +105,6 @@ class Inference(object):
         data_type (str): Source data type.
         verbose (bool): Print/log every translation.
         report_time (bool): Print/log total time/frequency.
-        copy_attn (bool): Use copy attention.
         global_scorer (mammoth.translate.GNMTGlobalScorer): Translation
             scoring/reranking object.
         out_file (TextIO or codecs.StreamReaderWriter): Output file.
@@ -139,7 +138,6 @@ class Inference(object):
         data_type="text",
         verbose=False,
         report_time=False,
-        copy_attn=False,
         global_scorer=None,
         out_file=None,
         report_align=False,
@@ -193,8 +191,6 @@ class Inference(object):
         self.data_type = data_type
         self.verbose = verbose
         self.report_time = report_time
-
-        self.copy_attn = copy_attn
 
         self.global_scorer = global_scorer
         if self.global_scorer.has_cov_pen and not self.model.decoder.attentional:
@@ -282,7 +278,6 @@ class Inference(object):
             data_type=opts.data_type,
             verbose=opts.verbose,
             report_time=opts.report_time,
-            copy_attn=model_opts.copy_attn,
             global_scorer=global_scorer,
             out_file=out_file,
             report_align=report_align,
@@ -642,10 +637,6 @@ class Inference(object):
         step=None,
         batch_offset=None,
     ):
-        if self.copy_attn:
-            # Turn any copied words into UNKs.
-            decoder_in = decoder_in.masked_fill(decoder_in.gt(self._tgt_vocab_len - 1), self._tgt_unk_idx)
-
         # Decoder forward, takes [tgt_len, batch, nfeats] as input
         # and [src_len, batch, hidden] as memory_bank
         # in case of inference tgt_len = 1, batch = beam times batch_size
@@ -817,7 +808,7 @@ class Translator(Inference):
             results (dict): The translation results.
         """
         # (0) Prep the components of the search.
-        use_src_map = self.copy_attn
+        use_src_map = False
         parallel_paths = decode_strategy.parallel_paths  # beam_size
         batch_size = batch.batch_size
 
@@ -1052,7 +1043,7 @@ class GeneratorLM(Inference):
             results (dict): The translation results.
         """
         # (0) Prep the components of the search.
-        use_src_map = self.copy_attn
+        use_src_map = False
         parallel_paths = decode_strategy.parallel_paths  # beam_size
         batch_size = batch.batch_size
 

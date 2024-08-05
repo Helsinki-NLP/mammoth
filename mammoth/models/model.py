@@ -11,7 +11,7 @@ class BaseModel(nn.Module):
     def __init__(self, encoder, decoder, attention_bridge):
         super(BaseModel, self).__init__()
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False):
+    def forward(self, src, tgt, lengths, return_attention=False):
         """Forward propagate a `src` and `tgt` pair for training.
         Possible initialized with a beginning decoder state.
 
@@ -25,7 +25,7 @@ class BaseModel(nn.Module):
             lengths(LongTensor): The src lengths, pre-padding ``(batch,)``.
             bptt (Boolean): A flag indicating if truncated bptt is set.
                 If reset then init_state
-            with_align (Boolean): A flag indicating whether output alignment,
+            return_attention (Boolean): A flag indicating whether output attention,
                 Only valid for transformer decoder.
 
         Returns:
@@ -58,24 +58,47 @@ class NMTModel(BaseModel):
         self.decoder = decoder
         self.attention_bridge = attention_bridge
 
-    def forward(self, src, tgt, lengths, bptt=False, with_align=False, metadata=None):
-        dec_in = tgt[:-1]  # exclude last target from inputs
-
+    def forward(self, src, decoder_input, src_mask, return_attention=False, metadata=None):
         # Activate the correct pluggable embeddings and modules
-        self.encoder.activate(metadata)
-        self.decoder.activate(metadata)
+        active_encoder = self.encoder.activate(
+            task_id=metadata.corpus_id,
+            adapter_ids=metadata.encoder_adapter_ids,
+        )
+        active_decoder = self.decoder.activate(
+            task_id=metadata.corpus_id,
+            adapter_ids=metadata.decoder_adapter_ids,
+        )
 
-        enc_state, memory_bank, lengths, mask = self.encoder(src, lengths)
+        # # QUI logging for batch shapes
+        # def quishape(name, val):
+        #     print(f'{name} {val.shape}  {val.shape[0] * val.shape[1]}')
+        # quishape('src', src)
+        # quishape('src_mask', src_mask)
 
-        memory_bank, alphas = self.attention_bridge(memory_bank, mask)
+        encoder_output = active_encoder(
+            x=src,
+            mask=src_mask,
+            return_embeddings=True,
+        )
+
+        encoder_output, alphas = self.attention_bridge(encoder_output, src_mask)
         if self.attention_bridge.is_fixed_length:
             # turn off masking in the transformer decoder
-            lengths = None
+            src_mask = None
 
-        if not bptt:
-            self.decoder.init_state(src, memory_bank, enc_state)
-        dec_out, attns = self.decoder(dec_in, memory_bank, memory_lengths=lengths, with_align=with_align)
-        return dec_out, attns
+        retval = active_decoder(
+            decoder_input,
+            context=encoder_output,
+            context_mask=src_mask,
+            return_attn=return_attention,
+            return_logits_and_embeddings=True,
+        )
+        if return_attention:
+            (logits, decoder_output), attentions = retval
+        else:
+            logits, decoder_output = retval
+            attentions = None
+        return logits, decoder_output, attentions
 
     def update_dropout(self, dropout):
         self.encoder.update_dropout(dropout)

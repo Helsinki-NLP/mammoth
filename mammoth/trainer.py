@@ -10,14 +10,17 @@
 """
 
 
-import mammoth.distributed
 import torch
 import torch.distributed
 import torch.nn as nn
 import traceback
-
+from einops import rearrange
 from itertools import islice
+
+import mammoth.distributed
 from mammoth.utils.logging import logger
+from mammoth.utils.loss import build_loss_function
+from mammoth.utils.statistics import Statistics
 
 
 def iter_on_device(iterator, device_context):
@@ -52,25 +55,18 @@ def build_trainer(
             used to save the model
     """
 
-    train_loss_md = nn.ModuleDict()
-    valid_loss_md = nn.ModuleDict()
+    loss_functions = nn.ModuleDict()
     logger.info("BUILD TRAINER")
 
     for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_my_vocabs('tgt', vocabs_dict):
         # FIXME: OpenNMT losses require a separate generator, which is not available in x_transformers
         # Just rip it out and use F.cross_entropy? Maybe label smoothing?
         # Or get the necessary components from the model to create a generator?
-        generator = generators_md[f'generator_{lang}']
-        train_loss_md.add_module(
-            f'trainloss{lang}',
-            mammoth.utils.loss.build_loss_compute(model, tgt_vocab, opts, train=True, generator=generator),
-        )
-        valid_loss_md.add_module(
-            f'valloss{lang}',
-            mammoth.utils.loss.build_loss_compute(model, tgt_vocab, opts, train=False, generator=generator),
+        loss_functions[lang] = build_loss_function(
+            tgt_vocab,
+            label_smoothing=opts.label_smoothing,
         )
 
-    shard_size = opts.max_generator_batches if opts.model_dtype == 'fp32' else 0
     norm_method = opts.normalization
     accum_count = opts.accum_count
     accum_steps = opts.accum_steps
@@ -89,17 +85,15 @@ def build_trainer(
     report_manager = mammoth.utils.build_report_manager(opts, device_context.node_rank, device_context.local_rank)
     trainer = mammoth.Trainer(
         model,
-        train_loss_md,
-        valid_loss_md,
+        loss_functions,
         optim,
-        shard_size,
         norm_method,
         accum_count,
         accum_steps,
         device_context=device_context,
         gpu_verbose_level=gpu_verbose_level,
         report_manager=report_manager,
-        with_align=True if opts.lambda_align > 0 else False,
+        return_attention=False,
         model_saver=model_saver,
         average_decay=average_decay,
         average_every=average_every,
@@ -109,6 +103,7 @@ def build_trainer(
         dropout_steps=dropout_steps,
         task_queue_manager=task_queue_manager,
         report_stats_from_parameters=opts.report_stats_from_parameters,
+        report_training_accuracy=opts.report_training_accuracy,
     )
     return trainer
 
@@ -120,13 +115,10 @@ class Trainer(object):
     Args:
             model(:py:class:`mammoth.models.model.NMTModel`): translation model
                 to train
-            train_loss(:obj:`mammoth.utils.loss.LossComputeBase`):
-               training loss computation
-            valid_loss(:obj:`mammoth.utils.loss.LossComputeBase`):
-               training loss computation
+            loss_functions:
+               ModelDict containing loss functions
             optim(:obj:`mammoth.utils.optimizers.Optimizer`):
                the optimizer responsible for update
-            shard_size(int): compute loss in shards of this size for efficiency
             data_type(string): type of the source input: [text]
             norm_method(string): normalization methods: [sents|tokens]
             accum_count(list): accumulate gradients this many times.
@@ -141,17 +133,15 @@ class Trainer(object):
     def __init__(
         self,
         model,
-        train_loss_md,
-        valid_loss_md,
+        loss_functions,
         optim,
-        shard_size=32,
         norm_method="sents",
         accum_count=[1],
         accum_steps=[0],
         device_context=None,
         gpu_verbose_level=0,
         report_manager=None,
-        with_align=False,
+        return_attention=False,
         model_saver=None,
         average_decay=0,
         average_every=1,
@@ -161,13 +151,12 @@ class Trainer(object):
         dropout_steps=[0],
         task_queue_manager=None,
         report_stats_from_parameters=False,
+        report_training_accuracy=False,
     ):
         # Basic attributes.
         self.model = model
-        self.train_loss_md = train_loss_md
-        self.valid_loss_md = valid_loss_md
+        self.loss_functions = loss_functions
         self.optim = optim
-        self.shard_size = shard_size
         self.norm_method = norm_method
         self.accum_count_l = accum_count
         self.accum_count = accum_count[0]
@@ -176,7 +165,8 @@ class Trainer(object):
         self.gpu_verbose_level = gpu_verbose_level
         self.report_manager = report_manager
         self.report_stats_from_parameters = report_stats_from_parameters
-        self.with_align = with_align
+        self.report_training_accuracy = report_training_accuracy
+        self.return_attention = return_attention
         self.model_saver = model_saver
         self.average_decay = average_decay
         self.moving_average = None
@@ -391,18 +381,30 @@ class Trainer(object):
                     stats = mammoth.utils.Statistics()
 
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-                tgt = batch.tgt
+                decoder_input = batch.tgt[:-1]
+                target = batch.tgt[1:]
 
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     # F-prop through the model.
-                    outputs, attns = valid_model(
-                        src, tgt, src_lengths, with_align=self.with_align, metadata=metadata
+                    logits, decoder_output, attns = valid_model(
+                        src,
+                        decoder_input,
+                        src_lengths,
+                        return_attention=self.return_attention,
+                        metadata=metadata,
                     )
 
                     # Compute loss.
-                    _, batch_stats = self.valid_loss_md[f"valloss{metadata.tgt_lang}"](batch, outputs, attns)
+                    loss = self.loss_functions[metadata.tgt_lang](logits, target)
 
                 # Update statistics.
+                padding_idx = self.loss_functions[metadata.tgt_lang].ignore_index
+                batch_stats = Statistics.from_loss_logits_target(
+                    loss,
+                    logits,
+                    target,
+                    padding_idx,
+                )
                 stats.update(batch_stats)
         if moving_average:
             for param_data, param in zip(model_params_data, self.model.parameters()):
@@ -435,63 +437,79 @@ class Trainer(object):
             # update data state
             self._data_state[metadata.corpus_id] = batch.line_idx
 
+            num_tokens = batch.tgt.mask.sum()
             if self.norm_method == "tokens":
-                num_tokens = (
-                    batch.labels[1:, :, 0].ne(self.train_loss_md[f'trainloss{metadata.tgt_lang}'].padding_idx).sum()
-                )
                 normalization += num_tokens.item()
             else:
                 normalization += batch.batch_size
+            report_stats.n_src_words += batch.src.mask.sum().item()
 
             # logger.info(f'batch with metadata {metadata}')
 
-            target_size = batch.tgt.size(0)
+            src = batch.src.tensor
+            src_mask = batch.src.mask
 
-            src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-            if src_lengths is not None:
-                report_stats.n_src_words += src_lengths.sum().item()
+            decoder_input = batch.tgt.tensor[:-1]
+            target = batch.tgt.tensor[1:]
+            # tgt_mask = batch.tgt.mask
 
-            # tgt_outer corresponds to the target-side input. The expected
-            # decoder output will be read directly from the batch:
-            # cf. `onmt.utils.loss.CommonLossCompute._make_shard_state`
-            tgt_outer = batch.tgt
+            # # QUI logging for batch shapes
+            # def quishape(name, val):
+            #     print(f'{name} {val.shape}  {val.shape[0] * val.shape[1]}')
+            # quishape('src', src)
+            # quishape('src_mask', src_mask)
+            # quishape('decoder_input', decoder_input)
+            # quishape('target', target)
+            # quishape('tgt_mask', tgt_mask)
 
-            # QUI logging for batch shapes
-            # print(src.shape, src.shape[0] * src.shape[1], tgt_outer.shape, tgt_outer.shape[0] * tgt_outer.shape[1])
+            # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
-            bptt = False
-            # TODO: these loops come from truncation / BPTT implementations which are removed in #60
-            for j in range(0, target_size - 1, target_size):
-                # 1. Create truncated target.
-                tgt = tgt_outer[j:(j + target_size)]
-                # TODO: AMP == TRUE If fp16
-                with torch.cuda.amp.autocast(enabled=self.optim.amp):
-                    outputs, attns = self.model(
-                        src, tgt, src_lengths, bptt=bptt, with_align=self.with_align, metadata=metadata
+            with torch.cuda.amp.autocast(enabled=self.optim.amp):
+                logits, decoder_output, attns = self.model(
+                    rearrange(src, 't b 1 -> b t'),
+                    rearrange(decoder_input, 't b 1 -> b t'),
+                    rearrange(src_mask, 't b -> b t'),
+                    return_attention=self.return_attention,
+                    metadata=metadata,
+                )
+                # quishape('logits', logits)
+                # quishape('decoder_output', decoder_output)
+                logits = rearrange(logits, 'b t i -> t b i')
+                decoder_output = rearrange(decoder_output, 'b t d -> t b d')
+
+                # 3. Compute loss.
+                loss = self.loss_functions[metadata.tgt_lang](
+                    rearrange(logits, 't b i -> (t b) i'),
+                    rearrange(target, 't b 1 -> (t b)'),
+                )
+                # logger.info(loss)
+
+            try:
+                if loss is not None:
+                    self.optim.backward(loss)
+
+                if self.report_training_accuracy:
+                    # Slow: requires max over logits, eq, masked_select
+                    batch_stats = Statistics.from_loss_logits_target(
+                        loss.item(),
+                        logits,
+                        target,
+                        padding_idx=self.loss_functions[metadata.tgt_lang].ignore_index,
                     )
-                    bptt = True
-
-                    # 3. Compute loss.
-                    loss, batch_stats = self.train_loss_md[f'trainloss{metadata.tgt_lang}'](
-                        batch,
-                        outputs,
-                        attns,
-                        normalization=normalization,
-                        shard_size=self.shard_size,
+                else:
+                    batch_stats = Statistics(
+                        loss.item(),
+                        num_tokens,
+                        n_correct=None,
                     )
-                    # logger.info(loss)
 
-                try:
-                    if loss is not None:
-                        self.optim.backward(loss)
+                total_stats.update(batch_stats)
+                report_stats.update(batch_stats)
+                report_stats.update_task_loss(batch_stats.loss, metadata)
 
-                    total_stats.update(batch_stats)
-                    report_stats.update(batch_stats)
-                    report_stats.update_task_loss(batch_stats.loss, metadata)
-
-                except Exception:
-                    traceback.print_exc()
-                    logger.info("At step %d, we removed a batch - accum %d", self.optim.training_step, k)
+            except Exception:
+                traceback.print_exc()
+                logger.info("At step %d, we removed a batch - accum %d", self.optim.training_step, k)
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')
 

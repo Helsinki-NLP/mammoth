@@ -5,7 +5,7 @@ from mammoth.utils.report_manager import ReportMgr, build_report_manager
 from mammoth.utils.statistics import Statistics
 from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.earlystopping import EarlyStopping, scorers_from_opts
-from mammoth.utils.loss import build_loss_compute
+from mammoth.utils.loss import build_loss_function
 
 __all__ = [
     "split_corpus",
@@ -19,5 +19,5 @@ __all__ = [
     "EarlyStopping",
     "scorers_from_opts",
     "make_batch_align_matrix",
-    "build_loss_compute",
+    "build_loss_function",
 ]

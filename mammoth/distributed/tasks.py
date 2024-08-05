@@ -20,7 +20,6 @@ from mammoth.distributed.components import (
     DistributedDecoder,
     DistributedEmbedding,
     DistributedEncoder,
-    DistributedGenerator,
     Side,
 )
 from mammoth.distributed.contexts import DeviceContext, WorldContext
@@ -364,14 +363,6 @@ class TaskQueueManager:
                     task_ids={task.corpus_id},
                     group=None,
                     side=Side.decoder,
-                    lang=task.tgt_lang,
-                )
-            )
-            builder.add(
-                DistributedGenerator(
-                    global_ranks={global_rank},
-                    task_ids={task.corpus_id},
-                    group=None,
                     lang=task.tgt_lang,
                 )
             )

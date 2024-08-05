@@ -54,9 +54,14 @@ class StackXcoder(nn.ModuleDict):
     """
     Switches between different AdaptedAttentionLayersStacks depending on the task.
     """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.active_task = None
+
     # TransformerWrapper wraps an AttentionLayers in embeddings and some other functionality.
     # We use one TransformerWrapper per task.
     def activate(self, task_id: str, adapter_ids: Optional[List[Tuple[int, str, str]]]):
+        self.active_task = task_id
         transformer_wrapper = self[task_id]
         attention_layers_stack = transformer_wrapper.attn_layers
         if adapter_ids:
@@ -64,3 +69,12 @@ class StackXcoder(nn.ModuleDict):
             for layer_stack_index, adapter_group, sub_id in adapter_ids:
                 attention_layers_stack.activate_adapter(layer_stack_index, adapter_group, sub_id)
         return transformer_wrapper
+
+    def get_attention_layers(self, task_id: str, layer_stack_index: int) -> AdaptedAttentionLayers:
+        return self[task_id].attn_layers.attention_layers_stack[layer_stack_index]
+
+    def get_embedding(self, task_id):
+        transformer_wrapper = self[task_id]
+        return transformer_wrapper.token_emb
+
+    # Lack of forward is intentional: call forward on the return value of activate

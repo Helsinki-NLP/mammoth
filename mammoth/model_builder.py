@@ -8,8 +8,9 @@ from collections import defaultdict
 from functools import partial
 from pathlib import Path
 from torch.nn.init import xavier_uniform_
-from typing import Optional, List
-from x_transformers import TransformerWrapper
+from typing import Optional, List, Dict, Tuple
+# from x_transformers import TransformerWrapper
+from x_transformers.x_transformers import TokenEmbedding
 
 from mammoth.distributed.components import (
     DistributedAdapter,
@@ -18,20 +19,21 @@ from mammoth.distributed.components import (
     DistributedEncoder,
     Side,
 )
-from mammoth.models import NMTModel
 from mammoth.modules.adapters import (
     AdaptedAttentionLayers,
     Adapter,
     FeedForwardAdapterLayer,
     LoraAdapterLayer,
 )
+from mammoth.inputters.vocab import Vocab
+from mammoth.models import NMTModel
+from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
 from mammoth.utils.module_splitter import _combine_ordered_dicts
 from mammoth.utils.parse import ArgumentParser
-
-from mammoth.modules.attention_bridge import AttentionBridge
+from mammoth.utils.transformer_wrapper import TransformerWrapper
 
 
 def uses_adapters(opts):
@@ -257,11 +259,22 @@ def get_attention_layers_kwargs(
 def build_xcoder(
     side: Side,
     model_opts,
-    vocabs_dict,
+    vocabs_dict: Dict[Tuple[str, str], Vocab],
     device,
     task_queue_manager,
     single_task: Optional[str] = None,
-):
+    token_embs: Optional[Dict[str, Vocab]] = None,
+) -> StackXcoder:
+    """
+    Build a StackXcoder for use as either Encoder or Decoder.
+    side: a Side enum from distributed components
+    model_opts: options
+    vocabs_dict: A dict mapping ('src'|'tgt', lang) to a Vocab.
+    device: torch.device
+    task_queue_manager: TaskQueueManager
+    single_task: if a task_id string is given, the built model contains only the components necessary for that task.
+    token_embs: to tie encoder and decoder embeddings, pass existing embeddings here.
+    """
     my_components: List[DistributedComponent] = task_queue_manager.get_my_distributed_components()
     my_components = [
         component for component in my_components
@@ -295,7 +308,11 @@ def build_xcoder(
             xcoder_id=xcoder_id,
             model_opts=model_opts,
         )
-        attention_layer_blocks[layer_stack_index][xcoder_id] = AdaptedAttentionLayers(**attention_layers_kwargs)
+        attention_layer_blocks[layer_stack_index][xcoder_id] = AdaptedAttentionLayers(
+            layer_stack_index=layer_stack_index,
+            xcoder_id=xcoder_id,
+            **attention_layers_kwargs
+        )
 
     # Create AdapterLayer objects and Adapter objects
     if uses_adapters(model_opts):
@@ -344,6 +361,23 @@ def build_xcoder(
                     for attention_layers in attention_layer_blocks[layer_stack_index]:
                         attention_layers.add_adapter(adapter)
 
+    # Create TokenEmbedding objects
+    l2norm_embed = False
+    if side == Side.encoder:
+        all_langs = sorted(set(task_queue_manager.get_my_src_langs()))
+    else:
+        all_langs = sorted(set(task_queue_manager.get_my_tgt_langs()))
+    side_alt_str = 'src' if side == Side.encoder else 'tgt'
+    if token_embs is None:
+        token_embs = dict()
+    for lang in all_langs:
+        if lang not in token_embs:
+            vocab = vocabs_dict[(side_alt_str, lang)]
+            token_embs[lang] = TokenEmbedding(
+                dim=model_opts.model_dim,
+                num_tokens=len(vocab),
+                l2norm_embed=l2norm_embed
+            )
     # Create AdaptedAttentionLayersStack objects and TransformerWrapper objects
     tasks = task_queue_manager.get_my_tasks()
     if single_task:
@@ -362,7 +396,6 @@ def build_xcoder(
             attention_layers_stack=attention_layers_stack
         )
 
-        side_alt_str = 'src' if side == Side.encoder else 'tgt'
         lang = task.src_lang if side == Side.encoder else task.tgt_lang
         vocab = vocabs_dict[(side_alt_str, lang)]
         max_seq_len = 0 if model_opts.max_length is None else model_opts.max_length
@@ -370,8 +403,7 @@ def build_xcoder(
         tie_embedding = True
         use_abs_pos_emb = True
         emb_frac_gradient = 1.
-        # FIXME: this won't work: creates embeddings for each task, not for each language
-        # Have to reimplement TransformerWrapper to allow passing in an embedding
+        # Using custom extended TransformerWrapper to allow passing in an embedding
         transformer_wrapper = TransformerWrapper(
             num_tokens=len(vocab),
             max_seq_len=max_seq_len,
@@ -381,6 +413,7 @@ def build_xcoder(
             tie_embedding=tie_embedding,
             use_abs_pos_emb=use_abs_pos_emb,
             emb_frac_gradient=emb_frac_gradient,
+            token_emb=token_embs[lang],
         )
         transformer_wrappers[task.corpus_id] = transformer_wrapper
 

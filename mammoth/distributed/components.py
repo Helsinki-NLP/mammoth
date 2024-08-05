@@ -39,7 +39,8 @@ class Side(Enum):
     decoder = auto()
 
 
-@dataclass
+# mypy doesn't like abstract dataclasses
+@dataclass      # type: ignore
 class DistributedComponent(ABC):
     """
     Represents a model component that may be distributed across several
@@ -78,10 +79,15 @@ class DistributedComponent(ABC):
 
 
 # TODO: This is a misnomer: Not an entire XCoder, but just one AttentionLayers block
-@dataclass
+@dataclass  # type: ignore
 class DistributedXCoder(DistributedComponent, ABC):
     layer_stack_index: int
     xcoder_id: str
+
+    @property
+    @abstractmethod
+    def side(self) -> Side:
+        pass
 
     def get_name(self) -> str:
         return f'{self.side.name}_{self.layer_stack_index}_{self.xcoder_id}'
@@ -106,7 +112,11 @@ class DistributedEncoder(DistributedXCoder):
         return self.xcoder_id
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        return model.encoder.get_submodule(self.layer_stack_index, self.xcoder_id)
+        a_task_id = sorted(self.task_ids)[0]
+        aal = model.encoder.get_attention_layers(a_task_id, self.layer_stack_index)
+        assert aal.xcoder_id == self.xcoder_id, \
+            f'{self.get_name()} {self.layer_stack_index}: expected {self.xcoder_id} found {aal.xcoder_id}'
+        return aal
 
 
 @dataclass
@@ -120,7 +130,11 @@ class DistributedDecoder(DistributedXCoder):
         return self.xcoder_id
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        return model.decoder.get_submodule(self.layer_stack_index, self.xcoder_id)
+        a_task_id = sorted(self.task_ids)[0]
+        aal = model.decoder.get_attention_layers(a_task_id, self.layer_stack_index)
+        assert aal.xcoder_id == self.xcoder_id, \
+            f'{self.get_name()} {self.layer_stack_index}: expected {self.xcoder_id} found {aal.xcoder_id}'
+        return aal
 
 
 @dataclass
@@ -133,21 +147,12 @@ class DistributedEmbedding(DistributedComponent):
         return f'{side_str}_embeddings_{self.lang}'
 
     def get_module(self, model: NMTModel) -> nn.Module:
+        a_task_id = sorted(self.task_ids)[0]
+        # FIXME: embeddings should be pre-created and stored in a dict keyed by lang
         if self.side == Side.encoder:
-            return model.encoder.embeddings[f'embeddings_{self.lang}']
+            return model.encoder.get_embedding(a_task_id)
         else:
-            return model.decoder.embeddings[f'embeddings_{self.lang}']
-
-
-@dataclass
-class DistributedGenerator(DistributedComponent):
-    lang: str
-
-    def get_name(self) -> str:
-        return f'generator_{self.lang}'
-
-    def get_module(self, model: NMTModel) -> nn.Module:
-        return model.generator[f'generator_{self.lang}']
+            return model.decoder.get_embedding(a_task_id)
 
 
 @dataclass
@@ -175,7 +180,7 @@ class DistributedAttentionBridge(DistributedComponent):
         return 'attention_bridge'
 
     def get_module(self, model: NMTModel) -> Optional[nn.Module]:
-        return self.model.attention_bridge
+        return model.attention_bridge
 
 
 @dataclass

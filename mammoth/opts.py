@@ -71,6 +71,13 @@ def _add_logging_opts(parser, is_train=True):
             help="Report parameter-level statistics in tensorboard. "
             "This has a huge impact on performance: only use for debugging.",
         )
+        group.add(
+            '--report_training_accuracy',
+            '-report_trainig_accuracy',
+            action="store_true",
+            help="Report accuracy for training batches. "
+            "This has an impact on performance: only use for debugging, or if no validation set exists.",
+        )
 
     else:
         # Options only during inference
@@ -387,16 +394,6 @@ def model_opts(parser):
 
     # Generator and loss options.
     group = parser.add_argument_group('Generator')
-    # FIXME likely broken, should be removed
-    group.add('--copy_attn', '-copy_attn', action="store_true", help='Train copy attention layer.')
-    group.add(
-        '--copy_attn_type',
-        '-copy_attn_type',
-        type=str,
-        default=None,
-        choices=['dot', 'general', 'mlp', 'none'],
-        help="The copy attention type to use. Leave as None to use the same as -global_attention.",
-    )
     group.add(
         '--generator_function',
         '-generator_function',
@@ -405,22 +402,6 @@ def model_opts(parser):
         help="Which function to use for generating "
         "probabilities over the target vocabulary (choices: "
         "softmax)",
-    )
-    group.add('--copy_attn_force', '-copy_attn_force', action="store_true", help='When available, train to copy.')
-    group.add('--reuse_copy_attn', '-reuse_copy_attn', action="store_true", help="Reuse standard attention for copy")
-    group.add(
-        '--copy_loss_by_seqlength',
-        '-copy_loss_by_seqlength',
-        action="store_true",
-        help="Divide copy loss by length of sequence",
-    )
-    group.add('--coverage_attn', '-coverage_attn', action="store_true", help='Train a coverage attention layer.')
-    group.add(
-        '--lambda_coverage',
-        '-lambda_coverage',
-        type=float,
-        default=0.0,
-        help='Lambda value for coverage loss of See et al (2017)',
     )
     group.add(
         '--loss_scale',
@@ -635,10 +616,8 @@ def _add_train_general_opts(parser):
         '--max_generator_batches',
         '-max_generator_batches',
         type=int,
-        default=32,
-        help="Maximum batches of words in a sequence to run "
-        "the generator on in parallel. Higher is faster, but "
-        "uses more memory. Set to 0 to disable.",
+        default=0,
+        help="Deprecated"
     )
     group.add(
         "-lookahead_minibatches",

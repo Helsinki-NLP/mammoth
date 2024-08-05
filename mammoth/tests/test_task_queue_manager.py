@@ -8,7 +8,6 @@ from mammoth.distributed.components import (
     DistributedEncoder,
     DistributedDecoder,
     DistributedEmbedding,
-    DistributedGenerator,
     # DistributedAdapter,
     # DistributedAttentionBridge,
     # DistributedComponentAction,
@@ -191,18 +190,6 @@ def test_create_all_distributed_components():
             layer_stack_index=0,
             xcoder_id="xxx",
         ),
-        DistributedGenerator(
-            global_ranks={0, 2},
-            task_ids={'train_3_e-b', 'train_0_a-b'},
-            group="Group 2 with GPU ranks [0, 2]",
-            lang="b",
-        ),
-        DistributedGenerator(
-            global_ranks={1},
-            task_ids={"train_2_a-d", "train_1_c-d"},
-            group=None,
-            lang="d",
-        ),
         DistributedEmbedding(
             global_ranks={0, 1},
             task_ids={"train_0_a-b", "train_2_a-d"},
@@ -277,12 +264,6 @@ def test_get_my_distributed_components():
             group=None,
             layer_stack_index=0,
             xcoder_id="xx",
-        ),
-        DistributedGenerator(
-            global_ranks={1},
-            task_ids={"train_2_a-d", "train_1_c-d"},
-            group=None,
-            lang="d",
         ),
         DistributedEmbedding(
             global_ranks={0, 1},

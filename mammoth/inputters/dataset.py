@@ -1,11 +1,12 @@
 import collections
-from dataclasses import dataclass
-import itertools
-from functools import partial
 import gzip
+import itertools
+from dataclasses import dataclass
+from functools import partial
 from io import IOBase
 
 import torch
+from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import IterableDataset
 
@@ -15,18 +16,21 @@ from mammoth.utils.logging import logger
 from mammoth.inputters.vocab import Vocab
 
 
+TensorWithMask = collections.namedtuple('TensorWithMask', 'tensor mask')
+
+
 @dataclass
 class Batch():
-    src: tuple  # of torch Tensors
-    tgt: torch.Tensor
-    labels: torch.Tensor
+    src: TensorWithMask
+    tgt: TensorWithMask
+    labels: Tensor
     batch_size: int
     line_idx: int
 
     def to(self, device):
-        self.src = (self.src[0].to(device), self.src[1].to(device))
+        self.src = TensorWithMask(self.src.tensor.to(device), self.src.mask.to(device))
         if self.tgt is not None:
-            self.tgt = self.tgt.to(device)
+            self.tgt = TensorWithMask(self.tgt.tensor.to(device), self.tgt.mask.to(device))
         if self.labels is not None:
             self.labels = self.labels.to(device)
         return self
@@ -196,23 +200,22 @@ class ParallelCorpus(IterableDataset):
 
     def collate_fn(self, examples, line_idx):
         has_tgt = 'tgt' in examples[0].keys()
-        src_padidx = self.vocabs['src'][DefaultTokens.PAD]
-        tgt_padidx = self.vocabs['tgt'][DefaultTokens.PAD]
-        if self.max_length is None:
-            src_lengths = torch.tensor([ex['src'].numel() for ex in examples], device='cpu')
-        else:
-            src_lengths = torch.tensor([min(ex['src'].numel(), self.max_length) for ex in examples], device='cpu')
-        src = (self._pad_sequence([ex['src'] for ex in examples], padding_value=src_padidx), src_lengths)
+        src_padding_idx = self.vocabs['src'][DefaultTokens.PAD]
+        tgt_padding_idx = self.vocabs['tgt'][DefaultTokens.PAD]
+        src = self._pad_sequence([ex['src'] for ex in examples], padding_value=src_padding_idx)
+        src_mask = src[:, :, 0].ne(src_padding_idx)
         if has_tgt:
-            tgt = self._pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padidx)
+            tgt = self._pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padding_idx)
+            tgt_mask = tgt[:, :, 0].ne(tgt_padding_idx)
             if 'labels' not in examples[0].keys():
                 labels = tgt
             else:
-                labels = self._pad_sequence([ex['labels'] for ex in examples], padding_value=tgt_padidx)
+                labels = self._pad_sequence([ex['labels'] for ex in examples], padding_value=tgt_padding_idx)
+            tgt_with_mask = TensorWithMask(tgt, tgt_mask)
         else:
-            tgt = None
+            tgt_with_mask = None
             labels = None
-        batch = Batch(src, tgt, labels, len(examples), line_idx)
+        batch = Batch(TensorWithMask(src, src_mask), tgt_with_mask, labels, len(examples), line_idx)
         return batch
 
 

@@ -35,6 +35,19 @@ class Statistics(object):
         self.param_magnitudes = Counter()
         self.grad_magnitudes = Counter()
 
+    @classmethod
+    def from_loss_logits_target(cls, loss: float, logits, target, padding_idx):
+        """
+        Alternate constructor for computing the stats from
+        loss, model prediction logits, and target indices.
+        Note that this is heavy. Only use for validation / debug purposes.
+        """
+        pred = logits.max(1)[1]
+        non_padding = target.ne(padding_idx)
+        num_correct = pred.eq(target).masked_select(non_padding).sum().item()
+        num_non_padding = non_padding.sum().item()
+        cls(loss, num_non_padding, num_correct)
+
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
         """
@@ -90,8 +103,10 @@ class Statistics(object):
 
         """
         self.loss += stat.loss
-        self.n_words += stat.n_words
-        self.n_correct += stat.n_correct
+        if stat.n_words:
+            self.n_words += stat.n_words
+        if stat.n_correct:
+            self.n_correct += stat.n_correct
 
         if update_n_src_words:
             self.n_src_words += stat.n_src_words
@@ -118,14 +133,23 @@ class Statistics(object):
 
     def accuracy(self):
         """compute accuracy"""
-        return 100 * (self.n_correct / self.n_words)
+        if self.n_correct and self.n_words:
+            return 100 * (self.n_correct / self.n_words)
+        else:
+            return None
 
     def xent(self):
         """compute cross entropy"""
-        return self.loss / self.n_words
+        if self.n_words:
+            return self.loss / self.n_words
+        else:
+            logger.warning('Number of non-padding tokens not tracked: reported loss is unnormalized')
+            return self.loss
 
     def ppl(self):
         """compute perplexity"""
+        if not self.n_words:
+            return None
         return math.exp(min(self.loss / self.n_words, 100))
 
     def elapsed_time(self):
@@ -148,13 +172,17 @@ class Statistics(object):
         meta_str = ''
         if num_steps > 0:
             step_fmt = "%s/%5d" % (step_fmt, num_steps)
+        acc = self.accuracy()
+        acc_str = f'{acc:6.2f}' if acc is not None else '--'
+        ppl = self.ppl()
+        ppl_str = f'{ppl:5.2f}' if ppl is not None else '--'
         logger.info(
-            ("%s: Step %s; acc: %6.2f; ppl: %5.2f; xent: %4.2f; %3.0f/%3.0f tok/s; %6.0f sec")
+            ("%s: Step %s; acc: %s; ppl: %s; xent: %4.2f; %3.0f/%3.0f tok/s; %6.0f sec")
             % (
                 meta_str,
                 step_fmt,
-                self.accuracy(),
-                self.ppl(),
+                acc_str,
+                ppl_str,
                 self.xent(),
                 # learning_rate,    # was "lr: %7.5f;"
                 self.n_src_words / (t + 1e-5),

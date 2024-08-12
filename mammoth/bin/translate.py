@@ -7,9 +7,11 @@ from mammoth.translate.translator import build_translator
 from mammoth.transforms import get_transforms_cls, make_transforms, TransformPipe
 
 import mammoth.opts as opts
-from mammoth.distributed import TaskSpecs
+from mammoth.distributed import TaskSpecs, TaskQueueManager
+from mammoth.distributed.contexts import WorldContext, DeviceContextEnum
 from mammoth.distributed.tasks import get_adapter_ids
 from mammoth.utils.parse import ArgumentParser
+from mammoth.utils.misc import use_gpu
 
 
 def translate(opts):
@@ -26,12 +28,24 @@ def translate(opts):
     if 'adapters' in corpus_opts:
         encoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'encoder')
         decoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'decoder')
+        uses_adapters = True
     else:
         encoder_adapter_ids = None
         decoder_adapter_ids = None
+        uses_adapters = False
+
+    node_rank = 0
+    local_rank = 0
+    if use_gpu(opts):
+        context_enum = DeviceContextEnum.SINGLE_GPU
+        gpus_per_node = 1
+    else:
+        context_enum = DeviceContextEnum.CPU
+        gpus_per_node = 0
+
     task = TaskSpecs(
-        node_rank=None,
-        local_rank=None,
+        node_rank=node_rank,
+        local_rank=local_rank,
         src_lang=src_lang,
         tgt_lang=tgt_lang,
         encoder_id=encoder_id,
@@ -46,7 +60,30 @@ def translate(opts):
         decoder_adapter_ids=decoder_adapter_ids,
     )
 
-    translator = build_translator(opts, task, logger=logger, report_score=True)
+    world_context = WorldContext(
+        context=context_enum,
+        n_nodes=1,
+        gpus_per_node=gpus_per_node,
+    )
+
+    task_queue_manager = TaskQueueManager(
+        tasks=[task],
+        accum_count=1,
+        world_context=world_context,
+        task_distribution_strategy_cls=None,
+        uses_adapters=uses_adapters,
+    ).global_to_local(
+        node_rank=node_rank,
+        local_rank=local_rank,
+        opts=opts,
+    )
+    # FIXME: fix the attention bridge in translation
+    task_queue_manager.create_all_distributed_components(
+        use_attention_bridge=False,     # (opts.ab_layers is not None and len(opts.ab_layers) != 0),
+        new_group_func=lambda: None,
+    )
+
+    translator = build_translator(opts, task_queue_manager, task, logger=logger, report_score=True)
 
     # data_reader = InferenceDataReader(opts.src, opts.tgt, opts.src_feats)
     src_shards = split_corpus(opts.src, opts.shard_size)

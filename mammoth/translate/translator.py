@@ -8,19 +8,21 @@ from itertools import count, zip_longest
 
 import torch
 
-import mammoth.model_builder
-import mammoth.modules.decoder_ensemble
 # from mammoth.inputters.text_dataset import InferenceDataIterator
-from mammoth.translate.beam_search import BeamSearch, BeamSearchLM
-from mammoth.translate.greedy_search import GreedySearch, GreedySearchLM
-from mammoth.utils.misc import tile, set_random_seed, report_matrix
-from mammoth.utils.alignment import extract_alignment, build_align_pharaoh
 from mammoth.constants import ModelTask, DefaultTokens
-from mammoth.inputters.dataset import ParallelCorpus
 from mammoth.inputters.dataloader import build_dataloader
+from mammoth.inputters.dataset import ParallelCorpus
+from mammoth.model_builder import build_model
+from mammoth.translate.beam_search import BeamSearch, BeamSearchLM, GNMTGlobalScorer
+from mammoth.translate.greedy_search import GreedySearch, GreedySearchLM
+from mammoth.translate.translation import TranslationBuilder
+from mammoth.utils.alignment import extract_alignment, build_align_pharaoh
+from mammoth.utils.misc import tile, set_random_seed, report_matrix, use_gpu
+from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_from_checkpoint
+from mammoth.utils.parse import ArgumentParser
 
 
-def build_translator(opts, task, report_score=True, logger=None, out_file=None):
+def build_translator(opts, task_queue_manager, task, report_score=True, logger=None, out_file=None):
     if out_file is None:
         outdir = os.path.dirname(opts.output)
         if outdir and not os.path.isdir(outdir):
@@ -29,15 +31,19 @@ def build_translator(opts, task, report_score=True, logger=None, out_file=None):
             os.makedirs(os.path.dirname(opts.output), exist_ok=True)
         out_file = codecs.open(opts.output, "w+", "utf-8")
 
-    load_test_model = (
-        mammoth.modules.decoder_ensemble.load_test_model if len(opts.models) > 3
-        else mammoth.model_builder.load_test_multitask_model
-    )
+    # TODO: reimplement ensemble decoding
+    load_model_for_translation_func = load_model_for_translation
     if logger:
         logger.info(str(task))
-    vocabs, model, model_opts = load_test_model(opts, task)
+    model_path = None
+    vocabs, model, model_opts = load_model_for_translation_func(
+        opts=opts,
+        task_queue_manager=task_queue_manager,
+        task=task,
+        model_path=model_path,
+    )
 
-    scorer = mammoth.translate.GNMTGlobalScorer.from_opts(opts)
+    scorer = GNMTGlobalScorer.from_opts(opts)
 
     translator = Translator.from_opts(
         model,
@@ -52,6 +58,49 @@ def build_translator(opts, task, report_score=True, logger=None, out_file=None):
         task=task,
     )
     return translator
+
+
+def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):
+    if task is None:
+        raise ValueError('Must set task')
+    if model_path is None:
+        model_path = opts.models[0]
+
+    # Load only the frame
+    frame, frame_ckpt_path = load_frame_checkpoint(ckpt_path=model_path)
+
+    vocabs_dict = {
+        ('src', task.src_lang): frame["vocab"].get(('src', task.src_lang)),
+        ('tgt', task.tgt_lang): frame["vocab"].get(('tgt', task.tgt_lang)),
+        'src': frame["vocab"].get(('src', task.src_lang)),
+        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
+    }
+    print(f'vocabs_dict {vocabs_dict}')
+    print(f'my compontents {task_queue_manager.get_my_distributed_components()}')
+
+    model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
+
+    model = build_model(
+        model_opts,
+        opts,
+        vocabs_dict,
+        task_queue_manager,
+        single_task=task.corpus_id,
+    )
+
+    load_parameters_from_checkpoint(
+        frame_ckpt_path,
+        model,
+        optim=None,
+        task_queue_manager=task_queue_manager,
+        reset_optim=True,
+    )
+
+    device = torch.device("cuda" if use_gpu(opts) else "cpu")
+    model.to(device)
+    model.eval()
+
+    return vocabs_dict, model, model_opts
 
 
 def max_tok_len(new, count, sofar):
@@ -153,7 +202,7 @@ class Inference(object):
 
         self.model = model
         self.vocabs = vocabs
-        tgt_vocab = dict(self.vocabs)["tgt"]
+        tgt_vocab = dict(self.vocabs)[("tgt", task.tgt_lang)]
         self._tgt_vocab = tgt_vocab
         self._tgt_eos_idx = self._tgt_vocab.stoi[DefaultTokens.EOS]
         self._tgt_pad_idx = self._tgt_vocab.stoi[DefaultTokens.PAD]
@@ -480,7 +529,7 @@ class Inference(object):
         # )
         # data_iter = None
 
-        xlation_builder = mammoth.translate.TranslationBuilder(
+        xlation_builder = TranslationBuilder(
             corpus,
             self.vocabs,
             self.n_best,
@@ -813,6 +862,7 @@ class Translator(Inference):
         batch_size = batch.batch_size
 
         # (0.5) Activate adapters
+        # FIXME: translation is broken, fix is WIP
         metadata = self.task.get_serializable_metadata()
         self.model.encoder.activate(metadata)
         self.model.decoder.activate(metadata)

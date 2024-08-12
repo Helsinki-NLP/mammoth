@@ -288,7 +288,10 @@ class TaskQueueManager:
         assert node_rank is not None
         assert local_rank is not None
         device_context = self.world_context.global_to_local(node_rank, local_rank)
-        task_distribution_strategy = self.task_distribution_strategy_cls(seed=opts.seed)
+        if self.task_distribution_strategy_cls is not None:
+            task_distribution_strategy = self.task_distribution_strategy_cls(seed=opts.seed)
+        else:
+            task_distribution_strategy = None
         return LocalTaskQueueManager(
             self.tasks,
             accum_count=self.accum_count,

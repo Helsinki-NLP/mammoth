@@ -47,51 +47,6 @@ def uses_adapters(opts):
     return 'adapters' in opts and opts.adapters
 
 
-def load_test_multitask_model(opts, task_queue_manager, task=None, model_path=None):
-    if task is None:
-        raise ValueError('Must set task')
-    if model_path is None:
-        model_path = opts.models[0]
-
-    # Load only the frame
-    frame, ckpt_path = load_frame_checkpoint(ckpt_path=opts.train_from)
-
-    vocabs_dict = {
-        'src': frame["vocab"].get(('src', task.src_lang)),
-        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
-    }
-
-    model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
-    # Avoid functionality on inference
-    # model_opts.update_vocab = False
-    model = build_model(
-        model_opts,
-        opts,
-        vocabs_dict,
-        task_queue_manager,
-        single_task=task.corpus_id,
-    )
-
-    # FIXME: load the model parameters
-
-    model_params = {name for name, p in model.named_parameters()}
-    model_params.update(name for name, p in model.named_buffers())
-    for key in set(combined_state_dict.keys()):
-        if key not in model_params:
-            print(f'Deleting unnecessary key: {key}')
-            del combined_state_dict[key]
-    for key in model_params:
-        if key not in combined_state_dict:
-            print(f'Key missing {key}')
-    model.load_state_dict(combined_state_dict)
-    device = torch.device("cuda" if use_gpu(opts) else "cpu")
-    model.to(device)
-
-    model.eval()
-
-    return vocabs_dict, model, model_opts
-
-
 def get_attention_layers_kwargs(
     side: Side,
     layer_stack_index,

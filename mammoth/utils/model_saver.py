@@ -88,11 +88,13 @@ def load_parameters_from_checkpoint(
                 logger.info(f'Module {name} incompatible keys: {incompatible_keys}')
                 all_ok = False
         else:
-            logger.warning(f'Could not find model checkpoint file {checkpoint_path}. Affected parameters are reinitialized.')
+            logger.warning(
+                f'Could not find model checkpoint file {checkpoint_path}. Affected parameters are reinitialized.'
+            )
             all_ok = False
 
         if not reset_optim:
-            optimizer_path  = f'{ckpt_prefix}_{name}_optim.pt'
+            optimizer_path = f'{ckpt_prefix}_{name}_optim.pt'
             if os.path.isfile(optimizer_path):
                 # The optimizer parameters are distributed the same way as the components
                 optim_state_dict = torch.load(optimizer_path)
@@ -101,15 +103,58 @@ def load_parameters_from_checkpoint(
                     logger.info(f'Optim {name} incompatible keys: {incompatible_keys}')
                     all_ok = False
             else:
-                logger.warning(f'Could not find optim checkpoint file {optimizer_path}. Affected parameters are reinitialized.')
+                logger.warning(
+                    f'Could not find optim checkpoint file {optimizer_path}. Affected parameters are reinitialized.'
+                )
                 all_ok = False
     if all_ok:
         if reset_optim:
             logger.info(f'All modules restored from checkpoint {ckpt_prefix}')
-            logger.info('Optimizer was reset')
+            if optim is not None:
+                logger.info('Optimizer was reset')
         else:
             logger.info(f'All modules and optimizer restored from checkpoint {ckpt_prefix}')
     # TODO: barf unless a flag --yes-i-messed-with-the-checkpoint is set
+
+
+def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):
+    if task is None:
+        raise ValueError('Must set task')
+    if model_path is None:
+        model_path = opts.models[0]
+
+        # Load only the frame
+    frame, frame_ckpt_path = load_frame_checkpoint(ckpt_path=opts.train_from)
+
+    vocabs_dict = {
+        'src': frame["vocab"].get(('src', task.src_lang)),
+        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
+    }
+
+    model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
+
+    model = build_model(
+        model_opts,
+        opts,
+        vocabs_dict,
+        task_queue_manager,
+        single_task=task.corpus_id,
+    )
+
+    load_parameters_from_checkpoint(
+        frame_ckpt_path,
+        model,
+        optim=None,
+        task_queue_manager=task_queue_manager,
+        reset_optim=True,
+    )
+
+    device = torch.device("cuda" if use_gpu(opts) else "cpu")
+    model.to(device)
+    model.eval()
+
+    return vocabs_dict, model, model_opts
+
 
 
 class ModelSaverBase(object):

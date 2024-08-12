@@ -59,9 +59,8 @@ def build_trainer(
     logger.info("BUILD TRAINER")
 
     for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_my_vocabs('tgt', vocabs_dict):
-        # FIXME: OpenNMT losses require a separate generator, which is not available in x_transformers
-        # Just rip it out and use F.cross_entropy? Maybe label smoothing?
-        # Or get the necessary components from the model to create a generator?
+        # Note that the old OpenNMT losses required a separate generator, which is not available in x_transformers
+        # In MAMMOTH, pytorch losses are used instead.
         loss_functions[lang] = build_loss_function(
             tgt_vocab,
             label_smoothing=opts.label_smoothing,

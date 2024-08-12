@@ -220,7 +220,17 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
         queue.put((batch, metadata, communication_batch_id))
 
 
-def consumer(process_fn, opts, device_context, error_queue, batch_queue, semaphore, task_queue_manager, checkpoint):
+def consumer(
+    process_fn,
+    opts,
+    device_context,
+    error_queue,
+    batch_queue,
+    semaphore,
+    task_queue_manager,
+    frame_checkpoint,
+    frame_ckpt_path,
+):
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
         logger.info(
@@ -238,7 +248,8 @@ def consumer(process_fn, opts, device_context, error_queue, batch_queue, semapho
             batch_queue=batch_queue,
             semaphore=semaphore,
             task_queue_manager=task_queue_manager,
-            checkpoint=checkpoint,
+            frame_checkpoint=frame_checkpoint,
+            frame_ckpt_path=frame_ckpt_path,
         )
 
     except KeyboardInterrupt:

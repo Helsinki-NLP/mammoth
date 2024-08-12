@@ -7,7 +7,7 @@ from mammoth.model_builder import build_model
 from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.misc import set_random_seed
 from mammoth.trainer import build_trainer
-from mammoth.utils.model_saver import build_model_saver
+from mammoth.utils.model_saver import build_model_saver, load_parameters_from_checkpoint
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
@@ -23,10 +23,10 @@ def configure_process(opts, device_id):
     set_random_seed(opts.seed, device_id >= 0)
 
 
-def _get_model_opts(opts, checkpoint=None):
+def _get_model_opts(opts, frame_checkpoint=None):
     """Get `model_opts` to build model, may load from `checkpoint` if any."""
-    if checkpoint is not None:
-        model_opts = ArgumentParser.ckpt_model_opts(checkpoint["opts"])
+    if frame_checkpoint is not None:
+        model_opts = ArgumentParser.ckpt_model_opts(frame_checkpoint["opts"])
         ArgumentParser.update_model_opts(model_opts)
         ArgumentParser.validate_model_opts(model_opts)
         if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
@@ -83,7 +83,8 @@ def main(
     batch_queue=None,
     semaphore=None,
     task_queue_manager=None,
-    checkpoint=None,
+    frame_checkpoint=None,
+    frame_ckpt_path=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opts`` has been validated and updated
@@ -100,15 +101,14 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opts._all_transform)
-    model_opts = _get_model_opts(opts, checkpoint=checkpoint)
+    model_opts = _get_model_opts(opts, frame_checkpoint=frame_checkpoint)
 
     task_queue_manager.create_all_distributed_components(
         use_attention_bridge=(model_opts.ab_layers is not None and len(model_opts.ab_layers) != 0),
     )
 
     # Build model.
-
-    model = build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint)
+    model = build_model(model_opts, opts, vocabs_dict, task_queue_manager)
 
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
@@ -123,8 +123,23 @@ def main(
         model,
         opts,
         task_queue_manager=task_queue_manager,
-        checkpoint=checkpoint,
+        frame_checkpoint=frame_checkpoint,
     )
+    logger.info("{} - total optimizer parameters: {}".format(
+        device_context.id,
+        optim.count_parameters(log=logger.debug)
+    ))
+
+    # Load parameters from checkpoint
+    if opts.train_from:
+        load_parameters_from_checkpoint(
+            frame_ckpt_path=frame_ckpt_path,
+            model=model,
+            optim=optim,
+            task_queue_manager=task_queue_manager,
+            reset_optim=opts.reset_optim in {'all', 'states'},
+        )
+        optim.global_training_step = frame_checkpoint['global_training_step']
 
     # Build model saver
     model_saver = build_model_saver(

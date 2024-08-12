@@ -1,5 +1,6 @@
 import torch.nn as nn
 from abc import ABC, abstractmethod
+from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Set, Any, Optional, Dict
@@ -69,6 +70,10 @@ class DistributedComponent(ABC):
         module = self.get_module(model)
         yield from module.named_parameters()
 
+    def state_dict(self, model: NMTModel, prefix='', keep_vars=False):
+        module = self.get_module(model)
+        return module.state_dict(prefix=prefix, keep_vars=keep_vars)
+
     @property
     def min_rank(self) -> int:
         return min(self.global_ranks)
@@ -99,6 +104,16 @@ class DistributedXCoder(DistributedComponent, ABC):
             # however, we want to treat these as distinct DistributedComponents
             if 'embeddings' not in name and 'adapter' not in name:
                 yield name, p
+
+    def state_dict(self, model: NMTModel, prefix='', keep_vars=False) -> Dict[str, Any]:
+        module = self.get_module(model)
+        destination: Dict[str, Any] = OrderedDict()
+        for name, sub_module in module._modules.items():
+            if name == 'adapters':
+                # Adapters are stored separately
+                continue
+            sub_module.state_dict(destination=destination, prefix=prefix + name + '.', keep_vars=keep_vars)
+        return destination
 
 
 @dataclass

@@ -16,7 +16,7 @@ def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_ma
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opts.save_model, model, model_opts, vocabs_dict, optim, opts.keep_checkpoint, task_queue_manager, opts.save_all_gpus
+        opts.save_model, model, model_opts, vocabs_dict, optim, opts.keep_checkpoint, task_queue_manager
     )
     return model_saver
 
@@ -51,7 +51,6 @@ class ModelSaverBase(object):
         optim,
         keep_checkpoint=-1,
         task_queue_manager=None,
-        all_gpus=False,
     ):
         self.base_path = base_path
         self.model = model
@@ -64,7 +63,6 @@ class ModelSaverBase(object):
             self.checkpoint_queue = deque([], maxlen=keep_checkpoint)
         assert task_queue_manager is not None
         self.task_queue_manager = task_queue_manager
-        self.all_gpus = all_gpus
 
     def save(self, step, data_state, moving_average=None):
         """Main entry point for model saver
@@ -149,8 +147,8 @@ class ModelSaver(ModelSaverBase):
             data_states = [None for _ in range(device_context.world_size)]
             torch.distributed.all_gather_object(data_states, data_state)
             data_state = {k: v for state in data_states for k, v in state.items()}
-            if device_context.is_master():
-                module_state_dicts['frame']['data_state'] = data_state
+        if device_context.is_master():
+            module_state_dicts['frame']['data_state'] = data_state
 
         for key, state_dict in module_state_dicts.items():
             # The state_dicts across different devices only contain one copy of each module:

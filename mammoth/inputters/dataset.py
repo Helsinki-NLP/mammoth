@@ -47,7 +47,11 @@ def read_examples_from_files(
     """Helper function to read examples"""
 
     # match starting line with offset
-    line_idx_generator = itertools.count(offset if offset is not None else 0)
+    # we need step, because _make_example_dict is applied after slicing the stride
+    line_idx_generator = itertools.count(
+        offset if offset is not None else 0,
+        step=stride if stride is not None else 1
+    )
 
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
@@ -170,11 +174,12 @@ class ParallelCorpus(IterableDataset):
 
         # ensure we only restore the first time the corpus is restored
         if self._line_idx_restore is not None:
-            logger.info(f'restoring to line: {self._line_idx_restore}')
+            logger.info(f'restoring {self.corpus_id} to line: {self._line_idx_restore}')
             if self.stride is not None:
                 # sanity check
-                assert self._line_idx_restore % self.stride == 0, \
-                    'Stride is inconsistent with data restoration index'
+                assert (self._line_idx_restore - self.offset) % self.stride == 0, \
+                    f'Stride {self.stride} is inconsistent with data restoration index {self._line_idx_restore} ' \
+                    'and original offset {self.offset}. ({self.corpus_id})'
             offset = self._line_idx_restore
             self._line_idx_restore = None
         else:

@@ -74,6 +74,10 @@ class DistributedComponent(ABC):
         module = self.get_module(model)
         return module.state_dict(prefix=prefix, keep_vars=keep_vars)
 
+    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
+        module = self.get_module(model)
+        return module.load_state_dict(state_dict)
+
     @property
     def min_rank(self) -> int:
         return min(self.global_ranks)
@@ -162,12 +166,10 @@ class DistributedEmbedding(DistributedComponent):
         return f'{side_str}_embeddings_{self.lang}'
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        a_task_id = sorted(self.task_ids)[0]
-        # FIXME: embeddings should be pre-created and stored in a dict keyed by lang
         if self.side == Side.encoder:
-            return model.encoder.get_embedding(a_task_id)
+            return model.encoder.get_embedding_by_lang(self.lang)
         else:
-            return model.decoder.get_embedding(a_task_id)
+            return model.decoder.get_embedding_by_lang(self.lang)
 
 
 @dataclass

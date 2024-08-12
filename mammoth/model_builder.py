@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 from collections import defaultdict, OrderedDict
 from functools import partial
-from pathlib import Path
 from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
 # from x_transformers import TransformerWrapper
@@ -31,6 +30,7 @@ from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
+from mammoth.utils.model_saver import load_frame_checkpoint
 from mammoth.utils.parse import ArgumentParser
 from mammoth.utils.transformer_wrapper import TransformerWrapper
 
@@ -53,65 +53,13 @@ def load_test_multitask_model(opts, task_queue_manager, task=None, model_path=No
     if model_path is None:
         model_path = opts.models[0]
 
-    checkpoint_modules = [
-        (f'encoder.embeddings.embeddings_{task.src_lang}.', f'src_embeddings_{task.src_lang}'),
-        (f'decoder.embeddings.embeddings_{task.tgt_lang}.', f'tgt_embeddings_{task.tgt_lang}'),
-        (f'generator.generator_{task.tgt_lang}.', f'generator_{task.tgt_lang}'),
-        ('attention_bridge.', 'attention_bridge'),
-    ]
-
-    for layer_stack_idx, layer_stack_key in enumerate(task.encoder_id):
-        checkpoint_modules.append(
-            (
-                f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.',
-                f'encoder_{layer_stack_idx}_{layer_stack_key}'
-            )
-        )
-    if task.encoder_adapter_ids:
-        for layer_stack_idx, adapter_group, sub_id in task.encoder_adapter_ids:
-            checkpoint_modules.append(
-                (
-                    f'encoder.encoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
-                    f'encoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
-                )
-            )
-    for layer_stack_idx, layer_stack_key in enumerate(task.decoder_id):
-        checkpoint_modules.append(
-            (
-                f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.',
-                f'decoder_{layer_stack_idx}_{layer_stack_key}'
-            )
-        )
-    if task.decoder_adapter_ids:
-        for layer_stack_idx, adapter_group, sub_id in task.decoder_adapter_ids:
-            checkpoint_modules.append(
-                (
-                    f'decoder.decoders.{layer_stack_idx}.{layer_stack_key}.adapters.adapter_{adapter_group}_{sub_id}.',    # noqa
-                    f'decoder_adapter_{layer_stack_idx}_{layer_stack_key}_{adapter_group}_{sub_id}'
-                )
-            )
-
-    model_path = model_path.rstrip('_')
-    checkpoint_paths = [
-        (prefix, f'{model_path}_{key}.pt') for (prefix, key) in checkpoint_modules
-    ]
-
-    opts.model_frame = model_path + '_frame.pt'
-    frame = torch.load(opts.model_frame, map_location=lambda storage, loc: storage)
-
-    checkpoint_state_dicts = {
-        prefix: torch.load(path, map_location=lambda storage, loc: storage)
-        for prefix, path in checkpoint_paths
-    }
-
-    combined_state_dict = _combine_ordered_dicts(checkpoint_state_dicts)
+    # Load only the frame
+    frame, ckpt_path = load_frame_checkpoint(ckpt_path=opts.train_from)
 
     vocabs_dict = {
         'src': frame["vocab"].get(('src', task.src_lang)),
         'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
     }
-    # FIXME
-    # fields["indices"] = Field(use_vocab=False, dtype=torch.long, sequential=False)
 
     model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
     # Avoid functionality on inference
@@ -121,9 +69,11 @@ def load_test_multitask_model(opts, task_queue_manager, task=None, model_path=No
         opts,
         vocabs_dict,
         task_queue_manager,
-        checkpoint=None,
         single_task=task.corpus_id,
     )
+
+    # FIXME: load the model parameters
+
     model_params = {name for name, p in model.named_parameters()}
     model_params.update(name for name, p in model.named_buffers())
     for key in set(combined_state_dict.keys()):
@@ -425,7 +375,7 @@ def build_xcoder(
         transformer_wrappers[task.corpus_id] = transformer_wrapper
 
     # Create a StackXcoder
-    stack_xcoder = StackXcoder(transformer_wrappers)
+    stack_xcoder = StackXcoder(transformer_wrappers, token_embs=token_embs)
     return stack_xcoder
 
 
@@ -442,50 +392,11 @@ def build_attention_bridge(model_opts):
     return attention_bridge
 
 
-def restore_from_checkpoint(stack_xcoder, checkpoint):
-    # FIXME: saving and loading are broken
-    trainstep = int(checkpoint['optim']['training_step']) - 1
-    for modname, gen in generators_md.items():
-        mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_{modname}.pt")
-        if mod_path.exists():
-            module = torch.load(mod_path)
-            gen.load_state_dict(module)
-            logger.info(f"Successfully loaded {modname} from the checkpoint.")
-
-    pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
-    decoder = build_only_dec(model_opts, pluggable_tgt_emb, task_queue_manager, checkpoint)
-
-    # TODO: implement hierarchical approach to layer sharing
-    attention_bridge = build_attention_bridge(model_opts)
-
-    if checkpoint:
-        # trainstep= int(checkpoint['optim']['training_step'])-1 - already recoderd in generators
-        attn_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_attention_bridge.pt")
-        if attn_path.exists():
-            attention_bridge.load_state_dict(torch.load(attn_path))
-            logger.info("Successfully loaded the attention bridge  from the checkpoint.")
-
-    if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
-        attention_bridge.half()
-
-    if uses_adapters(model_opts):
-        logger.info('Creating adapters...')
-        create_all_adapters(nmt_model, model_opts, task_queue_manager)
-        if checkpoint:
-            # TODO: plug in properly
-            logger.warning("Adapters' parameters are NOT being loaded from the checkpoint.")
-    print('built model:')
-    print(nmt_model)
-
-    return nmt_model, generators_md
-
-
 def build_model(
     model_opts,
     opts,
     vocabs_dict,
     task_queue_manager,
-    checkpoint=None,
     single_task=None,
 ):
     """Build a model from opts.
@@ -498,8 +409,6 @@ def build_model(
         vocabs_dict (dict[str, mammoth.inputters.Vocab]):
             `Vocab` objects for the model.
         task_queue_manager: TaskQueueManager
-        checkpoint: the model generated by train phase, or a resumed snapshot
-                    model from a stopped training.
         single_task: corpus_id of task, to create a single-task model
 
     Returns:

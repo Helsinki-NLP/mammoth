@@ -188,7 +188,8 @@ class SubOptimizer(object):
         if 'decay_step' in state_dict:
             self._decay_step = state_dict['decay_step']
         if 'optimizer' in state_dict:
-            self._optimizer.load_state_dict(state_dict['optimizer'])
+            return self._optimizer.load_state_dict(state_dict['optimizer'])
+        return None
 
     def zero_grad(self):
         """Zero the gradients of optimized parameters."""
@@ -231,8 +232,8 @@ class MultipleOptimizer(object):
         self.global_training_step = 1
 
     @classmethod
-    def from_opts(cls, model, opts, task_queue_manager, checkpoint=None):
-        optim_opts, optim_state_dict = cls._maybe_restore_from_checkpoint(opts, checkpoint)
+    def from_opts(cls, model, opts, task_queue_manager, frame_checkpoint=None):
+        optim_opts = cls._maybe_restore_from_checkpoint(opts, frame_checkpoint)
         base_optimizer = get_base_optimizer(optim_opts)
         use_grad_scaler = opts.model_dtype == "fp16"
         if use_grad_scaler:
@@ -254,30 +255,25 @@ class MultipleOptimizer(object):
         )
 
     @staticmethod
-    def _maybe_restore_from_checkpoint(opts, checkpoint=None):
+    def _maybe_restore_from_checkpoint(opts, frame_checkpoint=None):
         optim_opts = opts
-        optim_state_dict = None
 
-        if opts.train_from and checkpoint is not None:
-            ckpt_opts = checkpoint['opts']
-            ckpt_state_dict = checkpoint['optim']
+        if opts.train_from and frame_checkpoint is not None:
+            ckpt_opts = frame_checkpoint['opts']
 
             if opts.reset_optim == 'none':
                 # Load everything from the checkpoint.
                 optim_opts = ckpt_opts
-                optim_state_dict = ckpt_state_dict
             elif opts.reset_optim == 'all':
                 # Build everything from scratch.
                 pass
             elif opts.reset_optim == 'states':
                 # Reset optimizer, keep options.
                 optim_opts = ckpt_opts
-                optim_state_dict = ckpt_state_dict
-                del optim_state_dict['optimizer']
             elif opts.reset_optim == 'keep_states':
                 # Reset options, keep optimizer.
-                optim_state_dict = ckpt_state_dict
-        return optim_opts, optim_state_dict
+                pass
+        return optim_opts
 
     @staticmethod
     def _get_suboptimizers(model, task_queue_manager, base_optimizer, optim_opts, grad_scaler=None):
@@ -349,6 +345,18 @@ class MultipleOptimizer(object):
             lr = optimizer.learning_rate()
             result.append(f'Optimizer "{name}" has been stepped {count} times and has LR {lr}')
         return result
+
+    def count_parameters(self, log=print):
+        tot = 0
+        for name, optimizer in self.suboptimizers.items():
+            n_params = 0
+            for group in optimizer._optimizer.param_groups:
+                for param in group["params"]:
+                    n_params += param.nelement()
+            if callable(log):
+                log(f'optimizer {name}: {n_params}')
+            tot += n_params
+        return tot
 
     def state_dict(self):
         """Returns the state dictionary"""

@@ -17,7 +17,7 @@ from mammoth.utils.misc import set_random_seed
 # from mammoth.modules.embeddings import prepare_pretrained_embeddings
 from mammoth.utils.logging import init_logger, logger
 
-from mammoth.utils.model_saver import load_checkpoint
+from mammoth.utils.model_saver import load_frame_checkpoint
 from mammoth.train_single import main as single_main
 from mammoth.inputters import DynamicDatasetIter
 
@@ -59,45 +59,45 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 
 # TODO: reimplement save_transformed_sample
 
-def _init_train(opts):
-    """Common initilization stuff for all training process."""
-    ArgumentParser.validate_prepare_opts(opts)
-
-    if opts.train_from:
-        # Load checkpoint if we resume from a previous training.
-        checkpoint = load_checkpoint(ckpt_path=opts.train_from)
-        # fields = load_fields(opts.save_data, checkpoint)
-        transforms_cls = get_transforms_cls(opts._all_transform)
-        if (
-            hasattr(checkpoint["opts"], '_all_transform')
-            and len(opts._all_transform.symmetric_difference(checkpoint["opts"]._all_transform)) != 0
-        ):
-            _msg = "configured transforms is different from checkpoint:"
-            new_transf = opts._all_transform.difference(checkpoint["opts"]._all_transform)
-            old_transf = checkpoint["opts"]._all_transform.difference(opts._all_transform)
-            if len(new_transf) != 0:
-                _msg += f" +{new_transf}"
-            if len(old_transf) != 0:
-                _msg += f" -{old_transf}."
-            logger.warning(_msg)
-        # if opts.update_vocab:
-        #    logger.info("Updating checkpoint vocabulary with new vocabulary")
-            # fields, transforms_cls = prepare_fields_transforms(opts)
-    else:
-        checkpoint = None
-        # fields, transforms_cls = prepare_fields_transforms(opts)
-
-    # Report src and tgt vocab sizes
-    # for side in ['src', 'tgt']:
-    #     f = fields[side]
-    #     try:
-    #         f_iter = iter(f)
-    #     except TypeError:
-    #         f_iter = [(side, f)]
-    #     for sn, sf in f_iter:
-    #         if sf.use_vocab:
-    #             logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
-    return checkpoint, None, transforms_cls
+# def _init_train(opts):
+#     """Common initilization stuff for all training process."""
+#     ArgumentParser.validate_prepare_opts(opts)
+#
+#     if opts.train_from:
+#         # Load checkpoint if we resume from a previous training.
+#         checkpoint = load_checkpoint(ckpt_path=opts.train_from)
+#         # fields = load_fields(opts.save_data, checkpoint)
+#         transforms_cls = get_transforms_cls(opts._all_transform)
+#         if (
+#             hasattr(checkpoint["opts"], '_all_transform')
+#             and len(opts._all_transform.symmetric_difference(checkpoint["opts"]._all_transform)) != 0
+#         ):
+#             _msg = "configured transforms is different from checkpoint:"
+#             new_transf = opts._all_transform.difference(checkpoint["opts"]._all_transform)
+#             old_transf = checkpoint["opts"]._all_transform.difference(opts._all_transform)
+#             if len(new_transf) != 0:
+#                 _msg += f" +{new_transf}"
+#             if len(old_transf) != 0:
+#                 _msg += f" -{old_transf}."
+#             logger.warning(_msg)
+#         # if opts.update_vocab:
+#         #    logger.info("Updating checkpoint vocabulary with new vocabulary")
+#             # fields, transforms_cls = prepare_fields_transforms(opts)
+#     else:
+#         checkpoint = None
+#         # fields, transforms_cls = prepare_fields_transforms(opts)
+#
+#     # Report src and tgt vocab sizes
+#     # for side in ['src', 'tgt']:
+#     #     f = fields[side]
+#     #     try:
+#     #         f_iter = iter(f)
+#     #     except TypeError:
+#     #         f_iter = [(side, f)]
+#     #     for sn, sf in f_iter:
+#     #         if sf.use_vocab:
+#     #             logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
+#     return checkpoint, None, transforms_cls
 
 
 # def init_train_prepare_fields_transforms(opts, vocab_path, side):
@@ -183,10 +183,11 @@ def train(opts):
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
 
-    checkpoint = None
+    frame_checkpoint = None
+    ckpt_path = None
     if opts.train_from:
-        checkpoint = load_checkpoint(ckpt_path=opts.train_from)
-        vocabs_dict = checkpoint.get('vocab')
+        frame_checkpoint, ckpt_path = load_frame_checkpoint(ckpt_path=opts.train_from)
+        vocabs_dict = frame_checkpoint.get('vocab')
     else:
         vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
         for side in ('src', 'tgt'):
@@ -256,7 +257,17 @@ def train(opts):
         procs.append(
             mp.Process(
                 target=consumer,
-                args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
+                args=(
+                    train_process,
+                    opts,
+                    device_context,
+                    error_queue,
+                    q,
+                    semaphore,
+                    task_queue_manager,
+                    frame_checkpoint,
+                    ckpt_path,
+                ),
                 daemon=True,
             )
         )
@@ -273,8 +284,8 @@ def train(opts):
         )
         # Get the iterator to generate from
         line_idx_restore = None
-        if checkpoint is not None:
-            line_idx_restore = checkpoint['data_state']
+        if frame_checkpoint is not None:
+            line_idx_restore = frame_checkpoint['data_state']
         train_iter = DynamicDatasetIter.from_opts(
             task_queue_manager=task_queue_manager,
             transforms_cls=transforms_cls,

@@ -17,7 +17,7 @@ from mammoth.utils.misc import set_random_seed
 # from mammoth.modules.embeddings import prepare_pretrained_embeddings
 from mammoth.utils.logging import init_logger, logger
 
-from mammoth.models.model_saver import load_checkpoint
+from mammoth.utils.model_saver import load_checkpoint
 from mammoth.train_single import main as single_main
 from mammoth.inputters import DynamicDatasetIter
 

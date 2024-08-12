@@ -10,13 +10,13 @@ import torch.nn as nn
 from mammoth.utils.module_splitter import explode_model
 
 
-def build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context):
+def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_manager):
     # _check_save_model_path
     save_model_path = os.path.abspath(opts.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opts.save_model, model, model_opts, vocabs_dict, optim, opts.keep_checkpoint, device_context, opts.save_all_gpus
+        opts.save_model, model, model_opts, vocabs_dict, optim, opts.keep_checkpoint, task_queue_manager, opts.save_all_gpus
     )
     return model_saver
 
@@ -50,7 +50,7 @@ class ModelSaverBase(object):
         vocabs_dict,
         optim,
         keep_checkpoint=-1,
-        device_context=None,
+        task_queue_manager=None,
         all_gpus=False,
     ):
         self.base_path = base_path
@@ -62,8 +62,8 @@ class ModelSaverBase(object):
         self.keep_checkpoint = keep_checkpoint
         if keep_checkpoint > 0:
             self.checkpoint_queue = deque([], maxlen=keep_checkpoint)
-        assert device_context is not None
-        self.device_context = device_context
+        assert task_queue_manager is not None
+        self.task_queue_manager = task_queue_manager
         self.all_gpus = all_gpus
 
     def save(self, step, data_state, moving_average=None):
@@ -83,7 +83,7 @@ class ModelSaverBase(object):
                 model_params_data.append(param.data)
                 param.data = avg.data
 
-        chkpt_names = self._save(step, save_model, data_state, self.device_context)
+        chkpt_names = self._save(step, save_model, data_state, self.task_queue_manager)
         self.last_saved_step = step
 
         if moving_average:
@@ -96,14 +96,14 @@ class ModelSaverBase(object):
                 self._rm_checkpoint(todel)
             self.checkpoint_queue.append(chkpt_names)
 
-    def _save(self, step, save_model, data_state, device_context):
+    def _save(self, step, save_model, data_state, task_queue_manager):
         """Save a resumable checkpoint.
 
         Args:
             step (int): step number
             save_model (nn.Module): torch model to save
             data_state (dict): data streaming info
-            device_context: runtime info
+            task_queue_manager: distributed structure of modules
 
         Returns:
             (object, str):
@@ -128,60 +128,41 @@ class ModelSaverBase(object):
 class ModelSaver(ModelSaverBase):
     """Simple model saver to filesystem"""
 
-    def _save(self, step, model, data_state, device_context):
-        real_model = model.module if isinstance(model, nn.DataParallel) else model
-
-        model_state_dict = real_model.state_dict()
-
-        checkpoint = {
-            "model": model_state_dict,
-            # 'generator': generator_state_dict,
-            "vocab": self.vocabs_dict,
-            "opts": self.model_opts,
-            "optim": self.optim.state_dict(),
-            "whole_model": self.model,
-        }
+    def _save(self, step, model, data_state, task_queue_manager):
+        model = model.module if isinstance(model, nn.DataParallel) else model
+        device_context = task_queue_manager.device_context
 
         tmp_checkpoint_paths = []
 
-        if self.all_gpus:
-            # save models trained in each gpu
-            checkpoint_path = "{}_step_{}_gpu_{}.pt".format(self.base_path, step, device_context.global_rank)
-            logger.info("Saving full checkpoint {}".format(checkpoint_path))
-            torch.save(checkpoint, checkpoint_path)
-            tmp_checkpoint_paths.append(checkpoint_path)
+        module_state_dicts = explode_model(model, task_queue_manager)
 
-        modules, model_frame = explode_model(checkpoint)
-
-        for key, module in modules.items():
-            # All processes will try to save the modules present on that device
-            # Not that a race condition is possible:
-            # the process can be preempted after the check for existence, but before the save.
-            # This shouldn't be a problem, if writes are atomic.
-            checkpoint_path = f'{self.base_path}_step_{step}_{key}.pt'
-            if os.path.isfile(checkpoint_path):
-                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
-            else:
-                logger.info("Saving module checkpoint {}".format(checkpoint_path))
-                torch.save(module, checkpoint_path)
-                tmp_checkpoint_paths.append(checkpoint_path)
+        # The master device stores the frame
+        if device_context.is_master():
+            module_state_dicts['frame'] = {
+                'vocab': self.vocabs_dict,
+                'opts': self.model_opts,
+                'optim': self.optim.state_dict(),
+            }
 
         # In a distributed context, aggregate all data states for corpus restoration
         if device_context.is_distributed():
             data_states = [None for _ in range(device_context.world_size)]
             torch.distributed.all_gather_object(data_states, data_state)
             data_state = {k: v for state in data_states for k, v in state.items()}
+            if device_context.is_master():
+                module_state_dicts['frame']['data_state'] = data_state
 
-        model_frame['data_state'] = data_state
-        if device_context.is_master():
-            # TODO: not sure how to deal with model_state_dict, fields, model_opts and optim.state_dict() in a multi-gpu
-            #  setting. Is it OK to save only from master?
-
-            # model frame
-            checkpoint_path = "{}_step_{}_frame.pt".format(self.base_path, step)
-            logger.info("Saving model frame checkpoint {}".format(checkpoint_path))
-            torch.save(model_frame, checkpoint_path)
-            tmp_checkpoint_paths.append(checkpoint_path)
+        for key, state_dict in module_state_dicts.items():
+            # The state_dicts across different devices only contain one copy of each module:
+            # on the lowest ranked device having that module.
+            # There is no race condition.
+            checkpoint_path = f'{self.base_path}_step_{step}_{key}.pt'
+            if os.path.isfile(checkpoint_path):
+                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
+            else:
+                logger.info("Saving module checkpoint {}".format(checkpoint_path))
+                torch.save(state_dict, checkpoint_path)
+                tmp_checkpoint_paths.append(checkpoint_path)
 
         return tmp_checkpoint_paths
 

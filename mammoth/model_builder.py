@@ -4,7 +4,7 @@ and creates each encoder and decoder accordingly.
 """
 import torch
 import torch.nn as nn
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from functools import partial
 from pathlib import Path
 from torch.nn.init import xavier_uniform_
@@ -31,9 +31,16 @@ from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
-from mammoth.utils.module_splitter import _combine_ordered_dicts
 from mammoth.utils.parse import ArgumentParser
 from mammoth.utils.transformer_wrapper import TransformerWrapper
+
+
+def _combine_ordered_dicts(input_dicts: Dict[str, OrderedDict]) -> OrderedDict:
+    result = []
+    for prefix, input_dict in input_dicts.items():
+        for key, item in input_dict.items():
+            result.append((f'{prefix}{key}', item))
+    return OrderedDict(result)
 
 
 def uses_adapters(opts):

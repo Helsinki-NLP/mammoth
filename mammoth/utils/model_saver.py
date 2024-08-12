@@ -1,13 +1,14 @@
 import os
-from glob import glob
-from collections import deque
-from mammoth.utils.logging import logger
-
 import torch
 import torch.distributed
 import torch.nn as nn
+from collections import OrderedDict, deque
+from glob import glob
+from typing import Dict, Any, Tuple
 
-from mammoth.utils.module_splitter import explode_model
+from mammoth.distributed.tasks import LocalTaskQueueManager
+from mammoth.models import NMTModel
+from mammoth.utils.logging import logger
 
 
 def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_manager):
@@ -21,17 +22,94 @@ def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_ma
     return model_saver
 
 
-def load_checkpoint(ckpt_path):
-    """Load checkpoint from `ckpt_path` if any else return `None`."""
+def load_frame_checkpoint(ckpt_path):
+    """
+    Load only the frame checkpoint from `ckpt_path` if any else return `None`.
+
+    This function is intended to be called before the fork:
+    the model itself has not yet been constructed, so we don't want to load its parameters.
+    We need the vocabs and data loader state from the frame.
+    """
     checkpoint = None
     if ckpt_path:
         if not ckpt_path.endswith('.pt'):
             frames = glob(os.path.join(ckpt_path + '*frame*pt'))
             frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
             ckpt_path = frames[-1]
-        logger.info('Loading checkpoint from %s' % ckpt_path)
+        logger.info('Loading frame checkpoint from %s' % ckpt_path)
         checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
-    return checkpoint
+    return checkpoint, ckpt_path
+
+
+def explode_model(
+    model: NMTModel,
+    optim,
+    task_queue_manager: LocalTaskQueueManager,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """Splits the model into distributed components and retrieves the state dict of each."""
+    my_components = task_queue_manager.get_my_distributed_components()
+    my_global_rank = task_queue_manager.global_rank
+    state_dicts = OrderedDict()
+    optim_state_dicts = OrderedDict()
+    for component in my_components:
+        name = component.get_name()
+        if component.min_rank == my_global_rank:
+            # Only the lowest ranked device saves a component
+            state_dicts[name] = component.state_dict(model)
+            # The optimizer parameters are distributed the same way as the components
+            optim_state_dicts[name] = optim.suboptimizers[name].state_dict()
+    return state_dicts, optim_state_dicts
+
+
+def load_parameters_from_checkpoint(
+    frame_ckpt_path,
+    model,
+    optim,
+    task_queue_manager,
+    reset_optim=False,
+):
+    """
+    Splits the model into distributed components
+    and restores the state dict of each component from a checkpoint file.
+    """
+    if not frame_ckpt_path:
+        return
+    ckpt_prefix = frame_ckpt_path.removesuffix('_frame.pt')
+
+    my_components = task_queue_manager.get_my_distributed_components()
+    all_ok = True
+    for component in my_components:
+        name = component.get_name()
+        checkpoint_path = f'{ckpt_prefix}_{name}.pt'
+        if os.path.isfile(checkpoint_path):
+            state_dict = torch.load(checkpoint_path)
+            incompatible_keys = component.load_state_dict(model=model, state_dict=state_dict)
+            if incompatible_keys.missing_keys or incompatible_keys.unexpected_keys:
+                logger.info(f'Module {name} incompatible keys: {incompatible_keys}')
+                all_ok = False
+        else:
+            logger.warning(f'Could not find model checkpoint file {checkpoint_path}. Affected parameters are reinitialized.')
+            all_ok = False
+
+        if not reset_optim:
+            optimizer_path  = f'{ckpt_prefix}_{name}_optim.pt'
+            if os.path.isfile(optimizer_path):
+                # The optimizer parameters are distributed the same way as the components
+                optim_state_dict = torch.load(optimizer_path)
+                incompatible_keys = optim.suboptimizers[name].load_state_dict(optim_state_dict)
+                if incompatible_keys and (incompatible_keys.missing_keys or incompatible_keys.unexpected_keys):
+                    logger.info(f'Optim {name} incompatible keys: {incompatible_keys}')
+                    all_ok = False
+            else:
+                logger.warning(f'Could not find optim checkpoint file {optimizer_path}. Affected parameters are reinitialized.')
+                all_ok = False
+    if all_ok:
+        if reset_optim:
+            logger.info(f'All modules restored from checkpoint {ckpt_prefix}')
+            logger.info('Optimizer was reset')
+        else:
+            logger.info(f'All modules and optimizer restored from checkpoint {ckpt_prefix}')
+    # TODO: barf unless a flag --yes-i-messed-with-the-checkpoint is set
 
 
 class ModelSaverBase(object):
@@ -132,14 +210,14 @@ class ModelSaver(ModelSaverBase):
 
         tmp_checkpoint_paths = []
 
-        module_state_dicts = explode_model(model, task_queue_manager)
+        module_state_dicts, optim_state_dicts = explode_model(model, self.optim, task_queue_manager)
 
         # The master device stores the frame
         if device_context.is_master():
             module_state_dicts['frame'] = {
                 'vocab': self.vocabs_dict,
                 'opts': self.model_opts,
-                'optim': self.optim.state_dict(),
+                'global_training_step': self.optim.global_training_step,
             }
 
         # In a distributed context, aggregate all data states for corpus restoration
@@ -155,12 +233,16 @@ class ModelSaver(ModelSaverBase):
             # on the lowest ranked device having that module.
             # There is no race condition.
             checkpoint_path = f'{self.base_path}_step_{step}_{key}.pt'
+            optimizer_path = f'{self.base_path}_step_{step}_{key}_optim.pt'
             if os.path.isfile(checkpoint_path):
                 logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
             else:
-                logger.info("Saving module checkpoint {}".format(checkpoint_path))
+                logger.info(f'Saving module checkpoint {checkpoint_path} and optimizer {optimizer_path}')
                 torch.save(state_dict, checkpoint_path)
                 tmp_checkpoint_paths.append(checkpoint_path)
+                if key != 'frame':
+                    torch.save(optim_state_dicts[key], optimizer_path)
+                    tmp_checkpoint_paths.append(optimizer_path)
 
         return tmp_checkpoint_paths
 

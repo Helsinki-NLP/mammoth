@@ -7,7 +7,7 @@ from mammoth.model_builder import build_model
 from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.misc import set_random_seed
 from mammoth.trainer import build_trainer
-from mammoth.models import build_model_saver
+from mammoth.utils.model_saver import build_model_saver
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
@@ -127,7 +127,14 @@ def main(
     )
 
     # Build model saver
-    model_saver = build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context)
+    model_saver = build_model_saver(
+        model_opts,
+        opts,
+        model,
+        vocabs_dict,
+        optim,
+        task_queue_manager=task_queue_manager,
+    )
 
     logger.info("{} - Build trainer".format(device_context.id))
     trainer = build_trainer(

@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 from functools import partial
 from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
-# from x_transformers import TransformerWrapper
+from x_transformers import TransformerWrapper
 from x_transformers.x_transformers import TokenEmbedding
 
 from mammoth.distributed.components import (
@@ -32,7 +32,7 @@ from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
 from mammoth.utils.model_saver import load_frame_checkpoint
 from mammoth.utils.parse import ArgumentParser
-from mammoth.utils.transformer_wrapper import TransformerWrapper
+# from mammoth.utils.transformer_wrapper import TransformerWrapper
 
 
 def _combine_ordered_dicts(input_dicts: Dict[str, OrderedDict]) -> OrderedDict:

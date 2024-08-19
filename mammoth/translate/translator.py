@@ -4,30 +4,43 @@ import codecs
 import os
 import time
 import numpy as np
+import warnings
 from itertools import count, zip_longest
+from einops import rearrange
 
 import torch
 
 # from mammoth.inputters.text_dataset import InferenceDataIterator
-from mammoth.constants import ModelTask, DefaultTokens
+from mammoth.constants import DefaultTokens
 from mammoth.inputters.dataloader import build_dataloader
 from mammoth.inputters.dataset import ParallelCorpus
 from mammoth.model_builder import build_model
-from mammoth.translate.beam_search import BeamSearch, BeamSearchLM, GNMTGlobalScorer
-from mammoth.translate.greedy_search import GreedySearch, GreedySearchLM
+from mammoth.translate.beam_search import BeamSearch, GNMTGlobalScorer
+from mammoth.translate.greedy_search import GreedySearch
 from mammoth.translate.translation import TranslationBuilder
-from mammoth.utils.alignment import extract_alignment, build_align_pharaoh
-from mammoth.utils.misc import tile, set_random_seed, report_matrix, use_gpu
+from mammoth.utils.alignment import build_align_pharaoh
+from mammoth.utils.misc import set_random_seed, report_matrix, use_gpu
+from mammoth.utils.misc import tile
 from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_from_checkpoint
 from mammoth.utils.parse import ArgumentParser
+
+
+# QUI logging for batch shapes
+def quishape(name, val):
+    if val is None:
+        print(f'{name} is None')
+        return
+    if len(val.shape) >= 2:
+        print(f'{name} {val.shape}  {val.shape[0] * val.shape[1]}')
+    else:
+        print(f'{name} {val.shape}')
 
 
 def build_translator(opts, task_queue_manager, task, report_score=True, logger=None, out_file=None):
     if out_file is None:
         outdir = os.path.dirname(opts.output)
         if outdir and not os.path.isdir(outdir):
-            # FIXME use warnings instead
-            logger.info('WARNING: output file directory does not exist... creating it.')
+            warnings.warning(f'output file directory "{outdir}" does not exist... creating it.')
             os.makedirs(os.path.dirname(opts.output), exist_ok=True)
         out_file = codecs.open(opts.output, "w+", "utf-8")
 
@@ -212,7 +225,7 @@ class Inference(object):
 
         self._gpu = gpu
         self._use_cuda = gpu > -1
-        self._dev = torch.device("cuda", self._gpu) if self._use_cuda else torch.device("cpu")
+        self._device = torch.device("cuda", self._gpu) if self._use_cuda else torch.device("cpu")
 
         self.n_best = n_best
         self.max_length = max_length
@@ -344,24 +357,22 @@ class Inference(object):
 
     def _gold_score(
         self,
+        active_decoder,
         batch,
-        memory_bank,
-        src_lengths,
+        encoder_output,
+        src_mask,
         src_vocabs,
-        use_src_map,
-        enc_states,
         batch_size,
-        src,
     ):
         if batch.tgt is not None:
             gs = self._score_target(
+                active_decoder,
                 batch,
-                memory_bank,
-                src_lengths,
+                encoder_output,
+                src_mask,
                 src_vocabs,
-                batch.src_map if use_src_map else None,
+                batch_size,
             )
-            self.model.decoder.init_state(src, memory_bank, enc_states)
         else:
             gs = [0] * batch_size
         return gs
@@ -504,7 +515,7 @@ class Inference(object):
             # batch_size=batch_size,
             # batch_type=batch_type,
             task=self.task,
-        ).to(self._dev)
+        ).to(self._device)
 
         batches = build_dataloader(
             corpus,
@@ -519,7 +530,7 @@ class Inference(object):
 
         # data_iter = inputters.OrderedIterator(
         #     dataset=data,
-        #     device=self._dev,
+        #     device=self._device,
         #     batch_size=batch_size,
         #     batch_size_fn=max_tok_len if batch_type == "tokens" else None,
         #     train=False,
@@ -709,7 +720,14 @@ class Inference(object):
         """Translate a batch of sentences."""
         raise NotImplementedError
 
-    def _score_target(self, batch, memory_bank, src_lengths, src_vocabs, src_map):
+    def _score_target(
+        self,
+        batch,
+        encoder_output,
+        src_mask,
+        src_vocabs,
+        batch_size,
+    ):
         raise NotImplementedError
 
     def report_results(
@@ -718,9 +736,8 @@ class Inference(object):
         batch,
         batch_size,
         src,
-        src_lengths,
+        src_mask,
         src_vocabs,
-        use_src_map,
         decode_strategy,
     ):
         results = {
@@ -734,56 +751,10 @@ class Inference(object):
         results["scores"] = decode_strategy.scores
         results["predictions"] = decode_strategy.predictions
         results["attention"] = decode_strategy.attention
-        if self.report_align:
-            results["alignment"] = self._align_forward(batch, decode_strategy.predictions)
-        else:
-            results["alignment"] = [[] for _ in range(batch_size)]
         return results
 
 
 class Translator(Inference):
-
-    def _align_forward(self, batch, predictions):
-        """
-        For a batch of input and its prediction, return a list of batch predict
-        alignment src indice Tensor in size ``(batch, n_best,)``.
-        """
-        # (0) add BOS and padding to tgt prediction
-        batch_tgt_idxs = self._align_pad_prediction(predictions, bos=self._tgt_bos_idx, pad=self._tgt_pad_idx)
-        tgt_mask = (
-            batch_tgt_idxs.eq(self._tgt_pad_idx)
-            | batch_tgt_idxs.eq(self._tgt_eos_idx)
-            | batch_tgt_idxs.eq(self._tgt_bos_idx)
-        )
-
-        n_best = batch_tgt_idxs.size(1)
-        # (1) Encoder forward.
-        src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
-
-        # (2) Repeat src objects `n_best` times.
-        # We use batch_size x n_best, get ``(src_len, batch * n_best, nfeat)``
-        src = tile(src, n_best, dim=1)
-        enc_states = tile(enc_states, n_best, dim=1)
-        if isinstance(memory_bank, tuple):
-            memory_bank = tuple(tile(x, n_best, dim=1) for x in memory_bank)
-        else:
-            memory_bank = tile(memory_bank, n_best, dim=1)
-        src_lengths = tile(src_lengths, n_best)  # ``(batch * n_best,)``
-
-        # (3) Init decoder with n_best src,
-        self.model.decoder.init_state(src, memory_bank, enc_states)
-        # reshape tgt to ``(len, batch * n_best, nfeat)``
-        tgt = batch_tgt_idxs.view(-1, batch_tgt_idxs.size(-1)).T.unsqueeze(-1)
-        dec_in = tgt[:-1]  # exclude last target from inputs
-        _, attns = self.model.decoder(dec_in, memory_bank, memory_lengths=src_lengths, with_align=True)
-
-        alignment_attn = attns["align"]  # ``(B, tgt_len-1, src_len)``
-        # masked_select
-        align_tgt_mask = tgt_mask.view(-1, tgt_mask.size(-1))
-        prediction_mask = align_tgt_mask[:, 1:]  # exclude bos to match pred
-        # get aligned src id for each prediction's valid tgt tokens
-        alignement = extract_alignment(alignment_attn, prediction_mask, src_lengths, n_best)
-        return alignement
 
     def translate_batch(self, batch, src_vocabs, attn_debug):
         """Translate a batch of sentences."""
@@ -806,6 +777,7 @@ class Translator(Inference):
                     keep_topp=self.sample_from_topp,
                     beam_size=self.beam_size,
                     ban_unk_token=self.ban_unk_token,
+                    device=self._device,
                 )
             else:
                 # TODO: support these blacklisted features
@@ -827,22 +799,29 @@ class Translator(Inference):
                     stepwise_penalty=self.stepwise_penalty,
                     ratio=self.ratio,
                     ban_unk_token=self.ban_unk_token,
+                    device=self._device,
                 )
             return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
 
-    def _run_encoder(self, batch):
-        src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-
-        enc_states, memory_bank, src_lengths, mask = self.model.encoder(
-            src, src_lengths
+    def _run_encoder(self, active_encoder, batch):
+        src = rearrange(batch.src.tensor, 't b 1 -> b t')
+        src_mask = rearrange(batch.src.mask, 't b -> b t')
+        quishape('src in _run_encoder', src)
+        quishape('src_mask in _run_encoder', src_mask)
+        encoder_output = active_encoder(
+            x=src,
+            mask=src_mask,
+            return_embeddings=True,
         )
+        quishape('encoder_output in _run_encoder', encoder_output)
 
-        memory_bank, alphas = self.model.attention_bridge(memory_bank, mask)
+        encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
+        quishape('encoder_output after AB', encoder_output)
+        if self.model.attention_bridge.is_fixed_length:
+            # turn off masking in the transformer decoder
+            src_mask = None
 
-        if src_lengths is None or self.model.attention_bridge.is_fixed_length:
-            assert not isinstance(memory_bank, tuple), "Ensemble decoding only supported for text data"
-            src_lengths = torch.Tensor(batch.batch_size).type_as(memory_bank).long().fill_(memory_bank.size(0))
-        return src, enc_states, memory_bank, src_lengths
+        return encoder_output, src_mask
 
     def _translate_batch_with_strategy(self, batch, src_vocabs, decode_strategy):
         """Translate a batch of sentences step by step using cache.
@@ -857,337 +836,115 @@ class Translator(Inference):
             results (dict): The translation results.
         """
         # (0) Prep the components of the search.
-        use_src_map = False
-        parallel_paths = decode_strategy.parallel_paths  # beam_size
         batch_size = batch.batch_size
 
-        # (0.5) Activate adapters
-        # FIXME: translation is broken, fix is WIP
+        # (1) Activate the correct pluggable embeddings and modules
         metadata = self.task.get_serializable_metadata()
-        self.model.encoder.activate(metadata)
-        self.model.decoder.activate(metadata)
-
-        # (1) Run the encoder on the src.
-        src, enc_states, memory_bank, src_lengths = self._run_encoder(batch)
-        self.model.decoder.init_state(src, memory_bank, enc_states)
-
-        gold_score = self._gold_score(
-            batch,
-            memory_bank,
-            src_lengths,
-            src_vocabs,
-            use_src_map,
-            enc_states,
-            batch_size,
-            src,
+        active_encoder = self.model.encoder.activate(
+            task_id=metadata.corpus_id,
+            adapter_ids=metadata.encoder_adapter_ids,
+        )
+        active_decoder = self.model.decoder.activate(
+            task_id=metadata.corpus_id,
+            adapter_ids=metadata.decoder_adapter_ids,
         )
 
-        # (2) prep decode_strategy. Possibly repeat src objects.
-        src_map = batch.src_map if use_src_map else None
-        target_prefix = batch.tgt if self.tgt_prefix else None
-        (
-            fn_map_state,
-            memory_bank,
-            memory_lengths,
-            src_map,
-        ) = decode_strategy.initialize(memory_bank, src_lengths, src_map, target_prefix=target_prefix)
-        if fn_map_state is not None:
-            self.model.decoder.map_state(fn_map_state)
+        quishape('batch.src.tensor', batch.src.tensor)
+        quishape('batch.src.mask', batch.src.mask)
 
-        # (3) Begin decoding step by step:
+        # (2) Run the encoder on the src
+        encoder_output, src_mask = self._run_encoder(active_encoder, batch)
+        quishape('src_mask', src_mask)
+
+        # (3) Decode and score the gold targets
+        gold_score = self._gold_score(
+            active_decoder,
+            batch,
+            encoder_output,
+            src_mask,
+            src_vocabs,
+            batch_size,
+        )
+
+        # (4) prep decode_strategy
+        # TODO: produce an optional target prefix
+        # file contents or empty string -> transforms -> numericalize -> *left* pad (align right edge)
+        # unfortunately AttentionLayers takes a seq_start_pos and constructs the mask, instead of taking a mask
+        target_prefix = None
+        seq_start_pos = None
+        decode_strategy.initialize(target_prefix=target_prefix)
+
+        # (5) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
-            decoder_input = decode_strategy.current_predictions.view(1, -1, 1)
+            quishape('alive_seq', decode_strategy.alive_seq)
+            decoder_input = decode_strategy.alive_seq
+            encoder_output_tiled = tile(encoder_output, decode_strategy.parallel_paths, dim=0)
+            src_mask_tiled = tile(src_mask, decode_strategy.parallel_paths, dim=0)
+            quishape('decoder_input', decoder_input)
+            quishape('encoder_output', encoder_output)
+            quishape('encoder_output_tiled', encoder_output_tiled)
+            quishape('src_mask_tiled', src_mask_tiled)
 
-            log_probs, attn = self._decode_and_generate(
+            logits, new_cache = active_decoder(
                 decoder_input,
-                memory_bank,
-                batch,
-                src_vocabs,
-                memory_lengths=memory_lengths,
-                src_map=src_map,
-                step=step,
-                batch_offset=decode_strategy.batch_offset,
+                context=encoder_output_tiled,
+                context_mask=src_mask_tiled,
+                return_attn=False,
+                return_embeddings=False,
+                return_intermediates=True,
+                cache=decode_strategy.cache,
+                seq_start_pos=seq_start_pos,
             )
+            quishape('logits', logits)
+            print('new_cache len', len(new_cache))
+            # new_cache is a list of LayerIntermediates objects, one for each layer_stack
 
-            decode_strategy.advance(log_probs, attn)
+            if active_decoder.can_cache_kv:
+                decode_strategy.set_cache(new_cache)
+
+            logits = logits[:, -1]
+
+            decode_strategy.advance(logits, new_cache)
             any_finished = decode_strategy.is_finished.any()
             if any_finished:
                 decode_strategy.update_finished()
                 if decode_strategy.done:
                     break
 
-            select_indices = decode_strategy.select_indices
-
-            if any_finished:
-                # Reorder states.
-                if isinstance(memory_bank, tuple):
-                    memory_bank = tuple(x.index_select(1, select_indices) for x in memory_bank)
-                else:
-                    memory_bank = memory_bank.index_select(1, select_indices)
-
-                memory_lengths = memory_lengths.index_select(0, select_indices)
-
-                if src_map is not None:
-                    src_map = src_map.index_select(1, select_indices)
-
-            if parallel_paths > 1 or any_finished:
-                self.model.decoder.map_state(
-                    lambda state, dim: state.index_select(dim, select_indices)
-                )
-
         return self.report_results(
             gold_score,
             batch,
             batch_size,
-            src,
-            src_lengths,
+            batch.src,
+            src_mask,
             src_vocabs,
-            use_src_map,
             decode_strategy,
         )
 
-    def _score_target(self, batch, memory_bank, src_lengths, src_vocabs, src_map):
-        tgt = batch.tgt
-        tgt_in = tgt[:-1]
+    def _score_target(
+        self,
+        active_decoder,
+        batch,
+        encoder_output,
+        src_mask,
+        src_vocabs,
+        batch_size,
+    ):
+        tgt = batch.tgt.tensor
+        decoder_input = tgt[:-1]
 
-        log_probs, attn = self._decode_and_generate(
-            tgt_in,
-            memory_bank,
-            batch,
-            src_vocabs,
-            memory_lengths=src_lengths,
-            src_map=src_map,
+        logits, decoder_output = active_decoder(
+            decoder_input,
+            context=encoder_output,
+            context_mask=src_mask,
+            return_attn=False,
+            return_logits_and_embeddings=True,
         )
+        log_probs = torch.log_softmax(logits, dim=-1)
 
         log_probs[:, :, self._tgt_pad_idx] = 0
         gold = tgt[1:]
         gold_scores = log_probs.gather(2, gold)
-        gold_scores = gold_scores.sum(dim=0).view(-1)
-
-        return gold_scores
-
-
-# TODO remove
-class GeneratorLM(Inference):
-    @classmethod
-    def validate_task(cls, task):
-        if task != ModelTask.LANGUAGE_MODEL:
-            raise ValueError(
-                f"GeneratorLM does not support task {task}. Tasks supported: {ModelTask.LANGUAGE_MODEL}"
-            )
-
-    def _align_forward(self, batch, predictions):
-        """
-        For a batch of input and its prediction, return a list of batch predict
-        alignment src indice Tensor in size ``(batch, n_best,)``.
-        """
-        raise NotImplementedError
-
-    def translate(
-        self,
-        src,
-        src_feats={},
-        tgt=None,
-        batch_size=None,
-        batch_type="sents",
-        attn_debug=False,
-        align_debug=False,
-        phrase_table="",
-    ):
-        if batch_size != 1:
-            warning_msg = (
-                "GeneratorLM does not support batch_size != 1"
-                " nicely. You can remove this limitation here."
-                " With batch_size > 1 the end of each input is"
-                " repeated until the input is finished. Then"
-                " generation will start."
-            )
-            if self.logger:
-                self.logger.info(warning_msg)
-            else:
-                os.write(1, warning_msg.encode("utf-8"))
-
-        return super(GeneratorLM, self).translate(
-            src,
-            src_feats,
-            tgt,
-            batch_size=1,
-            batch_type=batch_type,
-            attn_debug=attn_debug,
-            align_debug=align_debug,
-            phrase_table=phrase_table,
-        )
-
-    def translate_batch(self, batch, src_vocabs, attn_debug):
-        """Translate a batch of sentences."""
-        with torch.no_grad():
-            if self.sample_from_topk != 0 or self.sample_from_topp != 0:
-                decode_strategy = GreedySearchLM(
-                    pad=self._tgt_pad_idx,
-                    bos=self._tgt_bos_idx,
-                    eos=self._tgt_eos_idx,
-                    unk=self._tgt_unk_idx,
-                    batch_size=batch.batch_size,
-                    global_scorer=self.global_scorer,
-                    min_length=self.min_length,
-                    max_length=self.max_length,
-                    block_ngram_repeat=self.block_ngram_repeat,
-                    exclusion_tokens=self._exclusion_idxs,
-                    return_attention=attn_debug or self.replace_unk,
-                    sampling_temp=self.random_sampling_temp,
-                    keep_topk=self.sample_from_topk,
-                    keep_topp=self.sample_from_topp,
-                    beam_size=self.beam_size,
-                    ban_unk_token=self.ban_unk_token,
-                )
-            else:
-                # TODO: support these blacklisted features
-                assert not self.dump_beam
-                decode_strategy = BeamSearchLM(
-                    self.beam_size,
-                    batch_size=batch.batch_size,
-                    pad=self._tgt_pad_idx,
-                    bos=self._tgt_bos_idx,
-                    eos=self._tgt_eos_idx,
-                    unk=self._tgt_unk_idx,
-                    n_best=self.n_best,
-                    global_scorer=self.global_scorer,
-                    min_length=self.min_length,
-                    max_length=self.max_length,
-                    return_attention=attn_debug or self.replace_unk,
-                    block_ngram_repeat=self.block_ngram_repeat,
-                    exclusion_tokens=self._exclusion_idxs,
-                    stepwise_penalty=self.stepwise_penalty,
-                    ratio=self.ratio,
-                    ban_unk_token=self.ban_unk_token,
-                )
-            return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
-
-    @classmethod
-    def split_src_to_prevent_padding(cls, src, src_lengths):
-        min_len_batch = torch.min(src_lengths).item()
-        target_prefix = None
-        if min_len_batch > 0 and min_len_batch < src.size(0):
-            target_prefix = src[min_len_batch:]
-            src = src[:min_len_batch]
-            src_lengths[:] = min_len_batch
-        return src, src_lengths, target_prefix
-
-    def tile_to_beam_size_after_initial_step(self, fn_map_state, log_probs):
-        if fn_map_state is not None:
-            log_probs = fn_map_state(log_probs, dim=1)
-            self.model.decoder.map_state(fn_map_state)
-            log_probs = log_probs[-1]
-        return log_probs
-
-    def _translate_batch_with_strategy(self, batch, src_vocabs, decode_strategy):
-        """Translate a batch of sentences step by step using cache.
-
-        Args:
-            batch: a batch of sentences, yield by data iterator.
-            src_vocabs (list): list of torchtext.data.Vocab if can_copy.
-            decode_strategy (DecodeStrategy): A decode strategy to use for
-                generate translation step by step.
-
-        Returns:
-            results (dict): The translation results.
-        """
-        # (0) Prep the components of the search.
-        use_src_map = False
-        parallel_paths = decode_strategy.parallel_paths  # beam_size
-        batch_size = batch.batch_size
-
-        # (1) split src into src and target_prefix to avoid padding.
-        src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-
-        src, src_lengths, target_prefix = self.split_src_to_prevent_padding(src, src_lengths)
-
-        # (2) init decoder
-        self.model.decoder.init_state(src, None, None)
-        gold_score = self._gold_score(
-            batch,
-            None,
-            src_lengths,
-            src_vocabs,
-            use_src_map,
-            None,
-            batch_size,
-            src,
-        )
-
-        # (3) prep decode_strategy. Possibly repeat src objects.
-        src_map = batch.src_map if use_src_map else None
-        (fn_map_state, src, memory_lengths, src_map,) = decode_strategy.initialize(
-            src,
-            src_lengths,
-            src_map,
-            target_prefix=target_prefix,
-        )
-
-        # (4) Begin decoding step by step:
-        for step in range(decode_strategy.max_length):
-            decoder_input = src if step == 0 else decode_strategy.current_predictions.view(1, -1, 1)
-
-            log_probs, attn = self._decode_and_generate(
-                decoder_input,
-                None,
-                batch,
-                src_vocabs,
-                memory_lengths=memory_lengths.clone(),
-                src_map=src_map,
-                step=step if step == 0 else step + src_lengths[0].item(),
-                batch_offset=decode_strategy.batch_offset,
-            )
-
-            if step == 0:
-                log_probs = self.tile_to_beam_size_after_initial_step(fn_map_state, log_probs)
-
-            decode_strategy.advance(log_probs, attn)
-            any_finished = decode_strategy.is_finished.any()
-            if any_finished:
-                decode_strategy.update_finished()
-                if decode_strategy.done:
-                    break
-
-            select_indices = decode_strategy.select_indices
-            memory_lengths += 1
-            if any_finished:
-                # Reorder states.
-                memory_lengths = memory_lengths.index_select(0, select_indices)
-
-                if src_map is not None:
-                    src_map = src_map.index_select(1, select_indices)
-
-            if parallel_paths > 1 or any_finished:
-                # select indexes in model state/cache
-                self.model.decoder.map_state(lambda state, dim: state.index_select(dim, select_indices))
-
-        return self.report_results(
-            gold_score,
-            batch,
-            batch_size,
-            src,
-            src_lengths,
-            src_vocabs,
-            use_src_map,
-            decode_strategy,
-        )
-
-    def _score_target(self, batch, memory_bank, src_lengths, src_vocabs, src_map):
-        tgt = batch.tgt
-        src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-
-        log_probs, attn = self._decode_and_generate(
-            src,
-            None,
-            batch,
-            src_vocabs,
-            memory_lengths=src_lengths,
-            src_map=src_map,
-        )
-
-        log_probs[:, :, self._tgt_pad_idx] = 0
-        gold_scores = log_probs.gather(2, tgt)
         gold_scores = gold_scores.sum(dim=0).view(-1)
 
         return gold_scores

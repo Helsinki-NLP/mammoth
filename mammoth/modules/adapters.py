@@ -45,7 +45,7 @@ class FeedForwardAdapterLayer(nn.Module):
             self.residual,
         ])
 
-    def apply(tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts):
+    def apply(self, tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts):
         # FeedForwards are injected after the base ff
         tmp_layer_types.append('f')
         tmp_layer_structs.append(self.as_layer_struct())
@@ -75,7 +75,7 @@ class LoraAdapterLayer(nn.Module):
     def is_wrapper(self):
         return True
 
-    def apply(tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts):
+    def apply(self, tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts):
         # LoraAdapterLayer wraps the existing feedforward. No norms are added.
         tmp_layer_structs[0][1] = self.wrap(tmp_layer_structs[0][1])
         return tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts

@@ -1,5 +1,6 @@
 from torch import nn
 from typing import List, Sequence, Optional, Tuple
+from x_transformers.x_transformers import LayerIntermediates
 
 from mammoth.modules.adapters import AdaptedAttentionLayers
 
@@ -16,14 +17,18 @@ class AdaptedAttentionLayersStack(nn.Module):
         assert len(set(attention_layers.dim for attention_layers in attention_layers_stack)) == 1, \
             'All AdaptedAttentionLayers must have the same dimension'
 
-    def forward(self, x, return_hiddens=False, **kwargs):
+    def forward(self, x, return_hiddens=False, cache: Optional[List[LayerIntermediates]] = None, **kwargs):
         all_intermediates = []
-        for attention_layers in self.attention_layers_stack:
+        for i, attention_layers in enumerate(self.attention_layers_stack):
+            if cache:
+                cache_i = cache[i]
+            else:
+                cache_i = None
             if return_hiddens:
-                x, intermediates = attention_layers.forward(x, return_hiddens=True, **kwargs)
+                x, intermediates = attention_layers.forward(x, return_hiddens=True, cache=cache_i, **kwargs)
                 all_intermediates.append(intermediates)
             else:
-                x = attention_layers.forward(x, return_hiddens=False, **kwargs)
+                x = attention_layers.forward(x, return_hiddens=False, cache=cache_i, **kwargs)
         if return_hiddens:
             return x, all_intermediates
         else:

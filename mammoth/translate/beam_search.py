@@ -73,21 +73,23 @@ class BeamSearchBase(DecodeStrategy):
         stepwise_penalty,
         ratio,
         ban_unk_token,
+        device,
     ):
         super(BeamSearchBase, self).__init__(
-            pad,
-            bos,
-            eos,
-            unk,
-            batch_size,
-            beam_size,
-            global_scorer,
-            min_length,
-            block_ngram_repeat,
-            exclusion_tokens,
-            return_attention,
-            max_length,
-            ban_unk_token,
+            pad=pad,
+            bos=bos,
+            eos=eos,
+            unk=unk,
+            batch_size=batch_size,
+            parallel_paths=beam_size,
+            global_scorer=global_scorer,
+            min_length=min_length,
+            block_ngram_repeat=block_ngram_repeat,
+            exclusion_tokens=exclusion_tokens,
+            return_attention=return_attention,
+            max_length=max_length,
+            ban_unk_token=ban_unk_token,
+            device=device,
         )
         # beam parameters
         self.beam_size = beam_size
@@ -109,31 +111,27 @@ class BeamSearchBase(DecodeStrategy):
         self._prev_penalty = None
         self._coverage = None
 
-        self._stepwise_cov_pen = stepwise_penalty and self.global_scorer.has_cov_pen
-        self._vanilla_cov_pen = not stepwise_penalty and self.global_scorer.has_cov_pen
-        self._cov_pen = self.global_scorer.has_cov_pen
-
         self.memory_lengths = None
 
     def initialize(self, *args, **kwargs):
         raise NotImplementedError
 
-    def initialize_(self, memory_bank, memory_lengths, src_map, device, target_prefix):
-        super(BeamSearchBase, self).initialize(memory_bank, memory_lengths, src_map, device, target_prefix)
+    def initialize_(self, target_prefix):
+        super(BeamSearchBase, self).initialize(target_prefix)
 
-        self.best_scores = torch.full([self.batch_size], -1e10, dtype=torch.float, device=device)
+        self.best_scores = torch.full([self.batch_size], -1e10, dtype=torch.float, device=self.device)
         self._beam_offset = torch.arange(
-            0, self.batch_size * self.beam_size, step=self.beam_size, dtype=torch.long, device=device
+            0, self.batch_size * self.beam_size, step=self.beam_size, dtype=torch.long, device=self.device
         )
         self.topk_log_probs = (
-            torch.tensor([0.0] + [float("-inf")] * (self.beam_size - 1), device=device)
+            torch.tensor([0.0] + [float("-inf")] * (self.beam_size - 1), device=self.device)
             .repeat(self.batch_size)
             .reshape(self.batch_size, self.beam_size)
         )
         # buffers for the topk scores and 'backpointer'
-        self.topk_scores = torch.empty((self.batch_size, self.beam_size), dtype=torch.float, device=device)
-        self.topk_ids = torch.empty((self.batch_size, self.beam_size), dtype=torch.long, device=device)
-        self._batch_index = torch.empty([self.batch_size, self.beam_size], dtype=torch.long, device=device)
+        self.topk_scores = torch.empty((self.batch_size, self.beam_size), dtype=torch.float, device=self.device)
+        self.topk_ids = torch.empty((self.batch_size, self.beam_size), dtype=torch.long, device=self.device)
+        self._batch_index = torch.empty([self.batch_size, self.beam_size], dtype=torch.long, device=self.device)
 
     @property
     def current_predictions(self):
@@ -246,26 +244,13 @@ class BeamSearchBase(DecodeStrategy):
             self.alive_attn = attention.index_select(1, non_finished).view(
                 step - 1, _B_new * self.beam_size, inp_seq_len
             )
-            if self._cov_pen:
-                self._coverage = (
-                    self._coverage.view(1, _B_old, self.beam_size, inp_seq_len)
-                    .index_select(1, non_finished)
-                    .view(1, _B_new * self.beam_size, inp_seq_len)
-                )
-                if self._stepwise_cov_pen:
-                    self._prev_penalty = self._prev_penalty.index_select(0, non_finished)
 
-    def advance(self, log_probs, attn):
+    def advance(self, logits, new_cache):
+        log_probs = torch.log_softmax(logits, dim=-1)
         vocab_size = log_probs.size(-1)
 
         # using integer division to get an integer _B without casting
         _B = log_probs.shape[0] // self.beam_size
-
-        if self._stepwise_cov_pen and self._prev_penalty is not None:
-            self.topk_log_probs += self._prev_penalty
-            self.topk_log_probs -= self.global_scorer.cov_penalty(self._coverage + attn, self.global_scorer.beta).view(
-                _B, self.beam_size
-            )
 
         # force the output to be longer than self.min_length
         step = len(self)
@@ -305,30 +290,6 @@ class BeamSearchBase(DecodeStrategy):
 
         self.maybe_update_forbidden_tokens()
 
-        if self.return_attention or self._cov_pen:
-            current_attn = attn.index_select(1, self.select_indices)
-            if step == 1:
-                self.alive_attn = current_attn
-                # update global state (step == 1)
-                if self._cov_pen:  # coverage penalty
-                    self._prev_penalty = torch.zeros_like(self.topk_log_probs)
-                    self._coverage = current_attn
-            else:
-                self.alive_attn = self.alive_attn.index_select(1, self.select_indices)
-                self.alive_attn = torch.cat([self.alive_attn, current_attn], 0)
-                # update global state (step > 1)
-                if self._cov_pen:
-                    self._coverage = self._coverage.index_select(1, self.select_indices)
-                    self._coverage += current_attn
-                    self._prev_penalty = self.global_scorer.cov_penalty(
-                        self._coverage, beta=self.global_scorer.beta
-                    ).view(_B, self.beam_size)
-
-        if self._vanilla_cov_pen:
-            # shape: (batch_size x beam_size, 1)
-            cov_penalty = self.global_scorer.cov_penalty(self._coverage, beta=self.global_scorer.beta)
-            self.topk_scores -= cov_penalty.view(_B, self.beam_size).float()
-
         self.is_finished = self.topk_ids.eq(self.eos)
         self.ensure_max_length()
 
@@ -338,57 +299,10 @@ class BeamSearch(BeamSearchBase):
     Beam search for seq2seq/encoder-decoder models
     """
 
-    def initialize(self, memory_bank, src_lengths, src_map=None, device=None, target_prefix=None):
+    def initialize(self, target_prefix=None):
         """Initialize for decoding.
-        Repeat src objects `beam_size` times.
         """
-
-        (fn_map_state, memory_bank, src_map, target_prefix) = self.initialize_tile(
-            memory_bank, src_lengths, src_map, target_prefix
-        )
-        if device is None:
-            device = self.get_device_from_memory_bank(memory_bank)
-
-        super(BeamSearch, self).initialize_(memory_bank, self.memory_lengths, src_map, device, target_prefix)
-
-        return fn_map_state, memory_bank, self.memory_lengths, src_map
-
-
-class BeamSearchLM(BeamSearchBase):
-    """
-    Beam search for language/decoder only models
-    """
-
-    def initialize(self, src, src_lengths, src_map=None, device=None, target_prefix=None):
-        """Initialize for decoding.
-        Repeat src objects `beam_size` times.
-        """
-        (fn_map_state, _, src_map, target_prefix) = self.initialize_tile(None, src_lengths, src_map, target_prefix)
-        if device is None:
-            device = src.device
-
-        super(BeamSearchLM, self).initialize_(
-            None, self.memory_lengths, src_map=src_map, device=device, target_prefix=target_prefix
-        )
-
-        return fn_map_state, src, self.memory_lengths, src_map
-
-    def advance(self, log_probs, attn):
-        super(BeamSearchLM, self).advance(log_probs, attn)
-
-        # in LM task memory_lengths is associated with currently generated src
-        # and therefore needs to follow the generation
-        self.memory_lengths += 1
-
-    def remove_finished_batches(self, _B_new, _B_old, non_finished, predictions, attention, step):
-        super(BeamSearchLM, self).remove_finished_batches(_B_new, _B_old, non_finished, predictions, attention, step)
-
-        # in LM task memory_lengths is associated with currently generated src
-        # and therefore needs to follow the generation
-        non_finished = non_finished.to(self.topk_ids.device)
-        self.memory_lengths = (
-            self.memory_lengths.view(_B_old, self.beam_size).index_select(0, non_finished).view(_B_new * self.beam_size)
-        )
+        super(BeamSearch, self).initialize_(target_prefix)
 
 
 class GNMTGlobalScorer(object):

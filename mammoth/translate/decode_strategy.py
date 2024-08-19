@@ -1,5 +1,8 @@
 import torch
 from copy import deepcopy
+from typing import Optional, List
+
+from x_transformers.x_transformers import LayerIntermediates
 
 from mammoth.utils.misc import tile
 
@@ -78,6 +81,7 @@ class DecodeStrategy(object):
         return_attention,
         max_length,
         ban_unk_token,
+        device,
     ):
 
         # magic indices
@@ -108,45 +112,21 @@ class DecodeStrategy(object):
 
         self.exclusion_tokens = exclusion_tokens
         self.return_attention = return_attention
+        self.device = device
 
         self.done = False
+        self.cache: Optional[List[LayerIntermediates]] = None
 
-    def get_device_from_memory_bank(self, memory_bank):
-        if isinstance(memory_bank, tuple):
-            mb_device = memory_bank[0].device
-        else:
-            mb_device = memory_bank.device
-        return mb_device
-
-    def initialize_tile(self, memory_bank, src_lengths, src_map=None, target_prefix=None):
-        def fn_map_state(state, dim):
-            return tile(state, self.beam_size, dim=dim)
-
-        if isinstance(memory_bank, tuple):
-            memory_bank = tuple(tile(x, self.beam_size, dim=1) for x in memory_bank)
-        elif memory_bank is not None:
-            memory_bank = tile(memory_bank, self.beam_size, dim=1)
-        if src_map is not None:
-            src_map = tile(src_map, self.beam_size, dim=1)
-
-        self.memory_lengths = tile(src_lengths, self.beam_size)
-        if target_prefix is not None:
-            target_prefix = tile(target_prefix, self.beam_size, dim=1)
-
-        return fn_map_state, memory_bank, src_map, target_prefix
-
-    def initialize(self, memory_bank, src_lengths, src_map=None, device=None, target_prefix=None):
+    def initialize(self, target_prefix=None):
         """DecodeStrategy subclasses should override :func:`initialize()`.
 
         `initialize` should be called before all actions.
         used to prepare necessary ingredients for decode.
         """
-        if device is None:
-            device = torch.device('cpu')
         self.alive_seq = torch.full(
-            [self.batch_size * self.parallel_paths, 1], self.bos, dtype=torch.long, device=device
+            [self.batch_size * self.parallel_paths, 1], self.bos, dtype=torch.long, device=self.device
         )
-        self.is_finished = torch.zeros([self.batch_size, self.parallel_paths], dtype=torch.uint8, device=device)
+        self.is_finished = torch.zeros([self.batch_size, self.parallel_paths], dtype=torch.uint8, device=self.device)
         if target_prefix is not None:
             seq_len, batch_size, n_feats = target_prefix.size()
             assert (
@@ -161,7 +141,9 @@ class DecodeStrategy(object):
             self.min_length += min(prefix_non_pad) - 1
 
         self.target_prefix = target_prefix  # NOTE: forced prefix words
-        return None, memory_bank, src_lengths, src_map
+
+    def set_cache(self, cache):
+        self.cache = cache
 
     def __len__(self):
         return self.alive_seq.shape[1]
@@ -293,7 +275,7 @@ class DecodeStrategy(object):
             return
         self.target_prefix = self.target_prefix.index_select(0, select_index)
 
-    def advance(self, log_probs, attn):
+    def advance(self, logits, new_cache):
         """DecodeStrategy subclasses should override :func:`advance()`.
 
         Advance is used to update ``self.alive_seq``, ``self.is_finished``,

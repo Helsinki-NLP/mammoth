@@ -32,12 +32,13 @@ def split_corpus(path, shard_size, default=None):
 
 def _split_corpus(path, shard_size):
     """Yield io's with `shard_size` lines each."""
+    # FIXME: this is a horrible, ugly kludge
     with open(path, "rt") as f:
         if shard_size <= 0:
             yield f
         else:
             while True:
-                shard = "\n".join(islice(f, shard_size))
+                shard = "".join(islice(f, shard_size))
                 if not shard:
                     break
                 yield StringIO(shard)

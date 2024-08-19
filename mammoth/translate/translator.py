@@ -515,6 +515,8 @@ class Inference(object):
             # batch_size=batch_size,
             # batch_type=batch_type,
             task=self.task,
+            stride=1,
+            offset=0,
         ).to(self._device)
 
         batches = build_dataloader(
@@ -806,17 +808,17 @@ class Translator(Inference):
     def _run_encoder(self, active_encoder, batch):
         src = rearrange(batch.src.tensor, 't b 1 -> b t')
         src_mask = rearrange(batch.src.mask, 't b -> b t')
-        quishape('src in _run_encoder', src)
-        quishape('src_mask in _run_encoder', src_mask)
+        # quishape('src in _run_encoder', src)
+        # quishape('src_mask in _run_encoder', src_mask)
         encoder_output = active_encoder(
             x=src,
             mask=src_mask,
             return_embeddings=True,
         )
-        quishape('encoder_output in _run_encoder', encoder_output)
+        # quishape('encoder_output in _run_encoder', encoder_output)
 
         encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
-        quishape('encoder_output after AB', encoder_output)
+        # quishape('encoder_output after AB', encoder_output)
         if self.model.attention_bridge.is_fixed_length:
             # turn off masking in the transformer decoder
             src_mask = None
@@ -849,12 +851,12 @@ class Translator(Inference):
             adapter_ids=metadata.decoder_adapter_ids,
         )
 
-        quishape('batch.src.tensor', batch.src.tensor)
-        quishape('batch.src.mask', batch.src.mask)
+        # quishape('batch.src.tensor', batch.src.tensor)
+        # quishape('batch.src.mask', batch.src.mask)
 
         # (2) Run the encoder on the src
         encoder_output, src_mask = self._run_encoder(active_encoder, batch)
-        quishape('src_mask', src_mask)
+        # quishape('src_mask', src_mask)
 
         # (3) Decode and score the gold targets
         gold_score = self._gold_score(
@@ -876,14 +878,14 @@ class Translator(Inference):
 
         # (5) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
-            quishape('alive_seq', decode_strategy.alive_seq)
+            # quishape('alive_seq', decode_strategy.alive_seq)
             decoder_input = decode_strategy.alive_seq
             encoder_output_tiled = tile(encoder_output, decode_strategy.parallel_paths, dim=0)
             src_mask_tiled = tile(src_mask, decode_strategy.parallel_paths, dim=0)
-            quishape('decoder_input', decoder_input)
-            quishape('encoder_output', encoder_output)
-            quishape('encoder_output_tiled', encoder_output_tiled)
-            quishape('src_mask_tiled', src_mask_tiled)
+            # quishape('decoder_input', decoder_input)
+            # quishape('encoder_output', encoder_output)
+            # quishape('encoder_output_tiled', encoder_output_tiled)
+            # quishape('src_mask_tiled', src_mask_tiled)
 
             logits, new_cache = active_decoder(
                 decoder_input,
@@ -895,8 +897,7 @@ class Translator(Inference):
                 cache=decode_strategy.cache,
                 seq_start_pos=seq_start_pos,
             )
-            quishape('logits', logits)
-            print('new_cache len', len(new_cache))
+            # quishape('logits', logits)
             # new_cache is a list of LayerIntermediates objects, one for each layer_stack
 
             if active_decoder.can_cache_kv:

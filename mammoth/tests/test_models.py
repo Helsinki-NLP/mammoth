@@ -5,7 +5,7 @@ import torch
 
 import mammoth
 import mammoth.opts
-from mammoth.model_builder import build_encoder, build_decoder
+from mammoth.model_builder import build_xcoder
 from mammoth.inputters.vocab import Vocab, DEFAULT_SPECIALS
 from mammoth.utils.parse import ArgumentParser
 

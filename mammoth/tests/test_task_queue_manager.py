@@ -193,7 +193,7 @@ def test_create_all_distributed_components():
         DistributedEmbedding(
             global_ranks={0, 1},
             task_ids={"train_0_a-b", "train_2_a-d"},
-            group="Group 3 with GPU ranks [0, 1]",
+            group="Group 2 with GPU ranks [0, 1]",
             side=Side.encoder,
             lang="a",
         ),
@@ -206,7 +206,7 @@ def test_create_all_distributed_components():
         DistributedEmbedding(
             global_ranks={0, 2},
             task_ids={'train_3_e-b', 'train_0_a-b'},
-            group="Group 4 with GPU ranks [0, 2]",
+            group="Group 3 with GPU ranks [0, 2]",
             side=Side.decoder,
             lang="b",
         ),
@@ -268,7 +268,7 @@ def test_get_my_distributed_components():
         DistributedEmbedding(
             global_ranks={0, 1},
             task_ids={"train_0_a-b", "train_2_a-d"},
-            group="Group 3 with GPU ranks [0, 1]",
+            group="Group 2 with GPU ranks [0, 1]",
             side=Side.encoder,
             lang="a",
         ),

@@ -30,7 +30,6 @@ from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
-# from mammoth.utils.transformer_wrapper import TransformerWrapper
 
 
 def _combine_ordered_dicts(input_dicts: Dict[str, OrderedDict]) -> OrderedDict:

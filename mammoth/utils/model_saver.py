@@ -7,8 +7,11 @@ from glob import glob
 from typing import Dict, Any, Tuple
 
 from mammoth.distributed.tasks import LocalTaskQueueManager
+from mammoth.model_builder import build_model
 from mammoth.models import NMTModel
 from mammoth.utils.logging import logger
+from mammoth.utils.misc import use_gpu
+from mammoth.utils.parse import ArgumentParser
 
 
 def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_manager):
@@ -154,7 +157,6 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
     model.eval()
 
     return vocabs_dict, model, model_opts
-
 
 
 class ModelSaverBase(object):

@@ -30,8 +30,6 @@ from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
-from mammoth.utils.model_saver import load_frame_checkpoint
-from mammoth.utils.parse import ArgumentParser
 # from mammoth.utils.transformer_wrapper import TransformerWrapper
 
 

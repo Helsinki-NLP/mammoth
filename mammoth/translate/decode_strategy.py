@@ -4,8 +4,6 @@ from typing import Optional, List
 
 from x_transformers.x_transformers import LayerIntermediates
 
-from mammoth.utils.misc import tile
-
 
 class DecodeStrategy(object):
     """Base class for generation strategies.

@@ -34,6 +34,8 @@ setup(
         "timeout_decorator",
         "sentencepiece==0.1.97",
         "sacrebleu==2.3.1",
+        "einops==0.8.0",
+        "x-transformers==1.32.14",
     ],
     entry_points={
         "console_scripts": [

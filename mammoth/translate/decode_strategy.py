@@ -126,11 +126,11 @@ class DecodeStrategy(object):
         )
         self.is_finished = torch.zeros([self.batch_size, self.parallel_paths], dtype=torch.uint8, device=self.device)
         if target_prefix is not None:
-            seq_len, batch_size, n_feats = target_prefix.size()
+            seq_len, batch_size = target_prefix.size()
             assert (
                 batch_size == self.batch_size * self.parallel_paths
             ), "forced target_prefix should've extend to same number of path!"
-            target_prefix_words = target_prefix[:, :, 0].transpose(0, 1)
+            target_prefix_words = target_prefix.transpose(0, 1)
             target_prefix = target_prefix_words[:, 1:]  # remove bos
 
             # fix length constraint and remove eos from count

@@ -7,13 +7,8 @@ import mammoth.opts
 from mammoth.model_builder import build_model, build_xcoder
 from mammoth.inputters.vocab import Vocab, DEFAULT_SPECIALS
 from mammoth.utils.parse import ArgumentParser
-from mammoth.distributed.components import (
-    Side,
-    DistributedEncoder,
-    DistributedDecoder,
-    DistributedEmbedding,
-)
-from mammoth.distributed.tasks import DatasetMetadata, TaskSpecs, TaskQueueManager, RoundRobinTaskDistributionStrategy
+from mammoth.distributed.components import Side
+from mammoth.distributed.tasks import TaskSpecs, TaskQueueManager, RoundRobinTaskDistributionStrategy
 from mammoth.distributed.contexts import WorldContext, DeviceContextEnum
 
 parser = ArgumentParser(description='train.py')

@@ -1,8 +1,10 @@
 import torch
+import warnings
+from einops import rearrange
+
 from mammoth.translate import penalties
 from mammoth.translate.decode_strategy import DecodeStrategy
-
-import warnings
+from mammoth.utils.misc import tile
 
 
 class BeamSearchBase(DecodeStrategy):
@@ -117,6 +119,12 @@ class BeamSearchBase(DecodeStrategy):
         raise NotImplementedError
 
     def initialize_(self, target_prefix):
+        if target_prefix is not None:
+            if target_prefix.ndim == 1:
+                target_prefix = rearrange(target_prefix, 'b -> 1 b')
+            # repeat the prefix for each beam
+            target_prefix = tile(target_prefix, self.parallel_paths, dim=1)
+
         super(BeamSearchBase, self).initialize(target_prefix)
 
         self.best_scores = torch.full([self.batch_size], -1e10, dtype=torch.float, device=self.device)
@@ -245,8 +253,7 @@ class BeamSearchBase(DecodeStrategy):
                 step - 1, _B_new * self.beam_size, inp_seq_len
             )
 
-    def advance(self, logits, new_cache):
-        log_probs = torch.log_softmax(logits, dim=-1)
+    def advance(self, log_probs, new_cache):
         vocab_size = log_probs.size(-1)
 
         # using integer division to get an integer _B without casting

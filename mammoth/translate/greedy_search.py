@@ -1,7 +1,9 @@
 import torch
 import torch.nn.functional as F
+from einops import rearrange
 
 from mammoth.translate.decode_strategy import DecodeStrategy
+from mammoth.utils.misc import tile
 
 
 def sample_topp(logits, keep_topp):
@@ -133,21 +135,23 @@ class GreedySearch(DecodeStrategy):
         keep_topp,
         beam_size,
         ban_unk_token,
+        device,
     ):
         super(GreedySearch, self).__init__(
-            pad,
-            bos,
-            eos,
-            unk,
-            batch_size,
-            beam_size,
-            global_scorer,
-            min_length,
-            block_ngram_repeat,
-            exclusion_tokens,
-            return_attention,
-            max_length,
-            ban_unk_token,
+            pad=pad,
+            bos=bos,
+            eos=eos,
+            unk=unk,
+            batch_size=batch_size,
+            parallel_paths=beam_size,
+            global_scorer=global_scorer,
+            min_length=min_length,
+            block_ngram_repeat=block_ngram_repeat,
+            exclusion_tokens=exclusion_tokens,
+            return_attention=return_attention,
+            max_length=max_length,
+            ban_unk_token=ban_unk_token,
+            device=device,
         )
         self.sampling_temp = sampling_temp
         self.keep_topk = keep_topk
@@ -155,19 +159,22 @@ class GreedySearch(DecodeStrategy):
         self.topk_scores = None
         self.beam_size = beam_size
 
-    def initialize(self, memory_bank, src_lengths, src_map=None, device=None, target_prefix=None):
+    def initialize(self, target_prefix=None):
         """Initialize for decoding."""
-        (fn_map_state, memory_bank, src_map, target_prefix) = self.initialize_tile(
-            memory_bank, src_lengths, src_map, target_prefix
-        )
-        if device is None:
-            device = self.get_device_from_memory_bank(memory_bank)
+        if target_prefix is not None:
+            if target_prefix.ndim == 1:
+                target_prefix = rearrange(target_prefix, 'b -> 1 b')
+            # repeat the prefix for each beam
+            target_prefix = tile(target_prefix, self.parallel_paths, dim=1)
 
-        super(GreedySearch, self).initialize(memory_bank, src_lengths, src_map, device, target_prefix)
-        self.select_indices = torch.arange(self.batch_size * self.beam_size, dtype=torch.long, device=device)
-        self.original_batch_idx = fn_map_state(torch.arange(self.batch_size, dtype=torch.long, device=device), dim=0)
-        self.beams_scores = torch.zeros((self.batch_size * self.beam_size, 1), dtype=torch.float, device=device)
-        return fn_map_state, memory_bank, self.memory_lengths, src_map
+        super(GreedySearch, self).initialize(target_prefix=target_prefix)
+        self.select_indices = torch.arange(self.batch_size * self.beam_size, dtype=torch.long, device=self.device)
+        self.original_batch_idx = tile(
+            torch.arange(self.batch_size, dtype=torch.long, device=self.device),
+            self.parallel_paths,
+            dim=0
+        )
+        self.beams_scores = torch.zeros((self.batch_size * self.beam_size, 1), dtype=torch.float, device=self.device)
 
     @property
     def current_predictions(self):
@@ -257,32 +264,3 @@ class GreedySearch(DecodeStrategy):
         self.select_indices = is_alive.nonzero(as_tuple=False).view(-1)
         self.original_batch_idx = self.original_batch_idx[is_alive]
         self.maybe_update_target_prefix(self.select_indices)
-
-
-class GreedySearchLM(GreedySearch):
-    def update_finished(self):
-        super(GreedySearchLM, self).update_finished()
-        self.update_memory_lengths()
-
-    def update_memory_lengths(self):
-        is_alive = ~self.is_finished.view(-1)
-        self.memory_lengths = self.memory_lengths[is_alive]
-
-    def advance(self, log_probs, attn):
-        super(GreedySearchLM, self).advance(log_probs, attn)
-
-        # in LM task memory_lengths is associated with currently generated src
-        # and therefore needs to follow the generation
-        self.memory_lengths += 1
-
-    def initialize(self, src, src_lengths, src_map=None, device=None, target_prefix=None):
-        """Initialize for decoding."""
-
-        if device is None:
-            device = src.device
-
-        (fn_map_state, _, self.memory_lengths, src_map) = super(GreedySearchLM, self).initialize(
-            None, src_lengths, src_map, device, target_prefix
-        )
-
-        return fn_map_state, src, self.memory_lengths, src_map

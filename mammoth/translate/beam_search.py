@@ -125,7 +125,7 @@ class BeamSearchBase(DecodeStrategy):
             # repeat the prefix for each beam
             target_prefix = tile(target_prefix, self.parallel_paths, dim=1)
 
-        super(BeamSearchBase, self).initialize(target_prefix)
+        super(BeamSearchBase, self).initialize(target_prefix=target_prefix)
 
         self.best_scores = torch.full([self.batch_size], -1e10, dtype=torch.float, device=self.device)
         self._beam_offset = torch.arange(

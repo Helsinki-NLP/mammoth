@@ -28,7 +28,6 @@ class TestGreedySearch(unittest.TestCase):
 
     BLOCKED_SCORE = -10e20
 
-    @unittest.skip('TMP')
     def test_doesnt_predict_eos_if_shorter_than_min_len(self):
         # batch 0 will always predict EOS. The other batches will predict
         # non-eos scores.
@@ -40,9 +39,25 @@ class TestGreedySearch(unittest.TestCase):
             eos_idx = 2
             lengths = torch.randint(0, 30, (batch_sz,))
             samp = GreedySearch(
-                0, 1, 2, 3, batch_sz, GlobalScorerStub(), min_length, False, set(), False, 30, 1.0, 1, 0, 1, False
+                0,
+                1,
+                2,
+                3,
+                batch_sz,
+                GlobalScorerStub(),
+                min_length,
+                False,
+                set(),
+                False,
+                30,
+                1.0,
+                1,
+                0,
+                1,
+                False,
+                device=lengths.device,
             )
-            samp.initialize(torch.zeros((1, 1)), lengths)
+            samp.initialize()
             all_attns = []
             for i in range(min_length + 4):
                 word_probs = torch.full((batch_sz, n_words), -float('inf'))
@@ -66,7 +81,6 @@ class TestGreedySearch(unittest.TestCase):
                 else:  # i > min_length
                     break
 
-    @unittest.skip('TMP')
     def test_returns_correct_scores_deterministic(self):
         for batch_sz in [1, 13]:
             for temp in [1.0, 3.0]:
@@ -77,9 +91,25 @@ class TestGreedySearch(unittest.TestCase):
                 eos_idx = 2
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0, 1, 2, 3, batch_sz, GlobalScorerStub(), 0, False, set(), False, 30, temp, 1, 0, 1, False
+                    0,
+                    1,
+                    2,
+                    3,
+                    batch_sz,
+                    GlobalScorerStub(),
+                    0,
+                    False,
+                    set(),
+                    False,
+                    30,
+                    temp,
+                    1,
+                    0,
+                    1,
+                    False,
+                    device=lengths.device,
                 )
-                samp.initialize(torch.zeros((1, 1)), lengths)
+                samp.initialize()
                 # initial step
                 i = 0
                 word_probs = torch.full((batch_sz, n_words), -float('inf'))
@@ -129,7 +159,6 @@ class TestGreedySearch(unittest.TestCase):
                 samp.update_finished()
                 self.assertTrue(samp.done)
 
-    @unittest.skip('TMP')
     def test_returns_correct_scores_non_deterministic(self):
         for batch_sz in [1, 13]:
             for temp in [1.0, 3.0]:
@@ -140,9 +169,25 @@ class TestGreedySearch(unittest.TestCase):
                 eos_idx = 2
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0, 1, 2, 3, batch_sz, GlobalScorerStub(), 0, False, set(), False, 30, temp, 2, 0, 1, False
+                    0,
+                    1,
+                    2,
+                    3,
+                    batch_sz,
+                    GlobalScorerStub(),
+                    0,
+                    False,
+                    set(),
+                    False,
+                    30,
+                    temp,
+                    2,
+                    0,
+                    1,
+                    False,
+                    device=lengths.device,
                 )
-                samp.initialize(torch.zeros((1, 1)), lengths)
+                samp.initialize()
                 # initial step
                 i = 0
                 for _ in range(100):
@@ -217,7 +262,6 @@ class TestGreedySearch(unittest.TestCase):
 
                 self.assertTrue(samp.done)
 
-    @unittest.skip('TMP')
     def test_returns_correct_scores_non_deterministic_beams(self):
         beam_size = 10
         for batch_sz in [1, 13]:
@@ -229,9 +273,25 @@ class TestGreedySearch(unittest.TestCase):
                 eos_idx = 2
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0, 1, 2, 3, batch_sz, GlobalScorerStub(), 0, False, set(), False, 30, temp, 50, 0, beam_size, False
+                    0,
+                    1,
+                    2,
+                    3,
+                    batch_sz,
+                    GlobalScorerStub(),
+                    0,
+                    False,
+                    set(),
+                    False,
+                    30,
+                    temp,
+                    50,
+                    0,
+                    beam_size,
+                    False,
+                    device=lengths.device,
                 )
-                samp.initialize(torch.zeros((1, 1)), lengths)
+                samp.initialize()
                 # initial step
                 # finish one beam
                 i = 0
@@ -308,7 +368,6 @@ class TestGreedySearch(unittest.TestCase):
 
                 self.assertTrue(samp.done)
 
-    @unittest.skip('TMP')
     def test_returns_correct_scores_non_deterministic_topp(self):
         for batch_sz in [1, 13]:
             for temp in [1.0, 0.3]:
@@ -319,9 +378,25 @@ class TestGreedySearch(unittest.TestCase):
                 eos_idx = 2
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0, 1, 2, 3, batch_sz, GlobalScorerStub(), 0, False, set(), False, -1, temp, 50, 0.5, 1, False
+                    0,
+                    1,
+                    2,
+                    3,
+                    batch_sz,
+                    GlobalScorerStub(),
+                    0,
+                    False,
+                    set(),
+                    False,
+                    -1,
+                    temp,
+                    50,
+                    0.5,
+                    1,
+                    False,
+                    device=lengths.device,
                 )
-                samp.initialize(torch.zeros((1, 1)), lengths)
+                samp.initialize()
                 # initial step
                 i = 0
                 for _ in range(100):

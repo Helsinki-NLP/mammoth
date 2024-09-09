@@ -327,7 +327,11 @@ def build_xcoder(
         transformer_wrappers[task.corpus_id] = transformer_wrapper
 
     # Create a StackXcoder
-    stack_xcoder = StackXcoder(transformer_wrappers, token_embs=token_embs)
+    stack_xcoder = StackXcoder(
+        transformer_wrappers=transformer_wrappers,
+        attention_layer_blocks=attention_layer_blocks,
+        token_embs=token_embs,
+    )
     return stack_xcoder
 
 

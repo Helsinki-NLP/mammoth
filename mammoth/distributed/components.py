@@ -131,10 +131,7 @@ class DistributedEncoder(DistributedXCoder):
         return self.xcoder_id
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        a_task_id = sorted(self.task_ids)[0]
-        aal = model.encoder.get_attention_layers(a_task_id, self.layer_stack_index)
-        assert aal.xcoder_id == self.xcoder_id, \
-            f'{self.get_name()} {self.layer_stack_index}: expected {self.xcoder_id} found {aal.xcoder_id}'
+        aal = model.encoder.get_attention_layers_by_xcoder_id(self.layer_stack_index, self.xcoder_id)
         return aal
 
 
@@ -149,10 +146,7 @@ class DistributedDecoder(DistributedXCoder):
         return self.xcoder_id
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        a_task_id = sorted(self.task_ids)[0]
-        aal = model.decoder.get_attention_layers(a_task_id, self.layer_stack_index)
-        assert aal.xcoder_id == self.xcoder_id, \
-            f'{self.get_name()} {self.layer_stack_index}: expected {self.xcoder_id} found {aal.xcoder_id}'
+        aal = model.decoder.get_attention_layers_by_xcoder_id(self.layer_stack_index, self.xcoder_id)
         return aal
 
 

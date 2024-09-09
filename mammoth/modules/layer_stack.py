@@ -1,6 +1,7 @@
 from torch import nn
-from typing import List, Sequence, Optional, Tuple
-from x_transformers.x_transformers import LayerIntermediates
+from typing import List, Sequence, Optional, Tuple, Dict
+from x_transformers import TransformerWrapper
+from x_transformers.x_transformers import LayerIntermediates, TokenEmbedding
 
 from mammoth.modules.adapters import AdaptedAttentionLayers
 
@@ -59,10 +60,16 @@ class StackXcoder(nn.ModuleDict):
     """
     Switches between different AdaptedAttentionLayersStacks depending on the task.
     """
-    def __init__(self, *args, token_embs=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.active_task = None
-        self.token_embs = token_embs
+    def __init__(
+        self,
+        transformer_wrappers: Dict[str, TransformerWrapper],
+        attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]],
+        token_embs: Dict[str, TokenEmbedding],
+    ):
+        super().__init__(transformer_wrappers)
+        self.attention_layers_by_xcoder_id: Dict[int, Dict[str, AdaptedAttentionLayers]] = attention_layer_blocks
+        self.token_embs: Dict[str, TokenEmbedding] = token_embs
+        self.active_task: Optional[str] = None
 
     # TransformerWrapper wraps an AttentionLayers in embeddings and some other functionality.
     # We use one TransformerWrapper per task.
@@ -76,8 +83,11 @@ class StackXcoder(nn.ModuleDict):
                 attention_layers_stack.activate_adapter(layer_stack_index, adapter_group, sub_id)
         return transformer_wrapper
 
-    def get_attention_layers(self, task_id: str, layer_stack_index: int) -> AdaptedAttentionLayers:
+    def get_attention_layers_by_task_id(self, task_id: str, layer_stack_index: int) -> AdaptedAttentionLayers:
         return self[task_id].attn_layers.attention_layers_stack[layer_stack_index]
+
+    def get_attention_layers_by_xcoder_id(self, layer_stack_index: int, xcoder_id: str) -> AdaptedAttentionLayers:
+        return self.attention_layers_by_xcoder_id[layer_stack_index][xcoder_id]
 
     def get_embedding_by_task_id(self, task_id):
         transformer_wrapper = self[task_id]

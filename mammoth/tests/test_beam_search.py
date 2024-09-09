@@ -61,7 +61,8 @@ class TestBeamSearch(unittest.TestCase):
                 word_probs[:, repeat_idx] = 0
 
                 attns = torch.randn(1, batch_sz * beam_sz, 53)
-                beam.advance(word_probs, attns)
+                beam.set_cache(attns)
+                beam.advance(word_probs)
 
                 if i < ngram_repeat:
                     # before repeat, scores are either 0 or -inf
@@ -130,7 +131,8 @@ class TestBeamSearch(unittest.TestCase):
                     # continue pushing around what beam 1 predicts
                     word_probs[1::beam_sz, repeat_idx + i + 1] = 0
                 attns = torch.randn(1, batch_sz * beam_sz, 53)
-                beam.advance(word_probs, attns)
+                beam.set_cache(attns)
+                beam.advance(word_probs)
                 if i < ngram_repeat:
                     self.assertFalse(beam.topk_log_probs[:, 0].eq(self.BLOCKED_SCORE).any())
                     self.assertFalse(beam.topk_log_probs[:, 1].eq(self.BLOCKED_SCORE).any())
@@ -196,7 +198,8 @@ class TestBeamSearch(unittest.TestCase):
                     # predict the allowed-repeat again in beam 2
                     word_probs[2::beam_sz, repeat_idx_ignored] = 0
                 attns = torch.randn(1, batch_sz * beam_sz, 53)
-                beam.advance(word_probs, attns)
+                beam.set_cache(attns)
+                beam.advance(word_probs)
                 if i < ngram_repeat:
                     self.assertFalse(beam.topk_log_probs[:, 0].eq(self.BLOCKED_SCORE).any())
                     self.assertFalse(beam.topk_log_probs[:, 1].eq(self.BLOCKED_SCORE).any())
@@ -245,7 +248,6 @@ class TestBeamSearch(unittest.TestCase):
                 device=device_init.device,
             )
             beam.initialize()
-            all_attns = []
             for i in range(min_length + 4):
                 # non-interesting beams are going to get dummy values
                 word_probs = torch.full((batch_sz * beam_sz, n_words), -float('inf'))
@@ -265,16 +267,18 @@ class TestBeamSearch(unittest.TestCase):
                         word_probs[beam_idx::beam_sz, j] = score
 
                 attns = torch.randn(1, batch_sz * beam_sz, 53)
-                all_attns.append(attns)
-                beam.advance(word_probs, attns)
+                beam.set_cache(attns)
+                beam.advance(word_probs)
                 if i < min_length:
                     expected_score_dist = (i + 1) * valid_score_dist[1:].unsqueeze(0)
                     # Note that when batch_sz is > 1, expected is broadcast across the batch
                     self.assertTrue(beam.topk_log_probs.allclose(expected_score_dist))
+                    self.assertTrue(beam.cache.shape == torch.Size([1, batch_sz * beam_sz, 53]))
                 elif i == min_length:
                     # now the top beam has ended and no others have
                     self.assertTrue(beam.is_finished[:, 0].eq(1).all())
                     self.assertTrue(beam.is_finished[:, 1:].eq(0).all())
+                    self.assertTrue(beam.cache.shape == torch.Size([1, batch_sz * (beam_sz - 1), 53]))
                 else:  # i > min_length
                     # not of interest, but want to make sure it keeps running
                     # since only beam 0 terminates and n_best = 2
@@ -337,7 +341,8 @@ class TestBeamSearch(unittest.TestCase):
                     word_probs[beam_idx::beam_sz, j] = score
 
             attns = torch.randn(1, batch_sz * beam_sz, 53)
-            beam.advance(word_probs, attns)
+            beam.set_cache(attns)
+            beam.advance(word_probs)
             if i < min_length:
                 self.assertFalse(beam.done)
             elif i == min_length:
@@ -408,7 +413,8 @@ class TestBeamSearch(unittest.TestCase):
                     word_probs[beam_idx::beam_sz, j] = score
 
             attns = torch.randn(1, batch_sz * beam_sz, 53)
-            beam.advance(word_probs, attns)
+            beam.set_cache(attns)
+            beam.advance(word_probs)
             if i < min_length:
                 self.assertFalse(beam.done)
                 # no top beams are finished yet
@@ -465,7 +471,7 @@ class TestBeamSearchAgainstReferenceCase(unittest.TestCase):
         expected_beam_scores, expected_preds_0 = new_scores.view(self.BATCH_SZ, self.BEAM_SZ * self.N_WORDS).topk(
             self.BEAM_SZ, dim=-1
         )
-        beam.advance(deepcopy(init_scores), self.random_attn())
+        beam.advance(deepcopy(init_scores))
         self.assertTrue(beam.topk_log_probs.allclose(expected_beam_scores))
         self.assertTrue(beam.topk_ids.equal(expected_preds_0))
         self.assertFalse(beam.is_finished.any())
@@ -489,7 +495,7 @@ class TestBeamSearchAgainstReferenceCase(unittest.TestCase):
         )
         scores_1 = scores_1.repeat(self.BATCH_SZ, 1)
 
-        beam.advance(deepcopy(scores_1), self.random_attn())
+        beam.advance(deepcopy(scores_1))
 
         new_scores = scores_1 + expected_beam_scores.view(-1).unsqueeze(1)
         expected_beam_scores, unreduced_preds = new_scores.view(self.BATCH_SZ, self.BEAM_SZ * self.N_WORDS).topk(
@@ -525,7 +531,7 @@ class TestBeamSearchAgainstReferenceCase(unittest.TestCase):
         )
         scores_2 = scores_2.repeat(self.BATCH_SZ, 1)
 
-        beam.advance(deepcopy(scores_2), self.random_attn())
+        beam.advance(deepcopy(scores_2))
 
         # ended beam 2 shouldn't continue
         expected_beam_scores[:, 2::self.BEAM_SZ] = self.DEAD_SCORE
@@ -568,7 +574,7 @@ class TestBeamSearchAgainstReferenceCase(unittest.TestCase):
         )
         scores_3 = scores_3.repeat(self.BATCH_SZ, 1)
 
-        beam.advance(deepcopy(scores_3), self.random_attn())
+        beam.advance(deepcopy(scores_3))
 
         expected_beam_scores[:, 0::self.BEAM_SZ] = self.DEAD_SCORE
         new_scores = scores_3 + expected_beam_scores.view(-1).unsqueeze(1)

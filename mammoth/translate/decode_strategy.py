@@ -273,7 +273,7 @@ class DecodeStrategy(object):
             return
         self.target_prefix = self.target_prefix.index_select(0, select_index)
 
-    def advance(self, logits, new_cache):
+    def advance(self, logits):
         """DecodeStrategy subclasses should override :func:`advance()`.
 
         Advance is used to update ``self.alive_seq``, ``self.is_finished``,

@@ -906,7 +906,7 @@ class Translator(Inference):
             logits = logits[:, -1]
             log_probs = torch.log_softmax(logits, dim=-1)
 
-            decode_strategy.advance(log_probs, new_cache)
+            decode_strategy.advance(log_probs)
             any_finished = decode_strategy.is_finished.any()
             if any_finished:
                 decode_strategy.update_finished()

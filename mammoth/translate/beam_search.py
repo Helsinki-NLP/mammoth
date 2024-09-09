@@ -234,6 +234,9 @@ class BeamSearchBase(DecodeStrategy):
 
         _B_new = non_finished.shape[0]
         self.remove_finished_batches(_B_new, _B_old, non_finished, predictions, attention, step)
+        if self.cache is not None:
+            # FIXME: self.cache is a list of LayerIntermediates. Reach in and manipulate it?
+            self.cache = None
 
     def remove_finished_batches(self, _B_new, _B_old, non_finished, predictions, attention, step):
         # Remove finished batches for the next step.
@@ -253,7 +256,7 @@ class BeamSearchBase(DecodeStrategy):
                 step - 1, _B_new * self.beam_size, inp_seq_len
             )
 
-    def advance(self, log_probs, new_cache):
+    def advance(self, log_probs):
         vocab_size = log_probs.size(-1)
 
         # using integer division to get an integer _B without casting

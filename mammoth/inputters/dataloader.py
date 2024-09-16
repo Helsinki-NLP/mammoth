@@ -37,7 +37,10 @@ def build_dataloader(
     return iter(loader) if as_iter else loader
 
 
-DatasetMetadata = collections.namedtuple('DatasetMetadata', 'src_lang tgt_lang encoder_id decoder_id corpus_id')
+DatasetMetadata = collections.namedtuple(
+    'DatasetMetadata',
+    ['src_lang', 'tgt_lang', 'encoder_id', 'decoder_id', 'corpus_id']
+)
 
 
 class InferenceBatcher():

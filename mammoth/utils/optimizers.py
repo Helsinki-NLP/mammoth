@@ -259,19 +259,20 @@ class MultipleOptimizer(object):
         optim_opts = opts
 
         if opts.train_from and frame_checkpoint is not None:
-            ckpt_opts = frame_checkpoint['opts']
+            checkpoint_opts = frame_checkpoint['opts']
 
             if opts.reset_optim == 'none':
                 # Load everything from the checkpoint.
-                optim_opts = ckpt_opts
+                optim_opts = checkpoint_opts
             elif opts.reset_optim == 'all':
                 # Build everything from scratch.
                 pass
             elif opts.reset_optim == 'states':
                 # Reset optimizer, keep options.
-                optim_opts = ckpt_opts
+                optim_opts = checkpoint_opts
             elif opts.reset_optim == 'keep_states':
                 # Reset options, keep optimizer.
+                # Note that options are reset in load_parameters_from_checkpoint, not here
                 pass
         return optim_opts
 
@@ -346,15 +347,14 @@ class MultipleOptimizer(object):
             result.append(f'Optimizer "{name}" has been stepped {count} times and has LR {lr}')
         return result
 
-    def count_parameters(self, log=print):
+    def count_parameters(self):
         tot = 0
         for name, optimizer in self.suboptimizers.items():
             n_params = 0
             for group in optimizer._optimizer.param_groups:
                 for param in group["params"]:
                     n_params += param.nelement()
-            if callable(log):
-                log(f'optimizer {name}: {n_params}')
+            logger.debug(f'optimizer {name}: {n_params}')
             tot += n_params
         return tot
 

@@ -68,7 +68,7 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
         model_path = opts.models[0]
 
     # Load only the frame
-    frame, frame_ckpt_path = load_frame_checkpoint(ckpt_path=model_path)
+    frame, frame_checkpoint_path = load_frame_checkpoint(checkpoint_path=model_path)
 
     vocabs_dict = {
         ('src', task.src_lang): frame["vocab"].get(('src', task.src_lang)),
@@ -79,7 +79,7 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
     print(f'vocabs_dict {vocabs_dict}')
     print(f'my compontents {task_queue_manager.get_my_distributed_components()}')
 
-    model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
+    model_opts = ArgumentParser.checkpoint_model_opts(frame['opts'])
 
     model = build_model(
         model_opts,
@@ -90,7 +90,7 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
     )
 
     load_parameters_from_checkpoint(
-        frame_ckpt_path,
+        frame_checkpoint_path,
         model,
         optim=None,
         task_queue_manager=task_queue_manager,
@@ -725,7 +725,6 @@ class Inference(object):
         gold_score,
         batch,
         batch_size,
-        src,
         src_mask,
         src_vocabs,
         decode_strategy,
@@ -796,17 +795,13 @@ class Translator(Inference):
     def _run_encoder(self, active_encoder, batch):
         src = rearrange(batch.src.tensor, 't b 1 -> b t')
         src_mask = rearrange(batch.src.mask, 't b -> b t')
-        # quishape('src in _run_encoder', src)
-        # quishape('src_mask in _run_encoder', src_mask)
         encoder_output = active_encoder(
             x=src,
             mask=src_mask,
             return_embeddings=True,
         )
-        # quishape('encoder_output in _run_encoder', encoder_output)
 
         encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
-        # quishape('encoder_output after AB', encoder_output)
         if self.model.attention_bridge.is_fixed_length:
             # turn off masking in the transformer decoder
             src_mask = None
@@ -839,12 +834,8 @@ class Translator(Inference):
             adapter_ids=metadata.decoder_adapter_ids,
         )
 
-        # quishape('batch.src.tensor', batch.src.tensor)
-        # quishape('batch.src.mask', batch.src.mask)
-
         # (2) Run the encoder on the src
         encoder_output, src_mask = self._run_encoder(active_encoder, batch)
-        # quishape('src_mask', src_mask)
 
         # (3) Decode and score the gold targets
         gold_score = self._gold_score(
@@ -871,11 +862,8 @@ class Translator(Inference):
         # (5) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
             decoder_input = decode_strategy.alive_seq
-            # quishape('decoder_input', decoder_input)
-            # quishape('encoder_output_tiled', decode_strategy.encoder_output_tiled)
-            # quishape('src_mask_tiled', decode_strategy.src_mask_tiled)
 
-            logits, new_cache = active_decoder(
+            logits_for_whole_sequence, new_cache = active_decoder(
                 decoder_input,
                 context=decode_strategy.encoder_output_tiled,
                 context_mask=decode_strategy.src_mask_tiled,
@@ -885,13 +873,13 @@ class Translator(Inference):
                 cache=decode_strategy.cache,
                 seq_start_pos=seq_start_pos,
             )
-            # quishape('logits', logits)
             # new_cache is a list of LayerIntermediates objects, one for each layer_stack
 
             if active_decoder.can_cache_kv:
                 decode_strategy.set_cache(new_cache)
 
-            logits = logits[:, -1]
+            # we only need the logits of the new prediction
+            logits = logits_for_whole_sequence[:, -1]
             log_probs = torch.log_softmax(logits, dim=-1)
 
             decode_strategy.advance(log_probs)
@@ -905,7 +893,6 @@ class Translator(Inference):
             gold_score,
             batch,
             batch_size,
-            batch.src,
             src_mask,
             src_vocabs,
             decode_strategy,

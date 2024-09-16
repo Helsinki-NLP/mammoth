@@ -874,23 +874,23 @@ class Translator(Inference):
         # unfortunately AttentionLayers takes a seq_start_pos and constructs the mask, instead of taking a mask
         target_prefix = None
         seq_start_pos = None
-        decode_strategy.initialize(target_prefix=target_prefix)
+        decode_strategy.initialize(
+            target_prefix=target_prefix,
+            encoder_output=encoder_output,
+            src_mask=src_mask,
+        )
 
         # (5) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
-            # quishape('alive_seq', decode_strategy.alive_seq)
             decoder_input = decode_strategy.alive_seq
-            encoder_output_tiled = tile(encoder_output, decode_strategy.parallel_paths, dim=0)
-            src_mask_tiled = tile(src_mask, decode_strategy.parallel_paths, dim=0)
-            # quishape('decoder_input', decoder_input)
-            # quishape('encoder_output', encoder_output)
-            # quishape('encoder_output_tiled', encoder_output_tiled)
-            # quishape('src_mask_tiled', src_mask_tiled)
+            quishape('decoder_input', decoder_input)
+            quishape('encoder_output_tiled', decode_strategy.encoder_output_tiled)
+            quishape('src_mask_tiled', decode_strategy.src_mask_tiled)
 
             logits, new_cache = active_decoder(
                 decoder_input,
-                context=encoder_output_tiled,
-                context_mask=src_mask_tiled,
+                context=decode_strategy.encoder_output_tiled,
+                context_mask=decode_strategy.src_mask_tiled,
                 return_attn=False,
                 return_embeddings=False,
                 return_intermediates=True,

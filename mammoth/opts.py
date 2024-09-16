@@ -140,26 +140,7 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         "Set to -1 to go full corpus, 0 to skip.",
     )
 
-    if not build_vocab_only:
-        # group.add(
-        #     '-dump_fields',
-        #     '--dump_fields',
-        #     action='store_true',
-        #     help="Dump fields `*.vocab.pt` to disk. -save_data should be set as saving prefix.",
-        # )
-        group.add(
-            '-dump_transforms',
-            '--dump_transforms',
-            action='store_true',
-            help="Dump transforms `*.transforms.pt` to disk. -save_data should be set as saving prefix.",
-        )
-    else:
-        group.add(
-            '-dump_samples',
-            '--dump_samples',
-            action='store_true',
-            help="Dump samples when building vocab. Warning: this may slow down the process.",
-        )
+    if build_vocab_only:
         group.add(
             '-num_threads', '--num_threads', type=int, default=1, help="Number of parallel threads to build the vocab."
         )

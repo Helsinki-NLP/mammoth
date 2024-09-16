@@ -452,15 +452,6 @@ class Trainer(object):
             target = batch.tgt.tensor[1:]
             # tgt_mask = batch.tgt.mask
 
-            # # QUI logging for batch shapes
-            # def quishape(name, val):
-            #     print(f'{name} {val.shape}  {val.shape[0] * val.shape[1]}')
-            # quishape('src', src)
-            # quishape('src_mask', src_mask)
-            # quishape('decoder_input', decoder_input)
-            # quishape('target', target)
-            # quishape('tgt_mask', tgt_mask)
-
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
             with torch.cuda.amp.autocast(enabled=self.optim.amp):
@@ -471,8 +462,6 @@ class Trainer(object):
                     return_attention=self.return_attention,
                     metadata=metadata,
                 )
-                # quishape('logits', logits)
-                # quishape('decoder_output', decoder_output)
                 logits = rearrange(logits, 'b t i -> t b i')
                 decoder_output = rearrange(decoder_output, 'b t d -> t b d')
 

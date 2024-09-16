@@ -1,6 +1,8 @@
 """ Onmt NMT Model base class definition """
 import torch.nn as nn
 
+from mammoth.utils.logging import logger
+
 
 class BaseModel(nn.Module):
     """
@@ -39,7 +41,7 @@ class BaseModel(nn.Module):
     def update_dropout(self, dropout):
         raise NotImplementedError
 
-    def count_parameters(self, log=print):
+    def count_parameters(self):
         raise NotImplementedError
 
 
@@ -68,12 +70,6 @@ class NMTModel(BaseModel):
             task_id=metadata.corpus_id,
             adapter_ids=metadata.decoder_adapter_ids,
         )
-
-        # # QUI logging for batch shapes
-        # def quishape(name, val):
-        #     print(f'{name} {val.shape}  {val.shape[0] * val.shape[1]}')
-        # quishape('src', src)
-        # quishape('src_mask', src_mask)
 
         encoder_output = active_encoder(
             x=src,
@@ -104,8 +100,8 @@ class NMTModel(BaseModel):
         self.encoder.update_dropout(dropout)
         self.decoder.update_dropout(dropout)
 
-    def count_parameters(self, log=print):
-        """Count number of parameters in model (& print with `log` callback).
+    def count_parameters(self):
+        """Count and log number of parameters in model.
 
         Returns:
             (int, int):
@@ -120,8 +116,7 @@ class NMTModel(BaseModel):
                 enc += param.nelement()
             else:
                 dec += param.nelement()
-        if callable(log):
-            log('encoder: {}'.format(enc))
-            log('decoder: {}'.format(dec))
-            log('* number of parameters: {}'.format(enc + dec))
+        logger.debug('encoder: {}'.format(enc))
+        logger.debug('decoder: {}'.format(dec))
+        logger.debug('* number of parameters: {}'.format(enc + dec))
         return enc, dec

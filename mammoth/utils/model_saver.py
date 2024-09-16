@@ -25,23 +25,23 @@ def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_ma
     return model_saver
 
 
-def load_frame_checkpoint(ckpt_path):
+def load_frame_checkpoint(checkpoint_path):
     """
-    Load only the frame checkpoint from `ckpt_path` if any else return `None`.
+    Load only the frame checkpoint from `checkpoint_path` if any else return `None`.
 
     This function is intended to be called before the fork:
     the model itself has not yet been constructed, so we don't want to load its parameters.
     We need the vocabs and data loader state from the frame.
     """
     checkpoint = None
-    if ckpt_path:
-        if not ckpt_path.endswith('.pt'):
-            frames = glob(os.path.join(ckpt_path + '*frame*pt'))
+    if checkpoint_path:
+        if not checkpoint_path.endswith('.pt'):
+            frames = glob(os.path.join(checkpoint_path + '*frame*pt'))
             frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
-            ckpt_path = frames[-1]
-        logger.info('Loading frame checkpoint from %s' % ckpt_path)
-        checkpoint = torch.load(ckpt_path, map_location=lambda storage, loc: storage)
-    return checkpoint, ckpt_path
+            checkpoint_path = frames[-1]
+        logger.info('Loading frame checkpoint from %s' % checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+    return checkpoint, checkpoint_path
 
 
 def explode_model(
@@ -65,25 +65,26 @@ def explode_model(
 
 
 def load_parameters_from_checkpoint(
-    frame_ckpt_path,
+    frame_checkpoint_path,
     model,
     optim,
     task_queue_manager,
     reset_optim=False,
+    yes_i_messed_with_the_checkpoint=False,
 ):
     """
     Splits the model into distributed components
     and restores the state dict of each component from a checkpoint file.
     """
-    if not frame_ckpt_path:
+    if not frame_checkpoint_path:
         return
-    ckpt_prefix = frame_ckpt_path.removesuffix('_frame.pt')
+    checkpoint_prefix = frame_checkpoint_path.removesuffix('_frame.pt')
 
     my_components = task_queue_manager.get_my_distributed_components()
     all_ok = True
     for component in my_components:
         name = component.get_name()
-        checkpoint_path = f'{ckpt_prefix}_{name}.pt'
+        checkpoint_path = f'{checkpoint_prefix}_{name}.pt'
         if os.path.isfile(checkpoint_path):
             state_dict = torch.load(checkpoint_path)
             incompatible_keys = component.load_state_dict(model=model, state_dict=state_dict)
@@ -97,7 +98,7 @@ def load_parameters_from_checkpoint(
             all_ok = False
 
         if not reset_optim:
-            optimizer_path = f'{ckpt_prefix}_{name}_optim.pt'
+            optimizer_path = f'{checkpoint_prefix}_{name}_optim.pt'
             if os.path.isfile(optimizer_path):
                 # The optimizer parameters are distributed the same way as the components
                 optim_state_dict = torch.load(optimizer_path)
@@ -112,12 +113,16 @@ def load_parameters_from_checkpoint(
                 all_ok = False
     if all_ok:
         if reset_optim:
-            logger.info(f'All modules restored from checkpoint {ckpt_prefix}')
+            logger.info(f'All modules restored from checkpoint {checkpoint_prefix}')
             if optim is not None:
                 logger.info('Optimizer was reset')
         else:
-            logger.info(f'All modules and optimizer restored from checkpoint {ckpt_prefix}')
-    # TODO: barf unless a flag --yes-i-messed-with-the-checkpoint is set
+            logger.info(f'All modules and optimizer restored from checkpoint {checkpoint_prefix}')
+    else:
+        if yes_i_messed_with_the_checkpoint:
+            logger.warning('Proceeding with a partial checkpoint due to --yes_i_messed_with_the_checkpoint')
+        else:
+            raise Exception('Some parameters are missing from the checkpoint.')
 
 
 def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):
@@ -127,14 +132,14 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
         model_path = opts.models[0]
 
         # Load only the frame
-    frame, frame_ckpt_path = load_frame_checkpoint(ckpt_path=opts.train_from)
+    frame, frame_checkpoint_path = load_frame_checkpoint(checkpoint_path=opts.train_from)
 
     vocabs_dict = {
         'src': frame["vocab"].get(('src', task.src_lang)),
         'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
     }
 
-    model_opts = ArgumentParser.ckpt_model_opts(frame['opts'])
+    model_opts = ArgumentParser.checkpoint_model_opts(frame['opts'])
 
     model = build_model(
         model_opts,
@@ -145,11 +150,12 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
     )
 
     load_parameters_from_checkpoint(
-        frame_ckpt_path,
+        frame_checkpoint_path,
         model,
         optim=None,
         task_queue_manager=task_queue_manager,
         reset_optim=True,
+        yes_i_messed_with_the_checkpoint=opts.yes_i_messed_with_the_checkpoint,
     )
 
     device = torch.device("cuda" if use_gpu(opts) else "cpu")

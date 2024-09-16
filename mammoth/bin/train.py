@@ -32,101 +32,6 @@ from mammoth.constants import ModelTask
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
-# def prepare_fields_transforms(opts):
-#     """Prepare or dump fields & transforms before training."""
-#     transforms_cls = get_transforms_cls(opts._all_transform)
-#     specials = get_specials(opts, transforms_cls)
-#
-#     fields = build_dynamic_fields(opts, src_specials=specials['src'], tgt_specials=specials['tgt'])
-#
-#     # maybe prepare pretrained embeddings, if any
-#     prepare_pretrained_embeddings(opts, fields)
-#
-#     if opts.dump_fields:
-#         save_fields(fields, opts.save_data, overwrite=opts.overwrite)
-#     if opts.dump_transforms or opts.n_sample != 0:
-#         transforms = make_transforms(opts, transforms_cls, fields)
-#     if opts.dump_transforms:
-#         save_transforms(transforms, opts.save_data, overwrite=opts.overwrite)
-#     if opts.n_sample != 0:
-#         logger.warning(
-#             f"`-n_sample` != 0: Training will not be started. Stop after saving {opts.n_sample} samples/corpus."
-#         )
-#         save_transformed_sample(opts, transforms, n_sample=opts.n_sample)
-#         logger.info("Sample saved, please check it before restart training.")
-#         sys.exit()
-#     return fields, transforms_cls
-
-# TODO: reimplement save_transformed_sample
-
-# def _init_train(opts):
-#     """Common initilization stuff for all training process."""
-#     ArgumentParser.validate_prepare_opts(opts)
-#
-#     if opts.train_from:
-#         # Load checkpoint if we resume from a previous training.
-#         checkpoint = load_checkpoint(ckpt_path=opts.train_from)
-#         # fields = load_fields(opts.save_data, checkpoint)
-#         transforms_cls = get_transforms_cls(opts._all_transform)
-#         if (
-#             hasattr(checkpoint["opts"], '_all_transform')
-#             and len(opts._all_transform.symmetric_difference(checkpoint["opts"]._all_transform)) != 0
-#         ):
-#             _msg = "configured transforms is different from checkpoint:"
-#             new_transf = opts._all_transform.difference(checkpoint["opts"]._all_transform)
-#             old_transf = checkpoint["opts"]._all_transform.difference(opts._all_transform)
-#             if len(new_transf) != 0:
-#                 _msg += f" +{new_transf}"
-#             if len(old_transf) != 0:
-#                 _msg += f" -{old_transf}."
-#             logger.warning(_msg)
-#         # if opts.update_vocab:
-#         #    logger.info("Updating checkpoint vocabulary with new vocabulary")
-#             # fields, transforms_cls = prepare_fields_transforms(opts)
-#     else:
-#         checkpoint = None
-#         # fields, transforms_cls = prepare_fields_transforms(opts)
-#
-#     # Report src and tgt vocab sizes
-#     # for side in ['src', 'tgt']:
-#     #     f = fields[side]
-#     #     try:
-#     #         f_iter = iter(f)
-#     #     except TypeError:
-#     #         f_iter = [(side, f)]
-#     #     for sn, sf in f_iter:
-#     #         if sf.use_vocab:
-#     #             logger.info(' * %s vocab size = %d' % (sn, len(sf.vocab)))
-#     return checkpoint, None, transforms_cls
-
-
-# def init_train_prepare_fields_transforms(opts, vocab_path, side):
-#     """Prepare or dump fields & transforms before training."""
-#
-#     fields = None # build_dynamic_fields_langspec(opts, vocab_path, side)
-#     transforms_cls = get_transforms_cls(opts._all_transform)
-#     # TODO: maybe prepare pretrained embeddings, if any, with `prepare_pretrained_embeddings(opts, fields)`
-#
-#     # if opts.dump_fields:
-#     #     save_fields(fields, opts.save_data, overwrite=opts.overwrite)
-#     if opts.dump_transforms or opts.n_sample != 0:
-#         transforms = make_transforms(opts, transforms_cls, fields)
-#     if opts.dump_transforms:
-#         save_transforms(transforms, opts.save_data, overwrite=opts.overwrite)
-#     if opts.n_sample != 0:
-#         logger.warning(
-#             f"`-n_sample` != 0: Training will not be started. Stop after saving {opts.n_sample} samples/corpus."
-#         )
-#         save_transformed_sample(opts, transforms, n_sample=opts.n_sample)
-#         logger.info("Sample saved, please check it before restart training.")
-#         sys.exit()
-#
-#     for name, field in fields[side].fields:
-#         logger.debug(f'prepped: {name}  {len(field.vocab)}')
-#
-#     return fields
-
-
 def validate_slurm_node_opts(current_env, world_context, opts):
     """If you are using slurm, confirm that opts match slurm environment variables"""
     slurm_n_nodes = int(current_env['SLURM_NNODES'])
@@ -184,9 +89,9 @@ def train(opts):
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
 
     frame_checkpoint = None
-    ckpt_path = None
+    checkpoint_path = None
     if opts.train_from:
-        frame_checkpoint, ckpt_path = load_frame_checkpoint(ckpt_path=opts.train_from)
+        frame_checkpoint, checkpoint_path = load_frame_checkpoint(checkpoint_path=opts.train_from)
         vocabs_dict = frame_checkpoint.get('vocab')
     else:
         vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
@@ -266,7 +171,7 @@ def train(opts):
                     semaphore,
                     task_queue_manager,
                     frame_checkpoint,
-                    ckpt_path,
+                    checkpoint_path,
                 ),
                 daemon=True,
             )

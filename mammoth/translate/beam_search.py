@@ -260,20 +260,26 @@ class BeamSearchBase(DecodeStrategy):
         self._batch_index = self._batch_index.index_select(0, non_finished)
         self.select_indices = self._batch_index.view(_B_new * self.beam_size)
         self.alive_seq = predictions.index_select(0, non_finished).view(-1, self.alive_seq.size(-1))
+
         # non_finished is batch-level, and we want to apply it to all beams in the batch.
         # encoder_output_tiled and src_mask_tiled have collapsed batches and beams into dim 0
+        encoder_output_by_batch = rearrange(
+            self.encoder_output_tiled, '(batch beam) t d -> batch beam t d', batch=_B_old,
+        )
+        encoder_output_by_batch = encoder_output_by_batch.index_select(0, non_finished)
         self.encoder_output_tiled = rearrange(
-            rearrange(
-                self.encoder_output_tiled, '(batch beam) t d -> batch beam t d', batch=_B_old,
-            ).index_select(0, non_finished),
+            encoder_output_by_batch,
             'batch beam t d -> (batch beam) t d',
         )
+        src_mask_by_batch = rearrange(
+            self.src_mask_tiled, '(batch beam) t -> batch beam t', batch=_B_old,
+        )
+        src_mask_by_batch = src_mask_by_batch.index_select(0, non_finished)
         self.src_mask_tiled = rearrange(
-            rearrange(
-                self.src_mask_tiled, '(batch beam) t -> batch beam t', batch=_B_old,
-            ).index_select(0, non_finished),
+            src_mask_by_batch,
             'batch beam t -> (batch beam) t',
         )
+
         self.topk_scores = self.topk_scores.index_select(0, non_finished)
         self.topk_ids = self.topk_ids.index_select(0, non_finished)
         self.maybe_update_target_prefix(self.select_indices)

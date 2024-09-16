@@ -16,7 +16,7 @@ from mammoth.utils.logging import logger
 from mammoth.inputters.vocab import Vocab
 
 
-TensorWithMask = collections.namedtuple('TensorWithMask', 'tensor mask')
+TensorWithMask = collections.namedtuple('TensorWithMask', ['tensor', 'mask'])
 
 
 @dataclass

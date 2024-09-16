@@ -118,14 +118,26 @@ class BeamSearchBase(DecodeStrategy):
     def initialize(self, *args, **kwargs):
         raise NotImplementedError
 
-    def initialize_(self, target_prefix):
+    def initialize_(
+        self,
+        target_prefix=None,
+        encoder_output=None,
+        src_mask=None,
+    ):
+        """Initialize for decoding."""
         if target_prefix is not None:
             if target_prefix.ndim == 1:
                 target_prefix = rearrange(target_prefix, 'b -> 1 b')
             # repeat the prefix for each beam
             target_prefix = tile(target_prefix, self.parallel_paths, dim=1)
+        tiled_encoder_output = tile(encoder_output, self.parallel_paths, dim=1)
+        tiled_src_mask = tile(src_mask, self.parallel_paths, dim=1)
 
-        super(BeamSearchBase, self).initialize(target_prefix=target_prefix)
+        super(BeamSearchBase, self).initialize(
+            target_prefix=target_prefix,
+            encoder_output=tiled_encoder_output,
+            src_mask=tiled_src_mask,
+        )
 
         self.best_scores = torch.full([self.batch_size], -1e10, dtype=torch.float, device=self.device)
         self._beam_offset = torch.arange(
@@ -234,9 +246,11 @@ class BeamSearchBase(DecodeStrategy):
 
         _B_new = non_finished.shape[0]
         self.remove_finished_batches(_B_new, _B_old, non_finished, predictions, attention, step)
+        is_alive = ~rearrange(self.is_finished, 'batch beam -> (batch beam)')
+        print(f'is_alive shape {is_alive.shape}')
         if self.cache is not None:
-            # FIXME: self.cache is a list of LayerIntermediates. Reach in and manipulate it?
-            self.cache = None
+            # self.cache is a list of LayerIntermediates. Reach in and manipulate it.
+            self.update_finished_in_cache(is_alive)
 
     def remove_finished_batches(self, _B_new, _B_old, non_finished, predictions, attention, step):
         # Remove finished batches for the next step.
@@ -247,6 +261,20 @@ class BeamSearchBase(DecodeStrategy):
         self._batch_index = self._batch_index.index_select(0, non_finished)
         self.select_indices = self._batch_index.view(_B_new * self.beam_size)
         self.alive_seq = predictions.index_select(0, non_finished).view(-1, self.alive_seq.size(-1))
+        # non_finished is batch-level, and we want to apply it to all beams in the batch.
+        # encoder_output_tiled and src_mask_tiled have collapsed batches and beams into dim 0
+        self.encoder_output_tiled = rearrange(
+            rearrange(
+                self.encoder_output_tiled, '(batch beam) t d -> batch beam t d', batch=_B_old,
+            ).index_select(0, non_finished),
+            'batch beam t d -> (batch beam) t d',
+        )
+        self.src_mask_tiled = rearrange(
+            rearrange(
+                self.src_mask_tiled, '(batch beam) t -> batch beam t', batch=_B_old,
+            ).index_select(0, non_finished),
+            'batch beam t -> (batch beam) t',
+        )
         self.topk_scores = self.topk_scores.index_select(0, non_finished)
         self.topk_ids = self.topk_ids.index_select(0, non_finished)
         self.maybe_update_target_prefix(self.select_indices)
@@ -309,10 +337,21 @@ class BeamSearch(BeamSearchBase):
     Beam search for seq2seq/encoder-decoder models
     """
 
-    def initialize(self, target_prefix=None):
+    def initialize(
+        self,
+        target_prefix=None,
+        encoder_output=None,
+        src_mask=None,
+    ):
         """Initialize for decoding.
         """
-        super(BeamSearch, self).initialize_(target_prefix)
+        assert encoder_output is not None
+        assert src_mask is not None
+        super(BeamSearch, self).initialize_(
+            target_prefix=target_prefix,
+            encoder_output=encoder_output,
+            src_mask=src_mask,
+        )
 
 
 class GNMTGlobalScorer(object):

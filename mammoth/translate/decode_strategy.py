@@ -1,8 +1,10 @@
 import torch
 from copy import deepcopy
 from typing import Optional, List
-
+from x_transformers.attend import Intermediates
 from x_transformers.x_transformers import LayerIntermediates
+
+from mammoth.utils.misc import tile
 
 
 class DecodeStrategy(object):
@@ -115,15 +117,25 @@ class DecodeStrategy(object):
         self.done = False
         self.cache: Optional[List[LayerIntermediates]] = None
 
-    def initialize(self, target_prefix=None):
+    def initialize(
+        self,
+        target_prefix=None,
+        encoder_output=None,
+        src_mask=None,
+    ):
         """DecodeStrategy subclasses should override :func:`initialize()`.
 
         `initialize` should be called before all actions.
         used to prepare necessary ingredients for decode.
         """
+        assert encoder_output is not None
+        assert src_mask is not None
         self.alive_seq = torch.full(
             [self.batch_size * self.parallel_paths, 1], self.bos, dtype=torch.long, device=self.device
         )
+        self.encoder_output_tiled = tile(encoder_output, self.parallel_paths, dim=0)
+        self.src_mask_tiled = tile(src_mask, self.parallel_paths, dim=0)
+        print(f'A alive_seq {self.alive_seq.shape} encoder_output_tiled {self.encoder_output_tiled.shape} src_mask_tiled {self.src_mask_tiled.shape}')
         self.is_finished = torch.zeros([self.batch_size, self.parallel_paths], dtype=torch.uint8, device=self.device)
         if target_prefix is not None:
             seq_len, batch_size = target_prefix.size()
@@ -211,6 +223,7 @@ class DecodeStrategy(object):
         n = self.block_ngram_repeat
 
         forbidden_tokens = list()
+        print(f'B alive_seq {self.alive_seq.shape} select_indices {len(self.select_indices)}')
         for path_idx, seq in zip(self.select_indices, self.alive_seq):
 
             # Reordering forbidden_tokens following beam selection
@@ -290,3 +303,55 @@ class DecodeStrategy(object):
         """
 
         raise NotImplementedError()
+
+    @staticmethod
+    def _update_single_tensor(t, select_mask):
+        if t is None or not isinstance(t, torch.Tensor):
+            return t
+        return t[select_mask]
+
+    def _update_single_layer_intermediates(self, layer_intermediates, select_mask):
+        layer_intermediates.last_hidden = self._update_single_tensor(layer_intermediates.last_hidden, select_mask)
+        layer_intermediates.attn_z_loss = self._update_single_tensor(layer_intermediates.attn_z_loss, select_mask)
+        layer_intermediates.mems = self._update_single_tensor(layer_intermediates.mems, select_mask)
+        layer_intermediates.memory_tokens = self._update_single_tensor(layer_intermediates.memory_tokens, select_mask)
+
+        if layer_intermediates.hiddens is not None:
+            layer_intermediates.hiddens = [
+                self._update_single_tensor(x, select_mask) for x in layer_intermediates.hiddens
+            ]
+        if layer_intermediates.layer_hiddens is not None:
+            layer_intermediates.layer_hiddens = [
+                self._update_single_tensor(x, select_mask) for x in layer_intermediates.layer_hiddens
+            ]
+
+        if layer_intermediates.attn_intermediates is not None:
+            result = []
+            for attn_i in layer_intermediates.attn_intermediates:
+                result.append(
+                    Intermediates(
+                        qk_similarities=self._update_single_tensor(attn_i.qk_similarities, select_mask),
+                        pre_softmax_attn=self._update_single_tensor(attn_i.pre_softmax_attn, select_mask),
+                        post_softmax_attn=self._update_single_tensor(attn_i.post_softmax_attn, select_mask),
+                        cached_kv=(
+                            self._update_single_tensor(attn_i.cached_kv[0], select_mask),
+                            self._update_single_tensor(attn_i.cached_kv[1], select_mask),
+                        ),
+                        layer_type=attn_i.layer_type,
+                    )
+                )
+            layer_intermediates.attn_intermediates = result
+
+    def update_finished_in_cache(self, select_mask):
+        """
+        Modify each field of a list of x-transformers LayerIntermediates objects,
+        to drop terminated beams.
+
+        This lovely beast will need to be updated whenever x-transformers changes the LayerIntermediates structure.
+        """
+        if self.cache is None:
+            return
+        self.cache = [
+            self._update_single_layer_intermediates(layer_intermediates, select_mask)
+            for layer_intermediates in self.cache
+        ]

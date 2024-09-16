@@ -25,17 +25,6 @@ from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_fro
 from mammoth.utils.parse import ArgumentParser
 
 
-# QUI logging for batch shapes
-def quishape(name, val):
-    if val is None:
-        print(f'{name} is None')
-        return
-    if len(val.shape) >= 2:
-        print(f'{name} {val.shape}  {val.shape[0] * val.shape[1]}')
-    else:
-        print(f'{name} {val.shape}')
-
-
 def build_translator(opts, task_queue_manager, task, report_score=True, logger=None, out_file=None):
     if out_file is None:
         outdir = os.path.dirname(opts.output)
@@ -883,9 +872,9 @@ class Translator(Inference):
         # (5) Begin decoding step by step:
         for step in range(decode_strategy.max_length):
             decoder_input = decode_strategy.alive_seq
-            quishape('decoder_input', decoder_input)
-            quishape('encoder_output_tiled', decode_strategy.encoder_output_tiled)
-            quishape('src_mask_tiled', decode_strategy.src_mask_tiled)
+            # quishape('decoder_input', decoder_input)
+            # quishape('encoder_output_tiled', decode_strategy.encoder_output_tiled)
+            # quishape('src_mask_tiled', decode_strategy.src_mask_tiled)
 
             logits, new_cache = active_decoder(
                 decoder_input,

@@ -135,7 +135,6 @@ class DecodeStrategy(object):
         )
         self.encoder_output_tiled = tile(encoder_output, self.parallel_paths, dim=0)
         self.src_mask_tiled = tile(src_mask, self.parallel_paths, dim=0)
-        print(f'A alive_seq {self.alive_seq.shape} encoder_output_tiled {self.encoder_output_tiled.shape} src_mask_tiled {self.src_mask_tiled.shape}')
         self.is_finished = torch.zeros([self.batch_size, self.parallel_paths], dtype=torch.uint8, device=self.device)
         if target_prefix is not None:
             seq_len, batch_size = target_prefix.size()
@@ -223,7 +222,6 @@ class DecodeStrategy(object):
         n = self.block_ngram_repeat
 
         forbidden_tokens = list()
-        print(f'B alive_seq {self.alive_seq.shape} select_indices {len(self.select_indices)}')
         for path_idx, seq in zip(self.select_indices, self.alive_seq):
 
             # Reordering forbidden_tokens following beam selection

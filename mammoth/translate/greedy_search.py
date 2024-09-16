@@ -191,7 +191,6 @@ class GreedySearch(DecodeStrategy):
 
     @property
     def current_predictions(self):
-        print(f'C alive_seq {self.alive_seq.shape} and returning {self.alive_seq[:, -1].shape}')
         return self.alive_seq[:, -1]
 
     @property
@@ -239,9 +238,7 @@ class GreedySearch(DecodeStrategy):
 
         self.is_finished = topk_ids.eq(self.eos)
 
-        print(f'D alive_seq {self.alive_seq.shape} before')
         self.alive_seq = torch.cat([self.alive_seq, topk_ids], -1)
-        print(f'E alive_seq {self.alive_seq.shape} after')
         self.ensure_max_length()
 
     def update_finished(self):
@@ -255,7 +252,6 @@ class GreedySearch(DecodeStrategy):
             b_orig = self.original_batch_idx[b]
             score = self.beams_scores[b, 0] / length_penalty
             pred = self.alive_seq[b, 1:]
-            print(f'F alive_seq {self.alive_seq.shape} pred {self.alive_seq[b, 1:].shape}')
             attention = None
             self.hypotheses[b_orig].append((score, pred, attention))
         self.done = self.is_finished.all()
@@ -268,11 +264,9 @@ class GreedySearch(DecodeStrategy):
                     self.attention[b].append(attn)
             return
         is_alive = ~self.is_finished.view(-1)
-        print(f'F alive_seq {self.alive_seq.shape} encoder_output_tiled {self.encoder_output_tiled.shape} src_mask_tiled {self.src_mask_tiled.shape}')
         self.alive_seq = self.alive_seq[is_alive]
         self.encoder_output_tiled = self.encoder_output_tiled[is_alive]
         self.src_mask_tiled = self.src_mask_tiled[is_alive]
-        print(f'G alive_seq {self.alive_seq.shape} encoder_output_tiled {self.encoder_output_tiled.shape} src_mask_tiled {self.src_mask_tiled.shape}')
         self.beams_scores = self.beams_scores[is_alive]
         self.select_indices = is_alive.nonzero(as_tuple=False).view(-1)
         self.original_batch_idx = self.original_batch_idx[is_alive]

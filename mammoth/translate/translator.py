@@ -20,7 +20,6 @@ from mammoth.translate.greedy_search import GreedySearch
 from mammoth.translate.translation import TranslationBuilder
 from mammoth.utils.alignment import build_align_pharaoh
 from mammoth.utils.misc import set_random_seed, report_matrix, use_gpu
-from mammoth.utils.misc import tile
 from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_from_checkpoint
 from mammoth.utils.parse import ArgumentParser
 

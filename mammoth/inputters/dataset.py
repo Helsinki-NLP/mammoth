@@ -275,11 +275,6 @@ def build_sub_vocab(examples, n_sample):
     sub_counter_tgt = collections.Counter()
     for i, item in enumerate(examples):
         src, tgt = item['src'], item['tgt']
-        # for feat_name, feat_line in maybe_example["src"].items():
-        #     if feat_name not in ["src", "src_original"]:
-        #         sub_counter_src_feats[feat_name].update(feat_line.split(' '))
-        #         if opts.dump_samples:
-        #             src_line_pretty = append_features_to_example(src_line_pretty, feat_line)
         sub_counter_src.update(src)
         sub_counter_tgt.update(tgt)
         if n_sample > 0 and (i + 1) >= n_sample:
@@ -304,9 +299,6 @@ def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
         logger.info(f"Build vocab on {n_sample} transformed examples/corpus.")
     else:
         raise ValueError(f"n_sample should > 0 or == -1, get {n_sample}.")
-
-    # FIXME
-    assert not opts.dump_samples, 'Not implemented'
 
     corpora = {
         corpus_id: read_examples_from_files(

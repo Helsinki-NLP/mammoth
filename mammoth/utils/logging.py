@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import logging
+import torch
 from logging.handlers import RotatingFileHandler
 from typing import Dict, Union
 
@@ -60,3 +61,17 @@ def structured_logging(obj: Dict[str, Union[str, int, float]]):
         structured_logger.info(json.dumps(obj))
     except Exception:
         pass
+
+
+# QUI logging for batch shapes
+def quishape(name, val):
+    if val is None:
+        print(f'{name} is None')
+        return
+    if not isinstance(val, torch.Tensor):
+        print(f'{name} is of type {type(val)}')
+        return
+    if len(val.shape) >= 2:
+        print(f'{name} {val.shape}  {val.shape[0] * val.shape[1]}')
+    else:
+        print(f'{name} {val.shape}')

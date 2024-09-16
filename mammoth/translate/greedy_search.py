@@ -159,15 +159,28 @@ class GreedySearch(DecodeStrategy):
         self.topk_scores = None
         self.beam_size = beam_size
 
-    def initialize(self, target_prefix=None):
+    def initialize(
+        self,
+        target_prefix=None,
+        encoder_output=None,
+        src_mask=None,
+    ):
         """Initialize for decoding."""
+        assert encoder_output is not None
+        assert src_mask is not None
         if target_prefix is not None:
             if target_prefix.ndim == 1:
                 target_prefix = rearrange(target_prefix, 'b -> 1 b')
             # repeat the prefix for each beam
             target_prefix = tile(target_prefix, self.parallel_paths, dim=1)
+        tiled_encoder_output = tile(encoder_output, self.parallel_paths, dim=1)
+        tiled_src_mask = tile(src_mask, self.parallel_paths, dim=1)
 
-        super(GreedySearch, self).initialize(target_prefix=target_prefix)
+        super(GreedySearch, self).initialize(
+            target_prefix=target_prefix,
+            encoder_output=tiled_encoder_output,
+            src_mask=tiled_src_mask,
+        )
         self.select_indices = torch.arange(self.batch_size * self.beam_size, dtype=torch.long, device=self.device)
         self.original_batch_idx = tile(
             torch.arange(self.batch_size, dtype=torch.long, device=self.device),
@@ -178,6 +191,7 @@ class GreedySearch(DecodeStrategy):
 
     @property
     def current_predictions(self):
+        print(f'C alive_seq {self.alive_seq.shape} and returning {self.alive_seq[:, -1].shape}')
         return self.alive_seq[:, -1]
 
     @property
@@ -202,7 +216,7 @@ class GreedySearch(DecodeStrategy):
                 self.select_indices.size(0), dtype=torch.long, device=self.select_indices.device
             )
 
-    def advance(self, log_probs, attn):
+    def advance(self, log_probs):
         """Select next tokens randomly from the top k possible next tokens.
 
         Args:
@@ -212,7 +226,6 @@ class GreedySearch(DecodeStrategy):
                 log-probabilities ``logits - logits.logsumexp(-1)``,
                 which equals the logits if they are log-probabilities summing
                 to 1.)
-            attn (FloatTensor): Shaped ``(1, B, inp_seq_len)``.
         """
 
         self.align_select_indices()
@@ -226,12 +239,9 @@ class GreedySearch(DecodeStrategy):
 
         self.is_finished = topk_ids.eq(self.eos)
 
+        print(f'D alive_seq {self.alive_seq.shape} before')
         self.alive_seq = torch.cat([self.alive_seq, topk_ids], -1)
-        if self.return_attention:
-            if self.alive_attn is None:
-                self.alive_attn = attn
-            else:
-                self.alive_attn = torch.cat([self.alive_attn, attn], 0)
+        print(f'E alive_seq {self.alive_seq.shape} after')
         self.ensure_max_length()
 
     def update_finished(self):
@@ -245,7 +255,8 @@ class GreedySearch(DecodeStrategy):
             b_orig = self.original_batch_idx[b]
             score = self.beams_scores[b, 0] / length_penalty
             pred = self.alive_seq[b, 1:]
-            attention = self.alive_attn[:, b, : self.memory_lengths[b]] if self.alive_attn is not None else []
+            print(f'F alive_seq {self.alive_seq.shape} pred {self.alive_seq[b, 1:].shape}')
+            attention = None
             self.hypotheses[b_orig].append((score, pred, attention))
         self.done = self.is_finished.all()
         if self.done:
@@ -257,10 +268,15 @@ class GreedySearch(DecodeStrategy):
                     self.attention[b].append(attn)
             return
         is_alive = ~self.is_finished.view(-1)
+        print(f'F alive_seq {self.alive_seq.shape} encoder_output_tiled {self.encoder_output_tiled.shape} src_mask_tiled {self.src_mask_tiled.shape}')
         self.alive_seq = self.alive_seq[is_alive]
+        self.encoder_output_tiled = self.encoder_output_tiled[is_alive]
+        self.src_mask_tiled = self.src_mask_tiled[is_alive]
+        print(f'G alive_seq {self.alive_seq.shape} encoder_output_tiled {self.encoder_output_tiled.shape} src_mask_tiled {self.src_mask_tiled.shape}')
         self.beams_scores = self.beams_scores[is_alive]
-        if self.alive_attn is not None:
-            self.alive_attn = self.alive_attn[:, is_alive]
         self.select_indices = is_alive.nonzero(as_tuple=False).view(-1)
         self.original_batch_idx = self.original_batch_idx[is_alive]
         self.maybe_update_target_prefix(self.select_indices)
+        if self.cache is not None:
+            # self.cache is a list of LayerIntermediates. Reach in and manipulate it.
+            self.update_finished_in_cache(is_alive)

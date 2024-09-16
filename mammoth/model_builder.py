@@ -51,7 +51,8 @@ def get_attention_layers_kwargs(
     model_opts,
 ):
     """Return arguments for x_transformers.AttentionLayers"""
-    depths = model_opts.enc_layers if side == Side.decoder else model_opts.dec_layers
+    assert side in {Side.encoder, Side.decoder}, f'Invalid side "{side}"'
+    depths = model_opts.enc_layers if side == Side.encoder else model_opts.dec_layers
     depth = depths[layer_stack_index]
     causal = side == Side.decoder
     cross_attend = side == Side.decoder

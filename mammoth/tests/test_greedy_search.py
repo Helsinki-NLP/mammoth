@@ -37,6 +37,7 @@ class TestGreedySearch(unittest.TestCase):
             valid_score_dist = torch.log_softmax(torch.tensor([6.0, 5.0]), dim=0)
             min_length = 5
             eos_idx = 2
+            src_len = 67
             lengths = torch.randint(0, 30, (batch_sz,))
             samp = GreedySearch(
                 0,
@@ -57,7 +58,10 @@ class TestGreedySearch(unittest.TestCase):
                 False,
                 device=lengths.device,
             )
-            samp.initialize()
+            samp.initialize(
+                encoder_output=torch.randn(batch_sz, src_len, 73),
+                src_mask=torch.randint(0, 1, (batch_sz, src_len))
+            )
             all_attns = []
             for i in range(min_length + 4):
                 word_probs = torch.full((batch_sz, n_words), -float('inf'))
@@ -70,7 +74,7 @@ class TestGreedySearch(unittest.TestCase):
 
                 attns = torch.randn(1, batch_sz, 53)
                 all_attns.append(attns)
-                samp.advance(word_probs, attns)
+                samp.advance(word_probs)
                 if i < min_length:
                     self.assertTrue(samp.topk_scores[0].allclose(valid_score_dist[1]))
                     self.assertTrue(samp.topk_scores[1:].eq(0).all())
@@ -89,6 +93,7 @@ class TestGreedySearch(unittest.TestCase):
                 valid_score_dist_1 = torch.log_softmax(torch.tensor([6.0, 5.0, 4.0, 3.0, 2.0, 1.0]), dim=0)
                 valid_score_dist_2 = torch.log_softmax(torch.tensor([6.0, 1.0]), dim=0)
                 eos_idx = 2
+                src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
                     0,
@@ -109,7 +114,10 @@ class TestGreedySearch(unittest.TestCase):
                     False,
                     device=lengths.device,
                 )
-                samp.initialize()
+                samp.initialize(
+                    encoder_output=torch.randn(batch_sz, src_len, 73),
+                    src_mask=torch.randint(0, 1, (batch_sz, src_len))
+                )
                 # initial step
                 i = 0
                 word_probs = torch.full((batch_sz, n_words), -float('inf'))
@@ -120,8 +128,7 @@ class TestGreedySearch(unittest.TestCase):
                 word_probs[0, _non_eos_idxs] = valid_score_dist_1[1:]
                 word_probs[1:, _non_eos_idxs[0] + i] = 0
 
-                attns = torch.randn(1, batch_sz, 53)
-                samp.advance(word_probs, attns)
+                samp.advance(word_probs)
                 self.assertTrue(samp.is_finished[0].eq(1).all())
                 samp.update_finished()
                 self.assertEqual([score for score, _, _ in samp.hypotheses[0]], [valid_score_dist_1[0] / temp])
@@ -139,8 +146,7 @@ class TestGreedySearch(unittest.TestCase):
                 word_probs[0:7, _non_eos_idxs[:2]] = valid_score_dist_2
                 word_probs[8:, _non_eos_idxs[:2]] = valid_score_dist_2
 
-                attns = torch.randn(1, batch_sz, 53)
-                samp.advance(word_probs, attns)
+                samp.advance(word_probs)
 
                 self.assertTrue(samp.is_finished[7].eq(1).all())
                 samp.update_finished()
@@ -152,8 +158,7 @@ class TestGreedySearch(unittest.TestCase):
                 # everything dies
                 word_probs[:, eos_idx] = 0
 
-                attns = torch.randn(1, batch_sz, 53)
-                samp.advance(word_probs, attns)
+                samp.advance(word_probs)
 
                 self.assertTrue(samp.is_finished.eq(1).all())
                 samp.update_finished()
@@ -167,6 +172,7 @@ class TestGreedySearch(unittest.TestCase):
                 valid_score_dist_1 = torch.log_softmax(torch.tensor([6.0, 5.0, 4.0, 3.0, 2.0, 1.0]), dim=0)
                 valid_score_dist_2 = torch.log_softmax(torch.tensor([6.0, 1.0]), dim=0)
                 eos_idx = 2
+                src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
                     0,
@@ -187,7 +193,10 @@ class TestGreedySearch(unittest.TestCase):
                     False,
                     device=lengths.device,
                 )
-                samp.initialize()
+                samp.initialize(
+                    encoder_output=torch.randn(batch_sz, src_len, 73),
+                    src_mask=torch.randint(0, 1, (batch_sz, src_len))
+                )
                 # initial step
                 i = 0
                 for _ in range(100):
@@ -199,8 +208,7 @@ class TestGreedySearch(unittest.TestCase):
                     word_probs[0, _non_eos_idxs] = valid_score_dist_1[1:]
                     word_probs[1:, _non_eos_idxs[0] + i] = 0
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished[0].eq(1).all():
                         break
                 else:
@@ -226,8 +234,7 @@ class TestGreedySearch(unittest.TestCase):
                     word_probs[0:7, _non_eos_idxs[:2]] = valid_score_dist_2
                     word_probs[8:, _non_eos_idxs[:2]] = valid_score_dist_2
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished[7].eq(1).all():
                         break
                 else:
@@ -247,8 +254,7 @@ class TestGreedySearch(unittest.TestCase):
                     # everything dies
                     word_probs[:, eos_idx] = 0
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished.any():
                         samp.update_finished()
                     if samp.is_finished.eq(1).all():
@@ -271,6 +277,7 @@ class TestGreedySearch(unittest.TestCase):
                 valid_score_dist_1 = torch.log_softmax(torch.tensor([6.0, 5.0, 4.0, 3.0, 2.0, 1.0]), dim=0)
                 valid_score_dist_2 = torch.log_softmax(torch.tensor([6.0, 1.0]), dim=0)
                 eos_idx = 2
+                src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
                     0,
@@ -291,7 +298,10 @@ class TestGreedySearch(unittest.TestCase):
                     False,
                     device=lengths.device,
                 )
-                samp.initialize()
+                samp.initialize(
+                    encoder_output=torch.randn(batch_sz, src_len, 73),
+                    src_mask=torch.randint(0, 1, (batch_sz, src_len))
+                )
                 # initial step
                 # finish one beam
                 i = 0
@@ -305,8 +315,7 @@ class TestGreedySearch(unittest.TestCase):
                     word_probs[beam_size - 2 + 1:, _non_eos_idxs[0] + i] = 0
                     word_probs[:beam_size - 2, _non_eos_idxs[0] + i] = 0
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished[beam_size - 2].eq(1).all():
                         self.assertFalse(samp.is_finished[: beam_size - 2].eq(1).any())
                         self.assertFalse(samp.is_finished[beam_size - 2 + 1].eq(1).any())
@@ -330,8 +339,7 @@ class TestGreedySearch(unittest.TestCase):
                     word_probs[: (batch_sz - 1) * beam_size + 7, _non_eos_idxs[:2]] = valid_score_dist_2
                     word_probs[(batch_sz - 1) * beam_size + 8:, _non_eos_idxs[:2]] = valid_score_dist_2
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished[(batch_sz - 1) * beam_size + 7].eq(1).all():
                         break
                 else:
@@ -353,8 +361,7 @@ class TestGreedySearch(unittest.TestCase):
                     # everything dies
                     word_probs[:, eos_idx] = 0
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished.any():
                         samp.update_finished()
                     if samp.is_finished.eq(1).all():
@@ -376,6 +383,7 @@ class TestGreedySearch(unittest.TestCase):
                 valid_score_dist_1 = torch.log_softmax(torch.tensor([6.0, 5.0, 4.0, 3.0, 2.0, 1.0]), dim=0)
                 valid_score_dist_2 = torch.log_softmax(torch.tensor([6.0, 1.0]), dim=0)
                 eos_idx = 2
+                src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
                     0,
@@ -396,7 +404,10 @@ class TestGreedySearch(unittest.TestCase):
                     False,
                     device=lengths.device,
                 )
-                samp.initialize()
+                samp.initialize(
+                    encoder_output=torch.randn(batch_sz, src_len, 73),
+                    src_mask=torch.randint(0, 1, (batch_sz, src_len))
+                )
                 # initial step
                 i = 0
                 for _ in range(100):
@@ -408,8 +419,7 @@ class TestGreedySearch(unittest.TestCase):
                     word_probs[0, _non_eos_idxs] = valid_score_dist_1[1:]
                     word_probs[1:, _non_eos_idxs[0] + i] = 0
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished[0].eq(1).all():
                         break
                 else:
@@ -435,8 +445,7 @@ class TestGreedySearch(unittest.TestCase):
                     word_probs[0:7, _non_eos_idxs[:2]] = valid_score_dist_2
                     word_probs[8:, _non_eos_idxs[:2]] = valid_score_dist_2
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished[7].eq(1).all():
                         break
                 else:
@@ -456,8 +465,7 @@ class TestGreedySearch(unittest.TestCase):
                     # everything dies
                     word_probs[:, eos_idx] = 0
 
-                    attns = torch.randn(1, batch_sz, 53)
-                    samp.advance(word_probs, attns)
+                    samp.advance(word_probs)
                     if samp.is_finished.any():
                         samp.update_finished()
                     if samp.is_finished.eq(1).all():

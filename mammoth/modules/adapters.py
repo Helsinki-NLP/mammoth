@@ -17,8 +17,6 @@ from x_transformers.x_transformers import (
     SimpleRMSNorm,
 )
 
-from mammoth.utils.logging import quishape
-
 
 class FeedForwardAdapterLayer(nn.Module):
     """A separate adapter layer injected after a FeedForward. Has its own norms."""
@@ -225,37 +223,28 @@ class AdaptedAttentionLayers(AttentionLayers):
         self.layer_dropouts = adapted_layer_dropouts
 
     def forward(self, *args, **kwargs):
-        print('\n## forward args')
-        for x in args:
-            quishape('arg', x)
-        print('## forward kwargs')
-        for k, x in kwargs.items():
-            quishape(k, x)
-        print('## forward cache')
-        if 'cache' in kwargs and kwargs['cache']:
-            layer_intermediates_shapes(kwargs['cache'])
         self._inject_adapters()
         return super().forward(*args, **kwargs)
 
 
-def layer_intermediates_shapes(cache):
-    quishape('last_hidden', cache.last_hidden)
-    quishape('attn_z_loss', cache.attn_z_loss)
-    quishape('mems', cache.mems)
-    quishape('memory_tokens', cache.memory_tokens)
-
-    if cache.hiddens is not None:
-        for x in cache.hiddens:
-            quishape('hiddens', x)
-    if cache.layer_hiddens is not None:
-        for x in cache.layer_hiddens:
-            quishape('layer_hiddens', x)
-
-    if cache.attn_intermediates is not None:
-        for attn_i in cache.attn_intermediates:
-            quishape('qk_similarities', attn_i.qk_similarities)
-            quishape('pre_softmax_attn', attn_i.pre_softmax_attn)
-            quishape('post_softmax_attn', attn_i.post_softmax_attn)
-            quishape('cached_kv[0]', attn_i.cached_kv[0])
-            quishape('cached_kv[1]', attn_i.cached_kv[1])
-            print('layer_type', attn_i.layer_type)
+# def layer_intermediates_shapes(cache):
+#     quishape('last_hidden', cache.last_hidden)
+#     quishape('attn_z_loss', cache.attn_z_loss)
+#     quishape('mems', cache.mems)
+#     quishape('memory_tokens', cache.memory_tokens)
+#
+#     if cache.hiddens is not None:
+#         for x in cache.hiddens:
+#             quishape('hiddens', x)
+#     if cache.layer_hiddens is not None:
+#         for x in cache.layer_hiddens:
+#             quishape('layer_hiddens', x)
+#
+#     if cache.attn_intermediates is not None:
+#         for attn_i in cache.attn_intermediates:
+#             quishape('qk_similarities', attn_i.qk_similarities)
+#             quishape('pre_softmax_attn', attn_i.pre_softmax_attn)
+#             quishape('post_softmax_attn', attn_i.post_softmax_attn)
+#             quishape('cached_kv[0]', attn_i.cached_kv[0])
+#             quishape('cached_kv[1]', attn_i.cached_kv[1])
+#             print('layer_type', attn_i.layer_type)

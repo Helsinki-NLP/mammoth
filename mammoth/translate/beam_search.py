@@ -247,7 +247,6 @@ class BeamSearchBase(DecodeStrategy):
         _B_new = non_finished.shape[0]
         self.remove_finished_batches(_B_new, _B_old, non_finished, predictions, attention, step)
         is_alive = ~rearrange(self.is_finished, 'batch beam -> (batch beam)')
-        print(f'is_alive shape {is_alive.shape}')
         if self.cache is not None:
             # self.cache is a list of LayerIntermediates. Reach in and manipulate it.
             self.update_finished_in_cache(is_alive)

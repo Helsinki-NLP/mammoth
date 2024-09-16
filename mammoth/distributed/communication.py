@@ -229,7 +229,7 @@ def consumer(
     semaphore,
     task_queue_manager,
     frame_checkpoint,
-    frame_ckpt_path,
+    frame_checkpoint_path,
 ):
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
     try:
@@ -249,7 +249,7 @@ def consumer(
             semaphore=semaphore,
             task_queue_manager=task_queue_manager,
             frame_checkpoint=frame_checkpoint,
-            frame_ckpt_path=frame_ckpt_path,
+            frame_checkpoint_path=frame_checkpoint_path,
         )
 
     except KeyboardInterrupt:

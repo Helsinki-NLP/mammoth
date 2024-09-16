@@ -307,12 +307,12 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             )
 
     @classmethod
-    def ckpt_model_opts(cls, ckpt_opt):
+    def checkpoint_model_opts(cls, checkpoint_opt):
         # Load default opts values, then overwrite with the opts in
         # the checkpoint. That way, if there are new options added,
         # the defaults are used.
         the_opts = cls.defaults(opts.model_opts)
-        the_opts.__dict__.update(ckpt_opt.__dict__)
+        the_opts.__dict__.update(checkpoint_opt.__dict__)
         return the_opts
 
     @classmethod

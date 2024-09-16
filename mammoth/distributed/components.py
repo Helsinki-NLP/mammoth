@@ -89,7 +89,7 @@ class DistributedComponent(ABC):
 
 # TODO: This is a misnomer: Not an entire XCoder, but just one AttentionLayers block
 @dataclass  # type: ignore
-class DistributedXCoder(DistributedComponent, ABC):
+class DistributedAttentionLayersBlock(DistributedComponent, ABC):
     layer_stack_index: int
     xcoder_id: str
 
@@ -121,7 +121,7 @@ class DistributedXCoder(DistributedComponent, ABC):
 
 
 @dataclass
-class DistributedEncoder(DistributedXCoder):
+class DistributedEncoder(DistributedAttentionLayersBlock):
     @property
     def side(self) -> Side:
         return Side.encoder
@@ -136,7 +136,7 @@ class DistributedEncoder(DistributedXCoder):
 
 
 @dataclass
-class DistributedDecoder(DistributedXCoder):
+class DistributedDecoder(DistributedAttentionLayersBlock):
     @property
     def side(self) -> Side:
         return Side.decoder
@@ -168,7 +168,7 @@ class DistributedEmbedding(DistributedComponent):
 
 @dataclass
 class DistributedAdapter(DistributedComponent):
-    # Can't use parent object of type DistributedXCoder: that refers to a
+    # Can't use parent object of type DistributedAttentionLayersBlock: that refers to a
     # specific module, while the adapter is for the entire layerstack slot
     side: Side
     layer_stack_index: int

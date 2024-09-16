@@ -26,7 +26,7 @@ def configure_process(opts, device_id):
 def _get_model_opts(opts, frame_checkpoint=None):
     """Get `model_opts` to build model, may load from `checkpoint` if any."""
     if frame_checkpoint is not None:
-        model_opts = ArgumentParser.ckpt_model_opts(frame_checkpoint["opts"])
+        model_opts = ArgumentParser.checkpoint_model_opts(frame_checkpoint["opts"])
         ArgumentParser.update_model_opts(model_opts)
         ArgumentParser.validate_model_opts(model_opts)
         if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
@@ -84,7 +84,7 @@ def main(
     semaphore=None,
     task_queue_manager=None,
     frame_checkpoint=None,
-    frame_ckpt_path=None,
+    frame_checkpoint_path=None,
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opts`` has been validated and updated
@@ -113,7 +113,7 @@ def main(
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
-    enc, dec = model.count_parameters(log=logger.debug)
+    enc, dec = model.count_parameters()
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
     logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))
 
@@ -127,13 +127,13 @@ def main(
     )
     logger.info("{} - total optimizer parameters: {}".format(
         device_context.id,
-        optim.count_parameters(log=logger.debug)
+        optim.count_parameters()
     ))
 
     # Load parameters from checkpoint
     if opts.train_from:
         load_parameters_from_checkpoint(
-            frame_ckpt_path=frame_ckpt_path,
+            frame_checkpoint_path=frame_checkpoint_path,
             model=model,
             optim=optim,
             task_queue_manager=task_queue_manager,

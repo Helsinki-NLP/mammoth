@@ -545,6 +545,12 @@ def _add_train_general_opts(parser):
         choices=['none', 'all', 'states', 'keep_states'],
         help="Optimization resetter when train_from.",
     )
+    group.add(
+        '--yes_i_messed_with_the_checkpoint',
+        '-yes_i_messed_with_the_checkpoint',
+        action='store_true',
+        help="Only set this if you know what you are doing."
+    )
 
     # Freeze word vectors
     group.add(
@@ -592,13 +598,6 @@ def _add_train_general_opts(parser):
         choices=TASK_DISTRIBUTION_STRATEGIES.keys(),
         default='weighted_sampling',
         help="Strategy for the order in which tasks (e.g. language pairs) are scheduled for training"
-    )
-    group.add(
-        '--max_generator_batches',
-        '-max_generator_batches',
-        type=int,
-        default=0,
-        help="Deprecated"
     )
     group.add(
         "-lookahead_minibatches",

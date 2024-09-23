@@ -42,11 +42,14 @@ class Statistics(object):
         loss, model prediction logits, and target indices.
         Note that this is heavy. Only use for validation / debug purposes.
         """
-        pred = logits.max(1)[1]
+        target = target.squeeze(-1)
+        pred = logits.max(dim=-1).indices
+        correct = pred.eq(target)
         non_padding = target.ne(padding_idx)
-        num_correct = pred.eq(target).masked_select(non_padding).sum().item()
+        correct_not_padded = correct.masked_select(non_padding)
+        num_correct = correct_not_padded.sum().item()
         num_non_padding = non_padding.sum().item()
-        cls(loss, num_non_padding, num_correct)
+        return cls(loss, num_non_padding, num_correct)
 
     @staticmethod
     def all_gather_stats(stat, max_size=4096):
@@ -199,8 +202,12 @@ class Statistics(object):
         """display statistics to tensorboard"""
         t = self.elapsed_time()
         writer.add_scalar(prefix + "/xent", self.xent(), step)
-        writer.add_scalar(prefix + "/ppl", self.ppl(), step)
-        writer.add_scalar(prefix + "/accuracy", self.accuracy(), step)
+        ppl = self.ppl()
+        if ppl is not None:
+            writer.add_scalar(prefix + "/ppl", ppl, step)
+        acc = self.accuracy()
+        if acc is not None:
+            writer.add_scalar(prefix + "/accuracy", acc, step)
         writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)
         # writer.add_scalar(prefix + "/lr", learning_rate, step)
         if patience is not None:

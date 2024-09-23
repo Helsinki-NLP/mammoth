@@ -276,6 +276,8 @@ class Trainer(object):
                     continue
                 # logger.warning(f'Syncing {component.get_name()}')   # DEBUG
                 params = component.named_parameters(self.model)
+                # gradient_sync.gradient_norm counts the number of devices that trained this component
+                # this doesn't normalize the number of masked tokens
                 mammoth.distributed.externally_managed_reduce_and_rescale_grads(
                     named_parameters=params,
                     has_local_gradient=gradient_sync.has_local_gradient,
@@ -441,9 +443,9 @@ class Trainer(object):
             # update data state
             self._data_state[metadata.corpus_id] = batch.line_idx
 
-            num_tokens = batch.tgt.mask.sum()
+            num_tokens = batch.tgt.mask.sum().item()
             if self.norm_method == "tokens":
-                normalization += num_tokens.item()
+                normalization += num_tokens
             else:
                 normalization += batch.batch_size
             report_stats.n_src_words += batch.src.mask.sum().item()

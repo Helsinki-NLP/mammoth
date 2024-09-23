@@ -304,12 +304,17 @@ class Trainer(object):
             # Learning rate used to be retrieved with: self.optim.learning_rate()
             # However, as each optimizer has its own learning rate, it is not obvious what to log here.
             # We might log the mean or the range of learning rates, but the simplest thing is to log nothing.
+            report_lr = None
+            if device_context.is_master():
+                sampled_task_counts = self.task_queue_manager.sampled_task_counts
+            else:
+                sampled_task_counts = None
             report_stats = self._maybe_report_training(
                 step,
                 train_steps,
-                None,
+                report_lr,
                 report_stats,
-                sampled_task_counts=self.task_queue_manager.sampled_task_counts,
+                sampled_task_counts=sampled_task_counts,
             )
 
             if step % valid_steps == 0 and valid_iter is not None:

@@ -1,7 +1,5 @@
 """Base Transform class and relate utils."""
-import torch
 from mammoth.utils.logging import logger
-from mammoth.utils.misc import check_path
 
 
 class Transform(object):

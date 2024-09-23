@@ -1,6 +1,4 @@
 # wmt14_en_de.yaml
-save_data: data/wmt/run/example
-
 # Corpus opts:
 data:
     commoncrawl:

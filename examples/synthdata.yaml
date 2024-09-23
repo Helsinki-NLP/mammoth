@@ -58,7 +58,6 @@ tgt_vocab:
     sort_source: "data/synthdata/shared_vocab"
     counting: "data/synthdata/shared_vocab"
     reverse_counting: "data/synthdata/shared_vocab"
-overwrite: False
 
 save_model: models/synthdata
 

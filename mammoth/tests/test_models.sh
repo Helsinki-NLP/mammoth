@@ -86,92 +86,6 @@ rm_tmp_checkpoints(){
 }
 
 
-### RNNLM
-###############################################
-lstm(){
-    rm -f "$DATA_DIR"/*.pt
-    $PYTHON_BIN preprocess.py -train_src "$DATA_DIR"/src-train.txt \
-                         -train_tgt "$DATA_DIR"/tgt-train.txt \
-                         -valid_src "$DATA_DIR"/src-val.txt \
-                         -valid_tgt "$DATA_DIR"/tgt-val.txt \
-                         -save_data "$DATA_PATH" \
-                         -src_vocab_size 1000 \
-                         -tgt_vocab_size 1000
-
-    $PYTHON_BIN train.py -data "$DATA_PATH" \
-                    -save_model "$MODEL_PATH" \
-                    -gpuid $GPUID \
-                    -rnn_size 512 \
-                    -word_vec_size 512 \
-                    -layers 1 \
-                    -train_steps 10000 \
-                    -optim adam  \
-                    -learning_rate 0.001 \
-                    -rnn_type LSTM
-    mv_best_checkpoint
-    maybe_translate
-    rm_tmp_checkpoints
-}
-
-
-
-### SRU
-###############################################
-sru(){
-    rm -f "$DATA_DIR"/*.pt
-    $PYTHON_BIN preprocess.py -train_src "$DATA_DIR"/src-train.txt \
-                         -train_tgt "$DATA_DIR"/tgt-train.txt \
-                         -valid_src "$DATA_DIR"/src-val.txt \
-                         -valid_tgt "$DATA_DIR"/tgt-val.txt \
-                         -save_data "$DATA_PATH" \
-                         -src_vocab_size 1000 \
-                         -tgt_vocab_size 1000 \
-                         -rnn_type "SRU" \
-                         -input_feed 0
-
-    $PYTHON_BIN train.py -data "$DATA_PATH" \
-                    -save_model "$MODEL_PATH" \
-                    -gpuid $GPUID \
-                    -rnn_size 512 \
-                    -word_vec_size 512 \
-                    -layers 1 \
-                    -train_steps 10000 \
-                    -optim adam  \
-                    -learning_rate 0.001 \
-                    -rnn_type LSTM
-    mv_best_checkpoint
-    maybe_translate
-    rm_tmp_checkpoints
-}
-### CNN
-###############################################
-cnn(){
-    rm -f "$DATA_DIR"/*.pt
-    $PYTHON_BIN preprocess.py -train_src "$DATA_DIR"/src-train.txt\
-                         -train_tgt "$DATA_DIR"/tgt-train.txt \
-                         -valid_src "$DATA_DIR"/src-val.txt \
-                         -valid_tgt "$DATA_DIR"/tgt-val.txt \
-                         -save_data "$DATA_PATH" \
-                         -src_vocab_size 1000 \
-                         -tgt_vocab_size 1000 
-    
-    $PYTHON_BIN train.py -data "$DATA_PATH" \
-                    -save_model "$MODEL_PATH" \
-                    -gpuid $GPUID \
-                    -rnn_size 256 \
-                    -word_vec_size 256 \
-                    -layers 2 \
-                    -train_steps 10000 \
-                    -optim adam  \
-                    -learning_rate 0.001 \
-                    -encoder_type cnn \
-                    -decoder_type cnn
-    mv_best_checkpoint
-    maybe_translate
-    rm_tmp_checkpoints
-}
-
-
 ### MORPH DATA
 ###############################################
 morph(){
@@ -180,8 +94,7 @@ morph(){
     $PYTHON_BIN preprocess.py -train_src "$DATA_DIR"/morph/src.train \
                          -train_tgt "$DATA_DIR"/morph/tgt.train \
                          -valid_src "$DATA_DIR"/morph/src.valid \
-                         -valid_tgt "$DATA_DIR"/morph/tgt.valid \
-                         -save_data "$DATA_DIR"/morph/data 
+                         -valid_tgt "$DATA_DIR"/morph/tgt.valid
 
     $PYTHON_BIN train.py -data "$DATA_DIR"/morph/data \
                     -save_model "$MODEL_PATH" \
@@ -207,7 +120,6 @@ transformer(){
                          -train_tgt "$DATA_DIR"/tgt-train.txt \
                          -valid_src "$DATA_DIR"/src-val.txt \
                          -valid_tgt "$DATA_DIR"/tgt-val.txt \
-                         -save_data "$DATA_PATH" \
                          -src_vocab_size 1000 \
                          -tgt_vocab_size 1000 \
                          -share_vocab

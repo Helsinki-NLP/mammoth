@@ -6,7 +6,6 @@ tgt_vocab:
   cs: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
   de: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
   en: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
-overwrite: False
 
 data:
   train_en-cs:

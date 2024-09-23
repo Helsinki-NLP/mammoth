@@ -314,7 +314,6 @@ def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
     queues = {
         c_name: [mp.Queue(opts.vocab_sample_queue_size) for i in range(opts.num_threads)] for c_name in corpora.keys()
     }
-    # sample_path = os.path.join(os.path.dirname(opts.save_data), CorpusName.SAMPLE)
     with mp.Pool(opts.num_threads, init_pool, [queues]) as p:
         func = partial(build_sub_vocab, corpora[corpus_id], n_sample, opts.num_threads)
         for sub_counter_src, sub_counter_tgt in p.imap(func, range(0, opts.num_threads)):

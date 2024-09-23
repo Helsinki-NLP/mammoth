@@ -1,8 +1,3 @@
-# Meta opts:
-## IO
-save_data: generated/dynamic.ex0
-overwrite: False
-
 ### vocab:
 src_vocab: data/vocab-train.src
 tgt_vocab: data/vocab-train.tgt

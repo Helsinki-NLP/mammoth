@@ -87,7 +87,6 @@ tgt_vocab:
   'sl': path_to_vocab/opusTC.mul.vocab.onmt
   'sv': path_to_vocab/opusTC.mul.vocab.onmt
 
-overwrite: False
 tasks:
   # GPU 0:0
   train_bg-en:
@@ -756,7 +755,6 @@ learning_rate: 3.0
 max_grad_norm: 0.0
 seed: 3435
 model_type: text
-save_all_gpus: false
 
 world_size: 4
 gpu_ranks: [0, 1, 2, 3]
@@ -817,7 +815,6 @@ tgt_vocab:
   'sl': path_to_vocab/opusTC.mul.vocab.onmt
   'sv': path_to_vocab/opusTC.mul.vocab.onmt
 
-overwrite: False
 tasks:
   # GPU 0:0
   train_bg-en:
@@ -1485,7 +1482,6 @@ learning_rate: 3.0
 max_grad_norm: 0.0
 seed: 3435
 model_type: text
-save_all_gpus: false
 
 n_nodes: 5
 world_size: 20

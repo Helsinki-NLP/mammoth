@@ -59,38 +59,11 @@ echo "Succeeded" | tee -a ${LOG_FILE}
 
 
 #
-# Get Vocabulary test
-#
-echo -n "[+] Testing vocabulary building..."
-PYTHONPATH=${PROJECT_ROOT}:${PYTHONPATH} ${PYTHON} onmt/bin/build_vocab.py \
-            -config ${DATA_DIR}/data.yaml \
-            -save_data $TMP_OUT_DIR/onmt \
-            -src_vocab $TMP_OUT_DIR/onmt.vocab.src \
-            -tgt_vocab $TMP_OUT_DIR/onmt.vocab.tgt \
-            -n_sample 5000 -overwrite >> ${LOG_FILE} 2>&1
-[ "$?" -eq 0 ] || error_exit
-echo "Succeeded" | tee -a ${LOG_FILE}
-rm -f -r $TMP_OUT_DIR/sample
-
-echo -n "[+] Testing vocabulary building with features..."
-PYTHONPATH=${PROJECT_ROOT}:${PYTHONPATH} ${PYTHON} onmt/bin/build_vocab.py \
-            -config ${DATA_DIR}/features_data.yaml \
-            -save_data $TMP_OUT_DIR/onmt_feat \
-            -src_vocab $TMP_OUT_DIR/onmt_feat.vocab.src \
-            -tgt_vocab $TMP_OUT_DIR/onmt_feat.vocab.tgt \
-            -src_feats_vocab '{"feat0": "${TMP_OUT_DIR}/onmt_feat.vocab.feat0"}' \
-            -n_sample -1  -overwrite>> ${LOG_FILE} 2>&1
-[ "$?" -eq 0 ] || error_exit
-echo "Succeeded" | tee -a ${LOG_FILE}
-rm -f -r $TMP_OUT_DIR/sample
-
-#
 # Training test
 #
 echo -n "[+] Testing NMT fields/transforms prepare..."
 ${PYTHON} onmt/bin/train.py \
             -config ${DATA_DIR}/data.yaml \
-            -save_data $TMP_OUT_DIR/onmt.train.check \
             -dump_fields -dump_transforms -n_sample 30 \
             -src_vocab $TMP_OUT_DIR/onmt.vocab.src \
             -tgt_vocab $TMP_OUT_DIR/onmt.vocab.tgt \

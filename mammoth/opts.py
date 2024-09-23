@@ -124,13 +124,6 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
     )
 
     group.add(
-        "-save_data",
-        "--save_data",
-        required=build_vocab_only,
-        help="Output base path for objects that will be saved (vocab, transforms, embeddings, ...).",
-    )
-    group.add("-overwrite", "--overwrite", action="store_true", help="Overwrite existing objects if any.")
-    group.add(
         '-n_sample',
         '--n_sample',
         type=int,

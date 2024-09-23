@@ -4,7 +4,6 @@
 # Both language-specific and groupwise shared adapters are added to multiple stacks.
 # group "foo" is used for uu and fr
 # group "bar" is used for en, de, and vv
-save_data: generated/smoketest.groups
 src_vocab: 
   en: generated/smoketest.groups/vocab.en.src
   de: generated/smoketest.groups/vocab.de.src
@@ -13,7 +12,6 @@ tgt_vocab:
   de: generated/smoketest.groups/vocab.de.tgt
   fr: generated/smoketest.groups/vocab.fr.tgt
   vv: generated/smoketest.groups/vocab.vv.tgt
-overwrite: False
 
 adapters:
   encoder:

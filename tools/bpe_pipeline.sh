@@ -104,7 +104,6 @@ python $ONMT/preprocess.py \
     -train_tgt $OUT/data/train.tgt \
     -valid_src $OUT/data/valid.src \
     -valid_tgt $OUT/data/valid.tgt \
-    -save_data $OUT/data/processed
 
 
 echo "Step 2: Train"

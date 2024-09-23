@@ -4,7 +4,6 @@ src_vocab:
 tgt_vocab:
   de: /scratch/project_2005099/data/wmt/many2many.wmt.vocab.src
   en: /scratch/project_2005099/data/wmt/many2many.wmt.vocab.src
-overwrite: False
 data:
   train_en-de:
     path_src: /scratch/project_2005099/data/wmt/train/en-de/wmt.en-de.train.BPE.en

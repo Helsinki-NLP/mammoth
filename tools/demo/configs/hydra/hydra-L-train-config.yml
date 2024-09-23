@@ -5,7 +5,6 @@ tgt_vocab:
   'fr': tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.vocab
   'ru': tools/demo/configs/hydra/vocab/mammoth-hydra.64k.spm.vocab
 
-overwrite: False
 tasks:
   # GPU 0:0
   defmod_en:

@@ -41,7 +41,6 @@ config_config:
     "sv": "da+sv"
 
 
-save_data: generated/opus.spm32k
 # vocabs serve two purposes: defines the vocab files, and gives the potential languages to consider
 src_vocab:
   "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
@@ -63,7 +62,6 @@ tgt_vocab:
   "it": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.ita.32k.spm.vocab"
   "nl": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.nld.32k.spm.vocab"
   "sv": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.swe.32k.spm.vocab"
-overwrite: False
 
 adapters:
   encoder:

@@ -251,19 +251,3 @@ def get_specials(opts, transforms_cls_dict):
         all_specials['tgt'].update(tgt_specials)
     logger.info(f"Get special vocabs from Transforms: {all_specials}.")
     return all_specials
-
-
-def save_transforms(transforms, save_data, overwrite=True):
-    """Dump `transforms` object."""
-    transforms_path = "{}.transforms.pt".format(save_data)
-    check_path(transforms_path, exist_ok=overwrite, log=logger.warning)
-    logger.info(f"Saving Transforms to {transforms_path}.")
-    torch.save(transforms, transforms_path)
-
-
-def load_transforms(opts):
-    """Load dumped `transforms` object."""
-    transforms_path = "{}.transforms.pt".format(opts.save_data)
-    transforms = torch.load(transforms_path)
-    logger.info("Transforms loaded.")
-    return transforms

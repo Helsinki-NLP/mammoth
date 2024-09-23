@@ -16,7 +16,6 @@ tgt_vocab:
   ru: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
   tr: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
   zh: /home/local/scaleUpMNMT-data/wmt/many2many.wmt.vocab.src
-overwrite: False
 
 data:
   # en-X

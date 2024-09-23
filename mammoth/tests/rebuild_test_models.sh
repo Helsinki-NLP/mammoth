@@ -5,9 +5,8 @@ my_python=python
 ############### TEST regular RNN choose either -rnn_type LSTM / GRU / SRU and set input_feed 0 for SRU
 if false; then
 $my_python build_vocab.py \
-    -config data/data.yaml -save_data data/data \
-    -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt \
-    -overwrite true
+    -config data/data.yaml \
+    -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt
 $my_python train.py \
     -config data/data.yaml -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt \
     -src_vocab_size 1000 -tgt_vocab_size 1000 \
@@ -27,9 +26,8 @@ fi
 ############### TEST CNN 
 if false; then
 $my_python build_vocab.py \
-    -config data/data.yaml -save_data data/data \
-    -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt \
-    -overwrite true
+    -config data/data.yaml \
+    -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt
 $my_python train.py \
     -config data/data.yaml -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt \
     -src_vocab_size 1000 -tgt_vocab_size 1000 \
@@ -46,9 +44,8 @@ fi
 ################# MORPH DATA
 if false; then
 $my_python build_vocab.py \
-    -config data/morph_data.yaml -save_data data/data \
-    -src_vocab data/morph_data.vocab.src -tgt_vocab data/morph_data.vocab.tgt \
-    -overwrite true
+    -config data/morph_data.yaml \
+    -src_vocab data/morph_data.vocab.src -tgt_vocab data/morph_data.vocab.tgt
 $my_python train.py \
     -config data/morph_data.yaml -src_vocab data/morph_data.vocab.src -tgt_vocab data/morph_data.vocab.tgt \
     -save_model tmp -world_size 1 -gpu_ranks 0 \
@@ -66,9 +63,9 @@ fi
 ############### TEST TRANSFORMER
 if false; then
 $my_python build_vocab.py \
-    -config data/data.yaml -save_data data/data \
+    -config data/data.yaml \
     -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt \
-    -overwrite true -share_vocab
+    -share_vocab
 
 $my_python train.py \
     -config data/data.yaml -src_vocab data/data.vocab.src -tgt_vocab data/data.vocab.tgt \
@@ -101,9 +98,8 @@ if false; then
 rm data/data_lm/*.python
 
 $my_python build_vocab.py \
-    -config data/lm_data.yaml -save_data data/data_lm -share_vocab \
+    -config data/lm_data.yaml -share_vocab \
     -src_vocab data/data_lm/data.vocab.src -tgt_vocab data/data_lm/data.vocab.tgt \
-    -overwrite true
 
 $my_python train.py -config data/lm_data.yaml -save_model /tmp/tmp \
  -accum_count 2 -dec_layers 2 -rnn_size 64 -word_vec_size 64 -batch_size 256 \

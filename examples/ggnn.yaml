@@ -1,9 +1,6 @@
 # For full desciption to setup and use this file, refer to
 # https://opennmt.net/OpenNMT-py/examples/GGNN.html
 
-# save_data is where the necessary objects will be written
-save_data: ../OpenNMT-py-ggnn-example/run/example
-
 # Filter long examples
 src_seq_length: 1000
 tgt_seq_length: 30

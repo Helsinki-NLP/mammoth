@@ -1,7 +1,6 @@
 
 seed: 42
 share_vocab: true
-save_data: data/wikitext-103-raw/run/example
 ## Where the vocab(s) will be written
 src_vocab: data/wikitext-103-raw/run/example.vocab.src
 src_vocab_size: 60000
@@ -14,9 +13,6 @@ src_onmttok_kwargs: '{"mode": "aggressive", "joiner_annotate": True, "preserve_p
 transforms: [onmt_tokenize, filtertoolong]
 src_seq_length: 512
 tgt_seq_length: 512
-
-# Prevent overwriting existing files in the folder
-overwrite: True
 
 # Corpus opts:
 data:

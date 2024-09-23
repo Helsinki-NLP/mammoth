@@ -100,7 +100,6 @@ batch_size: 32768
 batch_type: tokens
 normalization: tokens
 valid_batch_size: 4096
-max_generator_batches: 2
 use_attention_bridge: false
 attention_heads: 50
 encoder_type: transformer

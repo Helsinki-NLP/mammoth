@@ -198,12 +198,6 @@ class DataOptsCheckerMixin(object):
             cls._validate_file(vocab, info=f'src vocab ({key})')
             cls._validate_file(vocab, info=f'tgt vocab ({key})')
 
-        # if opts.dump_fields or opts.dump_transforms:
-        if opts.dump_transforms:
-            assert (
-                opts.save_data
-            ), "-save_data should be set if set -dump_transforms."
-
     @classmethod
     def _validate_language_model_compatibilities_opts(cls, opts):
         if opts.model_task != ModelTask.LANGUAGE_MODEL:

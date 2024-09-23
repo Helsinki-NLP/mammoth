@@ -7,6 +7,7 @@ import numpy as np
 import warnings
 from itertools import count, zip_longest
 from einops import rearrange
+from x_transformers.autoregressive_wrapper import AutoregressiveWrapper
 
 import torch
 
@@ -15,7 +16,7 @@ from mammoth.constants import DefaultTokens
 from mammoth.inputters.dataloader import build_dataloader
 from mammoth.inputters.dataset import ParallelCorpus
 from mammoth.model_builder import build_model
-from mammoth.translate.beam_search import BeamSearch, GNMTGlobalScorer
+from mammoth.translate.beam_search import BeamSearch
 from mammoth.translate.greedy_search import GreedySearch
 from mammoth.translate.translation import TranslationBuilder
 from mammoth.utils.alignment import build_align_pharaoh
@@ -44,20 +45,29 @@ def build_translator(opts, task_queue_manager, task, report_score=True, logger=N
         model_path=model_path,
     )
 
-    scorer = GNMTGlobalScorer.from_opts(opts)
-
-    translator = Translator.from_opts(
+    translator = XTransformersGreedyTranslator(
         model,
+        task,
         vocabs,
-        opts,
-        model_opts,
-        global_scorer=scorer,
-        out_file=out_file,
-        report_align=opts.report_align,
-        report_score=report_score,
-        logger=logger,
-        task=task,
+        out_file,
+        max_length=100,
+        encoder_adapter_ids=None,   # FIXME: adapters disabled
+        decoder_adapter_ids=None,
     )
+    # scorer = GNMTGlobalScorer.from_opts(opts)
+
+    # translator = Translator.from_opts(
+    #     model,
+    #     vocabs,
+    #     opts,
+    #     model_opts,
+    #     global_scorer=scorer,
+    #     out_file=out_file,
+    #     report_align=opts.report_align,
+    #     report_score=report_score,
+    #     logger=logger,
+    #     task=task,
+    # )
     return translator
 
 
@@ -925,3 +935,174 @@ class Translator(Inference):
         gold_scores = gold_scores.sum(dim=0).view(-1)
 
         return gold_scores
+
+
+class XTransformersGreedyTranslator:
+    def __init__(
+        self,
+        model,
+        task,
+        vocabs,
+        out_file,
+        max_length=100,
+        encoder_adapter_ids=None,
+        decoder_adapter_ids=None,
+    ):
+        self.model = model
+        self.task = task
+        self.vocabs = vocabs
+        self.out_file = out_file
+        self.max_length = max_length
+        self.tgt_vocab = vocabs[("tgt", task.tgt_lang)]
+        self.tgt_pad_idx = self.tgt_vocab.stoi[DefaultTokens.PAD]
+        self.tgt_bos_idx = self.tgt_vocab.stoi[DefaultTokens.BOS]
+        self.tgt_eos_idx = self.tgt_vocab.stoi[DefaultTokens.EOS]
+        self.active_encoder = self.model.encoder.activate(
+            task_id=task.corpus_id,
+            adapter_ids=encoder_adapter_ids,
+        )
+        self.active_decoder = self.model.decoder.activate(
+            task_id=task.corpus_id,
+            adapter_ids=decoder_adapter_ids,
+        )
+        self.ar_wrapper = AutoregressiveWrapper(
+            net=self.active_decoder,
+            ignore_index=self.tgt_pad_idx,
+            pad_value=self.tgt_pad_idx,
+        )
+        self._device = 'cpu'    # FIXME
+
+    def translate_batch(self, batch, src_vocabs, attn_debug):
+        encoder_output, src_mask = self._run_encoder(batch)
+        bos_prompts = torch.full((batch.batch_size, 1), self.tgt_bos_idx)
+        # TODO: kv cache disabled, because generate expects it to be a single object, not a list
+        output = self.ar_wrapper.generate(
+            prompts=bos_prompts,
+            seq_len=self.max_length,
+            eos_token=self.tgt_eos_idx,
+            temperature=0.,
+            context=encoder_output,
+            context_mask=src_mask,
+            cache_kv=False,
+        )
+        return output
+
+    def translate_dynamic(
+        self,
+        src,
+        transform,
+        tgt=None,
+        batch_size=None,
+        batch_type="sents",
+        attn_debug=False,
+        align_debug=False,
+        phrase_table=""
+    ):
+
+        if batch_size is None:
+            raise ValueError("batch_size must be set")
+
+        return self._translate(
+            src,
+            tgt=tgt,
+            batch_size=batch_size,
+            batch_type=batch_type,
+            attn_debug=attn_debug,
+            align_debug=align_debug,
+            phrase_table=phrase_table,
+            dynamic=True,
+            transforms=transform,
+        )
+
+    def _translate(
+        self,
+        src,
+        tgt=None,
+        batch_size=None,
+        batch_type="sents",
+        attn_debug=False,
+        align_debug=False,
+        phrase_table="",
+        transforms=None,
+        dynamic=False,
+    ):
+        """Translate content of ``src`` and get gold scores from ``tgt``.
+
+        Args:
+            src: See :func:`self.src_reader.read()`.
+            tgt: See :func:`self.tgt_reader.read()`.
+            src_feats: See :func`self.src_reader.read()`.
+            batch_size (int): size of examples per mini-batch
+            attn_debug (bool): enables the attention logging
+            align_debug (bool): enables the word alignment logging
+
+        Returns:
+            (`list`, `list`)
+
+            * all_scores is a list of `batch_size` lists of `n_best` scores
+            * all_predictions is a list of `batch_size` lists
+                of `n_best` predictions
+        """
+
+        corpus = ParallelCorpus(
+            src,
+            tgt,
+            self.vocabs['src'],
+            self.vocabs['tgt'],
+            transforms=transforms,
+            task=self.task,
+            stride=1,
+            offset=0,
+        ).to(self._device)
+
+        batches = build_dataloader(
+            corpus,
+            batch_size=batch_size,
+            batch_type=batch_type,
+            max_look_ahead_sentences=512,
+            lookahead_minibatches=512,
+            cycle=False,
+        )
+
+        all_scores = []
+        all_predictions = []
+
+        vocab = self.vocabs['tgt']
+        special_tokens = {
+            self.tgt_pad_idx,
+            self.tgt_bos_idx,
+            self.tgt_eos_idx,
+        }
+        for batch in batches:
+            batch.to(corpus.device)
+            batch_out = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
+
+            for i in range(batch_out.shape[0]):
+                tokens = []
+                for j in range(batch_out.shape[1]):
+                    token_idx = batch_out[i, j].item()
+                    if token_idx in special_tokens:
+                        continue
+                    tokens.append(vocab.itos[token_idx])
+                all_scores.append(0)
+                tokens = [transforms.apply_reverse(x) for x in tokens]
+                all_predictions.append(" ".join(tokens))
+        self.out_file.write("\n".join(all_predictions) + "\n")
+        self.out_file.flush()
+        return all_scores, all_predictions
+
+    def _run_encoder(self, batch):
+        src = rearrange(batch.src.tensor, 't b 1 -> b t')
+        src_mask = rearrange(batch.src.mask, 't b -> b t')
+        encoder_output = self.active_encoder(
+            x=src,
+            mask=src_mask,
+            return_embeddings=True,
+        )
+
+        encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
+        if self.model.attention_bridge.is_fixed_length:
+            # turn off masking in the transformer decoder
+            src_mask = None
+
+        return encoder_output, src_mask

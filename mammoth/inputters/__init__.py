@@ -7,7 +7,7 @@
 """
 
 from mammoth.inputters.dataloader import build_dataloader, DynamicDatasetIter
-from mammoth.inputters.dataset import get_corpus, build_vocab_counts, ParallelCorpus
+from mammoth.inputters.dataset import get_corpus, ParallelCorpus
 from mammoth.inputters.vocab import get_vocab, DEFAULT_SPECIALS
 
 
@@ -17,6 +17,5 @@ __all__ = [
     'get_corpus',
     'get_vocab',
     'DEFAULT_SPECIALS',
-    'build_vocab_counts',
     'ParallelCorpus'
 ]

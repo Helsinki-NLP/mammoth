@@ -181,7 +181,7 @@ class DataOptsCheckerMixin(object):
         opts._all_transform = opts.transforms
 
     @classmethod
-    def _validate_fields_opts(cls, opts, build_vocab_only=False):
+    def _validate_fields_opts(cls, opts):
         """Check options relate to vocab and fields."""
 
         for cname, corpus in opts.tasks.items():
@@ -208,12 +208,12 @@ class DataOptsCheckerMixin(object):
         assert opts.tgt_vocab is None, "vocab must be shared for LM task"
 
     @classmethod
-    def validate_prepare_opts(cls, opts, build_vocab_only=False):
+    def validate_prepare_opts(cls, opts):
         """Validate all options relate to prepare (data/transform/vocab)."""
         cls._validate_tasks(opts)
         cls._get_all_transform(opts)
         cls._validate_transforms_opts(opts)
-        cls._validate_fields_opts(opts, build_vocab_only=build_vocab_only)
+        cls._validate_fields_opts(opts)
 
     @classmethod
     def validate_model_opts(cls, opts):

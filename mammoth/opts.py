@@ -308,14 +308,14 @@ def model_opts(parser):
         help='Size of hidden transformer feed-forward, as a factor of model_dim'
     )
     group.add(
-        "-x_transformers",
-        "--x_transformers",
-        help="For a complete list of options, see"
+        "-x_transformers_opts",
+        "--x_transformers_opts",
+        help="For a complete list of options (name only), see the code"
         " https://github.com/lucidrains/x-transformers/blob/main/x_transformers/x_transformers.py ."
         " The kwargs of `AttentionLayers` can be used without prefix,"
         " the kwargs of `FeedForward` with the prefix `ff_`,"
         " and the kwargs of `Attention` with the prefix `attn_`."
-        " For tips and examples, see"
+        " For tips, examples, and citations see"
         " https://github.com/lucidrains/x-transformers/blob/main/README.md ."
     )
 

@@ -58,7 +58,7 @@ def get_attention_layers_kwargs(
     cross_attend = side == Side.decoder
     is_last = layer_stack_index == len(depths) - 1
     pre_norm_has_final_norm = is_last
-    kwargs = model_opts.x_transformers if model_opts.x_transformers else dict()
+    kwargs = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
     kwargs.update({
         'dim': model_opts.model_dim,
         'depth': depth,

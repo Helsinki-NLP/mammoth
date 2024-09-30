@@ -283,7 +283,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             'causal',
             'cross_attend',
             'pre_norm_has_final_norm',
-            'ff_mult',
         ):
             if overwritten_key in opts_dict:
                 raise ValueError(

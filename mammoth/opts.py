@@ -304,10 +304,6 @@ def model_opts(parser):
     )
     group.add('--heads', '-heads', type=int, default=8, help='Number of heads for transformer self-attention')
     group.add(
-        '--ff_mult', '-ff_mult', type=int, default=4,
-        help='Size of hidden transformer feed-forward, as a factor of model_dim'
-    )
-    group.add(
         "-x_transformers_opts",
         "--x_transformers_opts",
         help="For a complete list of options (name only), see the code"

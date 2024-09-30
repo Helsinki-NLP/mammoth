@@ -66,7 +66,6 @@ def get_attention_layers_kwargs(
         'causal': causal,
         'cross_attend': cross_attend,
         'pre_norm_has_final_norm': pre_norm_has_final_norm,
-        'ff_mult': model_opts.ff_mult,
     })
     return kwargs
 
@@ -123,7 +122,6 @@ def build_xcoder(
             xcoder_id=xcoder_id,
             model_opts=model_opts,
         )
-        logger.warning(str(attention_layers_kwargs))        # FIXME debug
         attention_layer_blocks[layer_stack_index][xcoder_id] = AdaptedAttentionLayers(
             layer_stack_index=layer_stack_index,
             xcoder_id=xcoder_id,

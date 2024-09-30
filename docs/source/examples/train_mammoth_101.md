@@ -730,8 +730,6 @@ valid_batch_size: 4096
 max_generator_batches: 2
 src_vocab_size: 100000
 tgt_vocab_size: 100000
-encoder_type: transformer
-decoder_type: transformer
 model_dim: 512
 transformer_ff: 2048
 heads: 8
@@ -741,7 +739,6 @@ dropout: 0.1
 label_smoothing: 0.1
 param_init: 0.0
 param_init_glorot: true
-position_encoding: true
 valid_steps: 10000
 warmup_steps: 10000
 report_every: 100
@@ -1458,8 +1455,6 @@ valid_batch_size: 4096
 max_generator_batches: 2
 src_vocab_size: 100000
 tgt_vocab_size: 100000
-encoder_type: transformer
-decoder_type: transformer
 model_dim: 512
 transformer_ff: 2048
 heads: 8
@@ -1469,7 +1464,6 @@ dropout: 0.1
 label_smoothing: 0.1
 param_init: 0.0
 param_init_glorot: true
-position_encoding: true
 valid_steps: 10000
 warmup_steps: 10000
 report_every: 100

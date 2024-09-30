@@ -57,113 +57,18 @@ def get_attention_layers_kwargs(
     causal = side == Side.decoder
     cross_attend = side == Side.decoder
     is_last = layer_stack_index == len(depths) - 1
-    # changed from default
-    use_simple_rmsnorm = True
-    attn_flash = True
-    ff_glu = True
     pre_norm_has_final_norm = is_last
-    # Mostly x_transformers defaults. Make (some of this) configurable.
-    return {
+    kwargs = model_opts.x_transformers if model_opts.x_transformers else dict()
+    kwargs.update({
         'dim': model_opts.model_dim,
         'depth': depth,
         'heads': model_opts.heads,
         'causal': causal,
         'cross_attend': cross_attend,
-        'only_cross': False,
-        'use_scalenorm': False,
-        'use_rmsnorm': False,
-        'use_simple_rmsnorm': use_simple_rmsnorm,
-        'use_adaptive_layernorm': False,
-        'use_adaptive_rmsnorm': False,
-        'use_adaptive_layerscale': False,
-        'norm_add_unit_offset': True,
-        'dim_condition': None,
-        'adaptive_condition_mlp': False,
-        'adaptive_condition_mlp_expansion': 4,
-        'alibi_pos_bias': False,
-        'alibi_num_heads': None,
-        'rel_pos_bias': False,
-        'rel_pos_num_buckets': 32,
-        'rel_pos_max_distance': 128,
-        'dynamic_pos_bias': False,
-        'dynamic_pos_bias_log_distance': False,
-        'dynamic_pos_bias_mlp_depth': 2,
-        'dynamic_pos_bias_norm': False,
-        'rotary_pos_emb': False,
-        'rotary_emb_dim': None,
-        'rotary_xpos': False,
-        'rotary_interpolation_factor': 1.,
-        'rotary_xpos_scale_base': 512,
-        'rotary_base_rescale_factor': 1.,
-        'weight_tie_layers': False,
-        'custom_layers': None,
-        'layers_execute_order': None,
-        # 'sandwich_coef': None,    # Sandwich would be very unintuitive with multiple layerstacks
-        'par_ratio': None,
-        'residual_attn': False,
-        'cross_residual_attn': False,
-        # 'macaron': False,         # Can not support macaron and inject adapters at each 'f' layer
-        'pre_norm': True,
         'pre_norm_has_final_norm': pre_norm_has_final_norm,
-        'gate_residual': False,
-        'scale_residual': False,
-        'scale_residual_constant': 1.,
-        'shift_tokens': 0,
-        'sandwich_norm': False,
-        'softclamp_output': False,
-        'softclamp_output_value': 30.,
-        'resi_dual': False,
-        'resi_dual_scale': 1.,
-        'zero_init_branch_output': False,
-        'layer_dropout': 0.,
-        'cross_attn_tokens_dropout': 0.,
-        'disable_abs_pos_emb': None,
-        'use_layerscale': False,
-        'layerscale_init_value': 0.,
-
-        'ff_dim_out': None,
         'ff_mult': model_opts.ff_mult,
-        'ff_glu': ff_glu,
-        'ff_glu_mult_bias': False,
-        'ff_swish': False,
-        'ff_relu_squared': False,
-        'ff_post_act_ln': False,
-        'ff_dropout': 0.,
-        'ff_no_bias': False,
-        'ff_zero_init_output': False,
-
-        'attn_dim_context': None,
-        'attn_flash': attn_flash,
-        'attn_talking_heads': False,
-        'attn_head_scale': False,
-        'attn_sparse_topk': None,
-        'attn_num_mem_kv': 0,
-        'attn_dropout': 0.,
-        'attn_on_attn': False,
-        'attn_gate_value_heads': False,
-        'attn_swiglu_values': False,
-        'attn_gate_values': False,
-        'attn_zero_init_output': False,
-        'attn_max_attend_past': None,
-        'attn_qk_norm': False,
-        'attn_qk_norm_groups': 1,
-        'attn_qk_norm_scale': 10,
-        'attn_qk_norm_dim_scale': False,
-        'attn_one_kv_head': False,
-        'attn_kv_heads': None,
-        'attn_shared_kv': False,
-        'attn_value_dim_head': None,
-        'attn_tensor_product': False,      # https://arxiv.org/abs/2208.06061
-        'attn_add_zero_kv': False,         # same as add_zero_attn in pytorch
-        'attn_rotary_embed_values': False,
-        'attn_use_cope': False,
-        'attn_cope_max_pos': 16,
-        'attn_cope_soft_onehot_pos': False,
-        'attn_cope_talking_heads': False,
-        'attn_softclamp_logits': False,
-        'attn_logit_softclamp_value': 50.,
-        'attn_onnxable': False,
-    }
+    })
+    return kwargs
 
 
 def build_xcoder(
@@ -218,6 +123,7 @@ def build_xcoder(
             xcoder_id=xcoder_id,
             model_opts=model_opts,
         )
+        logger.warning(str(attention_layers_kwargs))        # FIXME debug
         attention_layer_blocks[layer_stack_index][xcoder_id] = AdaptedAttentionLayers(
             layer_stack_index=layer_stack_index,
             xcoder_id=xcoder_id,

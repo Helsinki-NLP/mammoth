@@ -207,8 +207,6 @@ class DataOptsCheckerMixin(object):
 
         assert opts.tgt_vocab is None, "vocab must be shared for LM task"
 
-        assert opts.decoder_type == "transformer", "Only transformer decoder is supported for LM task"
-
     @classmethod
     def validate_prepare_opts(cls, opts, build_vocab_only=False):
         """Validate all options relate to prepare (data/transform/vocab)."""
@@ -273,6 +271,45 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             model_opts.full_context_alignment = False
 
     @classmethod
+    def validate_x_transformers_opts(cls, opts):
+        if not opts.x_transformers:
+            opts.x_transformers = dict()
+            return
+        opts_dict = yaml.safe_load(opts.x_transformers)
+        for overwritten_key in (
+            'dim',
+            'depth',
+            'heads',
+            'causal',
+            'cross_attend',
+            'pre_norm_has_final_norm',
+            'ff_mult',
+        ):
+            if overwritten_key in opts_dict:
+                raise ValueError(
+                    f'"{overwritten_key}" is overwritten with values from other Mammoth arguments. '
+                    'You can not set it as part of x_transformers opts.'
+                )
+        for unsupported_key in (
+            'sandwich_coef',    # Sandwich would be very unintuitive with multiple layerstacks
+            'macaron',          # Can not support macaron while injecting adapters at each 'f' layer
+        ):
+            if unsupported_key in opts_dict:
+                raise ValueError(
+                    f'"{unsupported_key}" is not supported in Mammoth.'
+                )
+        # Mammoth has a different default value than x-transformers,
+        # but you can set these explicitly
+        if 'use_simple_rmsnorm' not in opts_dict:
+            opts_dict['use_simple_rmsnorm'] = True
+        if 'attn_flash' not in opts_dict:
+            opts_dict['attn_flash'] = True
+        if 'ff_glu' not in opts_dict:
+            opts_dict['ff_glu'] = True
+
+        opts.x_transformers = opts_dict
+
+    @classmethod
     def validate_model_opts(cls, model_opts):
         # assert model_opts.model_type in ["text"], "Unsupported model type %s" % model_opts.model_type
 
@@ -283,7 +320,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         #    if model_opts.model_type != "text":
         #        raise AssertionError("--share_embeddings requires --model_type text.")
         if model_opts.lambda_align > 0.0:
-            assert model_opts.decoder_type == 'transformer', "Only transformer is supported to joint learn alignment."
             assert (
                 model_opts.alignment_layer < model_opts.dec_layers
                 and model_opts.alignment_layer >= -model_opts.dec_layers
@@ -294,6 +330,8 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
                     model_opts.alignment_layer, model_opts.alignment_heads, model_opts.full_context_alignment
                 )
             )
+
+        cls.validate_x_transformers_opts(model_opts)
 
     @classmethod
     def checkpoint_model_opts(cls, checkpoint_opt):

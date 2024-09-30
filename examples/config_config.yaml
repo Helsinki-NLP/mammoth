@@ -100,8 +100,6 @@ normalization: tokens
 valid_batch_size: 4096
 use_attention_bridge: false
 attention_heads: 50
-encoder_type: transformer
-decoder_type: transformer
 rnn_size: 512
 word_vec_size: 512
 ff_mult: 4
@@ -113,7 +111,6 @@ label_smoothing: 0.1
 weight_decay: 0.05
 param_init: 0.0
 param_init_glorot: true
-position_encoding: true
 train_steps: 150000
 valid_steps: 500000
 warmup_steps: 10000

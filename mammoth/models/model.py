@@ -13,7 +13,7 @@ class BaseModel(nn.Module):
     def __init__(self, encoder, decoder, attention_bridge):
         super(BaseModel, self).__init__()
 
-    def forward(self, src, tgt, lengths, return_attention=False):
+    def forward(self, src, tgt, lengths):
         """Forward propagate a `src` and `tgt` pair for training.
         Possible initialized with a beginning decoder state.
 
@@ -27,8 +27,6 @@ class BaseModel(nn.Module):
             lengths(LongTensor): The src lengths, pre-padding ``(batch,)``.
             bptt (Boolean): A flag indicating if truncated bptt is set.
                 If reset then init_state
-            return_attention (Boolean): A flag indicating whether output attention,
-                Only valid for transformer decoder.
 
         Returns:
             (FloatTensor, dict[str, FloatTensor]):
@@ -60,7 +58,7 @@ class NMTModel(BaseModel):
         self.decoder = decoder
         self.attention_bridge = attention_bridge
 
-    def forward(self, src, decoder_input, src_mask, return_attention=False, metadata=None):
+    def forward(self, src, decoder_input, src_mask, metadata=None):
         # Activate the correct pluggable embeddings and modules
         active_encoder = self.encoder.activate(
             task_id=metadata.corpus_id,
@@ -86,15 +84,13 @@ class NMTModel(BaseModel):
             decoder_input,
             context=encoder_output,
             context_mask=src_mask,
-            return_attn=return_attention,
+            return_attn=False,
             return_logits_and_embeddings=True,
         )
-        if return_attention:
-            (logits, decoder_output), attentions = retval
-        else:
-            logits, decoder_output = retval
-            attentions = None
-        return logits, decoder_output, attentions
+        # not that if return_attn were to be used, the return signature would be:
+        # (logits, decoder_output), attentions = retval
+        logits, decoder_output = retval
+        return logits, decoder_output
 
     def update_dropout(self, dropout):
         self.encoder.update_dropout(dropout)

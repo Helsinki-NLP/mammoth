@@ -92,7 +92,6 @@ def build_trainer(
         device_context=device_context,
         gpu_verbose_level=gpu_verbose_level,
         report_manager=report_manager,
-        return_attention=False,
         model_saver=model_saver,
         average_decay=average_decay,
         average_every=average_every,
@@ -140,7 +139,6 @@ class Trainer(object):
         device_context=None,
         gpu_verbose_level=0,
         report_manager=None,
-        return_attention=False,
         model_saver=None,
         average_decay=0,
         average_every=1,
@@ -165,7 +163,6 @@ class Trainer(object):
         self.report_manager = report_manager
         self.report_stats_from_parameters = report_stats_from_parameters
         self.report_training_accuracy = report_training_accuracy
-        self.return_attention = return_attention
         self.model_saver = model_saver
         self.average_decay = average_decay
         self.moving_average = None
@@ -392,11 +389,10 @@ class Trainer(object):
 
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     # F-prop through the model.
-                    logits, decoder_output, attns = valid_model(
+                    logits, decoder_output = valid_model(
                         src,
                         decoder_input,
                         src_lengths,
-                        return_attention=self.return_attention,
                         metadata=metadata,
                     )
 
@@ -462,11 +458,10 @@ class Trainer(object):
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
             with torch.cuda.amp.autocast(enabled=self.optim.amp):
-                logits, decoder_output, attns = self.model(
+                logits, decoder_output = self.model(
                     rearrange(src, 't b 1 -> b t'),
                     rearrange(decoder_input, 't b 1 -> b t'),
                     rearrange(src_mask, 't b -> b t'),
-                    return_attention=self.return_attention,
                     metadata=metadata,
                 )
                 logits = rearrange(logits, 'b t i -> t b i')

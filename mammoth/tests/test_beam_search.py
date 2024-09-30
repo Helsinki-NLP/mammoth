@@ -1,6 +1,5 @@
 import unittest
 from mammoth.translate.beam_search import BeamSearch, GNMTGlobalScorer
-from mammoth.utils.misc import tile
 
 from copy import deepcopy
 
@@ -47,7 +46,6 @@ class TestBeamSearch(unittest.TestCase):
                 global_scorer=GlobalScorerStub(),
                 min_length=0,
                 max_length=30,
-                return_attention=False,
                 block_ngram_repeat=ngram_repeat,
                 exclusion_tokens=set(),
                 stepwise_penalty=False,
@@ -104,22 +102,21 @@ class TestBeamSearch(unittest.TestCase):
         device_init = torch.zeros(1, 1)
         for batch_sz in [1, 3]:
             beam = BeamSearch(
-                beam_sz,
-                batch_sz,
-                0,
-                1,
-                2,
-                3,
-                2,
-                GlobalScorerStub(),
-                0,
-                30,
-                False,
-                ngram_repeat,
-                set(),
-                False,
-                0.0,
-                False,
+                beam_size=beam_sz,
+                batch_size=batch_sz,
+                pad=0,
+                bos=1,
+                eos=2,
+                unk=3,
+                n_best=2,
+                global_scorer=GlobalScorerStub(),
+                min_length=0,
+                max_length=30,
+                block_ngram_repeat=ngram_repeat,
+                exclusion_tokens=set(),
+                stepwise_penalty=False,
+                ratio=0.0,
+                ban_unk_token=False,
                 device=device_init.device,
             )
             beam.initialize(
@@ -177,22 +174,21 @@ class TestBeamSearch(unittest.TestCase):
         device_init = torch.zeros(1, 1)
         for batch_sz in [1, 3]:
             beam = BeamSearch(
-                beam_sz,
-                batch_sz,
-                0,
-                1,
-                2,
-                3,
-                2,
-                GlobalScorerStub(),
-                0,
-                30,
-                False,
-                ngram_repeat,
-                {repeat_idx_ignored},
-                False,
-                0.0,
-                False,
+                beam_size=beam_sz,
+                batch_size=batch_sz,
+                pad=0,
+                bos=1,
+                eos=2,
+                unk=3,
+                n_best=2,
+                global_scorer=GlobalScorerStub(),
+                min_length=0,
+                max_length=30,
+                block_ngram_repeat=ngram_repeat,
+                exclusion_tokens={repeat_idx_ignored},
+                stepwise_penalty=False,
+                ratio=0.0,
+                ban_unk_token=False,
                 device=device_init.device,
             )
             beam.initialize(
@@ -248,22 +244,21 @@ class TestBeamSearch(unittest.TestCase):
             src_len = 71
             device_init = torch.zeros(1, 1)
             beam = BeamSearch(
-                beam_sz,
-                batch_sz,
-                0,
-                1,
-                2,
-                3,
-                2,
-                GlobalScorerStub(),
-                min_length,
-                30,
-                False,
-                0,
-                set(),
-                False,
-                0.0,
-                False,
+                beam_size=beam_sz,
+                batch_size=batch_sz,
+                pad=0,
+                bos=1,
+                eos=2,
+                unk=3,
+                n_best=2,
+                global_scorer=GlobalScorerStub(),
+                min_length=min_length,
+                max_length=30,
+                block_ngram_repeat=0,
+                exclusion_tokens=set(),
+                stepwise_penalty=False,
+                ratio=0.0,
+                ban_unk_token=False,
                 device=device_init.device,
             )
             beam.initialize(
@@ -320,22 +315,21 @@ class TestBeamSearch(unittest.TestCase):
         src_len = 71
         device_init = torch.zeros(1, 1)
         beam = BeamSearch(
-            beam_sz,
-            batch_sz,
-            0,
-            1,
-            2,
-            3,
-            2,
-            GlobalScorerStub(),
-            min_length,
-            30,
-            False,
-            0,
-            set(),
-            False,
-            0.0,
-            False,
+            beam_size=beam_sz,
+            batch_size=batch_sz,
+            pad=0,
+            bos=1,
+            eos=2,
+            unk=3,
+            n_best=2,
+            global_scorer=GlobalScorerStub(),
+            min_length=min_length,
+            max_length=30,
+            block_ngram_repeat=0,
+            exclusion_tokens=set(),
+            stepwise_penalty=False,
+            ratio=0.0,
+            ban_unk_token=False,
             device=device_init.device,
         )
         beam.initialize(
@@ -384,104 +378,6 @@ class TestBeamSearch(unittest.TestCase):
                 self.assertTrue(beam.is_finished[:, 0].all())
                 beam.update_finished()
                 self.assertTrue(beam.done)
-
-    @unittest.skip('attention no longer returned')
-    def test_beam_returns_attn_with_correct_length(self):
-        beam_sz = 5
-        batch_sz = 3
-        n_words = 100
-        _non_eos_idxs = [47, 51, 13, 88, 99]
-        valid_score_dist = torch.log_softmax(torch.tensor([6.0, 5.0, 4.0, 3.0, 2.0, 1.0]), dim=0)
-        min_length = 5
-        eos_idx = 2
-        src_len = 71
-        inp_lens = tile(torch.randint(1, 30, (1, batch_sz,)), beam_sz, dim=1)
-        device_init = torch.zeros(1, 1)
-        beam = BeamSearch(
-            beam_sz,
-            batch_sz,
-            0,
-            1,
-            2,
-            3,
-            2,
-            GlobalScorerStub(),
-            min_length,
-            30,
-            True,
-            0,
-            set(),
-            False,
-            0.0,
-            False,
-            device=device_init.device,
-        )
-        beam.initialize(
-            target_prefix=None,
-            encoder_output=torch.randn(batch_sz, src_len, 73),
-            src_mask=torch.randint(0, 1, (batch_sz, src_len))
-        )
-        for i in range(min_length + 2):
-            # non-interesting beams are going to get dummy values
-            word_probs = torch.full((batch_sz * beam_sz, n_words), -float('inf'))
-            if i == 0:
-                # "best" prediction is eos - that should be blocked
-                word_probs[0::beam_sz, eos_idx] = valid_score_dist[0]
-                # include at least beam_sz predictions OTHER than EOS
-                # that are greater than -1e20
-                for j, score in zip(_non_eos_idxs, valid_score_dist[1:]):
-                    word_probs[0::beam_sz, j] = score
-            elif i <= min_length:
-                # predict eos in beam 1
-                word_probs[1::beam_sz, eos_idx] = valid_score_dist[0]
-                # provide beam_sz other good predictions in other beams
-                for k, (j, score) in enumerate(zip(_non_eos_idxs, valid_score_dist[1:])):
-                    beam_idx = min(beam_sz - 1, k)
-                    word_probs[beam_idx::beam_sz, j] = score
-            else:
-                word_probs[0::beam_sz, eos_idx] = valid_score_dist[0]
-                word_probs[1::beam_sz, eos_idx] = valid_score_dist[0]
-                # provide beam_sz other good predictions in other beams
-                for k, (j, score) in enumerate(zip(_non_eos_idxs, valid_score_dist[1:])):
-                    beam_idx = min(beam_sz - 1, k)
-                    word_probs[beam_idx::beam_sz, j] = score
-
-            # TODO: test that LayerIntermediates is correctly mangled
-            # attns = torch.randn(1, batch_sz * beam_sz, 53)
-            # beam.set_cache(attns)
-            beam.advance(word_probs)
-            if i < min_length:
-                self.assertFalse(beam.done)
-                # no top beams are finished yet
-                for b in range(batch_sz):
-                    self.assertEqual(beam.attention[b], [])
-            elif i == min_length:
-                # beam 1 dies on min_length
-                self.assertTrue(beam.is_finished[:, 1].all())
-                beam.update_finished()
-                self.assertFalse(beam.done)
-                # no top beams are finished yet
-                for b in range(batch_sz):
-                    self.assertEqual(beam.attention[b], [])
-            else:  # i > min_length
-                # beam 0 dies on the step after beam 1 dies
-                self.assertTrue(beam.is_finished[:, 0].all())
-                beam.update_finished()
-                self.assertTrue(beam.done)
-                # top beam is finished now so there are attentions
-                for b in range(batch_sz):
-                    # two beams are finished in each batch
-                    self.assertEqual(len(beam.attention[b]), 2)
-                    for k in range(2):
-                        # second dim is cut down to the non-padded src length
-                        self.assertEqual(beam.attention[b][k].shape[-1], inp_lens[b])
-                    # first dim is equal to the time of death
-                    # (beam 0 died at current step - adjust for SOS)
-                    self.assertEqual(beam.attention[b][0].shape[0], i + 1)
-                    # (beam 1 died at last step - adjust for SOS)
-                    self.assertEqual(beam.attention[b][1].shape[0], i)
-                # behavior gets weird when beam is already done so just stop
-                break
 
 
 class TestBeamSearchAgainstReferenceCase(unittest.TestCase):
@@ -637,22 +533,21 @@ class TestBeamSearchAgainstReferenceCase(unittest.TestCase):
         src_len = 71
         device_init = torch.zeros(1, 1)
         beam = BeamSearch(
-            self.BEAM_SZ,
-            self.BATCH_SZ,
-            0,
-            1,
-            2,
-            3,
-            self.N_BEST,
-            GlobalScorerStub(),
-            0,
-            30,
-            False,
-            0,
-            set(),
-            False,
-            0.0,
-            False,
+            beam_size=self.BEAM_SZ,
+            batch_size=self.BATCH_SZ,
+            pad=0,
+            bos=1,
+            eos=2,
+            unk=3,
+            n_best=self.N_BEST,
+            global_scorer=GlobalScorerStub(),
+            min_length=0,
+            max_length=30,
+            block_ngram_repeat=0,
+            exclusion_tokens=set(),
+            stepwise_penalty=False,
+            ratio=0.0,
+            ban_unk_token=False,
             device=device_init.device,
         )
         beam.initialize(
@@ -685,7 +580,6 @@ class TestBeamWithLengthPenalty(TestBeamSearchAgainstReferenceCase):
             global_scorer=scorer,
             min_length=0,
             max_length=30,
-            return_attention=False,
             block_ngram_repeat=0,
             exclusion_tokens=set(),
             stepwise_penalty=False,

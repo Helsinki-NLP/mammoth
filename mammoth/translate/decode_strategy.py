@@ -29,8 +29,6 @@ class DecodeStrategy(object):
             ``block_ngram_repeat``-grams repeat.
         exclusion_tokens (set[int]): If a gram contains any of these
             tokens, it may repeat.
-        return_attention (bool): Whether to work with attention too. If this
-            is true, it is assumed that the decoder is attentional.
 
     Attributes:
         pad (int): See above.
@@ -62,7 +60,6 @@ class DecodeStrategy(object):
         ban_unk_token (Boolean): See above.
         block_ngram_repeat (int): See above.
         exclusion_tokens (set[int]): See above.
-        return_attention (bool): See above.
         done (bool): See above.
     """
 
@@ -78,7 +75,6 @@ class DecodeStrategy(object):
         min_length,
         block_ngram_repeat,
         exclusion_tokens,
-        return_attention,
         max_length,
         ban_unk_token,
         device,
@@ -111,7 +107,6 @@ class DecodeStrategy(object):
         self.forbidden_tokens = [dict() for _ in range(n_paths)]
 
         self.exclusion_tokens = exclusion_tokens
-        self.return_attention = return_attention
         self.device = device
 
         self.done = False

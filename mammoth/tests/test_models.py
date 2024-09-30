@@ -175,7 +175,7 @@ class TestModel():
         # currently caller must adjust for the autoregressive step
         # shape: (batch, time)
         decoder_input = test_tgt[:, :-1]
-        logits, decoder_output, attentions = model(test_src, decoder_input, test_mask, metadata=metadata)
+        logits, decoder_output = model(test_src, decoder_input, test_mask, metadata=metadata)
         # Make sure that output has the correct size and type
         # x-transformers returns (batch, time, dim/vocab_index)
         logitsize = torch.zeros(bsize, source_l - 1, len(tgt_vocab))

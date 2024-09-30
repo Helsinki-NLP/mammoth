@@ -238,23 +238,11 @@ def model_opts(parser):
     group = parser.add_argument_group('Model- Embeddings')
 
     group.add(
-        '--share_decoder_embeddings',
-        '-share_decoder_embeddings',
-        action='store_true',
-        help="Use a shared weight matrix for the input and output word  embeddings in the decoder.",
-    )
-    group.add(
         '--enable_embeddingless',
         '-enable_embeddingless',
         action='store_true',
         help="Enable the use of byte-based embeddingless models" +
         "(Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
-    )
-    group.add(
-        '--position_encoding',
-        '-position_encoding',
-        action='store_true',
-        help="Use a sin to mark relative words positions. Necessary for non-RNN style models.",
     )
 
     # Encoder-Decoder Options
@@ -267,23 +255,6 @@ def model_opts(parser):
         help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
     )
     group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
-
-    group.add(
-        '--encoder_type',
-        '-encoder_type',
-        type=str,
-        default='transformer',
-        choices=['transformer'],
-        help="In deprecation. Only transformers are supported."
-    )
-    group.add(
-        '--decoder_type',
-        '-decoder_type',
-        type=str,
-        default='transformer',
-        choices=['transformer'],
-        help="In deprecation. Only transformers are supported."
-    )
 
     # group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
     group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder module')
@@ -335,6 +306,17 @@ def model_opts(parser):
     group.add(
         '--ff_mult', '-ff_mult', type=int, default=4,
         help='Size of hidden transformer feed-forward, as a factor of model_dim'
+    )
+    group.add(
+        "-x_transformers",
+        "--x_transformers",
+        help="For a complete list of options, see"
+        " https://github.com/lucidrains/x-transformers/blob/main/x_transformers/x_transformers.py ."
+        " The kwargs of `AttentionLayers` can be used without prefix,"
+        " the kwargs of `FeedForward` with the prefix `ff_`,"
+        " and the kwargs of `Attention` with the prefix `attn_`."
+        " For tips and examples, see"
+        " https://github.com/lucidrains/x-transformers/blob/main/README.md ."
     )
 
     # Alignement options
@@ -439,13 +421,6 @@ def _add_train_general_opts(parser):
         '-save_model',
         default='model',
         help="Model filename (the model will be saved as <save_model>_N.pt where N is the number of steps",
-    )
-
-    group.add(
-        "--save_all_gpus",
-        "-save_all_gpus",
-        action="store_true",
-        help="Deprecated.",
     )
 
     group.add(

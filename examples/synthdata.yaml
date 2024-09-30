@@ -65,8 +65,6 @@ batch_size: 4096
 batch_type: tokens
 normalization: tokens
 valid_batch_size: 4096
-encoder_type: transformer
-decoder_type: transformer
 model_dim: 128
 ff_mult: 4
 heads: 8
@@ -77,7 +75,6 @@ weight_decay: 0.05
 label_smoothing: 0.1
 param_init: 0.0
 param_init_glorot: true
-position_encoding: true
 train_steps: 150000
 valid_steps: 1000000
 warmup_steps: 10000

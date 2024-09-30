@@ -272,10 +272,10 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
     @classmethod
     def validate_x_transformers_opts(cls, opts):
-        if not opts.x_transformers:
-            opts.x_transformers = dict()
+        if not opts.x_transformers_opts:
+            opts.x_transformers_opts = dict()
             return
-        opts_dict = yaml.safe_load(opts.x_transformers)
+        opts_dict = yaml.safe_load(opts.x_transformers_opts)
         for overwritten_key in (
             'dim',
             'depth',
@@ -288,7 +288,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             if overwritten_key in opts_dict:
                 raise ValueError(
                     f'"{overwritten_key}" is overwritten with values from other Mammoth arguments. '
-                    'You can not set it as part of x_transformers opts.'
+                    'You can not set it as part of x_transformers_opts.'
                 )
         for unsupported_key in (
             'sandwich_coef',    # Sandwich would be very unintuitive with multiple layerstacks
@@ -307,7 +307,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if 'ff_glu' not in opts_dict:
             opts_dict['ff_glu'] = True
 
-        opts.x_transformers = opts_dict
+        opts.x_transformers_opts = opts_dict
 
     @classmethod
     def validate_model_opts(cls, model_opts):

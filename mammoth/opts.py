@@ -105,7 +105,7 @@ def _add_reproducibility_opts(parser):
     )
 
 
-def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
+def _add_dynamic_corpus_opts(parser):
     """Options related to training corpus, type: a list of dictionary."""
     group = parser.add_argument_group('Data/Tasks')
     group.add(
@@ -123,82 +123,26 @@ def _add_dynamic_corpus_opts(parser, build_vocab_only=False):
         help="Default transform pipeline to apply to data. Can be specified in each corpus of data to override.",
     )
 
-    group.add(
-        '-n_sample',
-        '--n_sample',
-        type=int,
-        default=(5000 if build_vocab_only else 0),
-        help=("Build vocab using " if build_vocab_only else "Stop after save ")
-        + "this number of transformed samples/corpus. Can be [-1, 0, N>0]. "
-        "Set to -1 to go full corpus, 0 to skip.",
-    )
 
-    if build_vocab_only:
-        group.add(
-            '-num_threads', '--num_threads', type=int, default=1, help="Number of parallel threads to build the vocab."
-        )
-        group.add(
-            '-vocab_sample_queue_size',
-            '--vocab_sample_queue_size',
-            type=int,
-            default=20,
-            help="Size of queues used in the build_vocab dump path.",
-        )
-
-
-def _add_dynamic_vocabs_opts(parser, build_vocab_only=False):
+def _add_dynamic_vocabs_opts(parser):
     """Options related to vocabulary.
 
     Add all options relate to vocabulary to parser.
-    If `build_vocab_only` set to True, do not contain vocab
-    related options which won't be used in `bin/build_vocab.py`.
     """
     group = parser.add_argument_group("Vocab")
     group.add(
         "-src_vocab",
         "--src_vocab",
         required=True,
-        help=("Path to save" if build_vocab_only else "Path to") + " src (or shared) vocabulary file. "
+        help="Path to src (or shared) vocabulary file. "
         "Format: one <word> or <word>\t<count> per line.",
     )
     group.add(
         "-tgt_vocab",
         "--tgt_vocab",
-        help=("Path to save" if build_vocab_only else "Path to") + " tgt vocabulary file. "
+        help="Path to tgt vocabulary file. "
         "Format: one <word> or <word>\t<count> per line.",
     )
-
-    # Moved to transform
-    # group.add("-share_vocab", "--share_vocab", action="store_true", help="Share source and target vocabulary.")
-
-    if not build_vocab_only:
-        group.add(
-            "-src_vocab_size",
-            "--src_vocab_size",
-            type=int,
-            default=None,
-            help="Maximum size of the source vocabulary; will silently truncate your vocab file if longer.",
-        )
-        group.add(
-            "-tgt_vocab_size",
-            "--tgt_vocab_size",
-            type=int,
-            default=None,
-            help="Maximum size of the target vocabulary; will silently truncate your vocab file if longer."
-        )
-
-        # FIXME: nuked in the great refactor. Commenting out for now (issue #60)
-        # group = parser.add_argument_group('Embeddings')
-        # group.add(
-        #     '-both_embeddings',
-        #     '--both_embeddings',
-        #     help="Path to the embeddings file to use for both source and target tokens.",
-        # )
-        # group.add('-src_embeddings', '--src_embeddings', help="Path to the embeddings file to use for source tokens.")
-        # group.add('-tgt_embeddings', '--tgt_embeddings', help="Path to the embeddings file to use for target tokens.")
-        # group.add(
-        #     '-embeddings_type', '--embeddings_type', choices=["GloVe", "word2vec"], help="Type of embeddings file."
-        # )
 
 
 def _add_dynamic_transform_opts(parser):
@@ -211,21 +155,15 @@ def _add_dynamic_transform_opts(parser):
         transform_cls.add_options(parser)
 
 
-def dynamic_prepare_opts(parser, build_vocab_only=False):
+def dynamic_prepare_opts(parser):
     """Options related to data prepare in dynamic mode.
 
     Add all dynamic data prepare related options to parser.
-    If `build_vocab_only` set to True, then only contains options that
-    will be used in `mammoth/bin/build_vocab.py`.
     """
     config_opts(parser)
-    _add_dynamic_corpus_opts(parser, build_vocab_only=build_vocab_only)
-    _add_dynamic_vocabs_opts(parser, build_vocab_only=build_vocab_only)
+    _add_dynamic_corpus_opts(parser)
+    _add_dynamic_vocabs_opts(parser)
     _add_dynamic_transform_opts(parser)
-
-    if build_vocab_only:
-        _add_reproducibility_opts(parser)
-        # as for False, this will be added in _add_train_general_opts
 
 
 def model_opts(parser):
@@ -761,7 +699,7 @@ def _add_train_general_opts(parser):
 def train_opts(parser):
     """All options used in train."""
     # options relate to data preprare
-    dynamic_prepare_opts(parser, build_vocab_only=False)
+    dynamic_prepare_opts(parser)
     # options relate to train
     model_opts(parser)
     _add_train_general_opts(parser)

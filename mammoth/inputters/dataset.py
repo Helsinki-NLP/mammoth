@@ -269,7 +269,7 @@ def get_corpus(
     return dataset
 
 
-def build_sub_vocab(examples, n_sample):
+def build_sub_vocab(examples):
     """Build vocab counts on (strided) subpart of the data."""
     sub_counter_src = collections.Counter()
     sub_counter_tgt = collections.Counter()
@@ -277,47 +277,9 @@ def build_sub_vocab(examples, n_sample):
         src, tgt = item['src'], item['tgt']
         sub_counter_src.update(src)
         sub_counter_tgt.update(tgt)
-        if n_sample > 0 and (i + 1) >= n_sample:
-            break
     return sub_counter_src, sub_counter_tgt
 
 
 def init_pool(queues):
     """Add the queues as attribute of the pooled function."""
     build_sub_vocab.queues = queues
-
-
-def build_vocab_counts(opts, corpus_id, transforms, n_sample=3):
-    """Build vocabulary counts from data."""
-
-    from functools import partial
-    import multiprocessing as mp
-
-    if n_sample == -1:
-        logger.info(f"n_sample={n_sample}: Build vocab on full datasets.")
-    elif n_sample > 0:
-        logger.info(f"Build vocab on {n_sample} transformed examples/corpus.")
-    else:
-        raise ValueError(f"n_sample should > 0 or == -1, get {n_sample}.")
-
-    corpora = {
-        corpus_id: read_examples_from_files(
-            opts.tasks[corpus_id]["path_src"],
-            opts.tasks[corpus_id]["path_tgt"],
-            # FIXME this is likely not working
-            transforms_fn=TransformPipe(transforms).apply if transforms else lambda x: x,
-        )
-    }
-    counter_src = collections.Counter()
-    counter_tgt = collections.Counter()
-
-    queues = {
-        c_name: [mp.Queue(opts.vocab_sample_queue_size) for i in range(opts.num_threads)] for c_name in corpora.keys()
-    }
-    with mp.Pool(opts.num_threads, init_pool, [queues]) as p:
-        func = partial(build_sub_vocab, corpora[corpus_id], n_sample, opts.num_threads)
-        for sub_counter_src, sub_counter_tgt in p.imap(func, range(0, opts.num_threads)):
-            counter_src.update(sub_counter_src)
-            counter_tgt.update(sub_counter_tgt)
-
-    return counter_src, counter_tgt

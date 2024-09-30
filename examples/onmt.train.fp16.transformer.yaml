@@ -1,11 +1,8 @@
 ### vocab:
-src_vocab: data/vocab-train.src
-tgt_vocab: data/vocab-train.tgt
-src_vocab_size: 32000
-tgt_vocab_size: 32000
-vocab_size_multiple: 8
-src_words_min_frequency: 10
-tgt_words_min_frequency: 10
+src_vocab: 
+  src: data/vocab-train.src
+tgt_vocab:
+  tgt: data/vocab-train.tgt
 share_vocab: True
 
 ### Transform related opts:
@@ -37,16 +34,15 @@ mask_length: subword
 poisson_lambda: 3.0
 replace_length: 1
 
-# Corpus opts:
-data:
-    corpus_1:
-        path_src: data/src-train.txt
-        path_tgt: data/tgt-train.txt
-        transforms: [tokenmask, tokendrop, onmt_tokenize, filtertoolong]
-    valid:
-        path_src: data/src-val.txt
-        path_tgt: data/tgt-val.txt
-        transforms: [onmt_tokenize]
+# Task definitions
+tasks:
+  corpus_1:
+    src_tgt: "src-tgt"
+    path_src: data/src-train.txt
+    path_tgt: data/tgt-train.txt
+    valid_path_src: data/src-val.txt
+    valid_path_tgt: data/tgt-val.txt
+    transforms: [tokenmask, tokendrop, onmt_tokenize, filtertoolong]
 
 # Model configuration
 save_model: foo
@@ -59,14 +55,12 @@ train_steps: 100000
 valid_steps: 4000
 
 queue_size: 10000
-bucket_size: 32768
 world_size: 2
 gpu_ranks: [0, 1]
 batch_type: "tokens"
 batch_size: 4096
 valid_batch_size: 8
 batch_size_multiple: 1
-max_generator_batches: 0
 accum_count: [3]
 accum_steps: [0]
 
@@ -82,17 +76,12 @@ param_init: 0
 param_init_glorot: true
 normalization: "tokens"
 
-encoder_type: transformer
-decoder_type: transformer
-enc_layers: 6
-dec_layers: 6
+enc_layers: [6]
+dec_layers: [6]
 heads: 8
-rnn_size: 512
-word_vec_size: 512
-transformer_ff: 2048
+model_dim: 512
 dropout_steps: [0]
 dropout: [0.1]
 attention_dropout: [0.1]
-share_decoder_embeddings: true
-share_embeddings: true
-position_encoding: true
+x_transformers_opts:
+  ff_mult: 4

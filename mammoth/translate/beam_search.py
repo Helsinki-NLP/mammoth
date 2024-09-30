@@ -27,7 +27,6 @@ class BeamSearchBase(DecodeStrategy):
         global_scorer (mammoth.translate.GNMTGlobalScorer): Scorer instance.
         min_length (int): See base.
         max_length (int): See base.
-        return_attention (bool): See base.
         block_ngram_repeat (int): See base.
         exclusion_tokens (set[int]): See base.
 
@@ -69,7 +68,6 @@ class BeamSearchBase(DecodeStrategy):
         global_scorer,
         min_length,
         max_length,
-        return_attention,
         block_ngram_repeat,
         exclusion_tokens,
         stepwise_penalty,
@@ -88,7 +86,6 @@ class BeamSearchBase(DecodeStrategy):
             min_length=min_length,
             block_ngram_repeat=block_ngram_repeat,
             exclusion_tokens=exclusion_tokens,
-            return_attention=return_attention,
             max_length=max_length,
             ban_unk_token=ban_unk_token,
             device=device,

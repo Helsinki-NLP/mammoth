@@ -106,7 +106,6 @@ class GreedySearch(DecodeStrategy):
         ban_unk_token (Boolean): See base.
         block_ngram_repeat (int): See base.
         exclusion_tokens (set[int]): See base.
-        return_attention (bool): See base.
         max_length (int): See base.
         sampling_temp (float): See
             :func:`~mammoth.translate.greedy_search.sample_with_temperature()`.
@@ -128,7 +127,6 @@ class GreedySearch(DecodeStrategy):
         min_length,
         block_ngram_repeat,
         exclusion_tokens,
-        return_attention,
         max_length,
         sampling_temp,
         keep_topk,
@@ -148,7 +146,6 @@ class GreedySearch(DecodeStrategy):
             min_length=min_length,
             block_ngram_repeat=block_ngram_repeat,
             exclusion_tokens=exclusion_tokens,
-            return_attention=return_attention,
             max_length=max_length,
             ban_unk_token=ban_unk_token,
             device=device,

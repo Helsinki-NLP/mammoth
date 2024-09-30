@@ -40,29 +40,27 @@ class TestGreedySearch(unittest.TestCase):
             src_len = 67
             lengths = torch.randint(0, 30, (batch_sz,))
             samp = GreedySearch(
-                0,
-                1,
-                2,
-                3,
-                batch_sz,
-                GlobalScorerStub(),
-                min_length,
-                False,
-                set(),
-                False,
-                30,
-                1.0,
-                1,
-                0,
-                1,
-                False,
+                pad=0,
+                bos=1,
+                eos=2,
+                unk=3,
+                batch_size=batch_sz,
+                global_scorer=GlobalScorerStub(),
+                min_length=min_length,
+                block_ngram_repeat=False,
+                exclusion_tokens=set(),
+                max_length=30,
+                sampling_temp=1.0,
+                keep_topk=1,
+                keep_topp=0,
+                beam_size=1,
+                ban_unk_token=False,
                 device=lengths.device,
             )
             samp.initialize(
                 encoder_output=torch.randn(batch_sz, src_len, 73),
                 src_mask=torch.randint(0, 1, (batch_sz, src_len))
             )
-            all_attns = []
             for i in range(min_length + 4):
                 word_probs = torch.full((batch_sz, n_words), -float('inf'))
                 # "best" prediction is eos - that should be blocked
@@ -72,8 +70,6 @@ class TestGreedySearch(unittest.TestCase):
                 word_probs[0, _non_eos_idxs[0]] = valid_score_dist[1]
                 word_probs[1:, _non_eos_idxs[0] + i] = 0
 
-                attns = torch.randn(1, batch_sz, 53)
-                all_attns.append(attns)
                 samp.advance(word_probs)
                 if i < min_length:
                     self.assertTrue(samp.topk_scores[0].allclose(valid_score_dist[1]))
@@ -96,22 +92,21 @@ class TestGreedySearch(unittest.TestCase):
                 src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0,
-                    1,
-                    2,
-                    3,
-                    batch_sz,
-                    GlobalScorerStub(),
-                    0,
-                    False,
-                    set(),
-                    False,
-                    30,
-                    temp,
-                    1,
-                    0,
-                    1,
-                    False,
+                    pad=0,
+                    bos=1,
+                    eos=2,
+                    unk=3,
+                    batch_size=batch_sz,
+                    global_scorer=GlobalScorerStub(),
+                    min_length=0,
+                    block_ngram_repeat=False,
+                    exclusion_tokens=set(),
+                    max_length=30,
+                    sampling_temp=temp,
+                    keep_topk=1,
+                    keep_topp=0,
+                    beam_size=1,
+                    ban_unk_token=False,
                     device=lengths.device,
                 )
                 samp.initialize(
@@ -175,22 +170,21 @@ class TestGreedySearch(unittest.TestCase):
                 src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0,
-                    1,
-                    2,
-                    3,
-                    batch_sz,
-                    GlobalScorerStub(),
-                    0,
-                    False,
-                    set(),
-                    False,
-                    30,
-                    temp,
-                    2,
-                    0,
-                    1,
-                    False,
+                    pad=0,
+                    bos=1,
+                    eos=2,
+                    unk=3,
+                    batch_size=batch_sz,
+                    global_scorer=GlobalScorerStub(),
+                    min_length=0,
+                    block_ngram_repeat=False,
+                    exclusion_tokens=set(),
+                    max_length=30,
+                    sampling_temp=temp,
+                    keep_topk=2,
+                    keep_topp=0,
+                    beam_size=1,
+                    ban_unk_token=False,
                     device=lengths.device,
                 )
                 samp.initialize(
@@ -280,22 +274,21 @@ class TestGreedySearch(unittest.TestCase):
                 src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0,
-                    1,
-                    2,
-                    3,
-                    batch_sz,
-                    GlobalScorerStub(),
-                    0,
-                    False,
-                    set(),
-                    False,
-                    30,
-                    temp,
-                    50,
-                    0,
-                    beam_size,
-                    False,
+                    pad=0,
+                    bos=1,
+                    eos=2,
+                    unk=3,
+                    batch_size=batch_sz,
+                    global_scorer=GlobalScorerStub(),
+                    min_length=0,
+                    block_ngram_repeat=False,
+                    exclusion_tokens=set(),
+                    max_length=30,
+                    sampling_temp=temp,
+                    keep_topk=50,
+                    keep_topp=0,
+                    beam_size=beam_size,
+                    ban_unk_token=False,
                     device=lengths.device,
                 )
                 samp.initialize(
@@ -386,22 +379,21 @@ class TestGreedySearch(unittest.TestCase):
                 src_len = 67
                 lengths = torch.randint(0, 30, (batch_sz,))
                 samp = GreedySearch(
-                    0,
-                    1,
-                    2,
-                    3,
-                    batch_sz,
-                    GlobalScorerStub(),
-                    0,
-                    False,
-                    set(),
-                    False,
-                    -1,
-                    temp,
-                    50,
-                    0.5,
-                    1,
-                    False,
+                    pad=0,
+                    bos=1,
+                    eos=2,
+                    unk=3,
+                    batch_size=batch_sz,
+                    global_scorer=GlobalScorerStub(),
+                    min_length=0,
+                    block_ngram_repeat=False,
+                    exclusion_tokens=set(),
+                    max_length=-1,
+                    sampling_temp=temp,
+                    keep_topk=50,
+                    keep_topp=0.5,
+                    beam_size=1,
+                    ban_unk_token=False,
                     device=lengths.device,
                 )
                 samp.initialize(

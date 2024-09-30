@@ -144,6 +144,21 @@ def _add_dynamic_vocabs_opts(parser):
         "Format: one <word> or <word>\t<count> per line.",
     )
 
+    group.add(
+        "-src_vocab_size",
+        "--src_vocab_size",
+        type=int,
+        default=None,
+        help="Maximum size of the source vocabulary; will silently truncate your vocab file if longer.",
+    )
+    group.add(
+        "-tgt_vocab_size",
+        "--tgt_vocab_size",
+        type=int,
+        default=None,
+        help="Maximum size of the target vocabulary; will silently truncate your vocab file if longer."
+    )
+
 
 def _add_dynamic_transform_opts(parser):
     """Options related to transforms.

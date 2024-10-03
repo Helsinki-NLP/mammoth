@@ -109,7 +109,11 @@ def main(
 
     # Build model.
     model = build_model(model_opts, opts, vocabs_dict, task_queue_manager)
-
+    print(model_opts.use_embeddingless)
+    print(opts.use_embeddingless)
+    print(model.encoder.token_embs)
+    print(model.decoder.token_embs)
+    
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)

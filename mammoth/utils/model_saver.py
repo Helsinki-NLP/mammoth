@@ -59,8 +59,10 @@ def explode_model(
         if component.min_rank == my_global_rank:
             # Only the lowest ranked device saves a component
             state_dicts[name] = component.state_dict(model)
-            # The optimizer parameters are distributed the same way as the components
-            optim_state_dicts[name] = optim.suboptimizers[name].state_dict()
+            if name in optim.suboptimizers.keys():
+                
+                # The optimizer parameters are distributed the same way as the components
+                optim_state_dicts[name] = optim.suboptimizers[name].state_dict()
     return state_dicts, optim_state_dicts
 
 
@@ -293,7 +295,7 @@ class ModelSaver(ModelSaverBase):
                 logger.info(f'Saving module checkpoint {checkpoint_path} and optimizer {optimizer_path}')
                 torch.save(state_dict, checkpoint_path)
                 tmp_checkpoint_paths.append(checkpoint_path)
-                if key != 'frame':
+                if key != 'frame' and key in optim_state_dicts.keys():
                     torch.save(optim_state_dicts[key], optimizer_path)
                     tmp_checkpoint_paths.append(optimizer_path)
 

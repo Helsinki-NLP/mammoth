@@ -102,6 +102,7 @@ def build_trainer(
         task_queue_manager=task_queue_manager,
         report_stats_from_parameters=opts.report_stats_from_parameters,
         report_training_accuracy=opts.report_training_accuracy,
+        max_nan_batches=opts.max_nan_batches,
     )
     return trainer
 
@@ -149,6 +150,7 @@ class Trainer(object):
         task_queue_manager=None,
         report_stats_from_parameters=False,
         report_training_accuracy=False,
+        max_nan_batches=0,
     ):
         # Basic attributes.
         self.model = model
@@ -171,6 +173,8 @@ class Trainer(object):
         self.earlystopper = earlystopper
         self.dropout = dropout
         self.dropout_steps = dropout_steps
+        self.max_nan_batches = max_nan_batches
+        self.nan_batches = 0
 
         self.task_queue_manager = task_queue_manager
 
@@ -476,6 +480,8 @@ class Trainer(object):
 
             try:
                 if loss is not None:
+                    if torch.isnan(loss):
+                        raise Exception('Loss blowout')
                     self.optim.backward(loss)
 
                 if self.report_training_accuracy:
@@ -500,6 +506,9 @@ class Trainer(object):
             except Exception:
                 traceback.print_exc()
                 logger.info("At step %d, we removed a batch - accum %d", self.optim.training_step, k)
+                self.nan_batches += 1
+                if self.nan_batches >= self.max_nan_batches:
+                    raise Exception('Exceeded allowed --max_nan_batches.')
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')
 

@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 from functools import partial
 from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
-from mammoth.modules.x_transformers import TransformerWrapper
+from mammoth.modules.x_tf import TransformerWrapper
 from x_transformers.x_transformers import TokenEmbedding
 
 from mammoth.distributed.components import (

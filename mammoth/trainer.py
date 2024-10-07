@@ -382,11 +382,11 @@ class Trainer(object):
             for batch, metadata, _ in valid_iter:
                 if stats is None:
                     stats = mammoth.utils.Statistics()
-
+                
                 src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
                 decoder_input = batch.tgt[:-1]
                 target = batch.tgt[1:]
-
+                
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     # F-prop through the model.
                     logits, decoder_output = valid_model(

@@ -88,20 +88,6 @@ ${PYTHON} onmt/bin/train.py \
 [ "$?" -eq 0 ] || error_exit
 echo "Succeeded" | tee -a ${LOG_FILE}
 
-echo -n "  [+] Testing NMT training w/ align..."
-${PYTHON} onmt/bin/train.py \
-            -config ${DATA_DIR}/align_data.yaml \
-            -src_vocab $TMP_OUT_DIR/onmt.vocab.src \
-            -tgt_vocab $TMP_OUT_DIR/onmt.vocab.tgt \
-            -src_vocab_size 1000 \
-            -tgt_vocab_size 1000 \
-            -encoder_type transformer -decoder_type transformer \
-            -layers 4 -word_vec_size 16 -rnn_size 16 -heads 2 -transformer_ff 64 \
-            -lambda_align 0.05 -alignment_layer 2 -alignment_heads 0 \
-            -report_every 5 -train_steps 10 >> ${LOG_FILE} 2>&1
-[ "$?" -eq 0 ] || error_exit
-echo "Succeeded" | tee -a ${LOG_FILE}
-
 echo -n "  [+] Testing LM training..."
 ${PYTHON} onmt/bin/train.py \
             -config ${DATA_DIR}/lm_data.yaml \

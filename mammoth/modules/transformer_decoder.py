@@ -60,6 +60,8 @@ class TransformerDecoderLayerBase(nn.Module):
 
         """
         super(TransformerDecoderLayerBase, self).__init__()
+        assert not full_context_alignment, 'alignment is obsolete'
+        assert alignment_heads == 0, 'alignment is obsolete'
 
         if self_attn_type == "scaled-dot":
             self.self_attn = MultiHeadedAttention(
@@ -86,8 +88,6 @@ class TransformerDecoderLayerBase(nn.Module):
             self.layer_norm_3 = nn.LayerNorm(d_model, eps=1e-6)
             self.layer_norm_4 = nn.LayerNorm(d_model, eps=1e-6)
         self.drop = nn.Dropout(dropout)
-        self.full_context_alignment = full_context_alignment
-        self.alignment_heads = alignment_heads
 
     def forward(self, *args, **kwargs):
         """Extend `_forward` for (possibly) multiple decoder pass:
@@ -97,7 +97,6 @@ class TransformerDecoderLayerBase(nn.Module):
 
         Args:
             * All arguments of _forward.
-            with_align (bool): whether return alignment attention.
 
         Returns:
             (FloatTensor, FloatTensor, FloatTensor or None):
@@ -106,22 +105,9 @@ class TransformerDecoderLayerBase(nn.Module):
             * top_attn ``(batch_size, T, src_len)``
             * attn_align ``(batch_size, T, src_len)`` or None
         """
-        with_align = kwargs.pop("with_align", False)
         output, attns = self._forward(*args, **kwargs)
         top_attn = attns[:, 0, :, :].contiguous()
         attn_align = None
-        if with_align:
-            if self.full_context_alignment:
-                # return _, (B, Q_len, K_len)
-                _, attns = self._forward(*args, **kwargs, future=True)
-
-            if self.alignment_heads > 0:
-                attns = attns[:, : self.alignment_heads, :, :].contiguous()
-            # layer average attention across heads, get ``(B, Q, K)``
-            # Case 1: no full_context, no align heads -> layer avg baseline
-            # Case 2: no full_context, 1 align heads -> guided align
-            # Case 3: full_context, 1 align heads -> full cte guided align
-            attn_align = attns.mean(dim=1)
         return output, top_attn, attn_align
 
     def update_dropout(self, dropout, attention_dropout):
@@ -317,9 +303,9 @@ class TransformerDecoderBase(DecoderBase):
             embeddings,
             opts.max_relative_positions,
             opts.aan_useffn,
-            opts.full_context_alignment,
-            opts.alignment_layer,
-            alignment_heads=opts.alignment_heads,
+            False,
+            None,
+            alignment_heads=0.,
             pos_ffn_activation_fn=opts.pos_ffn_activation_fn,
             layer_norm_module=(
                 nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
@@ -489,7 +475,6 @@ class TransformerDecoder(TransformerDecoderBase):
             src_max_len = memory_bank.size(1)
             src_pad_mask = ~sequence_mask(memory_lengths, src_max_len).unsqueeze(1)
 
-        with_align = kwargs.pop("with_align", False)
         attn_aligns = []
 
         for i, layer in enumerate(self._get_layers()):
@@ -505,7 +490,6 @@ class TransformerDecoder(TransformerDecoderBase):
                 tgt_pad_mask,
                 layer_cache=layer_cache,
                 step=step,
-                with_align=with_align,
             )
             if attn_align is not None:
                 attn_aligns.append(attn_align)
@@ -517,9 +501,6 @@ class TransformerDecoder(TransformerDecoderBase):
         attns = {"std": attn}
         if self._copy:
             attns["copy"] = attn
-        if with_align:
-            attns["align"] = attn_aligns[self.alignment_layer]  # `(B, Q, K)`
-            # attns["align"] = torch.stack(attn_aligns, 0).mean(0)  # All avg
 
         # TODO change the way attns is returned dict => list or tuple (onnx)
         return dec_outs, attns

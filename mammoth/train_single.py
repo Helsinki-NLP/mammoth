@@ -44,6 +44,12 @@ def _get_model_opts(opts, frame_checkpoint=None):
 def _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager):
     """Build iterator used for validation."""
     if not any(opts.tasks[corpus_id].get('path_valid_src', False) for corpus_id in opts.tasks.keys()):
+        logger.info("Validation set missing for: {}".format(
+            [
+                corpus_id for corpus_id in opts.tasks.keys()
+                if not opts.tasks[corpus_id].get('path_valid_src', False)
+            ]
+        ))
         return None
     logger.info("creating validation iterator")
     valid_iter = DynamicDatasetIter.from_opts(
@@ -176,7 +182,6 @@ def main(
 
     train_iter = _train_iter()
     # train_iter = iter_on_device(train_iter, device_context)
-    logger.info("Device {} - Valid iter".format(device_context.id))
     valid_iter = _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager)
 
     if len(opts.gpu_ranks):

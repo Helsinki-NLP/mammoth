@@ -71,13 +71,6 @@ class DataOptsCheckerMixin(object):
                 cls._validate_file(path_src, info=f'{cname}/path_src')
                 cls._validate_file(path_tgt, info=f'{cname}/path_tgt')
             """
-            path_align = corpus.get('path_align', None)
-            if path_align is None:
-                if hasattr(opts, 'lambda_align') and opts.lambda_align > 0.0:
-                    raise ValueError(f'Corpus {cname} alignment file path are required when lambda_align > 0.0')
-                corpus['path_align'] = None
-            else:
-                cls._validate_file(path_align, info=f'{cname}/path_align')
             # Check prefix: will be used when use prefix transform
             src_prefix = corpus.get('src_prefix', None)
             tgt_prefix = corpus.get('tgt_prefix', None)
@@ -169,11 +162,6 @@ class DataOptsCheckerMixin(object):
             _transforms = set(corpus['transforms'])
             if len(_transforms) != 0:
                 all_transforms.update(_transforms)
-        if hasattr(opts, 'lambda_align') and opts.lambda_align > 0.0:
-            if not all_transforms.isdisjoint({'sentencepiece', 'bpe', 'onmt_tokenize'}):
-                raise ValueError('lambda_align is not compatible with on-the-fly tokenization.')
-            if not all_transforms.isdisjoint({'tokendrop', 'prefix', 'denoising'}):
-                raise ValueError('lambda_align is not compatible yet with potential token deletion/addition.')
         opts._all_transform = all_transforms
 
     @classmethod
@@ -265,11 +253,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if hasattr(model_opts, 'fix_word_vecs_dec'):
             model_opts.freeze_word_vecs_dec = model_opts.fix_word_vecs_dec
 
-        if model_opts.alignment_layer is None:
-            model_opts.alignment_layer = -2
-            model_opts.lambda_align = 0.0
-            model_opts.full_context_alignment = False
-
     @classmethod
     def validate_x_transformers_opts(cls, opts):
         if not opts.x_transformers_opts:
@@ -279,7 +262,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         for overwritten_key in (
             'dim',
             'depth',
-            'heads',
             'causal',
             'cross_attend',
             'pre_norm_has_final_norm',
@@ -318,17 +300,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         # if model_opts.share_embeddings:
         #    if model_opts.model_type != "text":
         #        raise AssertionError("--share_embeddings requires --model_type text.")
-        if model_opts.lambda_align > 0.0:
-            assert (
-                model_opts.alignment_layer < model_opts.dec_layers
-                and model_opts.alignment_layer >= -model_opts.dec_layers
-            ), "N° alignment_layer should be smaller than number of layers."
-            logger.info(
-                "Joint learn alignment at layer [{}] "
-                "with {} heads in full_context '{}'.".format(
-                    model_opts.alignment_layer, model_opts.alignment_heads, model_opts.full_context_alignment
-                )
-            )
 
         cls.validate_x_transformers_opts(model_opts)
 
@@ -364,6 +335,12 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         assert len(opts.accum_count) == len(
             opts.accum_steps
         ), 'Number of accum_count values must match number of accum_steps'
+
+        if opts.decay_method not in {'linear_warmup', 'none'}:
+            logger.warn(
+                'Note that decay methods other than "linear_warmup" and "none" have weird scaling.'
+                ' Did you tune the learning rate for this decay method?'
+            )
 
         # TODO: do we want to remove that completely?
         # if opts.update_vocab:

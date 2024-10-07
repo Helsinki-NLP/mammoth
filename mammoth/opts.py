@@ -255,7 +255,11 @@ def model_opts(parser):
         "For more detailed information, see: "
         "https://arxiv.org/pdf/1803.02155.pdf",
     )
-    group.add('--heads', '-heads', type=int, default=8, help='Number of heads for transformer self-attention')
+    group.add(
+        '--heads', '-heads', type=int, default=8,
+        help='Number of heads for transformer self-attention. '
+        ' Semi-obsolete: not used for x-transformers, only used for some attention bridge configuations.'
+    )
     group.add(
         "-x_transformers_opts",
         "--x_transformers_opts",
@@ -266,35 +270,6 @@ def model_opts(parser):
         " and the kwargs of `Attention` with the prefix `attn_`."
         " For tips, examples, and citations see"
         " https://github.com/lucidrains/x-transformers/blob/main/README.md ."
-    )
-
-    # Alignement options
-    # TODO is this actually in use?
-    group = parser.add_argument_group('Model - Alignment')
-    group.add(
-        '--lambda_align',
-        '-lambda_align',
-        type=float,
-        default=0.0,
-        help="Lambda value for alignement loss of Garg et al (2019)"
-        "For more detailed information, see: "
-        "https://arxiv.org/abs/1909.02074",
-    )
-    group.add(
-        '--alignment_layer', '-alignment_layer', type=int, default=-3, help='Layer number which has to be supervised.'
-    )
-    group.add(
-        '--alignment_heads',
-        '-alignment_heads',
-        type=int,
-        default=0,
-        help='N. of cross attention heads per layer to supervised with',
-    )
-    group.add(
-        '--full_context_alignment',
-        '-full_context_alignment',
-        action="store_true",
-        help='Whether alignment is conditioned on full target context.',
     )
 
     # Generator and loss options.
@@ -558,7 +533,7 @@ def _add_train_general_opts(parser):
         '--max_grad_norm',
         '-max_grad_norm',
         type=float,
-        default=5,
+        default=1,
         help="If the norm of the gradient vector exceeds this, "
         "renormalize it to have the norm equal to "
         "max_grad_norm",
@@ -681,7 +656,7 @@ def _add_train_general_opts(parser):
         '-learning_rate',
         type=float,
         default=1.0,
-        help="Starting learning rate. Recommended settings: sgd = 1, adagrad = 0.1, adadelta = 1, adam = 0.001",
+        help="Starting learning rate. Recommended settings: sgd = TBD, adagrad = TBD, adadelta = TBD, adam = TBD",
     )
     group.add(
         '--learning_rate_decay',

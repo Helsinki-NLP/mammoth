@@ -136,7 +136,7 @@ class Statistics(object):
 
     def accuracy(self):
         """compute accuracy"""
-        if self.n_correct and self.n_words:
+        if self.n_correct is not None and self.n_words:
             return 100 * (self.n_correct / self.n_words)
         else:
             return None

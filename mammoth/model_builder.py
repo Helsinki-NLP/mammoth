@@ -75,7 +75,6 @@ def get_attention_layers_kwargs(
     kwargs.update({
         'dim': model_opts.model_dim,
         'depth': depth,
-        'heads': model_opts.heads,
         'causal': causal,
         'cross_attend': cross_attend,
         'pre_norm_has_final_norm': pre_norm_has_final_norm,

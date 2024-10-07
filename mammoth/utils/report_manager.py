@@ -95,7 +95,8 @@ class ReportMgrBase(object):
             if optimizer is not None:
                 for line in optimizer.report_steps():
                     logger.info(line)
-            return mammoth.utils.Statistics()
+            n_correct = None if report_stats.n_correct is None else 0
+            return mammoth.utils.Statistics(n_correct=n_correct)
         else:
             return report_stats
 
@@ -156,7 +157,8 @@ class ReportMgr(ReportMgrBase):
         report_stats.output(step, num_steps, learning_rate, self.start_time)
 
         self.maybe_log_tensorboard(report_stats, "progress", learning_rate, patience, step)
-        report_stats = mammoth.utils.Statistics()
+        n_correct = None if report_stats.n_correct is None else 0
+        report_stats = mammoth.utils.Statistics(n_correct=n_correct)
 
         total = sum(sampled_task_counts.values())
         logger.info(f'Task sampling distribution: (total {total})')
@@ -183,7 +185,7 @@ class ReportMgr(ReportMgrBase):
             structured_logging({
                 'type': 'validation',
                 'step': step,
-                'learning_rate': lr,
+                # 'learning_rate': lr,
                 'perplexity': ppl,
                 'accuracy': acc,
                 'crossentropy': valid_stats.xent(),

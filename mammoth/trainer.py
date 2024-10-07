@@ -471,9 +471,9 @@ class Trainer(object):
 
             with torch.cuda.amp.autocast(enabled=self.optim.amp):
                 logits, decoder_output = self.model(
-                    rearrange(src, 't b 1 -> b t'),
-                    rearrange(decoder_input, 't b 1 -> b t'),
-                    rearrange(src_mask, 't b -> b t'),
+                    src=rearrange(src, 't b 1 -> b t'),
+                    decoder_input=rearrange(decoder_input, 't b 1 -> b t'),
+                    src_mask=rearrange(src_mask, 't b -> b t'),
                     metadata=metadata,
                 )
                 logits = rearrange(logits, 'b t i -> t b i')

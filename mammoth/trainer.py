@@ -387,26 +387,33 @@ class Trainer(object):
                 if stats is None:
                     stats = mammoth.utils.Statistics()
 
-                src, src_lengths = batch.src if isinstance(batch.src, tuple) else (batch.src, None)
-                decoder_input = batch.tgt[:-1]
-                target = batch.tgt[1:]
+                stats.n_src_words += batch.src.mask.sum().item()
+                src = batch.src.tensor
+                src_mask = batch.src.mask
+                decoder_input = batch.tgt.tensor[:-1]
+                target = batch.tgt.tensor[1:]
 
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     # F-prop through the model.
                     logits, decoder_output = valid_model(
-                        src,
-                        decoder_input,
-                        src_lengths,
+                        rearrange(src, 't b 1 -> b t'),
+                        rearrange(decoder_input, 't b 1 -> b t'),
+                        rearrange(src_mask, 't b -> b t'),
                         metadata=metadata,
                     )
+                    logits = rearrange(logits, 'b t i -> t b i')
+                    decoder_output = rearrange(decoder_output, 'b t d -> t b d')
 
                     # Compute loss.
-                    loss = self.loss_functions[metadata.tgt_lang](logits, target)
+                    loss = self.loss_functions[metadata.tgt_lang](
+                        rearrange(logits, 't b i -> (t b) i'),
+                        rearrange(target, 't b 1 -> (t b)'),
+                    )
 
                 # Update statistics.
                 padding_idx = self.loss_functions[metadata.tgt_lang].ignore_index
                 batch_stats = Statistics.from_loss_logits_target(
-                    loss,
+                    loss.item(),
                     logits,
                     target,
                     padding_idx,

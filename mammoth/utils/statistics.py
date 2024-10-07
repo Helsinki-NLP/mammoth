@@ -20,7 +20,7 @@ class Statistics(object):
     * elapsed time
     """
 
-    def __init__(self, loss=0, n_words=0, n_correct=0):
+    def __init__(self, loss=0, n_words=0, n_correct=None):
         self.loss = loss
         self.n_words = n_words
         self.n_correct = n_correct

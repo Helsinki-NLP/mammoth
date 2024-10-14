@@ -393,6 +393,10 @@ class Trainer(object):
                 src_mask = batch.src.mask
                 decoder_input = batch.tgt.tensor[:-1]
                 target = batch.tgt.tensor[1:]
+                # if self.norm_method == "tokens":
+                #     normalization = batch.tgt.mask.sum().item()
+                # else:
+                #     normalization = batch.batch_size
 
                 with torch.cuda.amp.autocast(enabled=self.optim.amp):
                     # F-prop through the model.
@@ -410,6 +414,7 @@ class Trainer(object):
                         rearrange(logits, 't b i -> (t b) i'),
                         rearrange(target, 't b 1 -> (t b)'),
                     )
+                    # loss /= normalization
 
                 # Update statistics.
                 padding_idx = self.loss_functions[metadata.tgt_lang].ignore_index
@@ -490,6 +495,7 @@ class Trainer(object):
                 if loss is not None:
                     if torch.isnan(loss):
                         raise Exception('Loss blowout')
+                    # loss /= normalization
                     self.optim.backward(loss)
 
                 if self.report_training_accuracy:

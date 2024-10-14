@@ -355,7 +355,7 @@ def generate_from_config(
 @click.command(context_settings={'show_default': True})
 @click.option('--config_path', type=Path, required=True)
 @click.option('--vocab_size', type=int, default=300)
-@click.option('--num_examples_train', type=int, default=10000)
+@click.option('--num_examples_train', type=int, default=1000000)
 @click.option('--num_examples_test', type=int, default=100)
 @click.option('--start_seed', type=int, default=1)
 @click.option(

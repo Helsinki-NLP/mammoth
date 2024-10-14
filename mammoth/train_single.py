@@ -3,7 +3,7 @@
 import torch
 import time
 
-from mammoth.model_builder import build_model
+from mammoth.model_builder import build_model, validate_optimizer_coverage
 from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.misc import set_random_seed
 from mammoth.trainer import build_trainer
@@ -139,6 +139,7 @@ def main(
         device_context.id,
         optim.count_parameters()
     ))
+    validate_optimizer_coverage(model, optim)
 
     # Load parameters from checkpoint
     if opts.train_from:

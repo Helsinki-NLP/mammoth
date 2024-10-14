@@ -112,7 +112,7 @@ def load_parameters_from_checkpoint(
                 logger.warning(
                     f'Could not find optim checkpoint file {optimizer_path}. Affected parameters are reinitialized.'
                 )
-                all_ok = False
+                all_ok = True
     if all_ok:
         if reset_optim:
             logger.info(f'All modules restored from checkpoint {checkpoint_prefix}')

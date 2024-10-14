@@ -239,8 +239,9 @@ class Trainer(object):
         else:
             logger.info('Start training loop and validate every %d steps...', valid_steps)
 
-        total_stats = mammoth.utils.Statistics()
-        report_stats = mammoth.utils.Statistics()
+        n_correct = 0 if self.report_training_accuracy else None
+        total_stats = mammoth.utils.Statistics(n_correct=n_correct)
+        report_stats = mammoth.utils.Statistics(n_correct=n_correct)
         self._start_report_manager(start_time=total_stats.start_time)
         self.optim.zero_grad()
 
@@ -385,7 +386,7 @@ class Trainer(object):
 
             for batch, metadata, _ in valid_iter:
                 if stats is None:
-                    stats = mammoth.utils.Statistics()
+                    stats = mammoth.utils.Statistics(n_correct=0)
 
                 stats.n_src_words += batch.src.mask.sum().item()
                 src = batch.src.tensor
@@ -470,9 +471,9 @@ class Trainer(object):
 
             with torch.cuda.amp.autocast(enabled=self.optim.amp):
                 logits, decoder_output = self.model(
-                    rearrange(src, 't b 1 -> b t'),
-                    rearrange(decoder_input, 't b 1 -> b t'),
-                    rearrange(src_mask, 't b -> b t'),
+                    src=rearrange(src, 't b 1 -> b t'),
+                    decoder_input=rearrange(decoder_input, 't b 1 -> b t'),
+                    src_mask=rearrange(src_mask, 't b -> b t'),
                     metadata=metadata,
                 )
                 logits = rearrange(logits, 'b t i -> t b i')

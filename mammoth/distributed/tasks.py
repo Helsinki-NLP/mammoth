@@ -17,9 +17,10 @@ from mammoth.distributed.components import (
     DistributedComponent,
     DistributedComponentBuilder,
     DistributedComponentGradientSync,
-    DistributedDecoder,
+    DistributedDecoderAttentionLayersBlock,
     DistributedEmbedding,
-    DistributedEncoder,
+    DistributedEncoderAttentionLayersBlock,
+    DistributedTransformerWrapper,
     Side,
 )
 from mammoth.distributed.contexts import DeviceContext, WorldContext
@@ -369,9 +370,27 @@ class TaskQueueManager:
                     lang=task.tgt_lang,
                 )
             )
+            builder.add(
+                DistributedTransformerWrapper(
+                    global_ranks={global_rank},
+                    task_ids={task.corpus_id},
+                    group=None,
+                    side=Side.encoder,
+                    task_id=task.corpus_id,
+                )
+            )
+            builder.add(
+                DistributedTransformerWrapper(
+                    global_ranks={global_rank},
+                    task_ids={task.corpus_id},
+                    group=None,
+                    side=Side.decoder,
+                    task_id=task.corpus_id,
+                )
+            )
             for layer_stack_index, encoder_id in enumerate(task.encoder_id):
                 builder.add(
-                    DistributedEncoder(
+                    DistributedEncoderAttentionLayersBlock(
                         global_ranks={global_rank},
                         task_ids={task.corpus_id},
                         group=None,
@@ -381,7 +400,7 @@ class TaskQueueManager:
                 )
             for layer_stack_index, decoder_id in enumerate(task.decoder_id):
                 builder.add(
-                    DistributedDecoder(
+                    DistributedDecoderAttentionLayersBlock(
                         global_ranks={global_rank},
                         task_ids={task.corpus_id},
                         group=None,

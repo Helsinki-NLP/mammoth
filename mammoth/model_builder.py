@@ -14,8 +14,8 @@ from x_transformers.x_transformers import TokenEmbedding
 from mammoth.distributed.components import (
     DistributedAdapter,
     DistributedComponent,
-    DistributedDecoder,
-    DistributedEncoder,
+    DistributedDecoderAttentionLayersBlock,
+    DistributedEncoderAttentionLayersBlock,
     Side,
 )
 from mammoth.modules.adapters import (
@@ -43,6 +43,14 @@ class ByteEmbedding(Module):
     def forward(self, x):
         token_emb = self.emb(x.long())
         return token_emb
+
+TRANSFORMER_WRAPPER_OPTS = {
+    'post_emb_norm',
+    'tie_embedding',
+    'use_abs_pos_emb',
+    'scaled_sinu_pos_emb',
+    'emb_frac_gradient',
+}
 
 
 def _combine_ordered_dicts(input_dicts: Dict[str, OrderedDict]) -> OrderedDict:
@@ -72,12 +80,28 @@ def get_attention_layers_kwargs(
     is_last = layer_stack_index == len(depths) - 1
     pre_norm_has_final_norm = is_last
     kwargs = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
+    kwargs = {key: val for key, val in kwargs.items() if key not in TRANSFORMER_WRAPPER_OPTS}
     kwargs.update({
         'dim': model_opts.model_dim,
         'depth': depth,
         'causal': causal,
         'cross_attend': cross_attend,
         'pre_norm_has_final_norm': pre_norm_has_final_norm,
+    })
+    return kwargs
+
+
+def get_transformer_wrapper_kwargs(
+    side: Side,
+    model_opts,
+):
+    """Return arguments for x_transformers.TransformerWrapper"""
+    assert side in {Side.encoder, Side.decoder}, f'Invalid side "{side}"'
+    kwargs = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
+    kwargs = {key: val for key, val in kwargs.items() if key in TRANSFORMER_WRAPPER_OPTS}
+    max_seq_len = 0 if model_opts.max_length is None else model_opts.max_length
+    kwargs.update({
+        'max_seq_len': max_seq_len,
     })
     return kwargs
 
@@ -108,10 +132,10 @@ def build_xcoder(
     ]
     distributed_xcoder_class: type
     if side == Side.encoder:
-        distributed_xcoder_class = DistributedEncoder
+        distributed_xcoder_class = DistributedEncoderAttentionLayersBlock
         side_str = 'encoder'
     else:
-        distributed_xcoder_class = DistributedDecoder
+        distributed_xcoder_class = DistributedDecoderAttentionLayersBlock
         side_str = 'decoder'
     if single_task:
         my_components = [
@@ -210,6 +234,10 @@ def build_xcoder(
     if single_task:
         tasks = [task for task in tasks if task.corpus_id == single_task]
     transformer_wrappers = dict()
+    transformer_wrapper_kwargs = get_transformer_wrapper_kwargs(
+        side=side,
+        model_opts=model_opts,
+    )
     for task in tasks:
         if side == Side.encoder:
             xcoder_ids = task.encoder_id
@@ -225,21 +253,11 @@ def build_xcoder(
 
         lang = task.src_lang if side == Side.encoder else task.tgt_lang
         vocab = vocabs_dict[(side_alt_str, lang)]
-        max_seq_len = 0 if model_opts.max_length is None else model_opts.max_length
-        post_emb_norm = True
-        tie_embedding = True
-        use_abs_pos_emb = True
-        emb_frac_gradient = 1.
         # Using custom extended TransformerWrapper to allow passing in an embedding
         transformer_wrapper = TransformerWrapper(
             num_tokens=len(vocab),
-            max_seq_len=max_seq_len,
             attn_layers=adapted_attention_layers_stack,
             emb_dim=model_opts.model_dim,
-            post_emb_norm=post_emb_norm,
-            tie_embedding=tie_embedding,
-            use_abs_pos_emb=use_abs_pos_emb,
-            emb_frac_gradient=emb_frac_gradient,
             token_emb=token_embs[lang],
             initialize_embeddings=not (model_opts.use_embeddingless)
         )
@@ -324,3 +342,21 @@ def build_model(
     # logger.info(model)
     logger.info('Building model - done!')
     return model
+
+
+def validate_optimizer_coverage(model, optimizer):
+    trainable_model_params = {
+        name: p for name, p in model.named_parameters()
+        if p.requires_grad
+    }
+    optimized_params = set()
+    for group in optimizer.param_groups:
+        optimized_params.update(group['params'])
+    missing_params = [
+        name for name, p in trainable_model_params.items()
+        if p not in optimized_params
+    ]
+    if len(missing_params) > 0:
+        raise Exception(f'Missing optimizer for params: {sorted(missing_params)}')
+    else:
+        logger.info('All non-frozen parameters have an optimizer')

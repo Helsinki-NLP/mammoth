@@ -109,6 +109,8 @@ class Statistics(object):
         if stat.n_words:
             self.n_words += stat.n_words
         if stat.n_correct:
+            if self.n_correct is None:
+                self.n_correct=0
             self.n_correct += stat.n_correct
 
         if update_n_src_words:

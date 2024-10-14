@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 from mammoth.distributed import TaskQueueManager, WorldContext
 from mammoth.distributed.components import (
     Side,
-    DistributedEncoder,
-    DistributedDecoder,
+    DistributedEncoderAttentionLayersBlock,
+    DistributedDecoderAttentionLayersBlock,
     DistributedEmbedding,
     # DistributedAdapter,
     # DistributedAttentionBridge,
@@ -155,35 +155,35 @@ def test_create_all_distributed_components():
         use_attention_bridge=False, new_group_func=MockGroup()
     )
     assert all_components == [
-        DistributedDecoder(
+        DistributedDecoderAttentionLayersBlock(
             global_ranks={0, 2},
             task_ids={'train_3_e-b', 'train_0_a-b'},
             group="Group 0 with GPU ranks [0, 2]",
             layer_stack_index=0,
             xcoder_id="y",
         ),
-        DistributedDecoder(
+        DistributedDecoderAttentionLayersBlock(
             global_ranks={1},
             task_ids={"train_2_a-d", "train_1_c-d"},
             group=None,
             layer_stack_index=0,
             xcoder_id="yy",
         ),
-        DistributedEncoder(
+        DistributedEncoderAttentionLayersBlock(
             global_ranks={0, 1},
             task_ids={"train_2_a-d", "train_0_a-b"},
             group="Group 1 with GPU ranks [0, 1]",
             layer_stack_index=0,
             xcoder_id="x",
         ),
-        DistributedEncoder(
+        DistributedEncoderAttentionLayersBlock(
             global_ranks={1},
             task_ids={"train_1_c-d"},
             group=None,
             layer_stack_index=0,
             xcoder_id="xx",
         ),
-        DistributedEncoder(
+        DistributedEncoderAttentionLayersBlock(
             global_ranks={2},
             task_ids={'train_3_e-b'},
             group=None,
@@ -244,21 +244,21 @@ def test_get_my_distributed_components():
                 f"my component {component} not in all_components {all_components}"
             )
     assert my_components == [
-        DistributedDecoder(
+        DistributedDecoderAttentionLayersBlock(
             global_ranks={1},
             task_ids={"train_2_a-d", "train_1_c-d"},
             group=None,
             layer_stack_index=0,
             xcoder_id="yy",
         ),
-        DistributedEncoder(
+        DistributedEncoderAttentionLayersBlock(
             global_ranks={0, 1},
             task_ids={"train_2_a-d", "train_0_a-b"},
             group="Group 1 with GPU ranks [0, 1]",
             layer_stack_index=0,
             xcoder_id="x",
         ),
-        DistributedEncoder(
+        DistributedEncoderAttentionLayersBlock(
             global_ranks={1},
             task_ids={"train_1_c-d"},
             group=None,

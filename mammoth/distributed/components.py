@@ -87,7 +87,41 @@ class DistributedComponent(ABC):
         return self.group is not None
 
 
-# TODO: This is a misnomer: Not an entire XCoder, but just one AttentionLayers block
+@dataclass  # type: ignore
+class DistributedTransformerWrapper(DistributedComponent, ABC):
+    task_id: str
+    side: Side
+
+    def get_name(self) -> str:
+        return f'{self.side.name}_{self.task_id}'
+
+    def get_module(self, model: NMTModel) -> nn.Module:
+        parent = model.encoder if self.side == Side.encoder else model.decoder
+        tw = parent[self.task_id]
+        return tw
+
+    def named_parameters(self, model: NMTModel):
+        module = self.get_module(model)
+        for name, p in module.named_parameters():
+            # TransformerWrapper contains the AttentionLayers and the embs.
+            # however, we want to treat these as distinct DistributedComponents
+            if name.startswith('attn_layers.'):
+                continue
+            if name.startswith('token_emb.'):
+                continue
+            yield name, p
+
+    def state_dict(self, model: NMTModel, prefix='', keep_vars=False) -> Dict[str, Any]:
+        module = self.get_module(model)
+        destination: Dict[str, Any] = OrderedDict()
+        for name, sub_module in module._modules.items():
+            if name.endswith('attn_layers'):
+                # stored separately
+                continue
+            sub_module.state_dict(destination=destination, prefix=prefix + name + '.', keep_vars=keep_vars)
+        return destination
+
+
 @dataclass  # type: ignore
 class DistributedAttentionLayersBlock(DistributedComponent, ABC):
     layer_stack_index: int
@@ -106,8 +140,9 @@ class DistributedAttentionLayersBlock(DistributedComponent, ABC):
         for name, p in module.named_parameters():
             # encoders and decoders contain embeddings and adapters as submodules
             # however, we want to treat these as distinct DistributedComponents
-            if 'embeddings' not in name and 'adapter' not in name:
-                yield name, p
+            if 'adapter' in name:
+                continue
+            yield name, p
 
     def state_dict(self, model: NMTModel, prefix='', keep_vars=False) -> Dict[str, Any]:
         module = self.get_module(model)
@@ -121,7 +156,7 @@ class DistributedAttentionLayersBlock(DistributedComponent, ABC):
 
 
 @dataclass
-class DistributedEncoder(DistributedAttentionLayersBlock):
+class DistributedEncoderAttentionLayersBlock(DistributedAttentionLayersBlock):
     @property
     def side(self) -> Side:
         return Side.encoder
@@ -136,7 +171,7 @@ class DistributedEncoder(DistributedAttentionLayersBlock):
 
 
 @dataclass
-class DistributedDecoder(DistributedAttentionLayersBlock):
+class DistributedDecoderAttentionLayersBlock(DistributedAttentionLayersBlock):
     @property
     def side(self) -> Side:
         return Side.decoder

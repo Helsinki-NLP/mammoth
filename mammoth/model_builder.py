@@ -14,8 +14,8 @@ from x_transformers.x_transformers import TokenEmbedding
 from mammoth.distributed.components import (
     DistributedAdapter,
     DistributedComponent,
-    DistributedDecoder,
-    DistributedEncoder,
+    DistributedDecoderAttentionLayersBlock,
+    DistributedEncoderAttentionLayersBlock,
     Side,
 )
 from mammoth.modules.adapters import (
@@ -119,10 +119,10 @@ def build_xcoder(
     ]
     distributed_xcoder_class: type
     if side == Side.encoder:
-        distributed_xcoder_class = DistributedEncoder
+        distributed_xcoder_class = DistributedEncoderAttentionLayersBlock
         side_str = 'encoder'
     else:
-        distributed_xcoder_class = DistributedDecoder
+        distributed_xcoder_class = DistributedDecoderAttentionLayersBlock
         side_str = 'decoder'
     if single_task:
         my_components = [
@@ -328,3 +328,21 @@ def build_model(
     # logger.info(model)
     logger.info('Building model - done!')
     return model
+
+
+def validate_optimizer_coverage(model, optimizer):
+    trainable_model_params = {
+        name: p for name, p in model.named_parameters()
+        if p.requires_grad
+    }
+    optimized_params = set()
+    for group in optimizer.param_groups:
+        optimized_params.update(group['params'])
+    missing_params = [
+        name for name, p in trainable_model_params.items()
+        if p not in optimized_params
+    ]
+    if len(missing_params) > 0:
+        raise Exception(f'Missing optimizer for params: {sorted(missing_params)}')
+    else:
+        logger.info('All non-frozen parameters have an optimizer')

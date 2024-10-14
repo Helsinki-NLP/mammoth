@@ -121,6 +121,15 @@ class DistributedTransformerWrapper(DistributedComponent, ABC):
             sub_module.state_dict(destination=destination, prefix=prefix + name + '.', keep_vars=keep_vars)
         return destination
 
+    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
+        module = self.get_module(model)
+        mismatch = module.load_state_dict(state_dict, strict=False)
+        missing_keys = [
+            name for name in mismatch.missing_keys
+            if not name.startswith('attn_layers.') or name.startswith('token_emb.')
+        ]
+        return mismatch._replace(missing_keys=missing_keys)
+
 
 @dataclass  # type: ignore
 class DistributedAttentionLayersBlock(DistributedComponent, ABC):
@@ -147,12 +156,21 @@ class DistributedAttentionLayersBlock(DistributedComponent, ABC):
     def state_dict(self, model: NMTModel, prefix='', keep_vars=False) -> Dict[str, Any]:
         module = self.get_module(model)
         destination: Dict[str, Any] = OrderedDict()
-        for name, sub_module in module._modules.items():
+        for name, sub_module in module.get_sub_modules().items():
             if name == 'adapters':
                 # Adapters are stored separately
                 continue
             sub_module.state_dict(destination=destination, prefix=prefix + name + '.', keep_vars=keep_vars)
         return destination
+
+    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
+        module = self.get_module(model)
+        mismatch = module.load_state_dict(state_dict, strict=False)
+        missing_keys = [
+            name for name in mismatch.missing_keys
+            if not name.startswith('layers.')
+        ]
+        return mismatch._replace(missing_keys=missing_keys)
 
 
 @dataclass

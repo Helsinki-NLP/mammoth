@@ -65,6 +65,14 @@ def _add_logging_opts(parser, is_train=True):
             help="Log directory for Tensorboard. This is also the name of the run.",
         )
         group.add(
+        '--use_embeddingless',
+        '-use_embeddingless',
+        action='store_true',
+        default=False,
+        help="Enable the use of byte-based embeddingless models" +
+        "(Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
+         )
+        group.add(
             '--report_stats_from_parameters',
             '-report_stats_from_parameters',
             action="store_true",

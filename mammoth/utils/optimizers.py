@@ -158,6 +158,7 @@ class SubOptimizer(object):
         self.grad_scaler = grad_scaler
         self._training_step = 1
         self._decay_step = 1
+        self._n_clips = 0
 
     @property
     def param_groups(self):
@@ -194,6 +195,7 @@ class SubOptimizer(object):
     def zero_grad(self):
         """Zero the gradients of optimized parameters."""
         self._optimizer.zero_grad()
+        self._n_clips = 0
 
     def step(self):
         """Update the model parameters based on current gradients. """
@@ -202,7 +204,11 @@ class SubOptimizer(object):
         for group in self._optimizer.param_groups:
             group['lr'] = learning_rate
             if self._max_grad_norm > 0:
-                clip_grad_norm_(group['params'], self._max_grad_norm)
+                orig_norm = clip_grad_norm_(group['params'], self._max_grad_norm)
+                if orig_norm.item() > self._max_grad_norm:
+                    # FIXME: debug. Count and log instead
+                    print(f'Clipping {orig_norm} -> {self._max_grad_norm}')
+                    self._n_clips += 1
 
         if self.grad_scaler is not None:
             self.grad_scaler.step(self._optimizer)
@@ -395,6 +401,9 @@ class MultipleOptimizer(object):
     def amp(self):
         """True if use torch amp mix precision training."""
         return self.grad_scaler is not None
+
+    def n_clips(self):
+        return sum(optimizer._n_clips for optimizer in self.suboptimizers.values())
 
 
 # Code below is an implementation of https://arxiv.org/pdf/1804.04235.pdf

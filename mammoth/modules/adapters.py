@@ -225,3 +225,10 @@ class AdaptedAttentionLayers(AttentionLayers):
     def forward(self, *args, **kwargs):
         self._inject_adapters()
         return super().forward(*args, **kwargs)
+
+    def get_sub_modules(self):
+        omit_submodules = {'layers'}
+        return {
+            name: sub_module for name, sub_module in self._modules.items()
+            if name not in omit_submodules
+        }

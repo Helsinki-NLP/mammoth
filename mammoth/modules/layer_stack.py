@@ -9,7 +9,7 @@ from mammoth.modules.adapters import AdaptedAttentionLayers
 class AdaptedAttentionLayersStack(nn.Module):
     """
     Wrapper that allows stacking multiple AdaptedAttentionLayers.
-    Represents one particular stacking: does not allow switching out entire layers
+    Represents one particular task-specific stacking: does not allow switching out entire layers
     (but does delegate the switching out of adapters to its components)
     """
     def __init__(self, attention_layers_stack: Sequence[AdaptedAttentionLayers]):

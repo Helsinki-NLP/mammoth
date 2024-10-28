@@ -90,6 +90,8 @@ def get_transformer_wrapper_kwargs(
     kwargs.update({
         'max_seq_len': max_seq_len,
     })
+    if side == Side.encoder:
+        kwargs['return_only_embed'] = True
     return kwargs
 
 

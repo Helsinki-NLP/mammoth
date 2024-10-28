@@ -192,13 +192,13 @@ class AdaptedAttentionLayers(AttentionLayers):
         adapted_layer_types = []
         adapted_layers = nn.ModuleList()
         adapted_layer_dropouts = []
+        adapter_layers_by_index = self._merge_active_adapters()
         i = 0
         for layer_type, layer_struct, layer_dropout in zip(
             self._base_layer_types,
             self._base_layers,
             self._base_layer_dropouts,
         ):
-            adapter_layers_by_index = self._merge_active_adapters()
             if layer_type == 'f':
                 # Adapters apply to feedforward layers
                 adapter_layers = adapter_layers_by_index[i]

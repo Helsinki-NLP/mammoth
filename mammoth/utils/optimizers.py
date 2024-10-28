@@ -154,11 +154,12 @@ class SubOptimizer(object):
         self._optimizer = optimizer
         self._learning_rate = learning_rate
         self._learning_rate_decay_fn = learning_rate_decay_fn
-        self._max_grad_norm = max_grad_norm
         self.grad_scaler = grad_scaler
         self._training_step = 1
         self._decay_step = 1
         self._n_clips = 0
+        self._n_params_tot = self._count_params()
+        self._max_grad_norm = max_grad_norm * self._n_params_tot
 
     @property
     def param_groups(self):
@@ -168,6 +169,12 @@ class SubOptimizer(object):
     def training_step(self):
         """The current training step."""
         return self._training_step
+
+    def _count_params(self):
+        result = 0
+        for group in self._optimizer.param_groups:
+            result += sum(param.numel() for param in group['params'])
+        return result
 
     def learning_rate(self):
         """Returns the current learning rate."""
@@ -195,7 +202,6 @@ class SubOptimizer(object):
     def zero_grad(self):
         """Zero the gradients of optimized parameters."""
         self._optimizer.zero_grad()
-        self._n_clips = 0
 
     def step(self):
         """Update the model parameters based on current gradients. """
@@ -207,7 +213,7 @@ class SubOptimizer(object):
                 orig_norm = clip_grad_norm_(group['params'], self._max_grad_norm)
                 if orig_norm.item() > self._max_grad_norm:
                     # FIXME: debug. Count and log instead
-                    print(f'Clipping {orig_norm} -> {self._max_grad_norm}')
+                    # print(f'Clipping {orig_norm} -> {self._max_grad_norm}')
                     self._n_clips += 1
 
         if self.grad_scaler is not None:
@@ -350,7 +356,9 @@ class MultipleOptimizer(object):
         for name, optimizer in self.suboptimizers.items():
             count = optimizer.training_step
             lr = optimizer.learning_rate()
-            result.append(f'Optimizer "{name}" has been stepped {count} times and has LR {lr}')
+            n_clips = optimizer._n_clips
+            result.append(f'Optimizer "{name}" has been stepped {count} times. LR {lr} n_clips {n_clips}')
+            optimizer._n_clips = 0
         return result
 
     def count_parameters(self):

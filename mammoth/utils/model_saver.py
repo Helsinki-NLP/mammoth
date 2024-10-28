@@ -60,7 +60,9 @@ def explode_model(
             # Only the lowest ranked device saves a component
             state_dicts[name] = component.state_dict(model)
             # The optimizer parameters are distributed the same way as the components
-            optim_state_dicts[name] = optim.suboptimizers[name].state_dict()
+            # Not all components have trainable (unfrozen) parameters, though
+            if name in optim.suboptimizers:
+                optim_state_dicts[name] = optim.suboptimizers[name].state_dict()
     return state_dicts, optim_state_dicts
 
 
@@ -290,12 +292,14 @@ class ModelSaver(ModelSaverBase):
             if os.path.isfile(checkpoint_path):
                 logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
             else:
-                logger.info(f'Saving module checkpoint {checkpoint_path} and optimizer {optimizer_path}')
-                torch.save(state_dict, checkpoint_path)
-                tmp_checkpoint_paths.append(checkpoint_path)
-                if key != 'frame':
+                if key != 'frame' and key in optim_state_dicts:
+                    logger.info(f'Saving module checkpoint {checkpoint_path} and optimizer {optimizer_path}')
                     torch.save(optim_state_dicts[key], optimizer_path)
                     tmp_checkpoint_paths.append(optimizer_path)
+                else:
+                    logger.info(f'Saving module checkpoint {checkpoint_path} (no optimizer to save)')
+                torch.save(state_dict, checkpoint_path)
+                tmp_checkpoint_paths.append(checkpoint_path)
 
         return tmp_checkpoint_paths
 

@@ -516,13 +516,13 @@ class Trainer(object):
                 total_stats.update(batch_stats)
                 report_stats.update(batch_stats)
                 report_stats.update_task_loss(batch_stats.loss, metadata)
-
             except Exception:
                 traceback.print_exc()
                 logger.info("At step %d, we removed a batch - accum %d", self.optim.training_step, k)
                 self.nan_batches += 1
                 if self.nan_batches >= self.max_nan_batches:
                     raise Exception('Exceeded allowed --max_nan_batches.')
+
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')
 

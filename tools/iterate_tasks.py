@@ -16,7 +16,7 @@ from pathlib import Path
     '--src',
     type=str,
     default=None,
-    help='Template for source file paths. Use varibles src_lang and tgt_lang.',
+    help='Template for source file paths. Use varibles src_lang, tgt_lang, and task_id.',
 )
 @click.option(
     '--output',
@@ -27,7 +27,7 @@ from pathlib import Path
 @click.option(
     '--flag',
     is_flag=True,
-    help='Prefix with "--task_id". Implied by --src and --output.'
+    help='Prefix output with "--task_id". Implied by --src and --output.'
 )
 def main(config_path, match, src, output, flag):
     if src is not None or output is not None:

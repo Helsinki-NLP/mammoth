@@ -822,7 +822,7 @@ def _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path, valid_src_p
     if 'tasks' not in opts.in_config[0]:
         opts.in_config[0]['tasks'] = dict()
     tasks_section = opts.in_config[0]['tasks']
-    key = f'train_{src_lang}-{tgt_lang}'
+    key = f'{src_lang}-{tgt_lang}'
     if key not in tasks_section:
         tasks_section[key] = dict()
     tasks_section[key]['src_tgt'] = f'{src_lang}-{tgt_lang}'

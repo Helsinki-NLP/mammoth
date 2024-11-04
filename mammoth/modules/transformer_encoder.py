@@ -153,7 +153,7 @@ class TransformerEncoder(EncoderBase):
         return cls(
             opts.enc_layers,
             opts.model_dim,
-            opts.heads,
+            opts.ab_heads,
             opts.transformer_ff,
             opts.dropout[0] if isinstance(opts.dropout, list) else opts.dropout,
             opts.attention_dropout[0] if isinstance(opts.attention_dropout, list) else opts.attention_dropout,

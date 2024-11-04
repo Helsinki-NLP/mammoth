@@ -9,7 +9,10 @@ from mammoth.models import NMTModel
 
 
 class DistributedComponentBuilder:
-    def __init__(self):
+    """
+    Deduplicates DistributedComponents, merging the data from each copy.
+    """
+    def __init__(self) -> None:
         self.components: Dict[str, DistributedComponent] = dict()
 
     def add(self, component):
@@ -89,6 +92,7 @@ class DistributedComponent(ABC):
 
 @dataclass  # type: ignore
 class DistributedTransformerWrapper(DistributedComponent, ABC):
+    """Represents a distributed TransformerWrapper object from x-transformers"""
     task_id: str
     side: Side
 
@@ -133,6 +137,7 @@ class DistributedTransformerWrapper(DistributedComponent, ABC):
 
 @dataclass  # type: ignore
 class DistributedAttentionLayersBlock(DistributedComponent, ABC):
+    """Represents a distributed AttentionLayers object from x-transformers"""
     layer_stack_index: int
     xcoder_id: str
 
@@ -175,6 +180,7 @@ class DistributedAttentionLayersBlock(DistributedComponent, ABC):
 
 @dataclass
 class DistributedEncoderAttentionLayersBlock(DistributedAttentionLayersBlock):
+    """Represents a distributed encoder-side AttentionLayers object from x-transformers"""
     @property
     def side(self) -> Side:
         return Side.encoder
@@ -190,6 +196,7 @@ class DistributedEncoderAttentionLayersBlock(DistributedAttentionLayersBlock):
 
 @dataclass
 class DistributedDecoderAttentionLayersBlock(DistributedAttentionLayersBlock):
+    """Represents a distributed decoder-side AttentionLayers object from x-transformers"""
     @property
     def side(self) -> Side:
         return Side.decoder
@@ -205,6 +212,7 @@ class DistributedDecoderAttentionLayersBlock(DistributedAttentionLayersBlock):
 
 @dataclass
 class DistributedEmbedding(DistributedComponent):
+    """Represents a distributed Embeddings object"""
     side: Side
     lang: str
 
@@ -221,6 +229,7 @@ class DistributedEmbedding(DistributedComponent):
 
 @dataclass
 class DistributedAdapter(DistributedComponent):
+    """Represents a distributed Adapter object"""
     # Can't use parent object of type DistributedAttentionLayersBlock: that refers to a
     # specific module, while the adapter is for the entire layerstack slot
     side: Side
@@ -240,6 +249,11 @@ class DistributedAdapter(DistributedComponent):
 
 @dataclass
 class DistributedAttentionBridge(DistributedComponent):
+    """
+    Represents the attention bridge.
+    Even though the sharing of the attention bridge is not configurable (it is always fully shared),
+    representing it as a DistributedComponent allows for code reuse.
+    """
     def get_name(self) -> str:
         return 'attention_bridge'
 

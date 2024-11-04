@@ -333,6 +333,11 @@ def build_model(
 
 
 def validate_optimizer_coverage(model, optimizer):
+    """
+    Given a model (complete with all locally loaded modules),
+    confirm that all trained (non-frozen) parameters are covered
+    by a suboptimizer.
+    """
     trainable_model_params = {
         name: p for name, p in model.named_parameters()
         if p.requires_grad

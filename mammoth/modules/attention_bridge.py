@@ -78,7 +78,7 @@ class PerceiverAttentionBridgeLayer(BaseAttentionBridgeLayer):
             opts.model_dim,
             opts.hidden_ab_size,
             opts.ab_fixed_length,
-            opts.heads,
+            opts.ab_heads,
             opts.attention_dropout[0],
             opts.max_relative_positions,
             opts.ab_layer_norm,
@@ -279,7 +279,7 @@ class TransformerAttentionBridgeLayer(BaseAttentionBridgeLayer, TransformerEncod
     def from_opts(cls, opts):
         return cls(
             opts.model_dim,
-            opts.heads,
+            opts.ab_heads,
             opts.hidden_ab_size,  # d_ff
             # TODO: that list indexing things seems suspicious to me...
             opts.dropout[0],

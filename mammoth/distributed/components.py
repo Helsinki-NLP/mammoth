@@ -101,8 +101,8 @@ class DistributedTransformerWrapper(DistributedComponent, ABC):
 
     def get_module(self, model: NMTModel) -> nn.Module:
         parent = model.encoder if self.side == Side.encoder else model.decoder
-        tw = parent[self.task_id]
-        return tw
+        transformer_wrapper = parent[self.task_id]
+        return transformer_wrapper
 
     def named_parameters(self, model: NMTModel):
         module = self.get_module(model)
@@ -137,7 +137,7 @@ class DistributedTransformerWrapper(DistributedComponent, ABC):
 
 @dataclass  # type: ignore
 class DistributedAttentionLayersBlock(DistributedComponent, ABC):
-    """Represents a distributed AttentionLayers object from x-transformers"""
+    """Represents a distributed AdaptedAttentionLayers object"""
     layer_stack_index: int
     xcoder_id: str
 
@@ -180,7 +180,7 @@ class DistributedAttentionLayersBlock(DistributedComponent, ABC):
 
 @dataclass
 class DistributedEncoderAttentionLayersBlock(DistributedAttentionLayersBlock):
-    """Represents a distributed encoder-side AttentionLayers object from x-transformers"""
+    """Represents a distributed encoder-side AdaptedAttentionLayers"""
     @property
     def side(self) -> Side:
         return Side.encoder
@@ -190,13 +190,12 @@ class DistributedEncoderAttentionLayersBlock(DistributedAttentionLayersBlock):
         return self.xcoder_id
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        aal = model.encoder.get_attention_layers_by_xcoder_id(self.layer_stack_index, self.xcoder_id)
-        return aal
+        return model.encoder.get_attention_layers_by_xcoder_id(self.layer_stack_index, self.xcoder_id)
 
 
 @dataclass
 class DistributedDecoderAttentionLayersBlock(DistributedAttentionLayersBlock):
-    """Represents a distributed decoder-side AttentionLayers object from x-transformers"""
+    """Represents a distributed decoder-side AdaptedAttentionLayers"""
     @property
     def side(self) -> Side:
         return Side.decoder
@@ -206,8 +205,7 @@ class DistributedDecoderAttentionLayersBlock(DistributedAttentionLayersBlock):
         return self.xcoder_id
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        aal = model.decoder.get_attention_layers_by_xcoder_id(self.layer_stack_index, self.xcoder_id)
-        return aal
+        return model.decoder.get_attention_layers_by_xcoder_id(self.layer_stack_index, self.xcoder_id)
 
 
 @dataclass

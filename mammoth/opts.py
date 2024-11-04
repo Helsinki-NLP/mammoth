@@ -256,11 +256,6 @@ def model_opts(parser):
         "https://arxiv.org/pdf/1803.02155.pdf",
     )
     group.add(
-        '--heads', '-heads', type=int, default=8,
-        help='Number of heads for transformer self-attention. '
-        ' Semi-obsolete: not used for x-transformers, only used for some attention bridge configuations.'
-    )
-    group.add(
         "-x_transformers_opts",
         "--x_transformers_opts",
         help="For a complete list of options (name only), see the code"
@@ -287,7 +282,7 @@ def model_opts(parser):
         '--loss_scale',
         '-loss_scale',
         type=float,
-        default=0,
+        default=0.0,
         help="For FP16 training, the static loss scale to use. If not set, the loss scale is dynamically computed.",
     )
     group.add(
@@ -326,6 +321,11 @@ def model_opts(parser):
         default='layernorm',
         choices=['none', 'rmsnorm', 'layernorm'],
         help="""Use layer normalization after lin, simple and feedforward bridge layers""",
+    )
+    group.add(
+        '--ab_heads', '-ab_heads', type=int, default=8,
+        help='Number of heads for transformer self-attention. '
+        ' Semi-obsolete: not used for x-transformers, only used for some attention bridge configuations.'
     )
 
     # adapter options are in a dict "adapters", and in the corpus options
@@ -371,7 +371,7 @@ def _add_train_general_opts(parser):
         help='Criteria to use for early stopping.',
     )
     group.add(
-        '--max_nan_batches', '-max_nan_batches', type=int, default=5,
+        '--max_nan_batches', '-max_nan_batches', type=int, default=0,
         help='Number of batches that may be skipped due to loss blowout.'
     )
 
@@ -524,7 +524,7 @@ def _add_train_general_opts(parser):
         '--adagrad_accumulator_init',
         '-adagrad_accumulator_init',
         type=float,
-        default=0,
+        default=0.0,
         help="Initializes the accumulator values in adagrad. "
         "Mirrors the initial_accumulator_value option "
         "in the tensorflow adagrad (use 0.1 for their default).",
@@ -533,7 +533,7 @@ def _add_train_general_opts(parser):
         '--max_grad_norm',
         '-max_grad_norm',
         type=float,
-        default=1,
+        default=1.0,
         help="If the norm of the gradient vector exceeds this, "
         "renormalize it to have the norm equal to "
         "max_grad_norm",
@@ -542,7 +542,7 @@ def _add_train_general_opts(parser):
         '--weight_decay',
         '-weight_decay',
         type=float,
-        default=0,
+        default=0.0,
         help="L2 penalty (weight decay) regularizer",
     )
     # FIXME, mentions LSTM
@@ -609,7 +609,7 @@ def _add_train_general_opts(parser):
         '--average_decay',
         '-average_decay',
         type=float,
-        default=0,
+        default=0.0,
         help="Moving average decay. "
         "Set to other than 0 (e.g. 1e-4) to activate. "
         "Similar to Marian NMT implementation: "
@@ -656,7 +656,8 @@ def _add_train_general_opts(parser):
         '-learning_rate',
         type=float,
         default=1.0,
-        help="Starting learning rate. Recommended settings: sgd = TBD, adagrad = TBD, adadelta = TBD, adam = TBD",
+        help="Starting learning rate. ",
+        # "Recommended settings: sgd = TBD, adagrad = TBD, adadelta = TBD, adam = TBD",
     )
     group.add(
         '--learning_rate_decay',

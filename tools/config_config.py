@@ -115,6 +115,11 @@ def add_complete_language_pairs_args(parser):
         action='store_true',
         help='add autoencoder tasks, for which src_lang == tgt_lang'
     )
+    parser.add_argument(
+        '--autoencoder_validation',
+        action='store_true',
+        help='include autoencoder tasks in validation'
+    )
 
 
 def add_configs_args(parser):
@@ -477,6 +482,9 @@ def set_transforms(opts):
                 prefix = f'<to_{tgt}>'
             corpus['src_prefix'] = prefix
             corpus['tgt_prefix'] = ''   # does not work, but must be set nonetheless
+        else:
+            if cc_opts.get('use_src_lang_token', False):
+                raise Exception('use_src_lang_token requires prefix transform')
 
     duration = time.time() - start
     logger.info(f'step took {duration} s')
@@ -734,6 +742,9 @@ def complete_language_pairs(opts):
     src_path_template = opts.src_path if opts.src_path else cc_opts['src_path']
     tgt_path_template = opts.tgt_path if opts.tgt_path else cc_opts['tgt_path']
     autoencoder = opts.autoencoder if opts.autoencoder else cc_opts.get('autoencoder', False)
+    autoencoder_validation = (
+        opts.autoencoder_validation if opts.autoencoder_validation else cc_opts.get('autoencoder_validation', False)
+    )
     if autoencoder:
         ae_path_template = opts.ae_path if opts.ae_path else cc_opts.get('ae_path', None)
         if ae_path_template:
@@ -779,8 +790,12 @@ def complete_language_pairs(opts):
                     continue
                 src_path = ae_src_path_template.format(**template_variables)
                 tgt_path = ae_tgt_path_template.format(**template_variables)
-                valid_src_path = None
-                valid_tgt_path = None
+                if not autoencoder_validation:
+                    valid_src_path = None
+                    valid_tgt_path = None
+                else:
+                    valid_src_path = valid_src_path_template.format(**template_variables)
+                    valid_tgt_path = valid_tgt_path_template.format(**template_variables)
             else:
                 # translation task
                 src_path = src_path_template.format(**template_variables)

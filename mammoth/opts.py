@@ -370,10 +370,6 @@ def _add_train_general_opts(parser):
         default=None,
         help='Criteria to use for early stopping.',
     )
-    group.add(
-        '--max_nan_batches', '-max_nan_batches', type=int, default=0,
-        help='Number of batches that may be skipped due to loss blowout.'
-    )
 
     # GPU
     group = parser.add_argument_group('Computation Environment')

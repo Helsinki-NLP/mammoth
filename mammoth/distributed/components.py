@@ -119,7 +119,7 @@ class DistributedTransformerWrapper(DistributedComponent, ABC):
         module = self.get_module(model)
         destination: Dict[str, Any] = OrderedDict()
         for name, sub_module in module._modules.items():
-            if name.endswith('attn_layers'):
+            if name in {'attn_layers', 'token_emb'}:
                 # stored separately
                 continue
             sub_module.state_dict(destination=destination, prefix=prefix + name + '.', keep_vars=keep_vars)
@@ -240,9 +240,9 @@ class DistributedAdapter(DistributedComponent):
 
     def get_module(self, model: NMTModel) -> nn.Module:
         if self.side == Side.encoder:
-            model.encoder.get_adapter(self.adapter_group, self.sub_id)
+            return model.encoder.get_adapter(f'adapter_{self.adapter_group}_{self.sub_id}')
         else:
-            model.decoder.get_adapter(self.adapter_group, self.sub_id)
+            return model.decoder.get_adapter(f'adapter_{self.adapter_group}_{self.sub_id}')
 
 
 @dataclass

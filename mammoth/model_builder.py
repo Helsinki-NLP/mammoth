@@ -154,11 +154,13 @@ def build_xcoder(
         )
 
     # Create AdapterLayer objects and Adapter objects
+    adapters_by_name: Optional[Dict[str, Adapter]]
     if uses_adapters(model_opts):
         adapter_components = [
             component for component in my_components
             if isinstance(component, DistributedAdapter) and component.side == side
         ]
+        adapters_by_name = dict()
         adapter_params_by_group = dict()
         for adapter_group, adapter_opts in model_opts.adapters[side_str].items():
             adapter_params_by_group[adapter_group] = {
@@ -169,13 +171,13 @@ def build_xcoder(
             }
         for component in adapter_components:
             adapter_params = adapter_params_by_group[component.adapter_group]
-            if model_opts.adapter_type.lower() == 'lora':
+            if adapter_opts['adapter_type'].lower() == 'lora':
                 adapter_layer_func = partial(
                         LoraAdapterLayer,
                         dim=model_opts.model_dim,
                         r=adapter_params['hidden_dim'],
                     )
-            elif model_opts.adapter_type.lower() == 'ff':
+            elif adapter_opts['adapter_type'].lower() == 'ff':
                 mult = adapter_params['hidden_dim'] / model_opts.model_dim
                 # TODO: make norm locations and glu configurable
                 adapter_layer_func = partial(
@@ -187,18 +189,26 @@ def build_xcoder(
                     glu=True,
                 )
             else:
-                raise ValueError(f'Unrecognized adapter_type {model_opts.adapter_type}')
-            for sub_id in adapter_params['sub_ids']:
-                for layer_idx in adapter_params['layers']:
-                    adapter_layer = adapter_layer_func()
-                    adapter = Adapter(
-                        adapter_group=component.adapter_group,
-                        sub_id=sub_id,
-                    )
-                    adapter.add_layer(layer_idx, adapter_layer)
-                    layer_stack_index = adapter_params['layer_stack_index']
-                    for attention_layers in attention_layer_blocks[layer_stack_index]:
-                        attention_layers.add_adapter(adapter)
+                raise ValueError(f'Unrecognized adapter_type {adapter_opts["adapter_type"]}')
+            adapter = Adapter(
+                adapter_group=component.adapter_group,
+                sub_id=component.sub_id,
+            )
+            adapters_by_name[adapter.name] = adapter
+            for layer_idx in adapter_params['layers']:
+                adapter_layer = adapter_layer_func()
+                adapter.add_layer(layer_idx, adapter_layer)
+            layer_stack_index = adapter_params['layer_stack_index']
+            for xcoder_id, attention_layers in attention_layer_blocks[layer_stack_index].items():
+                # TODO: allow limiting which xcoder_ids get the adapter?
+                logger.info(f'adding {adapter.name} to {layer_stack_index}:{xcoder_id}:{component.sub_id}')
+                try:
+                    attention_layers.add_adapter(adapter)
+                except Exception as e:
+                    logger.error(repr(attention_layers))
+                    raise e
+    else:
+        adapters_by_name = None
 
     # Create TokenEmbedding objects
     l2norm_embed = False
@@ -256,6 +266,7 @@ def build_xcoder(
         transformer_wrappers=transformer_wrappers,
         attention_layer_blocks=attention_layer_blocks,
         token_embs=token_embs,
+        adapters=adapters_by_name,
     )
     return stack_xcoder
 

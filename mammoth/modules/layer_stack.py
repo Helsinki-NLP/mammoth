@@ -3,7 +3,7 @@ from typing import List, Sequence, Optional, Tuple, Dict
 from x_transformers import TransformerWrapper
 from x_transformers.x_transformers import LayerIntermediates, TokenEmbedding
 
-from mammoth.modules.adapters import AdaptedAttentionLayers
+from mammoth.modules.adapters import AdaptedAttentionLayers, Adapter
 
 
 class AdaptedAttentionLayersStack(nn.Module):
@@ -65,11 +65,13 @@ class StackXcoder(nn.ModuleDict):
         transformer_wrappers: Dict[str, TransformerWrapper],
         attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]],
         token_embs: Dict[str, TokenEmbedding],
+        adapters: Optional[Dict[str, Adapter]],
     ):
         super().__init__(transformer_wrappers)
         self.attention_layers_by_xcoder_id: Dict[int, Dict[str, AdaptedAttentionLayers]] = attention_layer_blocks
         self.token_embs: Dict[str, TokenEmbedding] = token_embs
         self.active_task: Optional[str] = None
+        self.adapters = adapters
 
     # TransformerWrapper wraps an AttentionLayers in embeddings and some other functionality.
     # We use one TransformerWrapper per task.
@@ -95,5 +97,8 @@ class StackXcoder(nn.ModuleDict):
 
     def get_embedding_by_lang(self, lang):
         return self.token_embs[lang]
+
+    def get_adapter(self, adapter_name):
+        return self.adapters[adapter_name]
 
     # Lack of forward is intentional: call forward on the return value of activate

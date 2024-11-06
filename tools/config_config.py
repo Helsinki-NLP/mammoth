@@ -618,36 +618,38 @@ def adapter_config(opts):
         if 'adapters' not in task_config:
             task_config['adapters'] = {'encoder': [], 'decoder': []}
     # TODO: refactor and add support for {SRC|TGT}_{LANGUAGE|GROUP} also to adapters
-    for adapter_name, adapter_config in sorted(encoder_adapters.items()):
-        if adapter_config['ids'] == 'LANGUAGE':
-            adapter_config['ids'] = list(src_langs)
-            for task_key, task_config in opts.in_config[0]['tasks'].items():
-                task_src, task_tgt = task_config['src_tgt'].split('-')
-                task_config['adapters']['encoder'].append([adapter_name, task_src])
-        elif adapter_config['ids'] == 'GROUP':
-            adapter_config['ids'] = list(src_groups)
-            for task_key, task_config in opts.in_config[0]['tasks'].items():
-                task_src, task_tgt = task_config['src_tgt'].split('-')
-                task_config['adapters']['encoder'].append([adapter_name, cc_opts['groups'][task_src]])
-        elif adapter_config['ids'] == 'FULL':
-            adapter_config['ids'] = ['full']
-            for task_key, task_config in opts.in_config[0]['tasks'].items():
-                task_config['adapters']['encoder'].append([adapter_name, 'full'])
-    for adapter_name, adapter_config in sorted(decoder_adapters.items()):
-        if adapter_config['ids'] == 'LANGUAGE':
-            adapter_config['ids'] = list(tgt_langs)
-            for task_key, task_config in opts.in_config[0]['tasks'].items():
-                task_src, task_tgt = task_config['src_tgt'].split('-')
-                task_config['adapters']['decoder'].append([adapter_name, task_tgt])
-        elif adapter_config['ids'] == 'GROUP':
-            adapter_config['ids'] = list(tgt_groups)
-            for task_key, task_config in opts.in_config[0]['tasks'].items():
-                task_src, task_tgt = task_config['src_tgt'].split('-')
-                task_config['adapters']['decoder'].append([adapter_name, cc_opts['groups'][task_tgt]])
-        elif adapter_config['ids'] == 'FULL':
-            adapter_config['ids'] = ['full']
-            for task_key, task_config in opts.in_config[0]['tasks'].items():
-                task_config['adapters']['decoder'].append([adapter_name, 'full'])
+    if len(encoder_adapters) > 0:
+        for adapter_name, adapter_config in sorted(encoder_adapters.items()):
+            if adapter_config['ids'] == 'LANGUAGE':
+                adapter_config['ids'] = list(src_langs)
+                for task_key, task_config in opts.in_config[0]['tasks'].items():
+                    task_src, task_tgt = task_config['src_tgt'].split('-')
+                    task_config['adapters']['encoder'].append([adapter_name, task_src])
+            elif adapter_config['ids'] == 'GROUP':
+                adapter_config['ids'] = list(src_groups)
+                for task_key, task_config in opts.in_config[0]['tasks'].items():
+                    task_src, task_tgt = task_config['src_tgt'].split('-')
+                    task_config['adapters']['encoder'].append([adapter_name, cc_opts['groups'][task_src]])
+            elif adapter_config['ids'] == 'FULL':
+                adapter_config['ids'] = ['full']
+                for task_key, task_config in opts.in_config[0]['tasks'].items():
+                    task_config['adapters']['encoder'].append([adapter_name, 'full'])
+    if len(decoder_adapters) > 0:
+        for adapter_name, adapter_config in sorted(decoder_adapters.items()):
+            if adapter_config['ids'] == 'LANGUAGE':
+                adapter_config['ids'] = list(tgt_langs)
+                for task_key, task_config in opts.in_config[0]['tasks'].items():
+                    task_src, task_tgt = task_config['src_tgt'].split('-')
+                    task_config['adapters']['decoder'].append([adapter_name, task_tgt])
+            elif adapter_config['ids'] == 'GROUP':
+                adapter_config['ids'] = list(tgt_groups)
+                for task_key, task_config in opts.in_config[0]['tasks'].items():
+                    task_src, task_tgt = task_config['src_tgt'].split('-')
+                    task_config['adapters']['decoder'].append([adapter_name, cc_opts['groups'][task_tgt]])
+            elif adapter_config['ids'] == 'FULL':
+                adapter_config['ids'] = ['full']
+                for task_key, task_config in opts.in_config[0]['tasks'].items():
+                    task_config['adapters']['decoder'].append([adapter_name, 'full'])
     opts.in_config[0]['adapters']['encoder'] = encoder_adapters
     opts.in_config[0]['adapters']['decoder'] = decoder_adapters
 

@@ -52,6 +52,11 @@ For the first, `{lang_pair}` and `{sorted_pair}` are the same.
 For the second, `{lang_pair}` is "eng-ben", but `{sorted_pair}` is "ben-eng".
 In order to use the files in the correct order, you should use the template `{sorted_pair}/train.{side_a}.gz` for the source template, and `{sorted_pair}/train.{side_b}.gz` for the target template.
 
+#### `valid_src_path` and `valid_tgt_path`
+
+Path templates for validation sets.
+The path templates can contain the same variables as `src_path` and `tgt_path`.
+
 #### `ae_path`
 
 Path templates for monolingual data for autoencoder tasks.
@@ -78,6 +83,12 @@ If set to `True`, use corpus weights based on temperature-adjusted corpus size.
 
 Note that the actual weight is proportional to the weights of the the other tasks assigned to the same GPU. E.g. if only one task is assigned to a GPU, it will receive 100% weight regardless of what the computed weight is.
 
+#### `temperature`
+
+Temperature specified in inverted form (1/T)
+Setting temperature to 1.0 results in the empirical distribution, i.e. tasks are sampled according to their unweighted corpus size.
+Setting temperature to 0.0 results in the uniform distribution, i.e. all tasks are equally likely.
+
 #### `use_introduce_at_training_step`
 
 If set to `True`, use a curriculum introducing corpora based on temperature-adjusted corpus size.
@@ -101,12 +112,20 @@ Only supervised pairs are generated, unless `zero_shot` is True.
 #### `zero_shot`
 
 Generate translation configs for zero-shot directions.
+(TODO: temporarily disabled)
+
+### `use_src_lang_token`
+
+Only has an effect if the `prefix` transform is used.
+If `use_src_lang_token` is unset or False, then only a target language token `<to_{tgt}>` is prefixed to the source.
+If `use_src_lang_token` is True, then a source language token is also prefixed: `<from_{src}> <to_{tgt}>`.
 
 #### `transforms` and `ae_transforms`
 
 A list of transforms, for translation tasks and autoencoder tasks, respectively.
-Use this to apply subword segmentation, e.g. using `sentencepiece`, and `denoising` noise for autoencoder.
+Use transforms to apply subword segmentation, e.g. using `sentencepiece`, and `denoising` noise for autoencoder.
 Both of these may change the sequence length, necessitating a `filtertoolong` transform.
+Use the `prefix` transform to add task selection tokens in front of the source sentence.
 
 #### `enc_sharing_groups` and `dec_sharing_groups`
 
@@ -130,9 +149,53 @@ Note that you also need to separately specify this information to slurm.
 
 #### Other top-level keys than `config_config`
 
-##### Parameter sharing in adapters
+##### Adapters
 
-The key `adapters.encoder.{adapter_name}.ids` takes one of 3 values:
+```
+adapters:
+  encoder:
+    {adapter_name}:
+      adapter_type: lora
+      layer_stack_index: 0
+      layers: [0, 1, 2]
+      hidden_dim: 8
+      ids: LANGUAGE
+    {adapter_name}:
+      adapter_type: lora
+      layer_stack_index: 1
+      layers: [0, 1, 2]
+      hidden_dim: 8
+      ids: LANGUAGE
+  decoder:
+    {adapter_name}:
+      adapter_type: ff
+      layer_stack_index: 0
+      layers: [0, 1]
+      hidden_dim: 16
+      ids: LANGUAGE
+```
+
+###### Adapter types
+
+The keys `adapters.encoder.{adapter_name}.adapter_type` and `adapters.decoder.{adapter_name}.adapter_type` take one of 2 values:
+
+  - `lora`: LoRA adaptation wraps the feedforward sublayer of existing Transformer layers.
+  - `ff`: A separate feedforward adapter layer injected after the feedforward sublayer of existing Transformer layers. The adapter layer has its own norms.
+
+###### Adapter size and location
+
+The keys `adapters.encoder.{adapter_name}.layer_stack_index` and `adapters.decoder.{adapter_name}.layer_stack_index`
+specify the index (counting from 0) of the LayerStack in which the adapters should be placed.
+
+The keys `adapters.encoder.{adapter_name}.layers` and `adapters.decoder.{adapter_name}.layers`
+specify the index of the layers (counting from 0) *within* the LayerStack. Note that each new LayerStack restarts the count from zero.
+
+The keys `adapters.encoder.{adapter_name}.hidden_dim` and `adapters.decoder.{adapter_name}.hidden_dim`
+specify the hidden (bottleneck) size of the adapter.
+
+###### Parameter sharing in adapters
+
+The keys `adapters.encoder.{adapter_name}.ids` and `adapters.decoder.{adapter_name}.ids` take one of 3 values:
 
   - `FULL`: fully shared parameters. Will be named using the constant "full".
   - `GROUP`: groupwise shared parameters. Will be named according to the cluster id.
@@ -192,6 +255,13 @@ The languages to consider as candidates are determined from the vocabulary keys.
 
 Determine weighting and curriculum for the tasks.
 
+Note that the first time this step is run for a particular corpus, the lines in the corpus are counted.
+This can take a long time for large corpora.
+The line counts are cached in the file `./corpora_length_cache`, keyed by the path of the corpus file.
+
+Reusing the same corpus files (without moving, copying, or transforming) in similar training runs will be fast, due to the use of the cached line counts.
+This is one of the benefits of using transforms instead of applying subword segmentation in preprocessing.
+
 #### `cluster_languages`
 
 Determine language groups by clustering.
@@ -225,7 +295,35 @@ Remove any meta-parameters that are not accepted by OpenNMT. This should always 
 
 #### `config_all`
 
-Meta-stage to run all of the stages in order.
+Meta-stage to run all of the stages above in order.
+
+#### `extra_cpu`
+
+Modifies a GPU config to run on a single CPU, for local smoketesting.
+Deletes `gpu_ranks`, `world_size`, and all `node_gpu`. Sets `n_nodes` to 1.
+
+This step is not included in `config_all`. Run it separately if needed.
+
+#### `extra_fully_shared_hack`
+
+Modifies config to use the "all" language hack for a truly fully shared decoder, including embeddings.
+Forces the `prefix` transform to use a language selection token.
+Sets the `dec_sharing_group` to `['full']`, i.e. a single fully shared LayerStack.
+Overrides all the language pair definitions `src_tgt` with `all-all`.
+Sets the `src_vocab` and `tgt_vocab` to a single joint vocabulary for the `all` pseudolanguage.
+
+This step is not included in `config_all`. Run it separately if needed.
+
+#### `extra_copy_gpu_assignment`
+
+Copies GPU assignment from one fully generated config to another config with exactly matching task ids.
+
+Copying the GPU assignment is useful, if you want to ensure that tasks are distributed exactly the same in different experiments.
+
+Also, because GPU assignment can be slow, you can save time by running it only once and then copying to other similar configs.
+Note that because `allocate_devices` is part of `config_all`, you must run config-config stepwise to skip it.
+
+This step (`extra_copy_gpu_assignment`) is not included in `config_all`. Run it separately if needed.
 
 ### Command line overrides
 

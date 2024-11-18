@@ -92,11 +92,11 @@ model_type: text
 src_seq_length: 200
 tgt_seq_length: 200
 #### Bart
+denoising_objective: bart
 mask_length: span-poisson
 poisson_lambda: 3.0
 mask_ratio: 0.2
 replace_length: 1
-denoising_objective: bart
 
 x_transformers_opts:
   attn_flash: True

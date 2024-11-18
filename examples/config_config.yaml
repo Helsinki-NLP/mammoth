@@ -5,9 +5,11 @@ config_config:
   # A better way would be to keep monolingual data separate.
   # If we want to support this, we need something ugly like {sorted_pair_with_pivot}
   autoencoder: True
-  # distance_matrix: not set here, but could use examples/config_config.distance.csv
+  # not set here, but could use examples/config_config.distance.csv
+  distance_matrix: null
   n_groups: 6
   use_weight: True
+  temperature: 0.5
   use_introduce_at_training_step: True
   zero_shot: True
   transforms:
@@ -24,9 +26,9 @@ config_config:
     - GROUP
     - FULL
     - GROUP
-  translation_config_dir: config/translation.opus
   n_gpus_per_node: 4
   n_nodes: 2
+  use_src_lang_token: False
 
   # Note that this specifies the groups manually instead of clustering
   groups:
@@ -66,27 +68,32 @@ tgt_vocab:
 adapters:
   encoder:
     enc_lang_bottom:
+      adapter_type: lora
       layer_stack_index: 0
       layers: [0, 1, 2]
       hidden_dim: 8
       ids: LANGUAGE
     enc_lang_top:
+      adapter_type: lora
       layer_stack_index: 1
       layers: [0, 1, 2]
       hidden_dim: 8
       ids: LANGUAGE
   decoder:
     dec_lang_bottom:
+      adapter_type: ff
       layer_stack_index: 0
       layers: [0, 1]
       hidden_dim: 16
       ids: LANGUAGE
     dec_lang_mid:
+      adapter_type: ff
       layer_stack_index: 1
       layers: [0, 1, 2]
       hidden_dim: 16
       ids: LANGUAGE
     dec_lang_top:
+      adapter_type: ff
       layer_stack_index: 2
       layers: [0]
       hidden_dim: 16
@@ -98,12 +105,7 @@ batch_size: 32768
 batch_type: tokens
 normalization: tokens
 valid_batch_size: 4096
-use_attention_bridge: false
-attention_heads: 50
-rnn_size: 512
-word_vec_size: 512
-ff_mult: 4
-heads: 8
+model_dim: 512
 enc_layers: [3, 3]
 dec_layers: [2, 3, 1]
 dropout: 0.1
@@ -112,16 +114,16 @@ weight_decay: 0.05
 param_init: 0.0
 param_init_glorot: true
 train_steps: 150000
-valid_steps: 500000
-warmup_steps: 10000
+valid_steps: 1000
+warmup_steps: 5000
 report_every: 100
-save_checkpoint_steps: 5000
+save_checkpoint_steps: 10000
 keep_checkpoint: 3
-accum_count: 12
+accum_count: 8
 optim: adafactor
-decay_method: none
-learning_rate: 3.0
-max_grad_norm: 0.0
+decay_method: linear_warmup
+learning_rate: 0.00003
+max_grad_norm: 1.0
 seed: 3435
 model_type: text
 #### Sentencepiece
@@ -136,7 +138,14 @@ tgt_subword_model: models/tatoeba_spm/opusTC.{tgt_lang}.32k.spm
 src_seq_length: 200
 tgt_seq_length: 200
 #### Bart
+denoising_objective: bart
 mask_length: span-poisson
 poisson_lambda: 3.0
 mask_ratio: 0.2
 replace_length: 1
+
+x_transformers_opts:
+  attn_flash: True
+  heads: 16
+  rotary_pos_emb: True
+  tie_embedding: True

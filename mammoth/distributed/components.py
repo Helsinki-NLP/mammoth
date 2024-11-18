@@ -130,7 +130,7 @@ class DistributedTransformerWrapper(DistributedComponent, ABC):
         mismatch = module.load_state_dict(state_dict, strict=False)
         missing_keys = [
             name for name in mismatch.missing_keys
-            if not name.startswith('attn_layers.') or name.startswith('token_emb.')
+            if not any(name.startswith(prefix) for prefix in ('attn_layers.', 'token_emb.'))
         ]
         return mismatch._replace(missing_keys=missing_keys)
 

@@ -77,8 +77,9 @@ class LoraAdapterLayer(nn.Module):
 
     def apply(self, tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts):
         # LoraAdapterLayer wraps the existing feedforward. No norms are added.
-        tmp_layer_structs[0][1] = self.wrap(tmp_layer_structs[0][1])
-        return tmp_layer_types, tmp_layer_structs, tmp_layer_dropouts
+        new_layer_structs = [nn.ModuleList(x) for x in tmp_layer_structs]
+        new_layer_structs[0][1] = self.wrap(new_layer_structs[0][1])
+        return tmp_layer_types, new_layer_structs, tmp_layer_dropouts
 
     def wrap(self, base_layer):
         self.wrapped_base_layer = base_layer
@@ -201,7 +202,7 @@ class AdaptedAttentionLayers(AttentionLayers):
         ):
             if layer_type == 'f':
                 # Adapters apply to feedforward layers
-                adapter_layers = adapter_layers_by_index[i]
+                adapter_layers = adapter_layers_by_index[f'layer{i}']
                 tmp_layer_types = [layer_type]
                 tmp_layer_structs = [layer_struct]
                 tmp_layer_dropouts = [layer_dropout]

@@ -131,7 +131,7 @@ def main(
         task_queue_manager=task_queue_manager,
         frame_checkpoint=frame_checkpoint,
     )
-    logger.info("{} - total optimizer parameters: {}".format(
+    logger.info("{} - total optimized parameters: {}".format(
         device_context.id,
         optim.count_parameters()
     ))

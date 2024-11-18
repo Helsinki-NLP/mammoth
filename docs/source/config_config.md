@@ -127,6 +127,20 @@ Use transforms to apply subword segmentation, e.g. using `sentencepiece`, and `d
 Both of these may change the sequence length, necessitating a `filtertoolong` transform.
 Use the `prefix` transform to add task selection tokens in front of the source sentence.
 
+A typical configuration for a fully shared architecture with task selection token:
+
+```yaml
+  transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+  ae_transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+```
+
 #### `enc_sharing_groups` and `dec_sharing_groups`
 
 A list of parameter sharing patterns, one for each LayerStack in the (enc|dec)oder.
@@ -142,6 +156,24 @@ Each list element takes one of 7 values:
 
 Note that it is possible to have target-language-dependent components in the encoder, by using `TGT_LANGUAGE` or `TGT_GROUP` in the `enc_sharing_groups`.
 
+For example, this configuration creates
+
+  - a two-part encoder beginning with 3 groupwise shared layers followed by 3 fully shared layers,
+  - a three-part "hamburger" decoder beginning with 2 language-specific layers, then 3 fully shared layers, and finally 1 more language specific layer.
+
+```yaml
+  enc_sharing_groups:
+    - GROUP
+    - FULL
+  dec_sharing_groups:
+    - LANGUAGE
+    - FULL
+    - LANGUAGE
+
+enc_layers: [3, 3]
+dec_layers: [2, 3, 1]
+```
+
 #### `n_nodes` and `n_gpus_per_node`
 
 The number of nodes and GPUs, for assignment of tasks to devices.
@@ -151,7 +183,7 @@ Note that you also need to separately specify this information to slurm.
 
 ##### Adapters
 
-```
+```yaml
 adapters:
   encoder:
     {adapter_name}:

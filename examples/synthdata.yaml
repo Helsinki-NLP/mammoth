@@ -1,0 +1,105 @@
+config_config:
+  # The synth data task key is given as both src_lang and tgt_lang
+  # We need to specify both, otherwise config-config would think cross-task data is available, even though it is not
+  src_path: "data/synthdata/train.{src_lang}-{tgt_lang}.src"
+  tgt_path: "data/synthdata/train.{src_lang}-{tgt_lang}.tgt"
+  valid_src_path: "data/synthdata/test.{src_lang}-{tgt_lang}.src"
+  valid_tgt_path: "data/synthdata/test.{src_lang}-{tgt_lang}.tgt"
+  # only autoencoder tasks exist in this setup
+  autoencoder: True
+  autoencoder_validation: True
+  distance_matrix: null
+  n_groups: 3
+  use_weight: False
+  temperature: 0.5
+  zero_shot: False
+  # only autoencoder tasks exist in this setup
+  transforms: []
+  ae_transforms:
+    - filtertoolong
+  enc_sharing_groups:
+    - LANGUAGE
+  dec_sharing_groups:
+    - LANGUAGE
+  n_gpus_per_node: 1
+  n_nodes: 1
+  use_src_lang_token: False
+  groups:
+    multi_query_associative_recall_kv6_q2:  multi_query_associative_recall
+    multi_query_associative_recall_kv20_q4: multi_query_associative_recall
+    multi_query_associative_recall_kv12_q8: multi_query_associative_recall
+    copy_source: copy_source
+    distractor_separator_kv20_q4: copy_source
+    distractor_separator_kv12_q8: copy_source
+    reverse_source: copy_source
+    sort_source: copy_source
+    counting: counting
+    reverse_counting: counting
+
+
+src_vocab: 
+    multi_query_associative_recall_kv6_q2: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv20_q4: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv12_q8: "data/synthdata/shared_vocab"
+    copy_source: "data/synthdata/shared_vocab"
+    distractor_separator_kv20_q4: "data/synthdata/shared_vocab"
+    distractor_separator_kv12_q8: "data/synthdata/shared_vocab"
+    reverse_source: "data/synthdata/shared_vocab"
+    sort_source: "data/synthdata/shared_vocab"
+    counting: "data/synthdata/shared_vocab"
+    reverse_counting: "data/synthdata/shared_vocab"
+tgt_vocab:
+    multi_query_associative_recall_kv6_q2: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv20_q4: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv12_q8: "data/synthdata/shared_vocab"
+    copy_source: "data/synthdata/shared_vocab"
+    distractor_separator_kv20_q4: "data/synthdata/shared_vocab"
+    distractor_separator_kv12_q8: "data/synthdata/shared_vocab"
+    reverse_source: "data/synthdata/shared_vocab"
+    sort_source: "data/synthdata/shared_vocab"
+    counting: "data/synthdata/shared_vocab"
+    reverse_counting: "data/synthdata/shared_vocab"
+
+save_model: models/synthdata
+
+batch_size: 8192
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 4096
+model_dim: 256
+enc_layers: [3]
+dec_layers: [2]
+dropout: 0.1
+weight_decay: 0.05
+label_smoothing: 0.2
+param_init: 0.0
+param_init_glorot: true
+train_steps: 50000
+valid_steps: 1000
+warmup_steps: 3000
+report_every: 1000
+save_checkpoint_steps: 10000
+keep_checkpoint: 10
+optim: sgd
+adam_beta1: 0.9
+adam_beta2: 0.998
+decay_method: linear_warmup
+learning_rate: 0.00003
+max_grad_norm: 1.0
+seed: 3435
+model_type: text
+#### Filter
+src_seq_length: 200
+tgt_seq_length: 200
+#### Bart
+mask_length: span-poisson
+poisson_lambda: 3.0
+mask_ratio: 0.2
+replace_length: 1
+denoising_objective: bart
+
+x_transformers_opts:
+  attn_flash: True
+  heads: 16
+  rotary_pos_emb: True
+  tie_embedding: True

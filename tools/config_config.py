@@ -748,13 +748,15 @@ def complete_language_pairs(opts):
         opts.autoencoder_validation if opts.autoencoder_validation else cc_opts.get('autoencoder_validation', False)
     )
     if autoencoder:
-        ae_path_template = opts.ae_path if opts.ae_path else cc_opts.get('ae_path', None)
-        if ae_path_template:
-            ae_src_path_template = ae_path_template
-            ae_tgt_path_template = ae_path_template
+        ae_path_templates = opts.ae_path if opts.ae_path else [cc_opts.get('ae_path', None)]
+        if isinstance(ae_path_templates, str):
+            ae_path_templates = [ae_path_templates]
+        if ae_path_templates:
+            ae_src_path_templates = ae_path_templates
+            ae_tgt_path_templates = ae_path_templates
         else:
-            ae_src_path_template = src_path_template
-            ae_tgt_path_template = tgt_path_template
+            ae_src_path_templates = [src_path_template]
+            ae_tgt_path_templates = [tgt_path_template]
     valid_src_path_template = opts.valid_src_path if opts.valid_src_path else cc_opts['valid_src_path']
     valid_tgt_path_template = opts.valid_tgt_path if opts.valid_tgt_path else cc_opts['valid_tgt_path']
 
@@ -790,24 +792,27 @@ def complete_language_pairs(opts):
                 # autoencoder task
                 if not autoencoder:
                     continue
-                src_path = ae_src_path_template.format(**template_variables)
-                tgt_path = ae_tgt_path_template.format(**template_variables)
-                if not autoencoder_validation:
-                    valid_src_path = None
-                    valid_tgt_path = None
-                else:
-                    valid_src_path = valid_src_path_template.format(**template_variables)
-                    valid_tgt_path = valid_tgt_path_template.format(**template_variables)
+                for ae_src_path_template, ae_tgt_path_template in zip(ae_src_path_templates, ae_tgt_path_templates):
+                    src_path = ae_src_path_template.format(**template_variables)
+                    tgt_path = ae_tgt_path_template.format(**template_variables)
+                    if not autoencoder_validation:
+                        valid_src_path = None
+                        valid_tgt_path = None
+                    else:
+                        valid_src_path = valid_src_path_template.format(**template_variables)
+                        valid_tgt_path = valid_tgt_path_template.format(**template_variables)
+                    if os.path.exists(src_path) and os.path.exists(tgt_path):
+                        _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path, valid_src_path, valid_tgt_path)
             else:
                 # translation task
                 src_path = src_path_template.format(**template_variables)
                 tgt_path = tgt_path_template.format(**template_variables)
                 valid_src_path = valid_src_path_template.format(**template_variables)
                 valid_tgt_path = valid_tgt_path_template.format(**template_variables)
-            if os.path.exists(src_path) and os.path.exists(tgt_path):
-                _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path, valid_src_path, valid_tgt_path)
-            else:
-                logger.warning(f'Paths do NOT exist, omitting language pair: {src_path} {tgt_path}')
+                if os.path.exists(src_path) and os.path.exists(tgt_path):
+                    _add_language_pair(opts, src_lang, tgt_lang, src_path, tgt_path, valid_src_path, valid_tgt_path)
+                else:
+                    logger.warning(f'Paths do NOT exist, omitting language pair: {src_path} {tgt_path}')
     if len(opts.in_config[0].get('tasks', [])) == 0:
         raise Exception('No language pairs were added. Check your path templates.')
     # Allow using language variables for vocabulary definitions

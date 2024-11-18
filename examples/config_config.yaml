@@ -1,11 +1,15 @@
 config_config:
-  src_path: "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/{sorted_pair}/opus.{sorted_pair}-train.{src_lang}"
-  tgt_path: "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/{sorted_pair}/opus.{sorted_pair}-train.{tgt_lang}"
-  ae_path:  "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/en-{tgt_lang}/opus.en-{tgt_lang}-train.{tgt_lang}" # FIXME: this doesn't actually support all langs, only langs sorting after en.
-  # A better way would be to keep monolingual data separate.
-  # If we want to support this, we need something ugly like {sorted_pair_with_pivot}
+  src_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-train.{src_lang}"
+  tgt_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-train.{tgt_lang}"
+  valid_src_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-valid.{src_lang}"
+  valid_tgt_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-valid.{tgt_lang}"
+  # This uses parallel data paired with the English language as monolingual data.
+  # Only existing files are added: one of the patterns will match and the other will not, depending on the language
+  ae_path:
+    - "data/opus/en-{tgt_lang}/opus.en-{tgt_lang}-train.{tgt_lang}"
+    - "data/opus/{tgt_lang}-en/opus.{tgt_lang}-en-train.{tgt_lang}"
   autoencoder: True
-  # not set here, but could use examples/config_config.distance.csv
+  # distance_matrix not set here, but could use examples/config_config.distance.csv
   distance_matrix: null
   n_groups: 6
   use_weight: True
@@ -45,25 +49,25 @@ config_config:
 
 # vocabs serve two purposes: defines the vocab files, and gives the potential languages to consider
 src_vocab:
-  "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
-  "da": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.dan.32k.spm.vocab"
-  "en": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.eng.32k.spm.vocab"
-  "es": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.spa.32k.spm.vocab"
-  "et": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.est.32k.spm.vocab"
-  "fi": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.fin.32k.spm.vocab"
-  "it": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.ita.32k.spm.vocab"
-  "nl": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.nld.32k.spm.vocab"
-  "sv": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.swe.32k.spm.vocab"
+  "af": "data/opus/vocabs/opusTC.afr.32k.spm.vocab"
+  "da": "data/opus/vocabs/opusTC.dan.32k.spm.vocab"
+  "en": "data/opus/vocabs/opusTC.eng.32k.spm.vocab"
+  "es": "data/opus/vocabs/opusTC.spa.32k.spm.vocab"
+  "et": "data/opus/vocabs/opusTC.est.32k.spm.vocab"
+  "fi": "data/opus/vocabs/opusTC.fin.32k.spm.vocab"
+  "it": "data/opus/vocabs/opusTC.ita.32k.spm.vocab"
+  "nl": "data/opus/vocabs/opusTC.nld.32k.spm.vocab"
+  "sv": "data/opus/vocabs/opusTC.swe.32k.spm.vocab"
 tgt_vocab:
-  "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
-  "da": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.dan.32k.spm.vocab"
-  "en": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.eng.32k.spm.vocab"
-  "es": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.spa.32k.spm.vocab"
-  "et": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.est.32k.spm.vocab"
-  "fi": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.fin.32k.spm.vocab"
-  "it": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.ita.32k.spm.vocab"
-  "nl": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.nld.32k.spm.vocab"
-  "sv": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.swe.32k.spm.vocab"
+  "af": "data/opus/vocabs/opusTC.afr.32k.spm.vocab"
+  "da": "data/opus/vocabs/opusTC.dan.32k.spm.vocab"
+  "en": "data/opus/vocabs/opusTC.eng.32k.spm.vocab"
+  "es": "data/opus/vocabs/opusTC.spa.32k.spm.vocab"
+  "et": "data/opus/vocabs/opusTC.est.32k.spm.vocab"
+  "fi": "data/opus/vocabs/opusTC.fin.32k.spm.vocab"
+  "it": "data/opus/vocabs/opusTC.ita.32k.spm.vocab"
+  "nl": "data/opus/vocabs/opusTC.nld.32k.spm.vocab"
+  "sv": "data/opus/vocabs/opusTC.swe.32k.spm.vocab"
 
 adapters:
   encoder:

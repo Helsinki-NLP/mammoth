@@ -48,8 +48,8 @@ class NMTModel(BaseModel):
     Core trainable object in OpenNMT. Implements a trainable interface
     for a simple, generic encoder + decoder model.
     Args:
-      encoder (mammoth.encoders.EncoderBase): an encoder object
-      decoder (mammoth.decoders.DecoderBase): a decoder object
+      encoder (mammoth.modules.layer_stack.StackXcoder): an encoder object
+      decoder (mammoth.modules.layer_stack.StackXcoder): a decoder object
     """
 
     def __init__(self, encoder, decoder, attention_bridge):

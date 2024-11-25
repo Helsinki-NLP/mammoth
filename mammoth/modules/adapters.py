@@ -7,7 +7,7 @@ or injected into an already trained network to adapt it for a new task.
 import torch
 import torch.nn as nn
 from collections import defaultdict
-from typing import Union, Set, Dict
+from typing import Union, Set, Dict, Tuple, Optional
 from functools import partial
 
 from x_transformers.x_transformers import (
@@ -69,7 +69,8 @@ class LoraAdapterLayer(nn.Module):
 
         self.A = nn.Parameter(torch.randn(dim, r))
         self.B = nn.Parameter(torch.zeros(r, dim_out))
-        self.wrapped_base_layer = None
+        # the type is a hack to avoid registering the wrapped base layer as a child
+        self._wrapped_base_layer: Optional[Tuple[nn.Module]] = None
 
     @property
     def is_wrapper(self):
@@ -82,7 +83,7 @@ class LoraAdapterLayer(nn.Module):
         return tmp_layer_types, new_layer_structs, tmp_layer_dropouts
 
     def wrap(self, base_layer):
-        self.wrapped_base_layer = base_layer
+        self._wrapped_base_layer = (base_layer,)
         return self
 
     @property
@@ -90,7 +91,11 @@ class LoraAdapterLayer(nn.Module):
         return (self.A @ self.B) * self.scale
 
     def forward(self, x):
-        return (x @ self.weight) + self.wrapped_base_layer.forward(x)
+        if self._wrapped_base_layer is None:
+            raise Exception('LoraAdapterLayer.wrap was not called before forward')
+        wrapped_base_layer = self._wrapped_base_layer[0]
+        self._wrapped_base_layer = None
+        return (x @ self.weight) + wrapped_base_layer.forward(x)
 
 
 AdapterLayer = Union[FeedForwardAdapterLayer, LoraAdapterLayer]
@@ -102,10 +107,11 @@ class Adapter(nn.Module):
     together with layer indices for injecting into the base network.
     """
 
-    def __init__(self, adapter_group: str, sub_id: str):
+    def __init__(self, adapter_group: str, sub_id: str, layer_stack_index: int):
         super().__init__()
         self.adapter_group = adapter_group
         self.sub_id = sub_id
+        self.layer_stack_index = layer_stack_index
         self.name = self._name(adapter_group, sub_id)
         # mapping layer_idx -> ModuleList of AdapterLayer to inject at that layer
         self.adapter_layers = nn.ModuleDict()

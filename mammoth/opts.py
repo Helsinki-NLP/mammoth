@@ -45,6 +45,12 @@ def _add_logging_opts(parser, is_train=True):
         if is_train
         else 'Print scores and predictions for each sentence',
     )
+    group.add(
+        '--log_model_structure',
+        '-log_model_structure',
+        action="store_true",
+        help='Print the entire model structure when building the model. Verbose, but useful for debugging.'
+    )
 
     if is_train:
         group.add('--report_every', '-report_every', type=int, default=50, help="Print stats at this interval.")

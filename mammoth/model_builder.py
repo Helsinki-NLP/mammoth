@@ -338,7 +338,10 @@ def build_model(
     )
 
     model.to(device)
-    # logger.info(model)
+    if opts.log_model_structure:
+        logger.info(model)
+        for component in task_queue_manager.get_my_distributed_components():
+            logger.info(component)
     logger.info('Building model - done!')
     return model
 

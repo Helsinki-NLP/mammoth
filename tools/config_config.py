@@ -748,7 +748,11 @@ def complete_language_pairs(opts):
         opts.autoencoder_validation if opts.autoencoder_validation else cc_opts.get('autoencoder_validation', False)
     )
     if autoencoder:
-        ae_path_templates = opts.ae_path if opts.ae_path else [cc_opts.get('ae_path', None)]
+        ae_path_templates = None
+        if opts.ae_path:
+            ae_path_templates = opts.ae_path
+        elif 'ae_path' in cc_opts:
+            ae_path_templates = cc_opts['ae_path']
         if isinstance(ae_path_templates, str):
             ae_path_templates = [ae_path_templates]
         if ae_path_templates:

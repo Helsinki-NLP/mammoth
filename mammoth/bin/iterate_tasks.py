@@ -22,7 +22,7 @@ from pathlib import Path
     '--output',
     type=str,
     default=None,
-    help='Template for source file paths. Use varibles src_lang, tgt_lang, and task_id.',
+    help='Template for translation output file paths. Use varibles src_lang, tgt_lang, and task_id.',
 )
 @click.option(
     '--flag',

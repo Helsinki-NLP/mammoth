@@ -13,7 +13,7 @@ from copy import deepcopy
 from itertools import compress
 from sklearn.cluster import AgglomerativeClustering
 
-from gpu_assignment import optimize_gpu_assignment
+from mammoth.utils.gpu_assignment import optimize_gpu_assignment
 
 logger = logging.getLogger('config_config')
 
@@ -918,12 +918,12 @@ def extra_copy_gpu_assignment(opts):
     opts.in_config[0]['gpu_ranks'] = opts.copy_from[0]['gpu_ranks']
 
 
-if __name__ == '__main__':
+def main():
     init_logging()
     opts = get_opts()
     # if not opts.out_config:
     #     opts.out_config = opts.in_config[1]
-    main = {
+    command = {
         func.__name__: func
         for func in (
             complete_language_pairs,
@@ -941,5 +941,9 @@ if __name__ == '__main__':
             extra_copy_gpu_assignment,
         )
     }[opts.command]
-    main(opts)
+    command(opts)
     save_yaml(opts)
+
+
+if __name__ == '__main__':
+    main()

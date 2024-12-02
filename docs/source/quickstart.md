@@ -137,7 +137,7 @@ popd
 mkdir -p models/spm
 for language in cs en de fr; do
     zcat data/multi30k/train.${language}.gz > /tmp/spm_train_${language}.txt
-    ${SENTENCEPIECE_DIR}/spm_train --input /tmp/spm_train_${language}.txt --model_prefix=models/spm/spm.${language} --vocab_size 8000
+    spm_train --input /tmp/spm_train_${language}.txt --model_prefix=models/spm/spm.${language} --vocab_size 8000
     rm /tmp/spm_train_${language}.txt
 done
 ```

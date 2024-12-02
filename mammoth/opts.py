@@ -223,7 +223,7 @@ def model_opts(parser):
         '-model_dim',
         type=int,
         default=-1,
-        help="Size of rnn hidden states.",
+        help="Size of Transformer representations.",
     )
 
     group.add(
@@ -418,7 +418,7 @@ def _add_train_general_opts(parser):
         '-param_init',
         type=float,
         default=0.1,
-        help="Parameters are initialized over uniform distribution "
+        help="Legacy opt for attention bridge. Parameters are initialized over uniform distribution "
         "with support (-param_init, param_init). "
         "Use 0 to not use initialization",
     )
@@ -426,7 +426,7 @@ def _add_train_general_opts(parser):
         '--param_init_glorot',
         '-param_init_glorot',
         action='store_true',
-        help="Init parameters with xavier_uniform. Required for transformer.",
+        help="Legacy opt for attention bridge. Init parameters with xavier_uniform.",
     )
 
     group.add(
@@ -554,7 +554,7 @@ def _add_train_general_opts(parser):
         type=float,
         default=[0.3],
         nargs='+',
-        help="Dropout probability; applied in LSTM stacks.",
+        help="Dropout probability; applied in LSTM stacks. (Probably legacy?)",
     )
     group.add(
         '--attention_dropout',

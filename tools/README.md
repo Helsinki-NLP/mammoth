@@ -1,3 +1,1 @@
-This directly contains scripts and tools adopted from other open source projects such as Apache Joshua and Moses Decoder.
-
-TODO: credit the authors and resolve license issues (if any)
+This directory contains some legacy scripts not deemed worthy to install as part of the mammoth package.

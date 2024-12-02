@@ -7,7 +7,7 @@ MAMMOTH is specifically designed for distributed training of modular systems in 
 In the example below, we will show you how to configure Mammoth.
 We will use two small experiments as examples
 
-1. A simple set of toy tasks with synthetic data. Easy and fast, requiring no resources except for the Mammoth git repo.
+1. A simple set of toy tasks with synthetic data. Easy and fast, requiring no resources except for the Mammoth package.
 2. A machine translation model with language-specific encoders and decoders.
 
 ### Step 0: Install mammoth
@@ -25,45 +25,37 @@ Easy and fast, requiring no resources except for the Mammoth git repo.
 This example uses a very small vocabulary, so we can use a "word level" model without sentencepiece.
 The opts `--n_nodes`, `--n_gpus_per_node`, `--node_rank`, and `--gpu_rank` are set to use a single GPU.
 
-### Step 1: Set the locations
-
-Set the locations to the directory in which you want to work on this project, and the path to the mammoth git repo.
-
-```bash
-export PROJECT_DIR="/path/to/work/dir"
-export MAMMOTH_DIR="/path/to/mammoth"
-```
-
-### Step 2: Activate your virtual env
+### Step 1: Activate your virtual env
 
 ```bash
 source ~/venvs/mammoth/bin/activate
 ```
 
-### Step 3: Copy the config template from the Mammoth repo
+### Step 2: Copy the config template from the Mammoth repo
 
 ```bash
-cd $PROJECT_DIR
 mkdir config
-cp -i ${MAMMOTH_DIR}/examples/synthdata.template.yaml config/synthdata.template.yaml
+pushd config
+wget "https://raw.githubusercontent.com/Helsinki-NLP/mammoth/refs/heads/main/examples/synthdata.template.yaml"
+popd 
 ```
 
-### Step 4: Generate synthetic data
+### Step 3: Generate synthetic data
 
 (this might take about 5 min)
 
 ```bash
-python ${MAMMOTH_DIR}/tools/generate_synth_data.py \
+mammoth_generate_synth_data \
     --config_path config/synthdata.template.yaml \
     --shared_vocab data/synthdata/shared_vocab
 ```
 
-### Step 5: Generate the actual config from the config template 
+### Step 4: Generate the actual config from the config template 
 
 (this should only take a few seconds)
 
 ```bash
-python ${MAMMOTH_DIR}/tools/config_config.py \
+mammoth_config_config \
     config_all \
     --in_config config/synthdata.template.yaml \
     --out_config config/synthdata.yaml \
@@ -71,7 +63,7 @@ python ${MAMMOTH_DIR}/tools/config_config.py \
     --n_gpus_per_node 1
 ```
 
-### Step 6: Train the model
+### Step 5: Train the model
 
 (This might take about 1h. To speed things up, train for a shorter time, e.g. `--train_steps 5000 --warmup_steps 600`)
 
@@ -79,7 +71,7 @@ python ${MAMMOTH_DIR}/tools/config_config.py \
 mammoth_train --config config/synthdata.yaml --node_rank 0 --gpu_rank 0
 ```
 
-### Step 7: Translate
+### Step 6: Translate
 
 (this might take a few minutes)
 
@@ -101,25 +93,15 @@ mammoth_translate \
 
 ## Experiment 2: Machine translation with multi30k
 
-### Step 1: Set the locations
-
-Set the locations to the directory in which you want to work on this project, and the path to the mammoth git repo.
-
-```bash
-export PROJECT_DIR="/path/to/work/dir"
-export MAMMOTH_DIR="/path/to/mammoth"
-```
-
-### Step 2: Activate your virtual env
+### Step 1: Activate your virtual env
 
 ```bash
 source ~/venvs/mammoth/bin/activate
 ```
 
-### Step 3: Download data
+### Step 2: Download data
 
 ```bash
-cd $PROJECT_DIR
 mkdir data/multi30k
 pushd data/multi30k
 
@@ -131,7 +113,7 @@ done
 popd
 ```
 
-### Step 4: Train sentencepiece models
+### Step 3: Train sentencepiece models
 
 ```bash
 mkdir -p models/spm
@@ -142,19 +124,21 @@ for language in cs en de fr; do
 done
 ```
 
-### Step 5: Copy the config template from the Mammoth repo
+### Step 4: Copy the config template from the Mammoth repo
 
 ```bash
 mkdir config
-cp -i ${MAMMOTH_DIR}/examples/multi30k.template.yaml config/multi30k.template.yaml
+pushd config
+wget "https://raw.githubusercontent.com/Helsinki-NLP/mammoth/refs/heads/main/examples/multi30k.template.yaml"
+popd 
 ```
 
-### Step 6: Generate the actual config from the config template 
+### Step 5: Generate the actual config from the config template 
 
 (this should only take a few seconds)
 
 ```bash
-python ${MAMMOTH_DIR}/tools/config_config.py \
+mammoth_config_config.py \
     config_all \
     --in_config config/multi30k.template.yaml \
     --out_config config/multi30k.yaml \
@@ -162,7 +146,7 @@ python ${MAMMOTH_DIR}/tools/config_config.py \
     --n_gpus_per_node 1
 ```
 
-### Step 7: Train the model
+### Step 6: Train the model
 
 (this might take a while)
 
@@ -170,7 +154,7 @@ python ${MAMMOTH_DIR}/tools/config_config.py \
 mammoth_train --config config/multi30k.yaml --node_rank 0 --gpu_rank 0
 ```
 
-### Step 8: Translate
+### Step 7: Translate
 
 (this might take a while)
 
@@ -189,7 +173,7 @@ MODEL="models/${EXP_NAME}_step_${STEP}"
 
 # Translate all language pairs
 mkdir -p "translations/${EXP_NAME}/"
-python ${MAMMOTH_DIR}/tools/iterate_tasks.py --config ${CONFIG} \
+mammoth_iterate_tasks --config ${CONFIG} \
     --src "data/${EXP_NAME}/test_2016_flickr.{src_lang}.gz" \
     --output "translations/${EXP_NAME}/test_2016_flickr.{task_id}.greedy.trans" \
     | while read task_flags; do \

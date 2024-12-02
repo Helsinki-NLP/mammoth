@@ -903,7 +903,7 @@ def translate_opts(parser, dynamic=False):
     _add_logging_opts(parser, is_train=False)
 
     group = parser.add_argument_group('Efficiency')
-    group.add('--batch_size', '-batch_size', type=int, default=300, help='Batch size')
+    group.add('--batch_size', '-batch_size', type=int, default=200, help='Batch size')
     group.add(
         '--batch_type',
         '-batch_type',
@@ -911,7 +911,7 @@ def translate_opts(parser, dynamic=False):
         choices=["sents", "tokens"],
         help="Batch grouping for batch_size. Standard is tokens (max of src and tgt). Sents is unimplemented.",
     )
-    group.add('--gpu', '-gpu', type=int, default=-1, help="Device to run on")
+    group.add('--gpu_rank', '-gpu_rank', type=int, default=-1, help="Device to run on")
 
     group.add(
         "--output_model",

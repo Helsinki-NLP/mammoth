@@ -119,7 +119,7 @@ class CTranslate2Translator(object):
 
         onmt_for_translator = {
             "device": "cuda" if opts.cuda else "cpu",
-            "device_index": opts.gpu if opts.cuda else 0,
+            "device_index": opts.gpu_rank if opts.cuda else 0,
         }
         for name, value in onmt_for_translator.items():
             setdefault_if_exists_must_match(ct2_translator_args, name, value)
@@ -417,7 +417,7 @@ class ServerModel(object):
         ArgumentParser.validate_prepare_opts(opts)
         ArgumentParser.validate_translate_opts(opts)
         ArgumentParser.validate_translate_opts_dynamic(opts)
-        opts.cuda = opts.gpu > -1
+        opts.cuda = opts.gpu_rank > -1
 
         sys.argv = prec_argv
         return opts
@@ -727,7 +727,7 @@ class ServerModel(object):
         if isinstance(self.translator, CTranslate2Translator):
             self.translator.to_gpu()
         else:
-            torch.cuda.set_device(self.opts.gpu)
+            torch.cuda.set_device(self.opts.gpu_rank)
             self.translator.model.cuda()
 
     def maybe_preprocess(self, sequence):

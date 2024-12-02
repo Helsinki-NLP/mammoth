@@ -13,6 +13,15 @@ RE_NODE_GPU = re.compile(r'\d+:\d+')
 RE_SRC_TGT = re.compile(r'[^-]+-[^-]+')
 
 
+def yaml_or_dict(val, name):
+    if isinstance(val, str):
+        return yaml.safe_load(val)
+    elif isinstance(val, dict):
+        return val
+    else:
+        raise TypeError(f'{name} {type(val)}')
+
+
 class DataOptsCheckerMixin(object):
     """Checker with methods for validate data related options."""
 
@@ -27,7 +36,7 @@ class DataOptsCheckerMixin(object):
         """Parse corpora specified in data field of YAML file."""
         if not opts.adapters:
             return
-        adapter_opts = yaml.safe_load(opts.adapters)
+        adapter_opts = yaml_or_dict(opts.adapters, name='opts.adapters')
         # TODO: validate adapter opts
         opts.adapters = adapter_opts
 

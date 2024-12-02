@@ -284,7 +284,7 @@ class ModelSaver(ModelSaverBase):
             module_state_dicts['frame']['data_state'] = data_state
 
         for key, state_dict in module_state_dicts.items():
-            # The state_dicts across different devices only contain one copy of each module:
+            # The exploded state_dicts across different devices only contain one copy of each module:
             # on the lowest ranked device having that module.
             # There is no race condition.
             checkpoint_path = f'{self.base_path}_step_{step}_{key}.pt'

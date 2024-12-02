@@ -1,0 +1,146 @@
+####################################
+# Meta-opts to control config_config
+config_config:
+  # The synth data task key is given as both src_lang and tgt_lang
+  # We need to specify both, otherwise config-config would think cross-task data is available, even though it is not
+  src_path: "data/synthdata/train.{src_lang}-{tgt_lang}.src"
+  tgt_path: "data/synthdata/train.{src_lang}-{tgt_lang}.tgt"
+  valid_src_path: "data/synthdata/test.{src_lang}-{tgt_lang}.src"
+  valid_tgt_path: "data/synthdata/test.{src_lang}-{tgt_lang}.tgt"
+  # Only autoencoder tasks exist in this setup. We turn on the autoencoder, and validation for autoencoder tasks.
+  autoencoder: True
+  autoencoder_validation: True
+  # No distance matrix, because 1) we specify groups manually, and 2) also we don't use groupwise shared parameters
+  distance_matrix: null
+  n_groups: 3
+  # No task weighting based on (temperature-adjusted) corpus size
+  use_weight: False
+  temperature: 0.5
+  # Do not generate a translation config for zero-shot tasks
+  zero_shot: False
+  # Transforms for translation tasks. As only autoencoder tasks exist in this setup, leave this empty.
+  transforms: []
+  # Transforms for autoencoder tasks. Because this toy task uses a small vocabulary, we don't apply sentencepiece.
+  ae_transforms:
+    - filtertoolong
+  # The encoder consists of one language-specific layer stack
+  enc_sharing_groups:
+    - LANGUAGE
+  # The decoder consists of one language-specific layer stack
+  dec_sharing_groups:
+    - LANGUAGE
+  # Defaults for the distributed training setup: number of nodes and how many GPUs each node has.
+  # Override these in the config_config command line arguments.
+  n_gpus_per_node: 1
+  n_nodes: 1
+  # If using the "prefix" transform, use_src_lang_token would add a source language token in addition to the target language token.
+  use_src_lang_token: False
+  # Manually specified sharing groups.
+  groups:
+    multi_query_associative_recall_kv6_q2:  multi_query_associative_recall
+    multi_query_associative_recall_kv20_q4: multi_query_associative_recall
+    multi_query_associative_recall_kv12_q8: multi_query_associative_recall
+    copy_source: copy_source
+    distractor_separator_kv20_q4: copy_source
+    distractor_separator_kv12_q8: copy_source
+    reverse_source: copy_source
+    sort_source: copy_source
+    counting: counting
+    reverse_counting: counting
+
+# Paths to vocabulary files. Also specifies which languages to consider as source and target languages
+src_vocab: 
+    multi_query_associative_recall_kv6_q2: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv20_q4: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv12_q8: "data/synthdata/shared_vocab"
+    copy_source: "data/synthdata/shared_vocab"
+    distractor_separator_kv20_q4: "data/synthdata/shared_vocab"
+    distractor_separator_kv12_q8: "data/synthdata/shared_vocab"
+    reverse_source: "data/synthdata/shared_vocab"
+    sort_source: "data/synthdata/shared_vocab"
+    counting: "data/synthdata/shared_vocab"
+    reverse_counting: "data/synthdata/shared_vocab"
+tgt_vocab:
+    multi_query_associative_recall_kv6_q2: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv20_q4: "data/synthdata/shared_vocab"
+    multi_query_associative_recall_kv12_q8: "data/synthdata/shared_vocab"
+    copy_source: "data/synthdata/shared_vocab"
+    distractor_separator_kv20_q4: "data/synthdata/shared_vocab"
+    distractor_separator_kv12_q8: "data/synthdata/shared_vocab"
+    reverse_source: "data/synthdata/shared_vocab"
+    sort_source: "data/synthdata/shared_vocab"
+    counting: "data/synthdata/shared_vocab"
+    reverse_counting: "data/synthdata/shared_vocab"
+
+################################
+# Opts passed through to Mammoth
+
+# Prefix for model checkpoint files
+save_model: models/synthdata
+
+# Maximum batch size for training, in tokens
+batch_size: 8192
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 4096
+
+# Size of Transformer representations
+model_dim: 256
+# The encoder consists of a single layerstack with 3 layers
+enc_layers: [3]
+# The decoder consists of a single layerstack with 2 layers
+dec_layers: [2]
+dropout: 0.1
+weight_decay: 0.05
+label_smoothing: 0.2
+# Stop training after this number of steps. Note that one step is accum_count minibatches.
+train_steps: 50000
+# Perfom validation every X steps
+valid_steps: 1000
+# Warmup takes X steps to reach maximum learning rate
+warmup_steps: 3000
+# Report training statistics every X steps
+report_every: 1000
+# Save a checkpoint every X steps
+save_checkpoint_steps: 10000
+# Delete oldest checkpoints, leaving this many
+keep_checkpoint: 3
+# Set optimizer to SGD
+optim: sgd
+# Adam parameters (do nothing, as we use SGD)
+adam_beta1: 0.9
+adam_beta2: 0.998
+# Ramp up learning rate linearly for warmup_steps, then decay it linearly until train_steps
+decay_method: linear_warmup
+# Maximum learning rate
+learning_rate: 0.00003
+# Clip the norm of the gradient of each distributed component, if it exceeds this value.
+# Don't rely on max_grad_norm to save you from too high learning rate: 
+# as each component is clipped individually, renormalization does NOT preserve the direction of the global gradient.
+max_grad_norm: 1.0
+# Random seed for replicability
+seed: 3435
+# Only text is supported for now
+model_type: text
+#### filtertoolong transform parameters
+src_seq_length: 200
+tgt_seq_length: 200
+#### denoising transform parameters (not used in this configuration)
+mask_length: span-poisson
+poisson_lambda: 3.0
+mask_ratio: 0.2
+replace_length: 1
+denoising_objective: bart
+
+#######################################
+# Opts passed through to x-transformers
+x_transformers_opts:
+  # Use flash attention
+  attn_flash: True
+  # The number of attention heads
+  heads: 16
+  # Use rotary positional embeddings.
+  # This seems to be the only type of positional embedding that works properly in Mammoth.
+  rotary_pos_emb: True
+  # Tie the input and output embeddings of the decoder
+  tie_embedding: True

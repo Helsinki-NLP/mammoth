@@ -28,7 +28,7 @@ def build_translator(opts, task_queue_manager, task, report_score=True, logger=N
     if out_file is None:
         outdir = os.path.dirname(opts.output)
         if outdir and not os.path.isdir(outdir):
-            warnings.warning(f'output file directory "{outdir}" does not exist... creating it.')
+            warnings.warn(f'output file directory "{outdir}" does not exist... creating it.')
             os.makedirs(os.path.dirname(opts.output), exist_ok=True)
         out_file = codecs.open(opts.output, "w+", "utf-8")
 
@@ -308,7 +308,7 @@ class Inference(object):
             vocabs,
             opts.src,
             tgt_file_path=opts.tgt,
-            gpu=opts.gpu,
+            gpu=opts.gpu_rank,
             n_best=opts.n_best,
             min_length=opts.min_length,
             max_length=opts.max_length,
@@ -831,6 +831,8 @@ class Translator(Inference):
             task_id=metadata.corpus_id,
             adapter_ids=metadata.decoder_adapter_ids,
         )
+        active_encoder.to(self._device)
+        active_decoder.to(self._device)
 
         # (2) Run the encoder on the src
         encoder_output, src_mask = self._run_encoder(active_encoder, batch)

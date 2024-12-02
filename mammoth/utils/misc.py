@@ -1,12 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import torch
-import random
+import gzip
 import inspect
 import numpy as np
-from itertools import islice, repeat
-from io import StringIO
 import os
+import random
+import torch
+from io import StringIO
+from itertools import islice, repeat
 
 
 def check_path(path, exist_ok=False, log=print):
@@ -33,7 +34,11 @@ def split_corpus(path, shard_size, default=None):
 def _split_corpus(path, shard_size):
     """Yield io's with `shard_size` lines each."""
     # FIXME: this is a horrible, ugly kludge
-    with open(path, "rt") as f:
+    if path.endswith('.gz'):
+        open_func = gzip.open
+    else:
+        open_func = open
+    with open_func(path, "rt") as f:
         if shard_size <= 0:
             yield f
         else:

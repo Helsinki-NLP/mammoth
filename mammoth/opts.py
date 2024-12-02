@@ -45,6 +45,12 @@ def _add_logging_opts(parser, is_train=True):
         if is_train
         else 'Print scores and predictions for each sentence',
     )
+    group.add(
+        '--log_model_structure',
+        '-log_model_structure',
+        action="store_true",
+        help='Print the entire model structure when building the model. Verbose, but useful for debugging.'
+    )
 
     if is_train:
         group.add('--report_every', '-report_every', type=int, default=50, help="Print stats at this interval.")
@@ -217,7 +223,7 @@ def model_opts(parser):
         '-model_dim',
         type=int,
         default=-1,
-        help="Size of rnn hidden states.",
+        help="Size of Transformer representations.",
     )
 
     group.add(
@@ -412,7 +418,7 @@ def _add_train_general_opts(parser):
         '-param_init',
         type=float,
         default=0.1,
-        help="Parameters are initialized over uniform distribution "
+        help="Legacy opt for attention bridge. Parameters are initialized over uniform distribution "
         "with support (-param_init, param_init). "
         "Use 0 to not use initialization",
     )
@@ -420,7 +426,7 @@ def _add_train_general_opts(parser):
         '--param_init_glorot',
         '-param_init_glorot',
         action='store_true',
-        help="Init parameters with xavier_uniform. Required for transformer.",
+        help="Legacy opt for attention bridge. Init parameters with xavier_uniform.",
     )
 
     group.add(
@@ -548,7 +554,7 @@ def _add_train_general_opts(parser):
         type=float,
         default=[0.3],
         nargs='+',
-        help="Dropout probability; applied in LSTM stacks.",
+        help="Dropout probability; applied in LSTM stacks. (Probably legacy?)",
     )
     group.add(
         '--attention_dropout',
@@ -897,7 +903,7 @@ def translate_opts(parser, dynamic=False):
     _add_logging_opts(parser, is_train=False)
 
     group = parser.add_argument_group('Efficiency')
-    group.add('--batch_size', '-batch_size', type=int, default=300, help='Batch size')
+    group.add('--batch_size', '-batch_size', type=int, default=200, help='Batch size')
     group.add(
         '--batch_type',
         '-batch_type',
@@ -905,7 +911,7 @@ def translate_opts(parser, dynamic=False):
         choices=["sents", "tokens"],
         help="Batch grouping for batch_size. Standard is tokens (max of src and tgt). Sents is unimplemented.",
     )
-    group.add('--gpu', '-gpu', type=int, default=-1, help="Device to run on")
+    group.add('--gpu_rank', '-gpu_rank', type=int, default=-1, help="Device to run on")
 
     group.add(
         "--output_model",

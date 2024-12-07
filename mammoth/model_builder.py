@@ -8,7 +8,7 @@ from collections import defaultdict, OrderedDict
 from functools import partial
 from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
-from x_transformers import TransformerWrapper
+from mammoth.modules.x_tf import TransformerWrapper
 from x_transformers.x_transformers import TokenEmbedding
 
 from mammoth.distributed.components import (
@@ -30,7 +30,20 @@ from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
-
+from torch.nn import Module
+# embedding
+import torch.nn.functional as F
+class ByteEmbedding(Module):
+    def __init__(self, dim, num_tokens, l2norm_embed = False):
+        super().__init__()
+        self.emb = nn.Embedding(num_tokens, dim)
+        one_hot_matrix = F.one_hot(torch.arange(num_tokens)).float()
+        one_hot_embed = torch.cat((one_hot_matrix, torch.zeros((num_tokens, dim - num_tokens))), dim=1)
+        self.emb.weight = torch.nn.parameter.Parameter(one_hot_embed, requires_grad=False)
+    def forward(self, x):
+        token_emb = self.emb(x.long())
+        return token_emb
+    
 TRANSFORMER_WRAPPER_OPTS = {
     'post_emb_norm',
     'tie_embedding',
@@ -222,7 +235,8 @@ def build_xcoder(
     for lang in all_langs:
         if lang not in token_embs:
             vocab = vocabs_dict[(side_alt_str, lang)]
-            token_embs[lang] = TokenEmbedding(
+            Embedding = ByteEmbedding if model_opts.use_embeddingless else TokenEmbedding
+            token_embs[lang] = Embedding(
                 dim=model_opts.model_dim,
                 num_tokens=len(vocab),
                 l2norm_embed=l2norm_embed
@@ -257,6 +271,7 @@ def build_xcoder(
             attn_layers=adapted_attention_layers_stack,
             emb_dim=model_opts.model_dim,
             token_emb=token_embs[lang],
+            initialize_embeddings=not (model_opts.use_embeddingless),
             **transformer_wrapper_kwargs,
         )
         transformer_wrappers[task.corpus_id] = transformer_wrapper

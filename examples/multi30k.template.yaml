@@ -1,0 +1,142 @@
+####################################
+# Meta-opts to control config_config
+config_config:
+  # Multi30k is fully multiparallel. Each file contains only one language code, and can be used as either source or target
+  src_path: "data/multi30k/train.{src_lang}.gz"
+  tgt_path: "data/multi30k/train.{tgt_lang}.gz"
+  valid_src_path: "data/multi30k/val.{src_lang}.gz"
+  valid_tgt_path: "data/multi30k/val.{tgt_lang}.gz"
+  # There is no monolingual data, and therefore we don't use autoencoder tasks in this setup.
+  autoencoder: False
+  autoencoder_validation: False
+  # No distance matrix, because 1) we specify groups manually, and 2) also we don't use groupwise shared parameters
+  distance_matrix: null
+  n_groups: 3
+  # No task weighting based on (temperature-adjusted) corpus size, all sizes are equal
+  use_weight: False
+  temperature: 0.5
+  # Do not generate a translation config for zero-shot tasks (there are none)
+  zero_shot: False
+  # Transforms for translation tasks.
+  transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+  # Transforms for autoencoder tasks. There are none, so we leave this empty.
+  ae_transforms: []
+  # The encoder consists of three layer stacks: first source-language-specific, then fully shared, and finally target-language-specific
+  enc_sharing_groups:
+    - SRC_LANGUAGE
+    - FULL
+    - TGT_LANGUAGE
+  # The decoder consists of one target-language-specific layer stack
+  dec_sharing_groups:
+    - LANGUAGE
+  # Defaults for the distributed training setup: number of nodes and how many GPUs each node has.
+  # Override these in the config_config command line arguments.
+  n_gpus_per_node: 1
+  n_nodes: 1
+  # When using the "prefix" transform, use_src_lang_token adds a source language token in addition to the target language token.
+  use_src_lang_token: True
+  # Manually specified sharing groups.
+  groups:
+    cs: "cs"
+    en: "en"
+    de: "de"
+    fr: "fr"
+
+# Paths to vocabulary files. Also specifies which languages to consider as source and target languages
+src_vocab: 
+    cs: "models/spm/spm.cs.vocab"
+    en: "models/spm/spm.en.vocab"
+    de: "models/spm/spm.de.vocab"
+    fr: "models/spm/spm.fr.vocab"
+tgt_vocab:
+    cs: "models/spm/spm.cs.vocab"
+    en: "models/spm/spm.en.vocab"
+    de: "models/spm/spm.de.vocab"
+    fr: "models/spm/spm.fr.vocab"
+
+################################
+# Opts passed through to Mammoth
+
+# Prefix for model checkpoint files
+save_model: models/multi30k
+
+# Maximum batch size for training, in tokens
+batch_size: 1024
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 512
+
+# Batch accumulation
+accum_count: 4
+lookahead_minibatches: 4
+# Size of Transformer representations
+model_dim: 512
+# The encoder consists of 3 layerstacks with 6 layers in total
+enc_layers: [2, 3, 1]
+# The decoder consists of a single layerstack with 3 layers
+dec_layers: [3]
+dropout: 0.1
+weight_decay: 0.05
+label_smoothing: 0.2
+# Stop training after this number of steps. Note that one step is accum_count minibatches.
+train_steps: 50000
+# Perfom validation every X steps
+valid_steps: 1000
+# Warmup takes X steps to reach maximum learning rate
+warmup_steps: 3000
+# Report training statistics every X steps
+report_every: 1000
+# Save a checkpoint every X steps
+save_checkpoint_steps: 10000
+# Delete oldest checkpoints, leaving this many
+keep_checkpoint: 3
+# Set optimizer to SGD
+optim: sgd
+# Adam parameters (do nothing, as we use SGD)
+adam_beta1: 0.9
+adam_beta2: 0.998
+# Ramp up learning rate linearly for warmup_steps, then decay it linearly until train_steps
+decay_method: linear_warmup
+# Maximum learning rate
+learning_rate: 0.00003
+# Clip the norm of the gradient of each distributed component, if it exceeds this value.
+# Don't rely on max_grad_norm to save you from too high learning rate: 
+# as each component is clipped individually, renormalization does NOT preserve the direction of the global gradient.
+max_grad_norm: 1.0
+# Random seed for replicability
+seed: 3435
+# Only text is supported for now
+model_type: text
+#### sentencepiece transform parameters
+src_subword_model: models/spm/spm.{src_lang}.model
+src_subword_nbest: 5
+src_subword_type: sentencepiece
+tgt_subword_model: models/spm/spm.{tgt_lang}.model
+tgt_subword_nbest: 5
+tgt_subword_type: sentencepiece
+#### filtertoolong transform parameters
+src_seq_length: 200
+tgt_seq_length: 200
+#### denoising transform parameters
+mask_length: span-poisson
+poisson_lambda: 3.0
+mask_ratio: 0.2
+replace_length: 1
+denoising_objective: bart
+
+#######################################
+# Opts passed through to x-transformers
+x_transformers_opts:
+  # Use flash attention
+  attn_flash: True
+  # The number of attention heads
+  heads: 16
+  # Use rotary positional embeddings.
+  # This seems to be the only type of positional embedding that works properly in Mammoth.
+  rotary_pos_emb: True
+  # Tie the input and output embeddings of the decoder
+  tie_embedding: True

@@ -1,13 +1,19 @@
 config_config:
-  src_path: "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/{sorted_pair}/opus.{sorted_pair}-train.{src_lang}"
-  tgt_path: "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/{sorted_pair}/opus.{sorted_pair}-train.{tgt_lang}"
-  ae_path:  "/scratch/project_2005099/data/opus-100-corpus/v1.0/supervised/en-{tgt_lang}/opus.en-{tgt_lang}-train.{tgt_lang}" # FIXME: this doesn't actually support all langs, only langs sorting after en.
-  # A better way would be to keep monolingual data separate.
-  # If we want to support this, we need something ugly like {sorted_pair_with_pivot}
+  src_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-train.{src_lang}"
+  tgt_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-train.{tgt_lang}"
+  valid_src_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-valid.{src_lang}"
+  valid_tgt_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-valid.{tgt_lang}"
+  # This uses parallel data paired with the English language as monolingual data.
+  # Only existing files are added: one of the patterns will match and the other will not, depending on the language
+  ae_path:
+    - "data/opus/en-{tgt_lang}/opus.en-{tgt_lang}-train.{tgt_lang}"
+    - "data/opus/{tgt_lang}-en/opus.{tgt_lang}-en-train.{tgt_lang}"
   autoencoder: True
-  # distance_matrix: not set here, but could use examples/config_config.distance.csv
+  # distance_matrix not set here, but could use examples/config_config.distance.csv
+  distance_matrix: null
   n_groups: 6
   use_weight: True
+  temperature: 0.5
   use_introduce_at_training_step: True
   zero_shot: True
   transforms:
@@ -24,9 +30,9 @@ config_config:
     - GROUP
     - FULL
     - GROUP
-  translation_config_dir: config/translation.opus
   n_gpus_per_node: 4
   n_nodes: 2
+  use_src_lang_token: False
 
   # Note that this specifies the groups manually instead of clustering
   groups:
@@ -43,50 +49,55 @@ config_config:
 
 # vocabs serve two purposes: defines the vocab files, and gives the potential languages to consider
 src_vocab:
-  "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
-  "da": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.dan.32k.spm.vocab"
-  "en": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.eng.32k.spm.vocab"
-  "es": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.spa.32k.spm.vocab"
-  "et": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.est.32k.spm.vocab"
-  "fi": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.fin.32k.spm.vocab"
-  "it": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.ita.32k.spm.vocab"
-  "nl": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.nld.32k.spm.vocab"
-  "sv": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.swe.32k.spm.vocab"
+  "af": "data/opus/vocabs/opusTC.afr.32k.spm.vocab"
+  "da": "data/opus/vocabs/opusTC.dan.32k.spm.vocab"
+  "en": "data/opus/vocabs/opusTC.eng.32k.spm.vocab"
+  "es": "data/opus/vocabs/opusTC.spa.32k.spm.vocab"
+  "et": "data/opus/vocabs/opusTC.est.32k.spm.vocab"
+  "fi": "data/opus/vocabs/opusTC.fin.32k.spm.vocab"
+  "it": "data/opus/vocabs/opusTC.ita.32k.spm.vocab"
+  "nl": "data/opus/vocabs/opusTC.nld.32k.spm.vocab"
+  "sv": "data/opus/vocabs/opusTC.swe.32k.spm.vocab"
 tgt_vocab:
-  "af": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.afr.32k.spm.vocab"
-  "da": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.dan.32k.spm.vocab"
-  "en": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.eng.32k.spm.vocab"
-  "es": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.spa.32k.spm.vocab"
-  "et": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.est.32k.spm.vocab"
-  "fi": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.fin.32k.spm.vocab"
-  "it": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.ita.32k.spm.vocab"
-  "nl": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.nld.32k.spm.vocab"
-  "sv": "/scratch/project_2005099/data/opus/prepare_opus_data_tc_out/opusTC.swe.32k.spm.vocab"
+  "af": "data/opus/vocabs/opusTC.afr.32k.spm.vocab"
+  "da": "data/opus/vocabs/opusTC.dan.32k.spm.vocab"
+  "en": "data/opus/vocabs/opusTC.eng.32k.spm.vocab"
+  "es": "data/opus/vocabs/opusTC.spa.32k.spm.vocab"
+  "et": "data/opus/vocabs/opusTC.est.32k.spm.vocab"
+  "fi": "data/opus/vocabs/opusTC.fin.32k.spm.vocab"
+  "it": "data/opus/vocabs/opusTC.ita.32k.spm.vocab"
+  "nl": "data/opus/vocabs/opusTC.nld.32k.spm.vocab"
+  "sv": "data/opus/vocabs/opusTC.swe.32k.spm.vocab"
 
 adapters:
   encoder:
     enc_lang_bottom:
+      adapter_type: lora
       layer_stack_index: 0
       layers: [0, 1, 2]
       hidden_dim: 8
       ids: LANGUAGE
     enc_lang_top:
+      adapter_type: lora
       layer_stack_index: 1
       layers: [0, 1, 2]
       hidden_dim: 8
       ids: LANGUAGE
   decoder:
     dec_lang_bottom:
+      adapter_type: ff
       layer_stack_index: 0
       layers: [0, 1]
       hidden_dim: 16
       ids: LANGUAGE
     dec_lang_mid:
+      adapter_type: ff
       layer_stack_index: 1
       layers: [0, 1, 2]
       hidden_dim: 16
       ids: LANGUAGE
     dec_lang_top:
+      adapter_type: ff
       layer_stack_index: 2
       layers: [0]
       hidden_dim: 16
@@ -98,12 +109,7 @@ batch_size: 32768
 batch_type: tokens
 normalization: tokens
 valid_batch_size: 4096
-use_attention_bridge: false
-attention_heads: 50
-rnn_size: 512
-word_vec_size: 512
-ff_mult: 4
-heads: 8
+model_dim: 512
 enc_layers: [3, 3]
 dec_layers: [2, 3, 1]
 dropout: 0.1
@@ -112,16 +118,16 @@ weight_decay: 0.05
 param_init: 0.0
 param_init_glorot: true
 train_steps: 150000
-valid_steps: 500000
-warmup_steps: 10000
+valid_steps: 1000
+warmup_steps: 5000
 report_every: 100
-save_checkpoint_steps: 5000
+save_checkpoint_steps: 10000
 keep_checkpoint: 3
-accum_count: 12
+accum_count: 8
 optim: adafactor
-decay_method: none
-learning_rate: 3.0
-max_grad_norm: 0.0
+decay_method: linear_warmup
+learning_rate: 0.00003
+max_grad_norm: 1.0
 seed: 3435
 model_type: text
 #### Sentencepiece
@@ -136,7 +142,14 @@ tgt_subword_model: models/tatoeba_spm/opusTC.{tgt_lang}.32k.spm
 src_seq_length: 200
 tgt_seq_length: 200
 #### Bart
+denoising_objective: bart
 mask_length: span-poisson
 poisson_lambda: 3.0
 mask_ratio: 0.2
 replace_length: 1
+
+x_transformers_opts:
+  attn_flash: True
+  heads: 16
+  rotary_pos_emb: True
+  tie_embedding: True

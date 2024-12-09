@@ -46,16 +46,43 @@ The path templates can contain the following variables that will be substituted 
   - `{side_b}`: 'trg' if the language pair is used in the "forward" direction, otherwise 'src'.
   - `{sorted_pair}`: the source and target languages in alphabetical order, separated by a hyphen.
 
-So for example, let's say your corpus contains the files `eng-ben/train.src.gz` (English side) and `eng-ben/train.trg.gz` (Bengali side).
+As a practical example, let's say your corpus contains the following files:
+```
++ afr-eng
+| + train.src.gz
+| + train.trg.gz
+| + valid.src.gz
+| + valid.trg.gz
++ ben-eng
+| + train.src.gz
+| + train.trg.gz
+| + valid.src.gz
+| + valid.trg.gz
++ eng-urd
+  + train.src.gz
+  + train.trg.gz
+| + valid.src.gz
+| + valid.trg.gz
+
+```
+
+For example, there is data for Bengali-to-English translation in `ben-eng/train.src.gz` (English side) and `ben-eng/train.trg.gz` (Bengali side).
 You want to use the data symmetrically for both ben-to-eng and eng-to-ben directions.
 For the first, `{lang_pair}` and `{sorted_pair}` are the same.
 For the second, `{lang_pair}` is "eng-ben", but `{sorted_pair}` is "ben-eng".
 In order to use the files in the correct order, you should use the template `{sorted_pair}/train.{side_a}.gz` for the source template, and `{sorted_pair}/train.{side_b}.gz` for the target template.
 
+| task       | lang_pair | sorted_pair | side_a | side_b | src_path (template)             | src_path (filled in)     |
+| ---------- | --------- | ----------- | ------ | ------ | --------                        | ----                     |
+| ben-to-eng | ben-eng   | ben-eng     | src    | trg    | {sorted_pair}/train.{side_a}.gz | ben-eng/train.src.gz     |
+| eng-to-ben | eng-ben   | ben-eng     | trg    | src    | {sorted_pair}/train.{side_a}.gz | ben-eng/train.trg.gz     |
+
 #### `valid_src_path` and `valid_tgt_path`
 
 Path templates for validation sets.
 The path templates can contain the same variables as `src_path` and `tgt_path`.
+
+For the corpus in the example above, `valid_src_path` should be set to `{sorted_pair}/valid.{side_a}.gz`.
 
 #### `ae_path`
 

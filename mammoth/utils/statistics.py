@@ -34,7 +34,7 @@ class Statistics(object):
         self.magnitude_denom = 0
         self.param_magnitudes = Counter()
         self.grad_magnitudes = Counter()
-
+        
     @classmethod
     def from_loss_logits_target(cls, loss: float, logits, target, padding_idx):
         """

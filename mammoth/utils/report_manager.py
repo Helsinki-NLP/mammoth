@@ -59,7 +59,7 @@ class ReportMgrBase(object):
         patience,
         report_stats,
         multigpu=False,
-        sampled_task_counts=None,
+        sampled_task_counts={},
         optimizer=None,
     ):
         """

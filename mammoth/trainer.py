@@ -311,7 +311,8 @@ class Trainer(object):
             if device_context.is_master():
                 sampled_task_counts = self.task_queue_manager.sampled_task_counts
             else:
-                sampled_task_counts = None
+                from collections import Counter
+                sampled_task_counts =  Counter()
             report_stats = self._maybe_report_training(
                 step,
                 train_steps,

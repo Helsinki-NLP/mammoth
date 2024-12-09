@@ -333,6 +333,22 @@ def model_opts(parser):
         help='Number of heads for transformer self-attention. '
         ' Semi-obsolete: not used for x-transformers, only used for some attention bridge configuations.'
     )
+    group.add(
+        '--dropout',
+        '-dropout',
+        type=float,
+        default=[0.3],
+        nargs='+',
+        help="Dropout probability; Legacy: applied in the attention bridge",
+    )
+    group.add(
+        '--attention_dropout',
+        '-attention_dropout',
+        type=float,
+        default=[0.1],
+        nargs='+',
+        help="Attention Dropout probability; Legacy: applied in the attention bridge",
+    )
 
     # adapter options are in a dict "adapters", and in the corpus options
     group = parser.add_argument_group("Adapters")
@@ -546,23 +562,6 @@ def _add_train_general_opts(parser):
         type=float,
         default=0.0,
         help="L2 penalty (weight decay) regularizer",
-    )
-    # FIXME, mentions LSTM
-    group.add(
-        '--dropout',
-        '-dropout',
-        type=float,
-        default=[0.3],
-        nargs='+',
-        help="Dropout probability; applied in LSTM stacks. (Probably legacy?)",
-    )
-    group.add(
-        '--attention_dropout',
-        '-attention_dropout',
-        type=float,
-        default=[0.1],
-        nargs='+',
-        help="Attention Dropout probability.",
     )
     group.add(
         '--dropout_steps', '-dropout_steps', type=int, nargs='+', default=[0], help="Steps at which dropout changes."

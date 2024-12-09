@@ -101,25 +101,31 @@ def build_adapters(
     task_queue_manager,
     single_task: Optional[str] = None,
 ) -> Optional[Dict[str, Adapter]]:
-    # Create AdapterLayer objects and Adapter objects
+    """
+    Create AdapterLayer objects and Adapter objects
+    """
     adapters_by_name: Optional[Dict[str, Adapter]]
     if side == Side.encoder:
         side_str = 'encoder'
     else:
         side_str = 'decoder'
     my_components: List[DistributedComponent] = task_queue_manager.get_my_distributed_components()
-    my_components = [
+    my_side_specific_components = [
         component for component in my_components
         if hasattr(component, 'side') and component.side == side
     ]
+
     if single_task:
-        my_components = [
-            component for component in my_components
+        components_to_create = [
+            component for component in my_side_specific_components
             if single_task in component.task_ids
         ]
+    else:
+        components_to_create = my_side_specific_components
+
     if uses_adapters(model_opts):
         adapter_components = [
-            component for component in my_components
+            component for component in components_to_create
             if isinstance(component, DistributedAdapter) and component.side == side
         ]
         adapters_by_name = dict()
@@ -188,26 +194,32 @@ def build_xcoder(
     token_embs: to tie encoder and decoder embeddings, pass existing embeddings here.
     """
     my_components: List[DistributedComponent] = task_queue_manager.get_my_distributed_components()
-    my_components = [
+    my_side_specific_components = [
         component for component in my_components
         if hasattr(component, 'side') and component.side == side
     ]
+
+    if single_task:
+        components_to_create = [
+            component for component in my_side_specific_components
+            if single_task in component.task_ids
+        ]
+    else:
+        components_to_create = my_side_specific_components
+
+    # Create AdaptedAttentionLayers objects (an extension of an x_transformers.AttentionLayers block)
     distributed_xcoder_class: type
     if side == Side.encoder:
         distributed_xcoder_class = DistributedEncoderAttentionLayersBlock
-    else:
+    elif side == Side.decoder:
         distributed_xcoder_class = DistributedDecoderAttentionLayersBlock
-    if single_task:
-        my_components = [
-            component for component in my_components
-            if single_task in component.task_ids
-        ]
-
-    # Create AdaptedAttentionLayers objects (an extension of an x_transformers.AttentionLayers block)
+    else:
+        raise TypeError(type(side))
     attention_layers_components = [
-        component for component in my_components
+        component for component in components_to_create
         if isinstance(component, distributed_xcoder_class)
     ]
+
     attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]] = defaultdict(dict)
     for component in attention_layers_components:
         layer_stack_index = component.layer_stack_index
@@ -385,7 +397,7 @@ def build_model(
         for component in task_queue_manager.get_my_distributed_components():
             logger.info(component)
         for name, p in model.named_parameters():
-            print(f'{p.requires_grad} {name}')
+            logger.info(f'{p.requires_grad} {name}')
     logger.info('Building model - done!')
     return model
 

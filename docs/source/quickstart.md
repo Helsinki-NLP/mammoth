@@ -185,6 +185,8 @@ Congratulations! You've successfully translated text using your Mammoth model. A
 
 ### Further reading
 
+[Best practices for training](training_tips.md).
+
 Reference documentation for the `config_config` tool can be found at [The config_config tool](config_config.md).
 
 A complete example for configuring different parameter sharing schemes is available at [MAMMOTH sharing schemes](examples/sharing_schemes.md).

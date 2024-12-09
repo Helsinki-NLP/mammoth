@@ -46,7 +46,7 @@ class DataOptsCheckerMixin(object):
         default_transforms = opts.transforms
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
-        corpora = yaml.safe_load(opts.tasks)
+        corpora = yaml_or_dict(opts.tasks, name='opts.tasks')
         logger.info("Parsing corpora")
         n_without_node_gpu = 0
         for cname, corpus in corpora.items():
@@ -148,11 +148,11 @@ class DataOptsCheckerMixin(object):
         logger.info(f"Parsed {len(corpora)} corpora from -data.")
         opts.tasks = corpora
 
-        src_vocab = yaml.safe_load(opts.src_vocab)
+        src_vocab = yaml_or_dict(opts.src_vocab, name="opts.src_vocab")
         logger.info(f"Parsed {len(src_vocab)} vocabs from -src_vocab.")
         opts.src_vocab = src_vocab
 
-        tgt_vocab = yaml.safe_load(opts.tgt_vocab)
+        tgt_vocab = yaml_or_dict(opts.tgt_vocab, name="opts.tgt_vocab")
         logger.info(f"Parsed {len(tgt_vocab)} vocabs from -tgt_vocab.")
         opts.tgt_vocab = tgt_vocab
 
@@ -185,7 +185,7 @@ class DataOptsCheckerMixin(object):
             if cname != CorpusName.VALID and corpus["src_feats"] is not None:
                 assert opts.src_feats_vocab, "-src_feats_vocab is required if using source features."
                 if isinstance(opts.src_feats_vocab, str):
-                    opts.src_feats_vocab = yaml.safe_load(opts.src_feats_vocab)
+                    opts.src_feats_vocab = yaml_or_dict(opts.src_feats_vocab, name="opts.src_feats_vocab")
 
                 for feature in corpus["src_feats"].keys():
                     assert feature in opts.src_feats_vocab, f"No vocab file set for feature {feature}"
@@ -267,7 +267,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         if not opts.x_transformers_opts:
             opts.x_transformers_opts = dict()
             return
-        opts_dict = yaml.safe_load(opts.x_transformers_opts)
+        opts_dict = yaml_or_dict(opts.x_transformers_opts, name="opts.x_transformers_opts")
         for overwritten_key in (
             'dim',
             'depth',

@@ -108,69 +108,37 @@ def get_transformer_wrapper_kwargs(
     return kwargs
 
 
-def build_xcoder(
+def build_adapters(
     side: Side,
     model_opts,
-    vocabs_dict: Dict[Tuple[str, str], Vocab],
-    device,
     task_queue_manager,
     single_task: Optional[str] = None,
-    token_embs: Optional[Dict[str, Vocab]] = None,
-) -> StackXcoder:
+) -> Optional[Dict[str, Adapter]]:
     """
-    Build a StackXcoder for use as either Encoder or Decoder.
-    side: a Side enum from distributed components
-    model_opts: options
-    vocabs_dict: A dict mapping ('src'|'tgt', lang) to a Vocab.
-    device: torch.device
-    task_queue_manager: TaskQueueManager
-    single_task: if a task_id string is given, the built model contains only the components necessary for that task.
-    token_embs: to tie encoder and decoder embeddings, pass existing embeddings here.
+    Create AdapterLayer objects and Adapter objects
     """
+    adapters_by_name: Optional[Dict[str, Adapter]]
+    if side == Side.encoder:
+        side_str = 'encoder'
+    else:
+        side_str = 'decoder'
     my_components: List[DistributedComponent] = task_queue_manager.get_my_distributed_components()
-    my_components = [
+    my_side_specific_components = [
         component for component in my_components
         if hasattr(component, 'side') and component.side == side
     ]
-    distributed_xcoder_class: type
-    if side == Side.encoder:
-        distributed_xcoder_class = DistributedEncoderAttentionLayersBlock
-        side_str = 'encoder'
-    else:
-        distributed_xcoder_class = DistributedDecoderAttentionLayersBlock
-        side_str = 'decoder'
+
     if single_task:
-        my_components = [
-            component for component in my_components
+        components_to_create = [
+            component for component in my_side_specific_components
             if single_task in component.task_ids
         ]
+    else:
+        components_to_create = my_side_specific_components
 
-    # Create AdaptedAttentionLayers objects (an extension of an x_transformers.AttentionLayers block)
-    attention_layers_components = [
-        component for component in my_components
-        if isinstance(component, distributed_xcoder_class)
-    ]
-    attention_layer_blocks = defaultdict(dict)
-    for component in attention_layers_components:
-        layer_stack_index = component.layer_stack_index
-        xcoder_id = component.xcoder_id
-        attention_layers_kwargs = get_attention_layers_kwargs(
-            side=side,
-            layer_stack_index=layer_stack_index,
-            xcoder_id=xcoder_id,
-            model_opts=model_opts,
-        )
-        attention_layer_blocks[layer_stack_index][xcoder_id] = AdaptedAttentionLayers(
-            layer_stack_index=layer_stack_index,
-            xcoder_id=xcoder_id,
-            **attention_layers_kwargs
-        )
-
-    # Create AdapterLayer objects and Adapter objects
-    adapters_by_name: Optional[Dict[str, Adapter]]
     if uses_adapters(model_opts):
         adapter_components = [
-            component for component in my_components
+            component for component in components_to_create
             if isinstance(component, DistributedAdapter) and component.side == side
         ]
         adapters_by_name = dict()
@@ -203,25 +171,95 @@ def build_xcoder(
                 )
             else:
                 raise ValueError(f'Unrecognized adapter_type {adapter_opts["adapter_type"]}')
+            layer_stack_index = adapter_params['layer_stack_index']
             adapter = Adapter(
                 adapter_group=component.adapter_group,
                 sub_id=component.sub_id,
+                layer_stack_index=layer_stack_index,
             )
             adapters_by_name[adapter.name] = adapter
             for layer_idx in adapter_params['layers']:
                 adapter_layer = adapter_layer_func()
                 adapter.add_layer(layer_idx, adapter_layer)
-            layer_stack_index = adapter_params['layer_stack_index']
-            for xcoder_id, attention_layers in attention_layer_blocks[layer_stack_index].items():
+    else:
+        adapters_by_name = None
+    return adapters_by_name
+
+
+def build_xcoder(
+    side: Side,
+    model_opts,
+    vocabs_dict: Dict[Tuple[str, str], Vocab],
+    device,
+    task_queue_manager,
+    single_task: Optional[str] = None,
+    token_embs: Optional[Dict[str, Vocab]] = None,
+    adapters_by_name: Optional[Dict[str, Adapter]] = None,
+) -> StackXcoder:
+    """
+    Build a StackXcoder for use as either Encoder or Decoder.
+    side: a Side enum from distributed components
+    model_opts: options
+    vocabs_dict: A dict mapping ('src'|'tgt', lang) to a Vocab.
+    device: torch.device
+    task_queue_manager: TaskQueueManager
+    single_task: if a task_id string is given, the built model contains only the components necessary for that task.
+    token_embs: to tie encoder and decoder embeddings, pass existing embeddings here.
+    """
+    my_components: List[DistributedComponent] = task_queue_manager.get_my_distributed_components()
+    my_side_specific_components = [
+        component for component in my_components
+        if hasattr(component, 'side') and component.side == side
+    ]
+
+    if single_task:
+        components_to_create = [
+            component for component in my_side_specific_components
+            if single_task in component.task_ids
+        ]
+    else:
+        components_to_create = my_side_specific_components
+
+    # Create AdaptedAttentionLayers objects (an extension of an x_transformers.AttentionLayers block)
+    distributed_xcoder_class: type
+    if side == Side.encoder:
+        distributed_xcoder_class = DistributedEncoderAttentionLayersBlock
+    elif side == Side.decoder:
+        distributed_xcoder_class = DistributedDecoderAttentionLayersBlock
+    else:
+        raise TypeError(type(side))
+    attention_layers_components = [
+        component for component in components_to_create
+        if isinstance(component, distributed_xcoder_class)
+    ]
+
+    attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]] = defaultdict(dict)
+    for component in attention_layers_components:
+        layer_stack_index = component.layer_stack_index
+        xcoder_id = component.xcoder_id
+        attention_layers_kwargs = get_attention_layers_kwargs(
+            side=side,
+            layer_stack_index=layer_stack_index,
+            xcoder_id=xcoder_id,
+            model_opts=model_opts,
+        )
+        attention_layer_blocks[layer_stack_index][xcoder_id] = AdaptedAttentionLayers(
+            layer_stack_index=layer_stack_index,
+            xcoder_id=xcoder_id,
+            **attention_layers_kwargs
+        )
+
+    # Add pre-created Adapters to the AdaptedAttentionLayers objects
+    if adapters_by_name is not None:
+        for adapter_name, adapter in adapters_by_name.items():
+            for xcoder_id, attention_layers in attention_layer_blocks[adapter.layer_stack_index].items():
                 # TODO: allow limiting which xcoder_ids get the adapter?
-                logger.info(f'adding {adapter.name} to {layer_stack_index}:{xcoder_id}:{component.sub_id}')
+                logger.info(f'adding {adapter.name} to {adapter.layer_stack_index}:{xcoder_id}:{adapter.sub_id}')
                 try:
                     attention_layers.add_adapter(adapter)
                 except Exception as e:
                     logger.error(repr(attention_layers))
                     raise e
-    else:
-        adapters_by_name = None
 
     # Create TokenEmbedding objects
     l2norm_embed = False
@@ -329,11 +367,26 @@ def build_model(
         device = torch.device("cpu")
     logger.info(device)
 
+    enc_adapters_by_name: Optional[Dict[str, Adapter]] = build_adapters(
+        side=Side.encoder,
+        model_opts=model_opts,
+        task_queue_manager=task_queue_manager,
+        single_task=single_task,
+    )
     encoder = build_xcoder(
         side=Side.encoder,
         model_opts=model_opts,
         vocabs_dict=vocabs_dict,
         device=device,
+        task_queue_manager=task_queue_manager,
+        single_task=single_task,
+        adapters_by_name=enc_adapters_by_name,
+    )
+    # TODO: to tie embeddings between encoder and decoder,
+    # take the token_embs from the encoder and pass them in the next build_xcoder call
+    dec_adapters_by_name: Optional[Dict[str, Adapter]] = build_adapters(
+        side=Side.decoder,
+        model_opts=model_opts,
         task_queue_manager=task_queue_manager,
         single_task=single_task,
     )
@@ -344,6 +397,7 @@ def build_model(
         device=device,
         task_queue_manager=task_queue_manager,
         single_task=single_task,
+        adapters_by_name=dec_adapters_by_name,
     )
     attention_bridge = build_attention_bridge(model_opts)
     model = NMTModel(
@@ -353,7 +407,12 @@ def build_model(
     )
 
     model.to(device)
-    # logger.info(model)
+    if opts.log_model_structure:
+        logger.info(model)
+        for component in task_queue_manager.get_my_distributed_components():
+            logger.info(component)
+        for name, p in model.named_parameters():
+            logger.info(f'{p.requires_grad} {name}')
     logger.info('Building model - done!')
     return model
 

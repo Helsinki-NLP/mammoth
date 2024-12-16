@@ -11,7 +11,7 @@ setup(
     description='Massively Multilingual Modular Open Translation @ Helsinki',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    version='0.1.1',
+    version='0.2.1',
     packages=find_packages(),
     project_urls={
         "Documentation": "https://helsinki-nlp.github.io/mammoth/",

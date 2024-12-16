@@ -138,7 +138,7 @@ popd
 (this should only take a few seconds)
 
 ```bash
-mammoth_config_config.py \
+mammoth_config_config \
     config_all \
     --in_config config/multi30k.template.yaml \
     --out_config config/multi30k.yaml \

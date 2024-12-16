@@ -1,0 +1,329 @@
+accum_count: 4
+adam_beta1: 0.9
+adam_beta2: 0.998
+batch_size: 1024
+batch_type: tokens
+dec_layers:
+- 3
+decay_method: linear_warmup
+denoising_objective: bart
+dropout: 0.1
+enc_layers:
+- 2
+- 3
+- 1
+gpu_ranks:
+- 0
+keep_checkpoint: 3
+label_smoothing: 0.2
+learning_rate: 3.0e-05
+lookahead_minibatches: 4
+mask_length: span-poisson
+mask_ratio: 0.2
+max_grad_norm: 1.0
+model_dim: 512
+model_type: text
+n_nodes: 1
+normalization: tokens
+optim: sgd
+poisson_lambda: 3.0
+replace_length: 1
+report_every: 1000
+save_checkpoint_steps: 10000
+save_model: models/multi30k
+seed: 3435
+src_seq_length: 200
+src_subword_model: models/spm/spm.{src_lang}.model
+src_subword_nbest: 5
+src_subword_type: sentencepiece
+src_vocab:
+  cs: models/spm/spm.cs.vocab
+  de: models/spm/spm.de.vocab
+  en: models/spm/spm.en.vocab
+  fr: models/spm/spm.fr.vocab
+tasks:
+  cs-de:
+    dec_sharing_group:
+    - de
+    enc_sharing_group:
+    - cs
+    - full
+    - de
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.cs.gz
+    path_tgt: data/multi30k/train.de.gz
+    path_valid_src: data/multi30k/val.cs.gz
+    path_valid_tgt: data/multi30k/val.de.gz
+    src_prefix: <from_cs> <to_de>
+    src_tgt: cs-de
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  cs-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - cs
+    - full
+    - en
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.cs.gz
+    path_tgt: data/multi30k/train.en.gz
+    path_valid_src: data/multi30k/val.cs.gz
+    path_valid_tgt: data/multi30k/val.en.gz
+    src_prefix: <from_cs> <to_en>
+    src_tgt: cs-en
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  cs-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - cs
+    - full
+    - fr
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.cs.gz
+    path_tgt: data/multi30k/train.fr.gz
+    path_valid_src: data/multi30k/val.cs.gz
+    path_valid_tgt: data/multi30k/val.fr.gz
+    src_prefix: <from_cs> <to_fr>
+    src_tgt: cs-fr
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  de-cs:
+    dec_sharing_group:
+    - cs
+    enc_sharing_group:
+    - de
+    - full
+    - cs
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.de.gz
+    path_tgt: data/multi30k/train.cs.gz
+    path_valid_src: data/multi30k/val.de.gz
+    path_valid_tgt: data/multi30k/val.cs.gz
+    src_prefix: <from_de> <to_cs>
+    src_tgt: de-cs
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  de-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - de
+    - full
+    - en
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.de.gz
+    path_tgt: data/multi30k/train.en.gz
+    path_valid_src: data/multi30k/val.de.gz
+    path_valid_tgt: data/multi30k/val.en.gz
+    src_prefix: <from_de> <to_en>
+    src_tgt: de-en
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  de-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - de
+    - full
+    - fr
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.de.gz
+    path_tgt: data/multi30k/train.fr.gz
+    path_valid_src: data/multi30k/val.de.gz
+    path_valid_tgt: data/multi30k/val.fr.gz
+    src_prefix: <from_de> <to_fr>
+    src_tgt: de-fr
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  en-cs:
+    dec_sharing_group:
+    - cs
+    enc_sharing_group:
+    - en
+    - full
+    - cs
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.en.gz
+    path_tgt: data/multi30k/train.cs.gz
+    path_valid_src: data/multi30k/val.en.gz
+    path_valid_tgt: data/multi30k/val.cs.gz
+    src_prefix: <from_en> <to_cs>
+    src_tgt: en-cs
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  en-de:
+    dec_sharing_group:
+    - de
+    enc_sharing_group:
+    - en
+    - full
+    - de
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.en.gz
+    path_tgt: data/multi30k/train.de.gz
+    path_valid_src: data/multi30k/val.en.gz
+    path_valid_tgt: data/multi30k/val.de.gz
+    src_prefix: <from_en> <to_de>
+    src_tgt: en-de
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  en-fr:
+    dec_sharing_group:
+    - fr
+    enc_sharing_group:
+    - en
+    - full
+    - fr
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.en.gz
+    path_tgt: data/multi30k/train.fr.gz
+    path_valid_src: data/multi30k/val.en.gz
+    path_valid_tgt: data/multi30k/val.fr.gz
+    src_prefix: <from_en> <to_fr>
+    src_tgt: en-fr
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  fr-cs:
+    dec_sharing_group:
+    - cs
+    enc_sharing_group:
+    - fr
+    - full
+    - cs
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.fr.gz
+    path_tgt: data/multi30k/train.cs.gz
+    path_valid_src: data/multi30k/val.fr.gz
+    path_valid_tgt: data/multi30k/val.cs.gz
+    src_prefix: <from_fr> <to_cs>
+    src_tgt: fr-cs
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  fr-de:
+    dec_sharing_group:
+    - de
+    enc_sharing_group:
+    - fr
+    - full
+    - de
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.fr.gz
+    path_tgt: data/multi30k/train.de.gz
+    path_valid_src: data/multi30k/val.fr.gz
+    path_valid_tgt: data/multi30k/val.de.gz
+    src_prefix: <from_fr> <to_de>
+    src_tgt: fr-de
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+  fr-en:
+    dec_sharing_group:
+    - en
+    enc_sharing_group:
+    - fr
+    - full
+    - en
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/multi30k/train.fr.gz
+    path_tgt: data/multi30k/train.en.gz
+    path_valid_src: data/multi30k/val.fr.gz
+    path_valid_tgt: data/multi30k/val.en.gz
+    src_prefix: <from_fr> <to_en>
+    src_tgt: fr-en
+    tgt_prefix: ''
+    transforms:
+    - sentencepiece
+    - prefix
+    - filtertoolong
+    - denoising
+    weight: 1
+tgt_seq_length: 200
+tgt_subword_model: models/spm/spm.{tgt_lang}.model
+tgt_subword_nbest: 5
+tgt_subword_type: sentencepiece
+tgt_vocab:
+  cs: models/spm/spm.cs.vocab
+  de: models/spm/spm.de.vocab
+  en: models/spm/spm.en.vocab
+  fr: models/spm/spm.fr.vocab
+train_steps: 50000
+valid_batch_size: 512
+valid_steps: 1000
+warmup_steps: 3000
+weight_decay: 0.05
+world_size: 1
+x_transformers_opts:
+  attn_flash: true
+  heads: 16
+  rotary_pos_emb: true
+  tie_embedding: true
+

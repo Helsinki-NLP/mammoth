@@ -1,0 +1,217 @@
+adam_beta1: 0.9
+adam_beta2: 0.998
+batch_size: 8192
+batch_type: tokens
+dec_layers:
+- 2
+decay_method: linear_warmup
+denoising_objective: bart
+dropout: 0.1
+enc_layers:
+- 3
+gpu_ranks:
+- 0
+keep_checkpoint: 3
+label_smoothing: 0.2
+learning_rate: 3.0e-05
+mask_length: span-poisson
+mask_ratio: 0.2
+max_grad_norm: 1.0
+model_dim: 256
+model_type: text
+n_nodes: 1
+normalization: tokens
+optim: sgd
+poisson_lambda: 3.0
+replace_length: 1
+report_every: 1000
+save_checkpoint_steps: 10000
+save_model: models/synthdata
+seed: 3435
+src_seq_length: 200
+src_vocab:
+  copy_source: data/synthdata/shared_vocab
+  counting: data/synthdata/shared_vocab
+  distractor_separator_kv12_q8: data/synthdata/shared_vocab
+  distractor_separator_kv20_q4: data/synthdata/shared_vocab
+  multi_query_associative_recall_kv12_q8: data/synthdata/shared_vocab
+  multi_query_associative_recall_kv20_q4: data/synthdata/shared_vocab
+  multi_query_associative_recall_kv6_q2: data/synthdata/shared_vocab
+  reverse_counting: data/synthdata/shared_vocab
+  reverse_source: data/synthdata/shared_vocab
+  sort_source: data/synthdata/shared_vocab
+tasks:
+  copy_source-copy_source:
+    dec_sharing_group:
+    - copy_source
+    enc_sharing_group:
+    - copy_source
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.copy_source-copy_source.src
+    path_tgt: data/synthdata/train.copy_source-copy_source.tgt
+    path_valid_src: data/synthdata/test.copy_source-copy_source.src
+    path_valid_tgt: data/synthdata/test.copy_source-copy_source.tgt
+    src_tgt: copy_source-copy_source
+    transforms:
+    - filtertoolong
+    weight: 1
+  counting-counting:
+    dec_sharing_group:
+    - counting
+    enc_sharing_group:
+    - counting
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.counting-counting.src
+    path_tgt: data/synthdata/train.counting-counting.tgt
+    path_valid_src: data/synthdata/test.counting-counting.src
+    path_valid_tgt: data/synthdata/test.counting-counting.tgt
+    src_tgt: counting-counting
+    transforms:
+    - filtertoolong
+    weight: 1
+  distractor_separator_kv12_q8-distractor_separator_kv12_q8:
+    dec_sharing_group:
+    - distractor_separator_kv12_q8
+    enc_sharing_group:
+    - distractor_separator_kv12_q8
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.distractor_separator_kv12_q8-distractor_separator_kv12_q8.src
+    path_tgt: data/synthdata/train.distractor_separator_kv12_q8-distractor_separator_kv12_q8.tgt
+    path_valid_src: data/synthdata/test.distractor_separator_kv12_q8-distractor_separator_kv12_q8.src
+    path_valid_tgt: data/synthdata/test.distractor_separator_kv12_q8-distractor_separator_kv12_q8.tgt
+    src_tgt: distractor_separator_kv12_q8-distractor_separator_kv12_q8
+    transforms:
+    - filtertoolong
+    weight: 1
+  distractor_separator_kv20_q4-distractor_separator_kv20_q4:
+    dec_sharing_group:
+    - distractor_separator_kv20_q4
+    enc_sharing_group:
+    - distractor_separator_kv20_q4
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.distractor_separator_kv20_q4-distractor_separator_kv20_q4.src
+    path_tgt: data/synthdata/train.distractor_separator_kv20_q4-distractor_separator_kv20_q4.tgt
+    path_valid_src: data/synthdata/test.distractor_separator_kv20_q4-distractor_separator_kv20_q4.src
+    path_valid_tgt: data/synthdata/test.distractor_separator_kv20_q4-distractor_separator_kv20_q4.tgt
+    src_tgt: distractor_separator_kv20_q4-distractor_separator_kv20_q4
+    transforms:
+    - filtertoolong
+    weight: 1
+  multi_query_associative_recall_kv12_q8-multi_query_associative_recall_kv12_q8:
+    dec_sharing_group:
+    - multi_query_associative_recall_kv12_q8
+    enc_sharing_group:
+    - multi_query_associative_recall_kv12_q8
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.multi_query_associative_recall_kv12_q8-multi_query_associative_recall_kv12_q8.src
+    path_tgt: data/synthdata/train.multi_query_associative_recall_kv12_q8-multi_query_associative_recall_kv12_q8.tgt
+    path_valid_src: data/synthdata/test.multi_query_associative_recall_kv12_q8-multi_query_associative_recall_kv12_q8.src
+    path_valid_tgt: data/synthdata/test.multi_query_associative_recall_kv12_q8-multi_query_associative_recall_kv12_q8.tgt
+    src_tgt: multi_query_associative_recall_kv12_q8-multi_query_associative_recall_kv12_q8
+    transforms:
+    - filtertoolong
+    weight: 1
+  multi_query_associative_recall_kv20_q4-multi_query_associative_recall_kv20_q4:
+    dec_sharing_group:
+    - multi_query_associative_recall_kv20_q4
+    enc_sharing_group:
+    - multi_query_associative_recall_kv20_q4
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.multi_query_associative_recall_kv20_q4-multi_query_associative_recall_kv20_q4.src
+    path_tgt: data/synthdata/train.multi_query_associative_recall_kv20_q4-multi_query_associative_recall_kv20_q4.tgt
+    path_valid_src: data/synthdata/test.multi_query_associative_recall_kv20_q4-multi_query_associative_recall_kv20_q4.src
+    path_valid_tgt: data/synthdata/test.multi_query_associative_recall_kv20_q4-multi_query_associative_recall_kv20_q4.tgt
+    src_tgt: multi_query_associative_recall_kv20_q4-multi_query_associative_recall_kv20_q4
+    transforms:
+    - filtertoolong
+    weight: 1
+  multi_query_associative_recall_kv6_q2-multi_query_associative_recall_kv6_q2:
+    dec_sharing_group:
+    - multi_query_associative_recall_kv6_q2
+    enc_sharing_group:
+    - multi_query_associative_recall_kv6_q2
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.multi_query_associative_recall_kv6_q2-multi_query_associative_recall_kv6_q2.src
+    path_tgt: data/synthdata/train.multi_query_associative_recall_kv6_q2-multi_query_associative_recall_kv6_q2.tgt
+    path_valid_src: data/synthdata/test.multi_query_associative_recall_kv6_q2-multi_query_associative_recall_kv6_q2.src
+    path_valid_tgt: data/synthdata/test.multi_query_associative_recall_kv6_q2-multi_query_associative_recall_kv6_q2.tgt
+    src_tgt: multi_query_associative_recall_kv6_q2-multi_query_associative_recall_kv6_q2
+    transforms:
+    - filtertoolong
+    weight: 1
+  reverse_counting-reverse_counting:
+    dec_sharing_group:
+    - reverse_counting
+    enc_sharing_group:
+    - reverse_counting
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.reverse_counting-reverse_counting.src
+    path_tgt: data/synthdata/train.reverse_counting-reverse_counting.tgt
+    path_valid_src: data/synthdata/test.reverse_counting-reverse_counting.src
+    path_valid_tgt: data/synthdata/test.reverse_counting-reverse_counting.tgt
+    src_tgt: reverse_counting-reverse_counting
+    transforms:
+    - filtertoolong
+    weight: 1
+  reverse_source-reverse_source:
+    dec_sharing_group:
+    - reverse_source
+    enc_sharing_group:
+    - reverse_source
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.reverse_source-reverse_source.src
+    path_tgt: data/synthdata/train.reverse_source-reverse_source.tgt
+    path_valid_src: data/synthdata/test.reverse_source-reverse_source.src
+    path_valid_tgt: data/synthdata/test.reverse_source-reverse_source.tgt
+    src_tgt: reverse_source-reverse_source
+    transforms:
+    - filtertoolong
+    weight: 1
+  sort_source-sort_source:
+    dec_sharing_group:
+    - sort_source
+    enc_sharing_group:
+    - sort_source
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/synthdata/train.sort_source-sort_source.src
+    path_tgt: data/synthdata/train.sort_source-sort_source.tgt
+    path_valid_src: data/synthdata/test.sort_source-sort_source.src
+    path_valid_tgt: data/synthdata/test.sort_source-sort_source.tgt
+    src_tgt: sort_source-sort_source
+    transforms:
+    - filtertoolong
+    weight: 1
+tgt_seq_length: 200
+tgt_vocab:
+  copy_source: data/synthdata/shared_vocab
+  counting: data/synthdata/shared_vocab
+  distractor_separator_kv12_q8: data/synthdata/shared_vocab
+  distractor_separator_kv20_q4: data/synthdata/shared_vocab
+  multi_query_associative_recall_kv12_q8: data/synthdata/shared_vocab
+  multi_query_associative_recall_kv20_q4: data/synthdata/shared_vocab
+  multi_query_associative_recall_kv6_q2: data/synthdata/shared_vocab
+  reverse_counting: data/synthdata/shared_vocab
+  reverse_source: data/synthdata/shared_vocab
+  sort_source: data/synthdata/shared_vocab
+train_steps: 50000
+valid_batch_size: 4096
+valid_steps: 1000
+warmup_steps: 3000
+weight_decay: 0.05
+world_size: 1
+x_transformers_opts:
+  attn_flash: true
+  heads: 16
+  rotary_pos_emb: true
+  tie_embedding: true
+

@@ -1,0 +1,2573 @@
+accum_count: 8
+adapters:
+  decoder:
+    dec_lang_bottom:
+      adapter_type: ff
+      hidden_dim: 16
+      ids:
+      - af
+      - da
+      - en
+      - es
+      - et
+      - fi
+      - it
+      - nl
+      - sv
+      layer_stack_index: 0
+      layers:
+      - 0
+      - 1
+    dec_lang_mid:
+      adapter_type: ff
+      hidden_dim: 16
+      ids:
+      - af
+      - da
+      - en
+      - es
+      - et
+      - fi
+      - it
+      - nl
+      - sv
+      layer_stack_index: 1
+      layers:
+      - 0
+      - 1
+      - 2
+    dec_lang_top:
+      adapter_type: ff
+      hidden_dim: 16
+      ids:
+      - af
+      - da
+      - en
+      - es
+      - et
+      - fi
+      - it
+      - nl
+      - sv
+      layer_stack_index: 2
+      layers:
+      - 0
+  encoder:
+    enc_lang_bottom:
+      adapter_type: lora
+      hidden_dim: 8
+      ids:
+      - af
+      - da
+      - en
+      - es
+      - et
+      - fi
+      - it
+      - nl
+      - sv
+      layer_stack_index: 0
+      layers:
+      - 0
+      - 1
+      - 2
+    enc_lang_top:
+      adapter_type: lora
+      hidden_dim: 8
+      ids:
+      - af
+      - da
+      - en
+      - es
+      - et
+      - fi
+      - it
+      - nl
+      - sv
+      layer_stack_index: 1
+      layers:
+      - 0
+      - 1
+      - 2
+batch_size: 32768
+batch_type: tokens
+dec_layers:
+- 2
+- 3
+- 1
+decay_method: linear_warmup
+denoising_objective: bart
+dropout: 0.1
+enc_layers:
+- 3
+- 3
+gpu_ranks:
+- 0
+keep_checkpoint: 3
+label_smoothing: 0.1
+learning_rate: 3.0e-05
+mask_length: span-poisson
+mask_ratio: 0.2
+max_grad_norm: 1.0
+model_dim: 512
+model_type: text
+n_nodes: 1
+normalization: tokens
+optim: adafactor
+param_init: 0.0
+param_init_glorot: true
+poisson_lambda: 3.0
+replace_length: 1
+report_every: 100
+save_checkpoint_steps: 10000
+save_model: models/opus.spm32k.adafactor.hamburger.l2.dsae/opus.spm32k.adafactor.hamburger.l2.dsae
+seed: 3435
+src_seq_length: 200
+src_subword_model: models/tatoeba_spm/opusTC.{src_lang}.32k.spm
+src_subword_nbest: 5
+src_subword_type: sentencepiece
+src_vocab:
+  af: data/opus/vocabs/opusTC.afr.32k.spm.vocab
+  da: data/opus/vocabs/opusTC.dan.32k.spm.vocab
+  en: data/opus/vocabs/opusTC.eng.32k.spm.vocab
+  es: data/opus/vocabs/opusTC.spa.32k.spm.vocab
+  et: data/opus/vocabs/opusTC.est.32k.spm.vocab
+  fi: data/opus/vocabs/opusTC.fin.32k.spm.vocab
+  it: data/opus/vocabs/opusTC.ita.32k.spm.vocab
+  nl: data/opus/vocabs/opusTC.nld.32k.spm.vocab
+  sv: data/opus/vocabs/opusTC.swe.32k.spm.vocab
+tasks:
+  af-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-en/opus.af-en-train.af
+    path_tgt: data/opus/af-en/opus.af-en-train.af
+    src_tgt: af-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+  af-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-da/opus.af-da-train.af
+    path_tgt: data/opus/af-da/opus.af-da-train.da
+    src_tgt: af-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  af-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-en/opus.af-en-train.af
+    path_tgt: data/opus/af-en/opus.af-en-train.en
+    src_tgt: af-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  af-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-es/opus.af-es-train.af
+    path_tgt: data/opus/af-es/opus.af-es-train.es
+    src_tgt: af-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  af-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-et/opus.af-et-train.af
+    path_tgt: data/opus/af-et/opus.af-et-train.et
+    src_tgt: af-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  af-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-fi/opus.af-fi-train.af
+    path_tgt: data/opus/af-fi/opus.af-fi-train.fi
+    src_tgt: af-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  af-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-it/opus.af-it-train.af
+    path_tgt: data/opus/af-it/opus.af-it-train.it
+    src_tgt: af-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  af-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-nl/opus.af-nl-train.af
+    path_tgt: data/opus/af-nl/opus.af-nl-train.nl
+    src_tgt: af-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  af-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - af
+      - - enc_lang_top
+        - af
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-sv/opus.af-sv-train.af
+    path_tgt: data/opus/af-sv/opus.af-sv-train.sv
+    src_tgt: af-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-da/opus.af-da-train.da
+    path_tgt: data/opus/af-da/opus.af-da-train.af
+    src_tgt: da-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-en/opus.da-en-train.da
+    path_tgt: data/opus/da-en/opus.da-en-train.da
+    src_tgt: da-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+  da-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-en/opus.da-en-train.da
+    path_tgt: data/opus/da-en/opus.da-en-train.en
+    src_tgt: da-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-es/opus.da-es-train.da
+    path_tgt: data/opus/da-es/opus.da-es-train.es
+    src_tgt: da-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-et/opus.da-et-train.da
+    path_tgt: data/opus/da-et/opus.da-et-train.et
+    src_tgt: da-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-fi/opus.da-fi-train.da
+    path_tgt: data/opus/da-fi/opus.da-fi-train.fi
+    src_tgt: da-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-it/opus.da-it-train.da
+    path_tgt: data/opus/da-it/opus.da-it-train.it
+    src_tgt: da-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-nl/opus.da-nl-train.da
+    path_tgt: data/opus/da-nl/opus.da-nl-train.nl
+    src_tgt: da-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  da-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - da
+      - - enc_lang_top
+        - da
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-sv/opus.da-sv-train.da
+    path_tgt: data/opus/da-sv/opus.da-sv-train.sv
+    src_tgt: da-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-en/opus.af-en-train.en
+    path_tgt: data/opus/af-en/opus.af-en-train.af
+    src_tgt: en-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-en/opus.da-en-train.en
+    path_tgt: data/opus/da-en/opus.da-en-train.da
+    src_tgt: en-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-es/opus.en-es-train.en
+    path_tgt: data/opus/en-es/opus.en-es-train.es
+    src_tgt: en-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-et/opus.en-et-train.en
+    path_tgt: data/opus/en-et/opus.en-et-train.et
+    src_tgt: en-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-fi/opus.en-fi-train.en
+    path_tgt: data/opus/en-fi/opus.en-fi-train.fi
+    src_tgt: en-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-it/opus.en-it-train.en
+    path_tgt: data/opus/en-it/opus.en-it-train.it
+    src_tgt: en-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-nl/opus.en-nl-train.en
+    path_tgt: data/opus/en-nl/opus.en-nl-train.nl
+    src_tgt: en-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  en-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - en
+      - - enc_lang_top
+        - en
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - en
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-sv/opus.en-sv-train.en
+    path_tgt: data/opus/en-sv/opus.en-sv-train.sv
+    src_tgt: en-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-es/opus.af-es-train.es
+    path_tgt: data/opus/af-es/opus.af-es-train.af
+    src_tgt: es-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-es/opus.da-es-train.es
+    path_tgt: data/opus/da-es/opus.da-es-train.da
+    src_tgt: es-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-es/opus.en-es-train.es
+    path_tgt: data/opus/en-es/opus.en-es-train.en
+    src_tgt: es-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-es/opus.en-es-train.es
+    path_tgt: data/opus/en-es/opus.en-es-train.es
+    src_tgt: es-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+  es-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-et/opus.es-et-train.es
+    path_tgt: data/opus/es-et/opus.es-et-train.et
+    src_tgt: es-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-fi/opus.es-fi-train.es
+    path_tgt: data/opus/es-fi/opus.es-fi-train.fi
+    src_tgt: es-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-it/opus.es-it-train.es
+    path_tgt: data/opus/es-it/opus.es-it-train.it
+    src_tgt: es-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-nl/opus.es-nl-train.es
+    path_tgt: data/opus/es-nl/opus.es-nl-train.nl
+    src_tgt: es-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  es-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - es
+      - - enc_lang_top
+        - es
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-sv/opus.es-sv-train.es
+    path_tgt: data/opus/es-sv/opus.es-sv-train.sv
+    src_tgt: es-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-et/opus.af-et-train.et
+    path_tgt: data/opus/af-et/opus.af-et-train.af
+    src_tgt: et-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-et/opus.da-et-train.et
+    path_tgt: data/opus/da-et/opus.da-et-train.da
+    src_tgt: et-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-et/opus.en-et-train.et
+    path_tgt: data/opus/en-et/opus.en-et-train.en
+    src_tgt: et-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-et/opus.es-et-train.et
+    path_tgt: data/opus/es-et/opus.es-et-train.es
+    src_tgt: et-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-et/opus.en-et-train.et
+    path_tgt: data/opus/en-et/opus.en-et-train.et
+    src_tgt: et-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+  et-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-fi/opus.et-fi-train.et
+    path_tgt: data/opus/et-fi/opus.et-fi-train.fi
+    src_tgt: et-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-it/opus.et-it-train.et
+    path_tgt: data/opus/et-it/opus.et-it-train.it
+    src_tgt: et-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-nl/opus.et-nl-train.et
+    path_tgt: data/opus/et-nl/opus.et-nl-train.nl
+    src_tgt: et-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  et-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - et
+      - - enc_lang_top
+        - et
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-sv/opus.et-sv-train.et
+    path_tgt: data/opus/et-sv/opus.et-sv-train.sv
+    src_tgt: et-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-fi/opus.af-fi-train.fi
+    path_tgt: data/opus/af-fi/opus.af-fi-train.af
+    src_tgt: fi-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-fi/opus.da-fi-train.fi
+    path_tgt: data/opus/da-fi/opus.da-fi-train.da
+    src_tgt: fi-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-fi/opus.en-fi-train.fi
+    path_tgt: data/opus/en-fi/opus.en-fi-train.en
+    src_tgt: fi-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-fi/opus.es-fi-train.fi
+    path_tgt: data/opus/es-fi/opus.es-fi-train.es
+    src_tgt: fi-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-fi/opus.et-fi-train.fi
+    path_tgt: data/opus/et-fi/opus.et-fi-train.et
+    src_tgt: fi-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-fi/opus.en-fi-train.fi
+    path_tgt: data/opus/en-fi/opus.en-fi-train.fi
+    src_tgt: fi-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+  fi-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/fi-it/opus.fi-it-train.fi
+    path_tgt: data/opus/fi-it/opus.fi-it-train.it
+    src_tgt: fi-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/fi-nl/opus.fi-nl-train.fi
+    path_tgt: data/opus/fi-nl/opus.fi-nl-train.nl
+    src_tgt: fi-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  fi-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - fi
+      - - enc_lang_top
+        - fi
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - et+fi
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/fi-sv/opus.fi-sv-train.fi
+    path_tgt: data/opus/fi-sv/opus.fi-sv-train.sv
+    src_tgt: fi-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-it/opus.af-it-train.it
+    path_tgt: data/opus/af-it/opus.af-it-train.af
+    src_tgt: it-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-it/opus.da-it-train.it
+    path_tgt: data/opus/da-it/opus.da-it-train.da
+    src_tgt: it-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-it/opus.en-it-train.it
+    path_tgt: data/opus/en-it/opus.en-it-train.en
+    src_tgt: it-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-it/opus.es-it-train.it
+    path_tgt: data/opus/es-it/opus.es-it-train.es
+    src_tgt: it-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-it/opus.et-it-train.it
+    path_tgt: data/opus/et-it/opus.et-it-train.et
+    src_tgt: it-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/fi-it/opus.fi-it-train.it
+    path_tgt: data/opus/fi-it/opus.fi-it-train.fi
+    src_tgt: it-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-it/opus.en-it-train.it
+    path_tgt: data/opus/en-it/opus.en-it-train.it
+    src_tgt: it-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+  it-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/it-nl/opus.it-nl-train.it
+    path_tgt: data/opus/it-nl/opus.it-nl-train.nl
+    src_tgt: it-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  it-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - it
+      - - enc_lang_top
+        - it
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - es+it
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/it-sv/opus.it-sv-train.it
+    path_tgt: data/opus/it-sv/opus.it-sv-train.sv
+    src_tgt: it-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-nl/opus.af-nl-train.nl
+    path_tgt: data/opus/af-nl/opus.af-nl-train.af
+    src_tgt: nl-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-nl/opus.da-nl-train.nl
+    path_tgt: data/opus/da-nl/opus.da-nl-train.da
+    src_tgt: nl-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-nl/opus.en-nl-train.nl
+    path_tgt: data/opus/en-nl/opus.en-nl-train.en
+    src_tgt: nl-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-nl/opus.es-nl-train.nl
+    path_tgt: data/opus/es-nl/opus.es-nl-train.es
+    src_tgt: nl-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-nl/opus.et-nl-train.nl
+    path_tgt: data/opus/et-nl/opus.et-nl-train.et
+    src_tgt: nl-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/fi-nl/opus.fi-nl-train.nl
+    path_tgt: data/opus/fi-nl/opus.fi-nl-train.fi
+    src_tgt: nl-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/it-nl/opus.it-nl-train.nl
+    path_tgt: data/opus/it-nl/opus.it-nl-train.it
+    src_tgt: nl-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  nl-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-nl/opus.en-nl-train.nl
+    path_tgt: data/opus/en-nl/opus.en-nl-train.nl
+    src_tgt: nl-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+  nl-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - nl
+      - - enc_lang_top
+        - nl
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - af+nl
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/nl-sv/opus.nl-sv-train.nl
+    path_tgt: data/opus/nl-sv/opus.nl-sv-train.sv
+    src_tgt: nl-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-af:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - af
+      - - dec_lang_mid
+        - af
+      - - dec_lang_top
+        - af
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/af-sv/opus.af-sv-train.sv
+    path_tgt: data/opus/af-sv/opus.af-sv-train.af
+    src_tgt: sv-af
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-da:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - da
+      - - dec_lang_mid
+        - da
+      - - dec_lang_top
+        - da
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/da-sv/opus.da-sv-train.sv
+    path_tgt: data/opus/da-sv/opus.da-sv-train.da
+    src_tgt: sv-da
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-en:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - en
+      - - dec_lang_mid
+        - en
+      - - dec_lang_top
+        - en
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - en
+    - full
+    - en
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-sv/opus.en-sv-train.sv
+    path_tgt: data/opus/en-sv/opus.en-sv-train.en
+    src_tgt: sv-en
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-es:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - es
+      - - dec_lang_mid
+        - es
+      - - dec_lang_top
+        - es
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/es-sv/opus.es-sv-train.sv
+    path_tgt: data/opus/es-sv/opus.es-sv-train.es
+    src_tgt: sv-es
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-et:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - et
+      - - dec_lang_mid
+        - et
+      - - dec_lang_top
+        - et
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/et-sv/opus.et-sv-train.sv
+    path_tgt: data/opus/et-sv/opus.et-sv-train.et
+    src_tgt: sv-et
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-fi:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - fi
+      - - dec_lang_mid
+        - fi
+      - - dec_lang_top
+        - fi
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - et+fi
+    - full
+    - et+fi
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/fi-sv/opus.fi-sv-train.sv
+    path_tgt: data/opus/fi-sv/opus.fi-sv-train.fi
+    src_tgt: sv-fi
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-it:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - it
+      - - dec_lang_mid
+        - it
+      - - dec_lang_top
+        - it
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - es+it
+    - full
+    - es+it
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/it-sv/opus.it-sv-train.sv
+    path_tgt: data/opus/it-sv/opus.it-sv-train.it
+    src_tgt: sv-it
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-nl:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - nl
+      - - dec_lang_mid
+        - nl
+      - - dec_lang_top
+        - nl
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - af+nl
+    - full
+    - af+nl
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/nl-sv/opus.nl-sv-train.sv
+    path_tgt: data/opus/nl-sv/opus.nl-sv-train.nl
+    src_tgt: sv-nl
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    weight: 0.334370152488211
+  sv-sv:
+    adapters:
+      decoder:
+      - - dec_lang_bottom
+        - sv
+      - - dec_lang_mid
+        - sv
+      - - dec_lang_top
+        - sv
+      encoder:
+      - - enc_lang_bottom
+        - sv
+      - - enc_lang_top
+        - sv
+    dec_sharing_group:
+    - da+sv
+    - full
+    - da+sv
+    enc_sharing_group:
+    - da+sv
+    - full
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    path_src: data/opus/en-sv/opus.en-sv-train.sv
+    path_tgt: data/opus/en-sv/opus.en-sv-train.sv
+    src_tgt: sv-sv
+    transforms:
+    - sentencepiece
+    - filtertoolong
+    - denoising
+    weight: 0.334370152488211
+tgt_seq_length: 200
+tgt_subword_model: models/tatoeba_spm/opusTC.{tgt_lang}.32k.spm
+tgt_subword_nbest: 5
+tgt_vocab:
+  af: data/opus/vocabs/opusTC.afr.32k.spm.vocab
+  da: data/opus/vocabs/opusTC.dan.32k.spm.vocab
+  en: data/opus/vocabs/opusTC.eng.32k.spm.vocab
+  es: data/opus/vocabs/opusTC.spa.32k.spm.vocab
+  et: data/opus/vocabs/opusTC.est.32k.spm.vocab
+  fi: data/opus/vocabs/opusTC.fin.32k.spm.vocab
+  it: data/opus/vocabs/opusTC.ita.32k.spm.vocab
+  nl: data/opus/vocabs/opusTC.nld.32k.spm.vocab
+  sv: data/opus/vocabs/opusTC.swe.32k.spm.vocab
+train_steps: 150000
+trg_subword_type: sentencepiece
+valid_batch_size: 4096
+valid_steps: 1000
+warmup_steps: 5000
+weight_decay: 0.05
+world_size: 1
+x_transformers_opts:
+  attn_flash: true
+  heads: 16
+  rotary_pos_emb: true
+  tie_embedding: true
+

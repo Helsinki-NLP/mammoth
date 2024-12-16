@@ -1,3 +1,4 @@
+# This configuration showcases some of the features of Mammoth and config-config
 config_config:
   src_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-train.{src_lang}"
   tgt_path: "data/opus/{sorted_pair}/opus.{sorted_pair}-train.{tgt_lang}"

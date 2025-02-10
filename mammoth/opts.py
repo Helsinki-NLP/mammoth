@@ -204,13 +204,6 @@ def model_opts(parser):
     # Embedding Options
     group = parser.add_argument_group('Model- Embeddings')
 
-    group.add(
-        '--enable_embeddingless',
-        '-enable_embeddingless',
-        action='store_true',
-        help="Enable the use of byte-based embeddingless models" +
-        "(Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
-    )
 
     # Encoder-Decoder Options
     group = parser.add_argument_group('Model- Encoder-Decoder')

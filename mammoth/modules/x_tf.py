@@ -227,6 +227,14 @@ class ReluSquared(Module):
 
 # embedding
 
+class Scaler(Module):
+    def __init__(self,emb_dim):
+        super().__init__()
+        self.embed_scale = nn.Parameter(torch.Tensor([0]))
+        nn.init.constant_(self.embed_scale, math.sqrt(emb_dim))
+    def forward(self, x):
+        return x*self.embed_scale
+    
 class TokenEmbedding(Module):
     def __init__(self, dim, num_tokens, l2norm_embed = False):
         super().__init__()
@@ -2008,7 +2016,9 @@ class TransformerWrapper(Module):
         mixture_of_softmax = False,
         mixture_of_softmax_k = 4,
         sigsoftmax_logits = False,
-        initialize_embeddings=True
+        initialize_embeddings=True,
+        scale_embeddings: bool = False,     # NEW: whether to multiply embeddings by sqrt(emb_dim)
+        scale_outputs: bool = False,    # NEW: whether to scale final outputs
     ):
         super().__init__()
         self.initialize_embeddings =initialize_embeddings
@@ -2016,6 +2026,9 @@ class TransformerWrapper(Module):
         emb_dim = default(emb_dim, dim)
         self.emb_dim = emb_dim
         self.num_tokens = num_tokens
+
+        self.scale_embeddings = scale_embeddings
+        self.scale_outputs = scale_outputs
 
         self.max_seq_len = max_seq_len
         self.max_mem_len = max_mem_len
@@ -2027,7 +2040,10 @@ class TransformerWrapper(Module):
             token_emb = TokenEmbedding(emb_dim, num_tokens, l2norm_embed = l2norm_embed)
 
         self.token_emb = token_emb
-
+        
+        self.embed_scale = Scaler(emb_dim)
+        self.out_embed_scale = Scaler(emb_dim)
+      
         no_abs_pos_emb = max_seq_len == 0 or not (use_abs_pos_emb and not attn_layers.disable_abs_pos_emb)
 
         if no_abs_pos_emb:
@@ -2176,6 +2192,9 @@ class TransformerWrapper(Module):
         external_pos_emb = exists(pos) and pos.dtype != torch.long
         pos_emb = self.pos_emb(x, pos = pos, seq_start_pos = seq_start_pos) if not external_pos_emb else pos
         x = self.token_emb(x) + pos_emb
+
+        if self.scale_embeddings:
+            x = self.embed_scale(x) 
 
         # add additional embeddings
 
@@ -2355,6 +2374,16 @@ class TransformerWrapper(Module):
                 logits = first(logits)
 
         # different returns
+
+        if self.scale_outputs:
+            if return_logits_and_embeddings:
+                x = self.out_embed_scale(x)
+                logits = self.out_embed_scale(logits)
+            elif return_embeddings:
+                x = self.out_embed_scale(x)
+            else:
+                logits = self.out_embed_scale(logits)
+                
 
         if return_logits_and_embeddings:
             out = (logits, x)

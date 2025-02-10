@@ -10,6 +10,7 @@ from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
 from mammoth.modules.x_tf import TransformerWrapper
 from x_transformers.x_transformers import TokenEmbedding
+from mammoth.constants import DefaultTokens
 
 from mammoth.distributed.components import (
     DistributedAdapter,
@@ -34,16 +35,17 @@ from torch.nn import Module
 # embedding
 import torch.nn.functional as F
 class ByteEmbedding(Module):
-    def __init__(self, dim, num_tokens, l2norm_embed = False):
+    def __init__(self, dim, num_tokens, padding_idx):
         super().__init__()
-        self.emb = nn.Embedding(num_tokens, dim)
+        self.emb = nn.Embedding(num_tokens, dim, padding_idx=padding_idx)
         one_hot_matrix = F.one_hot(torch.arange(num_tokens)).float()
         one_hot_embed = torch.cat((one_hot_matrix, torch.zeros((num_tokens, dim - num_tokens))), dim=1)
+        one_hot_embed[padding_idx] = torch.zeros(dim).unsqueeze(0)
         self.emb.weight = torch.nn.parameter.Parameter(one_hot_embed, requires_grad=False)
     def forward(self, x):
         token_emb = self.emb(x.long())
         return token_emb
-    
+
 TRANSFORMER_WRAPPER_OPTS = {
     'post_emb_norm',
     'tie_embedding',
@@ -273,12 +275,20 @@ def build_xcoder(
     for lang in all_langs:
         if lang not in token_embs:
             vocab = vocabs_dict[(side_alt_str, lang)]
-            Embedding = ByteEmbedding if model_opts.use_embeddingless else TokenEmbedding
-            token_embs[lang] = Embedding(
-                dim=model_opts.model_dim,
-                num_tokens=len(vocab),
-                l2norm_embed=l2norm_embed
-            )
+            padding_idx = vocab[DefaultTokens.PAD]
+            if model_opts.use_embeddingless:
+                token_embs[lang]  = ByteEmbedding(
+                    dim=model_opts.model_dim,
+                    num_tokens=len(vocab),
+                    padding_idx=padding_idx
+                    )
+            else:
+                token_embs[lang]  = TokenEmbedding(
+                    dim=model_opts.model_dim,
+                    num_tokens=len(vocab),
+                    l2norm_embed=l2norm_embed
+                )
+   
     # Create AdaptedAttentionLayersStack objects and TransformerWrapper objects
     tasks = task_queue_manager.get_my_tasks()
     if single_task:
@@ -310,6 +320,8 @@ def build_xcoder(
             emb_dim=model_opts.model_dim,
             token_emb=token_embs[lang],
             initialize_embeddings=not (model_opts.use_embeddingless),
+            scale_outputs= model_opts.use_embeddingless,
+            scale_embeddings = model_opts.use_embeddingless, 
             **transformer_wrapper_kwargs,
         )
         transformer_wrappers[task.corpus_id] = transformer_wrapper

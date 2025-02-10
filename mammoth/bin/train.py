@@ -178,7 +178,8 @@ def train(opts):
     vocabs_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
-
+    if opts.train_from:
+        checkpoint = load_checkpoint(ckpt_path=opts.train_from)
     vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
     for side in ('src', 'tgt'):
         for lang in global_task_queue_manager.get_langs(side):
@@ -231,7 +232,7 @@ def train(opts):
             procs.append(
                 mp.Process(
                     target=consumer,
-                    args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager),
+                    args=(train_process, opts, device_context, error_queue, q, semaphore, task_queue_manager, checkpoint),
                     daemon=True,
                 )
             )
@@ -274,7 +275,7 @@ def train(opts):
             local_rank=0,
             opts=opts
         )
-        train_process(opts, device_context=device_context, task_queue_manager=task_queue_manager)
+        train_process(opts, device_context=device_context, task_queue_manager=task_queue_manager, checkpoint=checkpoint)
 
 
 def _get_parser():

@@ -29,8 +29,8 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
                 if 'adapter' in param_name and 'adapter' not in component_type:
                     # omit adapters from base component optimizers
                     continue
-                if 'embedding' in param_name:
-                    print(f'adding {param_name} to suboptimizer {name}')
+                # if 'embedding' in param_name:
+                #     print(f'adding {param_name} to suboptimizer {name}')
                 params.append(param)
             if name in suboptimizers:
                 raise Exception(f'Trying to create second optimizer for "{name}"')
@@ -493,14 +493,18 @@ class Optimizer(object):
                 if "training_step" in optim_state_dict:
                     print("Loading training step...")
                     opt._training_step = optim_state_dict['training_step']
+                    optimizer._training_step = optim_state_dict['training_step']
                 else:
                     opt._training_step = opts.train_step
+                    optimizer._training_step = int(opts.train_step)
                     
                 if 'decay_step' in optim_state_dict:
                     print("Loading training step...")
                     opt._decay_step = optim_state_dict['decay_step']
+                    optimizer._training_step = int(optim_state_dict['decay_step'])+1
                 else:
                     opt._decay_step = 40000
+                    optimizer._decay_step = int(opts.train_step)+1
         if opts.model_dtype == "fp16":
             if opts.optim == "fusedadam":
                 optimizer._fp16 = "legacy"

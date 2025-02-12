@@ -360,7 +360,7 @@ class Trainer(object):
                 self.optim.learning_rate(),
                 report_stats,
             )
-
+            
             if step % valid_steps == 0 and valid_iter is not None:
                 if self.gpu_verbose_level > 0:
                     logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
@@ -406,6 +406,14 @@ class Trainer(object):
             :obj:`nmt.Statistics`: validation loss statistics
         """
         valid_model = self.model
+        # print(self.model)
+        # print(self.model.encoder.embeddings.embeddings_en.make_embedding.emb_luts[0].weight)
+        # print(self.model.encoder.encoders[0].en.transformer[0].self_attn.linear_keys.weight)
+        # print(self.model.decoder.embeddings.embeddings_ar.make_embedding.emb_luts[0].weight)
+        # print(self.model.decoder.decoders[0].ar.transformer_layers[0].self_attn.linear_keys.weight)
+        # print(self.model.generator.generator_ar[0].weight)
+        
+
         if moving_average:
             # swap model params w/ moving average
             # (and keep the original parameters)

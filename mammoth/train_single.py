@@ -211,7 +211,9 @@ def main(
     if opts.single_pass and train_steps > 0:
         if device_context.is_master():
             logger.warning("Option single_pass is enabled, ignoring train_steps.")
+        print("excuse me")
         train_steps = 0
+    print(train_steps)
     logger.info("{} - Starting training".format(device_context.id))
     trainer.train(
         train_iter,

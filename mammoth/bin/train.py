@@ -178,6 +178,7 @@ def train(opts):
     vocabs_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
+    checkpoint = None
     if opts.train_from:
         checkpoint = load_checkpoint(ckpt_path=opts.train_from)
     vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}

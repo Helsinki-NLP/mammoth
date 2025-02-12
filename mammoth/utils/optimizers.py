@@ -12,6 +12,8 @@ from torch.nn.utils import clip_grad_norm_
 
 
 def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
+    print("ARE WE DOING THIS???")
+    print("2"*100)
     suboptimizers = {}
     my_grouped_components = task_queue_manager.get_grouped_components(model)
     for component_type in my_grouped_components:
@@ -56,7 +58,7 @@ def attention_bridge_optimizer(model, task_queue_manager, base_optimizer):
     if len(attParam):
         optimizer = base_optimizer(attParam)
         suboptimizers["attention_bridge"] = optimizer
-
+    
     optimizer = MultipleOptimizer(suboptimizers, None)
     return optimizer
 
@@ -200,7 +202,67 @@ def linear_warmup_decay(step, warmup_steps, rate, train_steps):
     else:
         return max(end_rate, (train_steps - step) / (train_steps - warmup_steps))
 
+def get_base_optimizer(opts):
+    """Builds the PyTorch optimizer factory.
 
+    We use the default parameters for Adam that are suggested by
+    the original paper https://arxiv.org/pdf/1412.6980.pdf
+    These values are also used by other established implementations,
+    e.g. https://www.tensorflow.org/api_docs/python/tf/train/AdamOptimizer
+    https://keras.io/optimizers/
+    Recently there are slightly different values used in the paper
+    "Attention is all you need"
+    https://arxiv.org/pdf/1706.03762.pdf, particularly the value beta2=0.98
+    was used there however, beta2=0.999 is still arguably the more
+    established value, so we use that here as well
+
+    Args:
+      opts. The dictionary of options.
+
+    Returns:
+      A callable that returns ``torch.optim.Optimizer`` instances.
+    """
+    betas = [opts.adam_beta1, opts.adam_beta2]
+    if opts.optim == 'sgd':
+        base_optimizer = functools.partial(optim.SGD, lr=opts.learning_rate)
+    elif opts.optim == 'adagrad':
+        base_optimizer = functools.partial(
+            optim.Adagrad,
+            lr=opts.learning_rate,
+            initial_accumulator_value=opts.adagrad_accumulator_init,
+        )
+    elif opts.optim == 'adadelta':
+        base_optimizer = functools.partial(
+            optim.Adadelta,
+            lr=opts.learning_rate,
+        )
+    elif opts.optim == 'adafactor':
+        base_optimizer = functools.partial(
+            AdaFactorFairSeq,
+            weight_decay=opts.weight_decay,
+        )
+    elif opts.optim == 'adam':
+        base_optimizer = functools.partial(
+            optim.Adam,
+            lr=opts.learning_rate,
+            betas=betas,
+            eps=1e-9,
+            weight_decay=opts.weight_decay,
+        )
+    elif opts.optim == 'adamw':
+        base_optimizer = functools.partial(
+            optim.AdamW,
+            lr=opts.learning_rate,
+            betas=betas,
+            eps=1e-9,
+            weight_decay=opts.weight_decay,
+        )
+    elif opts.optim == 'fusedadam':
+        raise NotImplementedError()
+    else:
+        raise ValueError('Invalid optimizer type: ' + opts.optim)
+
+    return base_optimizer
 class MultipleOptimizer(object):
     """Implement multiple optimizers"""
 
@@ -208,7 +270,77 @@ class MultipleOptimizer(object):
         self.optimizers = op
         self.multiOptims_Langs = multiOptims_Langs
         self._steps = Counter()
+        
 
+    @classmethod
+    def from_opts(cls, model, opts, task_queue_manager, frame_checkpoint=None):
+        optim_opts = cls._maybe_restore_from_checkpoint(opts, frame_checkpoint)
+        base_optimizer = get_base_optimizer(optim_opts)
+        use_grad_scaler = opts.model_dtype == "fp16"
+        if use_grad_scaler:
+            from torch.cuda.amp import GradScaler
+            grad_scaler = GradScaler()
+        else:
+            grad_scaler = None
+        suboptimizers = cls._get_suboptimizers(
+            model,
+            task_queue_manager,
+            base_optimizer,
+            optim_opts,
+            grad_scaler=grad_scaler,
+        )
+        
+        obj= cls(
+            optimizers=suboptimizers,
+            grad_scaler=grad_scaler,
+        )
+        
+        
+    def _get_suboptimizers(model, task_queue_manager, base_optimizer, optim_opts, grad_scaler=None):
+        suboptimizers = {}
+        # All components on device, in consistent order across devices
+        my_components = task_queue_manager.get_my_distributed_components()
+        # Also keeping components that are on a single device
+        for component in my_components:
+            name = component.get_name()
+            params = [
+                param for param_name, param in component.named_parameters(model)
+                if param.requires_grad
+            ]
+            if name in suboptimizers:
+                raise Exception(f'Trying to create second optimizer for "{name}"')
+            if len(params) != 0:
+                optimizer = Optimizer(
+                    optimizer=base_optimizer(params),
+                    learning_rate=optim_opts.learning_rate,
+                    learning_rate_decay_fn=make_learning_rate_decay_fn(optim_opts),
+                    max_grad_norm=optim_opts.max_grad_norm,
+                    grad_scaler=grad_scaler,
+                )
+                suboptimizers[name] = optimizer
+
+        return suboptimizers
+    @staticmethod
+    def _maybe_restore_from_checkpoint(opts, frame_checkpoint=None):
+        optim_opts = opts
+
+        if opts.train_from and frame_checkpoint is not None:
+            checkpoint_opts = frame_checkpoint['opts']
+
+            if opts.reset_optim == 'none':
+                # Load everything from the checkpoint.
+                optim_opts = checkpoint_opts
+            elif opts.reset_optim == 'all':
+                # Build everything from scratch.
+                pass
+            elif opts.reset_optim == 'states':
+                # Reset optimizer, keep options.
+                optim_opts = checkpoint_opts
+            elif opts.reset_optim == 'keep_states':
+                # Reset options, keep optimizer.
+                # Note that options are reset in load_parameters_from_checkpoint, not here
+                pass
+        return optim_opts
     @property
     def param_groups(self):
         param_groups = []
@@ -249,8 +381,32 @@ class MultipleOptimizer(object):
             count = self._steps[name]
             result.append(f'Optimizer "{name}" has been stepped {count} times')
         return result
+    def load_state_dict(self, state_dict):
+        for key in self.optimizers.keys():
+            if key in state_dict.keys():
+                self.optimizers[key].load_state_dict(state_dict[key])
+    def state_dict(self):
+        """Returns the state dictionary"""
+        return {
+            'optimizer': {k: v.state_dict() for k, v in self.optimizers.items()},
+            # 'steps': self._steps,
+        }
+    def load_state_dict(self, state_dict):
+        """Loads the optimizer from the state dictionary"""
 
+        # do not load any optimizer state if one component is missing
+        do_load = True
+        for k in state_dict["optimizer"].keys():
+            if k not in self.optimizers.keys():
+                do_load = False
 
+        if do_load is True:
+            for k in state_dict["optimizers"].keys():
+                self.optimizers[k].load_state_dict(state_dict["optimizers"][k])
+        else:
+            print("Some components do not match. Do not load optimizer from checkpoint.")
+
+        # self._steps = state_dict["steps"]
 class Optimizer(object):
     """
     Controller class for optimization. Mostly a thin
@@ -304,8 +460,8 @@ class Optimizer(object):
                 ckpt_state_dict['decay_step'] = optim._step + 1
                 ckpt_state_dict['optimizer'] = optim.optimizer.state_dict()
             else:
-                ckpt_state_dict = optim
-
+                ckpt_state_dict = checkpoint
+            print("HERE", opts.reset_optim)
             if opts.reset_optim == 'none':
                 # Load everything from the checkpoint.
                 optim_opt = ckpt_opt
@@ -322,13 +478,29 @@ class Optimizer(object):
                 # Reset options, keep optimizer.
                 optim_state_dict = ckpt_state_dict
 
+
+        print("1"*100)
         optimizer = cls(
             build_torch_optimizer(model, optim_opt, task_queue_manager),
             optim_opt.learning_rate,
             learning_rate_decay_fn=make_learning_rate_decay_fn(optim_opt),
             max_grad_norm=optim_opt.max_grad_norm,
         )
-
+        for name, opt in optimizer._optimizer.optimizers.items():
+            if name in optim_state_dict["optim"]:
+                print("Loaded optimizer from ", )
+                opt.load_state_dict(optim_state_dict["optim"][name])
+                if "training_step" in optim_state_dict:
+                    print("Loading training step...")
+                    opt._training_step = optim_state_dict['training_step']
+                else:
+                    opt._training_step = opts.train_step
+                    
+                if 'decay_step' in optim_state_dict:
+                    print("Loading training step...")
+                    opt._decay_step = optim_state_dict['decay_step']
+                else:
+                    opt._decay_step = 40000
         if opts.model_dtype == "fp16":
             if opts.optim == "fusedadam":
                 optimizer._fp16 = "legacy"
@@ -338,8 +510,11 @@ class Optimizer(object):
 
                 optimizer._scaler = GradScaler()
 
-        if optim_state_dict:
-            optimizer.load_state_dict(optim_state_dict)
+        
+        # if optim_state_dict:
+        #     print("loading from state_directory")
+        #     optimizer.load_state_dict(optim_state_dict)
+           
         return optimizer
 
     @property
@@ -367,12 +542,17 @@ class Optimizer(object):
         }
 
     def load_state_dict(self, state_dict):
-        self._training_step = state_dict['training_step']
+        print(self.state_dict().keys())
+        if "training_step" in state_dict:
+            self._training_step = state_dict['training_step']
         # State can be partially restored.
         if 'decay_step' in state_dict:
             self._decay_step = state_dict['decay_step']
         if 'optimizer' in state_dict:
+            print("LOADING OPTIMIZER HEREEE")
             self._optimizer.load_state_dict(state_dict['optimizer'])
+        print("Suboptimiser ???")
+       
 
     def zero_grad(self):
         """Zero the gradients of optimized parameters."""

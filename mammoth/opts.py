@@ -666,8 +666,8 @@ def _add_train_general_opts(parser):
         help="Model filename (the model will be saved as <save_model>_N.pt where N is the number of steps",
     )
     group.add(
-        '--trainstep',
-        '-trainstep',
+        '--train_step',
+        '-train_step',
         default=0,
         help="Train steps to load from.",
     )

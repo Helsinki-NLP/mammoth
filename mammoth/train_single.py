@@ -115,6 +115,7 @@ def main(
     batch_queue=None,
     semaphore=None,
     task_queue_manager=None,
+    checkpoint=None
 ):
     """Start training on `device_id`."""
     # NOTE: It's important that ``opts`` has been validated and updated
@@ -131,7 +132,6 @@ def main(
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))
 
     transforms_cls = get_transforms_cls(opts._all_transform)
-    checkpoint = None
     model_opts = _get_model_opts(opts, checkpoint=checkpoint)
 
     # Build model.
@@ -156,6 +156,7 @@ def main(
         task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
     )
+    
 
     # Build model saver
     model_saver = build_model_saver(model_opts, opts, model, vocabs_dict, optim, device_context)

@@ -285,6 +285,7 @@ def build_task_specific_model(
     device,
     task_queue_manager,
     checkpoint,
+    opts
 ):
     logger.info(f'TaskQueueManager: {task_queue_manager}')
     if not model_opts.model_task == ModelTask.SEQ2SEQ:
@@ -300,7 +301,7 @@ def build_task_specific_model(
         src_emb = build_src_emb(model_opts, vocab)
         src_embs[lang] = src_emb
     pluggable_src_emb = PluggableEmbeddings(src_embs)
-    encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager, checkpoint)
+    encoder = build_only_enc(model_opts, pluggable_src_emb, task_queue_manager, checkpoint, opts)
 
     for side, lang, _, vocab in task_queue_manager.get_vocabs(side='tgt', vocabs_dict=vocabs_dict):
         tgt_emb = build_tgt_emb(model_opts, vocab)
@@ -309,16 +310,18 @@ def build_task_specific_model(
         generators_md.add_module(f'generator_{lang}', generator)
 
     if checkpoint:
-        trainstep = checkpoint['opt'].train_step
+        print("LOADING FROM CHECKPOINT")
+        trainstep = opts.train_step
         for modname, gen in generators_md.items():
-            mod_path = Path(checkpoint['opt'].save_model + f"_step_{trainstep}_{modname}.pt")
+            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_{modname}.pt")
+            print("generator ", mod_path)
             if mod_path.exists():
-                module = torch.load(mod_path)
+                module = torch.load(mod_path, map_location=lambda storage, loc: storage)
                 gen.load_state_dict(module)
-                logger.info(f"Successfully loaded {modname} from the checkpoint.")
+                logger.info(f"Successfully loaded generator {modname} from the checkpoint.")
     pluggable_tgt_emb = PluggableEmbeddings(tgt_embs)
-    decoder = build_only_dec(model_opts, pluggable_tgt_emb, task_queue_manager,  checkpoint)
-
+    decoder = build_only_dec(model_opts, pluggable_tgt_emb, task_queue_manager,  checkpoint, opts)
+    
     # TODO: implement hierarchical approach to layer sharing
     attention_bridge = AttentionBridge.from_opts(model_opts)
 
@@ -368,82 +371,89 @@ def build_task_specific_model(
     return nmt_model, generators_md
 
 
-def build_only_enc(model_opts, src_emb, task_queue_manager, checkpoint=None):
+def build_only_enc(model_opts, src_emb, task_queue_manager, checkpoint=None, opts=None):
     """Truly only builds encoder: no embeddings"""
     encoder = build_encoder(model_opts, src_emb, task_queue_manager)
     if model_opts.param_init != 0.0:
         for name, p in encoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+            if not ("embedding" in name and "relative" not in name and model_opts.enable_embeddingless is True):
                 p.data.uniform_(-model_opts.param_init, model_opts.param_init)
 
     if model_opts.param_init_glorot:
         for name, p in encoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+            if not ("embedding" in name and "relative" not in name and model_opts.enable_embeddingless is True):
                 if p.dim() > 1:
                     xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if checkpoint:
-        trainstep = checkpoint['opt'].train_step
-        embnames = [srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opt'].data.values()]
+        trainstep = opts.train_step
+        print(trainstep)
+        embnames = [srctgt['src_tgt'].split('-')[0] for srctgt in checkpoint['opts'].tasks.values()]
         embnames = set(embnames)
         groupnames = [
-            (idx, modname) for srctgt in checkpoint['opt'].data.values()
+            (idx, modname) for srctgt in checkpoint['opts'].tasks.values()
             for idx, modname in enumerate(srctgt['enc_sharing_group'])
         ]
         groupnames = set(groupnames)
         # load embs
         for modname in embnames:
-            module = torch.load(checkpoint['opt'].save_model + f"_step_{trainstep}_src_embeddings_{modname}.pt")
             if f'embeddings_{modname}' in encoder.embeddings._modules.keys():
+                print(checkpoint['opts'].save_model + f"_step_{trainstep}_src_embeddings_{modname}.pt")
+                module = torch.load(checkpoint['opts'].save_model + f"_step_{trainstep}_src_embeddings_{modname}.pt", map_location=lambda storage, loc: storage)
                 encoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
                 logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
-
+                print(encoder.embeddings._modules[f'embeddings_{modname}'].make_embedding.emb_luts[0].weight)
         # load layers
         for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opt'].save_model + f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
+            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_encoder_{idx}_{modname}.pt")
             if mod_path.exists() and modname in encoder.encoders._modules[str(idx)].keys():
-                module = torch.load(mod_path)
+                print(mod_path)
+                module = torch.load(mod_path, map_location=lambda storage, loc: storage)
                 encoder.encoders._modules[str(idx)][modname].load_state_dict(module)
-                logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
+                logger.info(f"Successfully loaded encoder layer {str(idx)} of {modname} from the checkpoint.")
+                print(encoder.encoders._modules[str(idx)][modname].transformer[0].self_attn.linear_keys.weight)
+
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         encoder.half()
 
     return encoder
 
 
-def build_only_dec(model_opts, tgt_emb, task_queue_manager, checkpoint=None):
+def build_only_dec(model_opts, tgt_emb, task_queue_manager, checkpoint=None, opts=None):
     decoder = build_decoder(model_opts, tgt_emb, task_queue_manager)
     if model_opts.param_init != 0.0:
         for name, p in decoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+            if not ("embedding" in name and "relative" not in name and model_opts.enable_embeddingless is True):
                 p.data.uniform_(-model_opts.param_init, model_opts.param_init)
     if model_opts.param_init_glorot:
         for name, p in decoder.named_parameters():
-            if not ("embedding" in name and "pe" not in name and model_opts.enable_embeddingless is True):
+            if not ("embedding" in name and "relative" not in name and model_opts.enable_embeddingless is True):
                 if p.dim() > 1:
                     xavier_uniform_(p, gain=nn.init.calculate_gain('relu'))
     if checkpoint:
-        trainstep = checkpoint['opt'].train_step
-        embnames = [srctgt['src_tgt'].split('-')[1] for srctgt in checkpoint['opt'].data.values()]
+        trainstep = opts.train_step
+        embnames = [srctgt['src_tgt'].split('-')[1] for srctgt in checkpoint['opts'].tasks.values()]
         embnames = set(embnames)
         groupnames = [
-            (idx, modname) for srctgt in checkpoint['opt'].data.values()
+            (idx, modname) for srctgt in checkpoint['opts'].tasks.values()
             for idx, modname in enumerate(srctgt['dec_sharing_group'])
         ]
         groupnames = set(groupnames)
         # load embs
         for modname in embnames:
             if f'embeddings_{modname}' in decoder.embeddings._modules.keys():
-                module = torch.load(checkpoint['opt'].save_model + f"_step_{trainstep}_tgt_embeddings_{modname}.pt")
+                print(checkpoint['opts'].save_model + f"_step_{trainstep}_tgt_embeddings_{modname}.pt" )
+                module = torch.load(checkpoint['opts'].save_model + f"_step_{trainstep}_tgt_embeddings_{modname}.pt",map_location=lambda storage, loc: storage)
                 decoder.embeddings._modules[f'embeddings_{modname}'].load_state_dict(module)
                 logger.info(f"Successfully loaded the embeddings of {modname} from the checkpoint.")
 
         # load layers
         for idx, modname in groupnames:
-            mod_path = Path(checkpoint['opt'].save_model + f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
+            mod_path = Path(checkpoint['opts'].save_model + f"_step_{trainstep}_decoder_{idx}_{modname}.pt")
             if mod_path.exists() and modname in decoder.decoders._modules[str(idx)].keys():
-                module = torch.load(mod_path)
+                print(mod_path)
+                module = torch.load(mod_path, map_location=lambda storage, loc: storage)
                 decoder.decoders._modules[str(idx)][modname].load_state_dict(module)
-                logger.info(f"Successfully loaded layer {str(idx)} of {modname} from the checkpoint.")
+                logger.info(f"Successfully loaded decoder layer {str(idx)} of {modname} from the checkpoint.")
     if model_opts.model_dtype == 'fp16' and model_opts.optim == 'fusedadam':
         decoder.half()
 
@@ -509,6 +519,7 @@ def build_base_model_langspec(
     gpu,
     task_queue_manager,
     checkpoint=None,
+    opts=None
 ):
     """Build a model from opts.
 
@@ -546,6 +557,7 @@ def build_base_model_langspec(
         device=device,
         task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
+        opts=opts
     )
 
     model.generator = generators_md
@@ -683,6 +695,7 @@ def build_model(model_opts, opts, vocabs_dict, task_queue_manager, checkpoint):
         gpu=use_gpu(opts),
         task_queue_manager=task_queue_manager,
         checkpoint=checkpoint,
+        opts=opts
     )
     # logger.info(model)
     logger.info('Building model - done!')

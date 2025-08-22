@@ -826,7 +826,6 @@ def _add_decoding_opts(parser):
         "the table), then it will copy the source token.",
     )
 
-
 def translate_opts(parser, dynamic=False):
     """Translation / inference options"""
     group = parser.add_argument_group('Model')

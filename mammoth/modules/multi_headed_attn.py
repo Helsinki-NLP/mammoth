@@ -200,7 +200,6 @@ class MultiHeadedAttention(nn.Module):
 
         # Return multi-head attn
         attns = attn.view(batch_size, head_count, query_len, key_len)
-
         return output, attns
 
     def update_dropout(self, dropout):

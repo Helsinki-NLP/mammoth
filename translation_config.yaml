@@ -1,0 +1,29 @@
+# translation_config.yaml
+
+model: /Users/chaowang/Desktop/Mammoth/saved_models/
+task_id: bart_translation
+src_vocab:
+  en: /Users/chaowang/Desktop/Mammoth/hf_integration/src_vocab.txt
+tgt_vocab:
+  es: /Users/chaowang/Desktop/Mammoth/hf_integration/src_vocab.txt
+seed: 42
+src: /Users/chaowang/Desktop/Mammoth/hf_integration/src.en
+output: /Users/chaowang/Desktop/Mammoth/hf_integration/output.txt
+batch_size: 1
+batch_type: sents
+shard_size: 0
+model_dtype: fp32
+beam_size: 1
+max_length: 20
+transforms: [huggingface]
+src_hf_model_name: /Users/chaowang/Desktop/Mammoth/model/bart-base-translation-en-es
+tgt_hf_model_name: /Users/chaowang/Desktop/Mammoth/model/bart-base-translation-en-es
+
+tasks:
+  bart_translation: # This should match your --task_id
+    src_tgt: en-es # source-target language pair
+    # Add other task-specific configurations as needed
+    enc_sharing_group: ["en"] # encoder sharing group
+    dec_sharing_group: ["es"] # decoder sharing group
+    introduce_at_training_step: 0
+    weight: 1

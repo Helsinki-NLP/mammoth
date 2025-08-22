@@ -7,7 +7,7 @@ import numpy as np
 import warnings
 from itertools import count, zip_longest
 from einops import rearrange
-
+from mammoth.constants import DefaultTokens
 import torch
 
 # from mammoth.inputters.text_dataset import InferenceDataIterator
@@ -217,7 +217,6 @@ class Inference(object):
 
         self.n_best = n_best
         self.max_length = max_length
-
         self.beam_size = beam_size
         self.random_sampling_temp = random_sampling_temp
         self.sample_from_topk = random_sampling_topk
@@ -636,7 +635,7 @@ class Inference(object):
             )
         return all_scores, all_predictions
 
-    def _align_pad_prediction(self, predictions, bos, pad):
+    def _align_pad_prediction(self, predictions, bos, pad, eos):
         """
         Padding predictions in batch and add BOS.
 
@@ -646,6 +645,7 @@ class Inference(object):
                 eos id.
             bos (int): bos index to be used.
             pad (int): pad index to be used.
+            eos (int): eos index to be used.
 
         Return:
             batched_nbest_predict (torch.LongTensor): `(batch, n_best, tgt_l)`
@@ -876,7 +876,7 @@ class Translator(Inference):
             # new_cache is a list of LayerIntermediates objects, one for each layer_stack
 
             if active_decoder.can_cache_kv:
-                decode_strategy.set_cache(new_cache)
+                decode_strategy.set_cache([new_cache])
 
             # we only need the logits of the new prediction
             logits = logits_for_whole_sequence[:, -1]
@@ -888,7 +888,11 @@ class Translator(Inference):
                 decode_strategy.update_finished()
                 if decode_strategy.done:
                     break
-
+        # Log final results
+        if self.logger:
+            # Log the final token IDs for each sequence
+            for i, pred_seq in enumerate(decode_strategy.predictions):
+                self.logger.info(f"Sequence {i} token IDs: {pred_seq}")
         return self.report_results(
             gold_score,
             batch,

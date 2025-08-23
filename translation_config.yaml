@@ -1,14 +1,14 @@
 # translation_config.yaml
 
-model: .../saved_models/
+model: ./models/
 task_id: bart_translation
 src_vocab:
-  en: .../src_vocab.txt
+  en: ./src_vocab_en.txt
 tgt_vocab:
-  es: .../src_vocab.txt
+  es: ./src_vocab_en.txt
 seed: 42
-src: ../src.en
-output: ../output.txt
+src: ./src.en
+output: ./output.txt
 batch_size: 1
 batch_type: sents
 shard_size: 0
@@ -16,8 +16,8 @@ model_dtype: fp32
 beam_size: 1
 max_length: 20
 transforms: [huggingface]
-src_hf_model_name: .../model/bart-base-translation-en-es
-tgt_hf_model_name: .../model/bart-base-translation-en-es
+src_hf_model_name: vgaraujov/bart-base-translation-en-es
+tgt_hf_model_name: vgaraujov/bart-base-translation-en-es
 
 tasks:
   bart_translation: # This should match your --task_id

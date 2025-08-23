@@ -17,18 +17,34 @@ We thank the NVIDIA AI Technology Center Finland for their help with the multi-g
 
 This guide shows how to quickly convert and use HuggingFace BART models with Mammoth.
 
-## 🚀 Quick Start: HF Converter
+## 🚀 Quick Start: 
 
-### Basic Usage
+### Setup
+
+```bash
+# Copy repository from feat/hf_integration branch
+git clone -b feat/hf_integration https://github.com/Helsinki-NLP/mammoth.git
+
+# cd into the directory
+cd mammoth
+
+# Install the dependencies
+pip install -r requirements.txt
+```
+
+
+### HF Converter
+
+#### Basic Usage
 
 Convert a HuggingFace BART model to Mammoth format:
 
 ```bash
 # Basic conversion
-python hf_converter.py facebook/bart-base ./models/my_bart_model
+python hf_converter.py vgaraujov/bart-base-translation-en-es ./models/my_bart_model
 
 # With custom language pair
-python hf_converter.py facebook/bart-base ./models/en_fr_model --src-lang en --tgt-lang fr
+python hf_converter.py vgaraujov/bart-base-translation-en-es ./models/en_es_model --src-lang en --tgt-lang es
 
 # Local model conversion
 python hf_converter.py /path/to/local/bart/model ./models/converted_model
@@ -68,6 +84,8 @@ python hf_converter.py --help
 
 After conversion, you'll find:
 - `{save_path}/` - Main Mammoth model checkpoint 
+- `src_vocab_{src_lang}.txt` - Vocab file of source language
+- `tgt_vocab_{tgt_lang}.txt` - Vocab file of target language 
 - `xt_model_keys.txt` - x-transformers model layer names (debug)
 - `mammoth_model_keys.txt` - Mammoth model layer names (debug)
 
@@ -80,25 +98,20 @@ Mammoth models are saved in components so do not panic.
 ✅ **Tested Models:**
 - [vgaraujov/bart-base-translation-en-es](https://huggingface.co/vgaraujov/bart-base-translation-en-es)
 
-  
-
 ⚠️ **Requirements:**
 - Model must be BART-based architecture (BART has its own specific settings)
 
 ---
 
-## 🛠️ Quick Start: Translation Config
+## 🛠️ Quick Start: Translation
 
 ### Basic Usage
 
-Use the provided `translation_config.yaml` as a template:
+Use the provided `translation_config.yaml` as a template config:
 
 ```bash
-# Copy and customize the config
-cp translation_config.yaml translation_config.yaml
-
 # Run translation
-python .../Mammoth/mammoth/bin/translate.py -config .../translation_config.yaml
+python translate.py -config .../translation_config.yaml
 ```
 
 ### Configuration template structure
@@ -117,7 +130,7 @@ tgt_vocab:
   es: /path/to/vocab.txt
 
 # Input/output
-src: /path/to/source.txt
+src: /path/to/source.txt 
 output: /path/to/output.txt
 
 # Translation settings
@@ -132,7 +145,7 @@ tgt_hf_model_name: /path/to/original/hf/model
 
 # Task configuration
 tasks:
-  bart_translation:
+  bart_translation: 
     src_tgt: en-es
     enc_sharing_group: ["en"]
     dec_sharing_group: ["es"]
@@ -144,11 +157,10 @@ tasks:
 
 #### Model Settings
 - `model`: Path to converted Mammoth model checkpoint
-- `task_id`: Must match the task key in `tasks` section
-- `model_dtype`: Data type (`fp32`, `fp16`)
+- `task_id`: Must match the `task_id` in `tasks` section
 
 #### Vocabulary
-- `src_vocab`/`tgt_vocab`: Language-specific vocabulary files
+- `src_vocab`/`tgt_vocab`: Language-specific vocabulary files generated during the conversion.
 - For HF BART models, there is usually only one vocab shared by the source and target text.
 
 #### HuggingFace Integration

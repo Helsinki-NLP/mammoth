@@ -41,17 +41,9 @@ mammoth/
 ```
 
 
-
 #### With HuggingFace Ecosystem
 - **Model Hub**: Direct loading from HF model hub
 - **Tokenizers**: Automatic vocabulary extraction, on-the-fly tokenization/detokenization
 - **Configurations**: Preserves original model hyperparameters
-
-### Advantages
-
-- **Pre-trained Model Access**: Leverage pretrained HF models
-- **Zero-shot Translation**: Use existing fine-tuned models
-- **Research Acceleration**: Quick experimentation with SOTA models
-- **Multilingual Support**: Enhanced vocabulary and tokenization
 
 For usage instructions, please refer to README.md.

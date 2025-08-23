@@ -687,11 +687,11 @@ class HuggingFaceTokenizerTransform(TokenizerTransform):
         # Handle SentencePiece tokens (▁ prefix indicates word boundaries)
         detokenized_text = ""
         for token in cleaned_tokens:
-            if token.startswith('▁'):
-                # ▁ indicates start of a new word, replace with space
-                detokenized_text += " " + token[1:]  # Remove ▁ and add space
+            if token.startswith('▁') or token.startswith('Ġ'):
+                # ▁ and Ġ indicate start of a new word, replace with space
+                detokenized_text += " " + token[1:]  # Remove ▁ and Ġ and add space
             else:
-                # No ▁ means it's a continuation of the previous word
+                # No ▁ or Ġ means it's a continuation of the previous word
                 detokenized_text += token
         
         # Clean up extra spaces and strip

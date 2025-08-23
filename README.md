@@ -13,11 +13,10 @@ FINAL NOTE: We would appreciate it A LOT if you report issues with this repo and
 ### Acknowledgements
 We thank the NVIDIA AI Technology Center Finland for their help with the multi-gpu/node implementation.
 
-# Quick Start: HuggingFace Integration
+## Quick Start: HuggingFace Integration
 
 This guide shows how to quickly convert and use HuggingFace BART models with Mammoth.
 
-## 🚀 Quick Start: 
 
 ### Setup
 
@@ -40,14 +39,11 @@ pip install -r requirements.txt
 Convert a HuggingFace BART model to Mammoth format:
 
 ```bash
-# Basic conversion
-python hf_converter.py vgaraujov/bart-base-translation-en-es ./models/my_bart_model
-
-# With custom language pair
+# Basic conversion from Hugging Face model hub (language pair needs to be specified)
 python hf_converter.py vgaraujov/bart-base-translation-en-es ./models/en_es_model --src-lang en --tgt-lang es
 
-# Local model conversion
-python hf_converter.py /path/to/local/bart/model ./models/converted_model
+# Local model conversion (language pair needs to be specified)
+python hf_converter.py /path/to/local/bart/model ./models/converted_model --src-lang en --tgt-lang es
 ```
 
 Note:
@@ -55,7 +51,7 @@ Note:
 2. BART architecture is originally used in many tasks, but the current setup has been only tuned for and tested on translation tasks (HF model head: BartForConditionalGeneration). Different model heads have different weights hence might lead to unexpected results.
 3. The HF BART model used in debugging is [vgaraujov/bart-base-translation-en-es](https://huggingface.co/vgaraujov/bart-base-translation-en-es).
 
-### Command Line Options
+#### Command Line Options
 
 ```bash
 python hf_converter.py --help
@@ -71,7 +67,7 @@ python hf_converter.py --help
 - `--tgt-lang`: Target language code (default: `es`)
 
 
-### What the Converter Does
+#### What the Converter Does
 
 1. **Downloads/Loads** the HF BART model and tokenizer
 2. **Creates** an x-transformers model with matching architecture
@@ -80,7 +76,7 @@ python hf_converter.py --help
 5. **Transfers weights** from x-transformers to Mammoth
 6. **Saves** the complete Mammoth checkpoint
 
-### Output Files
+#### Output Files
 
 After conversion, you'll find:
 - `{save_path}/` - Main Mammoth model checkpoint 
@@ -93,19 +89,21 @@ Note:
 
 Mammoth models are saved in components so do not panic.
 
-### Supported Models
+#### Supported Models
 
-✅ **Tested Models:**
+✅ **Tested Models:** (batch size: 1)
 - [vgaraujov/bart-base-translation-en-es](https://huggingface.co/vgaraujov/bart-base-translation-en-es)
+- [NYTK/translation-bart-128-en-hu](https://huggingface.co/NYTK/translation-bart-128-en-hu)
+- [ahazeemi/bart-base-wmt-en-fr-finetuned](https://huggingface.co/ahazeemi/bart-base-wmt-en-fr-finetuned)
+- [NYTK/translation-bart-hu-en](https://huggingface.co/NYTK/translation-bart-hu-en) (Not very stable)
 
 ⚠️ **Requirements:**
 - Model must be BART-based architecture (BART has its own specific settings)
-
 ---
 
-## 🛠️ Quick Start: Translation
+### 🛠️ Quick Start: Translation
 
-### Basic Usage
+#### Basic Usage
 
 Use the provided `translation_config.yaml` as a template config:
 
@@ -114,7 +112,7 @@ Use the provided `translation_config.yaml` as a template config:
 python translate.py -config .../translation_config.yaml
 ```
 
-### Configuration template structure
+#### Configuration template structure
 
 ```yaml
 # translation_config.yaml
@@ -153,18 +151,18 @@ tasks:
     weight: 1
 ```
 
-### Key Configuration Options
+#### Key Configuration Options
 
-#### Model Settings
+##### Model Settings
 - `model`: Path to converted Mammoth model checkpoint
 - `task_id`: Must match the `task_id` in `tasks` section
 
-#### Vocabulary
+##### Vocabulary
 - `src_vocab`/`tgt_vocab`: Language-specific vocabulary files generated during the conversion.
 - For HF BART models, there is usually only one vocab shared by the source and target text.
 
-#### HuggingFace Integration
-- `transforms: [huggingface]`: Enables HF tokenization
+##### HuggingFace Integration
+- `transforms: [huggingface]`: Enables HF on-the-fly tokenization/detokenization
 - `src_hf_model_name`: Original HF model for tokenization
 - `tgt_hf_model_name`: Usually same as source for BART
 

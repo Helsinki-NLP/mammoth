@@ -47,8 +47,8 @@ python hf_converter.py /path/to/local/bart/model ./models/converted_model --src-
 ```
 
 Note:
-1. "my_bart_model" will be the prefix of the model (components) name and will not impact the inference later.
-2. BART architecture is originally used in many tasks, but the current setup has been only tuned for and tested on translation tasks (HF model head: BartForConditionalGeneration). Different model heads have different weights hence might lead to unexpected results.
+1. "en_es_model" in the basic conversion command will be the prefix of the model (components) name and will not impact the inference later.
+2. BART architecture is originally used in many tasks, but the current setup has been only tuned for and tested on translation tasks (HF model head: BartForConditionalGeneration). Different model heads can have different weights hence might lead to unexpected results.
 3. The HF BART model used in debugging is [vgaraujov/bart-base-translation-en-es](https://huggingface.co/vgaraujov/bart-base-translation-en-es).
 
 #### Command Line Options

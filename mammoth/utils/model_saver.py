@@ -98,7 +98,11 @@ def load_parameters_from_checkpoint(
         name = component.get_name()
         checkpoint_path = f"{checkpoint_prefix}_{name}.pt"
         if os.path.isfile(checkpoint_path):
-            state_dict = torch.load(checkpoint_path)
+            state_dict = torch.load(
+                checkpoint_path,
+                map_location=lambda storage, loc: storage,
+                weights_only=False,
+            )
             incompatible_keys = component.load_state_dict(
                 model=model, state_dict=state_dict
             )
@@ -115,7 +119,11 @@ def load_parameters_from_checkpoint(
             optimizer_path = f"{checkpoint_prefix}_{name}_optim.pt"
             if os.path.isfile(optimizer_path):
                 # The optimizer parameters are distributed the same way as the components
-                optim_state_dict = torch.load(optimizer_path)
+                optim_state_dict = torch.load(
+                    optimizer_path,
+                    map_location=lambda storage, loc: storage,
+                    weights_only=False,
+                )
                 incompatible_keys = optim.suboptimizers[name].load_state_dict(
                     optim_state_dict
                 )

@@ -20,8 +20,8 @@ For the update history in this branch, see CHANGELOG.md.
 This guide shows: 
 - how to quickly convert and use HuggingFace BART models with Mammoth
 - how to inference with a converted (or general) Mammoth model
-- how to train a converted (or general) Mammoth model.
-- how to push the Mammoth BART model to HuggingFace.
+- how to continue training a Mammoth model from a converted checkpoint (or any checkpoint)
+<!-- - how to push the Mammoth BART model to HuggingFace. -->
 
 ### Setup
 
@@ -90,7 +90,7 @@ Mammoth models are saved in components so do not panic.
 - Model must be BART-based architecture (BART has its own specific settings)
 ---
 
-### 🛠️ Quick Start: Translation
+### Translation
 
 #### Basic Usage
 
@@ -106,7 +106,7 @@ Note:
 - `task_id`: Must match the `task_id` in `tasks` section
 
 
-### 🛠️ Quick Start: Training from the converted model (or any checkpoint)
+### Training from the converted model (or any checkpoint)
 
 #### Basic Usage
 

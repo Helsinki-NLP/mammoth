@@ -39,8 +39,8 @@ batch_size: 16
 batch_type: sents                    # adjust based on GPU memory
 valid_batch_size: 8          # validation batch size
 # max_train_steps: 1000          # maximum training steps
-valid_steps: 5000
-valid_metrics: [bleu]              # validation frequency
+valid_steps: 5000               # validation frequency    
+valid_metrics: [bleu]              
 save_checkpoint_steps: 5000       # checkpoint saving frequency
 keep_checkpoint: 5               # number of checkpoints to keep
 

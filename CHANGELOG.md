@@ -15,7 +15,7 @@ For usage instructions, please refer to README.md.
 
 ### Enhanced Dependencies
 
-- Added `sentencepiece==0.2.1` for improved tokenization support
+- Added `sentencepiece==0.2.1` for tokenization/detokenization support
 - Cleaned up NVIDIA CUDA dependencies for broader compatibility
 
 ## What Was Updated (27-Aug-2025)

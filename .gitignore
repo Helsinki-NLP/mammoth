@@ -118,3 +118,7 @@ sftp.config*.json
 *.swp
 *.swo
 *.ipynb
+
+# claude
+CLAUDE.md
+.claude/*

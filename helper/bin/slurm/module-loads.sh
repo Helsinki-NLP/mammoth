@@ -21,31 +21,37 @@ LOCAL_PROJHOME=$PROJHOME
 # and load a sensible module stack. On Puhti, use the standard 'pytorch' module.
 
 detect_node_kind () {
-    # Allows manual override
-    if [[ -n "${NODE_KIND:-}" ]]; then
-        return
-    fi
+  # 1) Manual override (normalize to lowercase, validate, and echo)
+  if [[ -n "${NODE_KIND:-}" ]]; then
+    local override="${NODE_KIND,,}"   # bash lowercase
+    case "$override" in
+      gpu|cpu|login) echo "$override"; return ;;
+      *) echo "Invalid NODE_KIND='$NODE_KIND' (use gpu|cpu|login)" >&2; return 1 ;;
+    esac
+  fi
 
-    local part_lc=""
-    if [[ -n "${SLURM_JOB_PARTITION:-}" ]]; then
-        part_lc="$(echo "$SLURM_JOB_PARTITION" | tr '[:upper:]' '[:lower:]')"
-        if [[ "$part_lc" == *"g"* || "$part_lc" == *"gpu"* ]]; then
-            echo "gpu"; return
-        elif [[ "$part_lc" == *"c"* || "$part_lc" == *"cpu"* ]]; then
-            echo "cpu"; return
-        fi
+  # 2) From SLURM partition (safer than '*g*' / '*c*')
+  if [[ -n "${SLURM_JOB_PARTITION:-}" ]]; then
+    local part="${SLURM_JOB_PARTITION,,}"
+    if [[ "$part" == *gpu* || "$part" =~ (^|[^a-z])g($|[^a-z]) ]]; then
+      echo "gpu"; return
+    elif [[ "$part" == *cpu* || "$part" =~ (^|[^a-z])c($|[^a-z]) ]]; then
+      echo "cpu"; return
     fi
+  fi
 
-    # Device presence -> GPU (works for AMD or NVIDIA)
-    if [[ -e /dev/kfd ]] || ls /dev/dri/renderD* >/dev/null 2>&1 || command -v nvidia-smi >/dev/null 2>&1; then
-        echo "gpu"; return
-    fi
+  # 3) Device presence → GPU
+  if [[ -e /dev/kfd ]] || compgen -G "/dev/dri/renderD*" >/dev/null || command -v nvidia-smi >/dev/null; then
+    echo "gpu"; return
+  fi
 
-    if [[ -n "${SLURM_JOB_ID:-}" ]]; then
-        echo "cpu"; return
-    fi
+  # 4) In a SLURM job but no GPU devices → CPU
+  if [[ -n "${SLURM_JOB_ID:-}" ]]; then
+    echo "cpu"; return
+  fi
 
-    echo "login"
+  # 5) Fallback
+  echo "login"
 }
 
 module --force purge

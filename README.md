@@ -57,9 +57,11 @@ git worktree add ../mammoth-helper feat/helper
 ```
 
 4. Start the building script:
+```
 $GITHOME/mammoth-helper/helper/bin/conf/build-venv-mammoth-hf.sh
+```
 
-You should see:
+After a while, you should see:
 ```
 Successfully installed certifi-2025.8.3 charset-normalizer-3.4.3 configargparse-1.7.1 einx-0.3.0 flake8-4.0.1 flask-2.0.3 frozendict-2.4.6 idna-3.10 loguru-0.7.3 mammoth-nlp-0.2.1 markupsafe-3.0.2 mccabe-0.6.1 networkx-3.5 protobuf-6.32.0 pycodestyle-2.8.0 pyflakes-2.4.0 pytest-flake8-1.1.1 sympy-1.14.0 transformers-4.55.4 typing_extensions-4.14.1 urllib3-2.5.0 waitress-3.0.2 x-transformers-1.32.14
 [build-venv-mammoth-hf] installed mammoth and the requirements

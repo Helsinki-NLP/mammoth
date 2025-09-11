@@ -66,6 +66,7 @@ Successfully installed certifi-2025.8.3 charset-normalizer-3.4.3 configargparse-
 ```
 
 5. Check that you $PROJHOME now looks like:
+```
 ├── bin -> helper/bin
 ├── git
 │   ├── mammoth
@@ -77,6 +78,7 @@ Successfully installed certifi-2025.8.3 charset-normalizer-3.4.3 configargparse-
 ├── mammoth -> /project/$ACCOUNT/members/$USER/git/mammoth-hf
 └── venv
     └── mammoth-hf
+```
 
 6. You can use the mammoth-hf (feat/hf-integration) branch with the virtual
 environment `venv/mammoth-hf`.  There are more useful scripts in `bin`, but

@@ -1,0 +1,23 @@
+$PROJDATA/
+├─ exp/
+│  ├─ ${EXP_ID}/
+│  │  ├─ cfg/               # configit + kirjanpito
+│  │  │  ├─ config.yml
+│  │  │  └─ README.md       # lyhyt kuvaus hyperpareista, datasta, commitista
+│  │  ├─ slurm/             # ajoskriptit ja Slurmin lokit
+│  │  │  ├─ run.slurm
+│  │  │  └─ logs/           # *.out ja *.err
+│  │  ├─ data/              # linkit varsinaiseen dataan (ei kopioida isoa dataa)
+│  │  │  ├─ train.en  -> /path/to/corpus/train.en
+│  │  │  ├─ train.fi  -> /path/to/corpus/train.fi
+│  │  │  ├─ valid.en  -> /path/to/corpus/valid.en
+│  │  │  └─ valid.fi  -> /path/to/corpus/valid.fi
+│  │  ├─ artifacts/         # mallin tuotokset
+│  │  │  ├─ checkpoints/    # save_model-*.pt
+│  │  │  ├─ tensorboard/    # events.out.tfevents...
+│  │  │  ├─ translations/   # dekoodatut valid/test
+│  │  │  └─ metrics/        # BLEU, chrF, json/csv-yhteenveto
+│  │  ├─ scripts/           # pienet apuskriptit tälle kokeelle
+│  │  └─ tmp/               # välitiedostot, miopen-cache yms.
+│  └─ latest -> ${EXP_ID}   # symlink tuoreimpaan kokeeseen
+└─ corpora/                 # (valinn.) yhteinen raakadata, jos haluat pitää erillään

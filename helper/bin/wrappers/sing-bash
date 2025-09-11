@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Ensure container module was loaded ---
+if [ -z "$SING_IMAGE" ]; then
+    echo "ERROR: No singularity-based module loaded!"
+    THIS_DIR=$(dirname "$(readlink -f "$0")")
+    echo "You probably should not have $THIS_DIR in your PATH."
+    exit 1
+fi
+
+REAL_PYTHON="${BASH_SOURCE[0]}"
+echo "Real bash: $REAL_PYTHON"
+EXEC_BIN=bash  #  $(basename "$0")
+echo "Running $EXEC_BIN in $SING_IMAGE..."
+
+export SING_FLAGS="$SING_FLAGS -B /appl/local/csc/soft/ai/bin -B /appl/lumi"
+
+# This is needed for commands line lumi-allocations to work, but this path is not present in compute nodes
+if [ -d "/var/lib/project_info" ]; then
+    SING_FLAGS="$SING_FLAGS -B /var/lib/project_info"
+    echo SING_FLAGS=$SING_FLAGS
+fi
+
+# Virtualenv PYTHONPATH helper (only needed inside container) 
+echo $VIRTUAL_ENV
+if [ -n "$VIRTUAL_ENV" ]; then
+    for _tmp_py_dir in "$VIRTUAL_ENV"/lib{,64}/python*/site-packages; do
+	echo including $_tmp_py_dir ...
+        export PYTHONPATH="$_tmp_py_dir:$PYTHONPATH"
+    done
+fi
+
+if [ -d /.singularity.d/ ]; then
+    echo We are already in the container
+
+    if [ -n "$WITH_CONDA" ]; then
+        eval "$WITH_CONDA"
+    else
+        echo "⚠️  WITH_CONDA not set — using default container Python."
+    fi
+
+    # Finally, run the intended command
+    echo exec -a $REAL_PYTHON $EXEC_BIN "$@"
+    exec -a $REAL_PYTHON $EXEC_BIN "$@"
+
+else
+    echo Launch into container and forward virtual environment
+    CONTAINER_CMD=""
+
+    # Build container-side command to run after entry
+    if [ -n "$WITH_CONDA" ]; then
+        CONTAINER_CMD="\$WITH_CONDA && "
+    fi
+
+    CONTAINER_CMD+="exec -a \"$REAL_PYTHON\" \"$EXEC_BIN\""
+    if [ $# -gt 0 ]; then
+        CONTAINER_CMD+=" $(printf " %q" "$@")"
+    fi
+
+    BINDINGS="--bind /bin/ip:/bin/ip --bind /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0 \
+    --bind /opt/cray/libfabric/1.15.2.0/bin/fi_info:/bin/fi_info "
+
+    echo /appl/local/csc/soft/ai/bin/singularity_wrapper exec $BINDINGS $SING_IMAGE bash -c "$CONTAINER_CMD"
+    singularity exec $BINDINGS $SING_IMAGE bash -c "$CONTAINER_CMD"
+fi

@@ -1,0 +1,8 @@
+NOTE: This module uses Singularity. Some commands execute inside the container
+(e.g. python3, pip3).
+
+This local module has been *derived* from a module (pytorch) provided by CSC and it
+is based on a singularity container provided by CSC.
+
+Documentation: https://docs.csc.fi/apps/pytorch/
+Support: https://docs.csc.fi/support/contact/

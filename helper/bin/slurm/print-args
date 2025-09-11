@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+i=0; for a in "$@"; do printf 'arg[%d]=%q\n' "$i" "$a"; ((i++)); done
+
+##!/usr/bin/env python3
+#import sys; print(*sys.argv[1:], sep="\n")

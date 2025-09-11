@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# train-sbatch-puhti-1n1g-1h.slurm
+#SBATCH --job-name=mammoth-puhti-1n1g-1h
+#SBATCH --account="$ACCOUNT"
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=10
+#SBATCH --gpus-per-task=1
+#SBATCH --gres=gpu:1
+#SBATCH --time=01:00:00
+#SBATCH --mem=45G
+#SBATCH --output=logs/%x-%j.out
+#SBATCH --error=logs/%x-%j.err
+source "$PROJHOME/bin/sbatch-tail.sh"

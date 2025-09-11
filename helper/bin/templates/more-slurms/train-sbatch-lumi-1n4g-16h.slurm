@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# train-sbatch-lumi-1n4g-16h.slurm
+#SBATCH --job-name=mammoth-lumi-1n4g-16h
+#SBATCH --account="$ACCOUNT"
+#SBATCH --partition=standard-g         # longer runs → standard-g
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=4
+#SBATCH --cpus-per-task=16
+#SBATCH --gpus-per-task=1
+#SBATCH --gres=gpu:mi250:4
+#SBATCH --time=16:00:00
+#SBATCH --mem=240G
+#SBATCH --hint=nomultithread
+#SBATCH --output=logs/%x-%j.out
+#SBATCH --error=logs/%x-%j.err
+source "$PROJHOME/bin/sbatch-tail.sh"

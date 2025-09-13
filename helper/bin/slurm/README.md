@@ -8,24 +8,27 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
       [this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/conf)
       to install this branch of MAMMOTH and the create the environment.
 
-   2) give a *name* to your project(directory), and make it inhert the `base`
+   2) Give a *name* to your project(directory), and make it inherit the `base`
       ```
       export JOB_NAME=your-job-name
       mkdir -p $PROJHOME/data/$JOB_NAME
       ln    -s $PROJHOME/base $PROJHOME/data/$JOB_NAME  # inherits all except itself
       ```
-   3) Add `sbatch-entry.sh` and other subdirectories
+   3) Add the subdirectories and copy `sbatch-entry.slurm`:
       ```
       cd       $PROJHOME/data/$JOB_NAME
-      mkdir    logs models tensorboard
-      cp       base/mammoth-helper/helper/bin/slurm/sbatch-entry.slurm .
+      mkdir    cfg in out logs
+      mkdir    in/data in/models in/vocab log/slurm log/tb
+      mkdir    out/checkpoints out/metrics out/models out/translations
+      cp       base/mammoth-helper/helper/bin/slurm/sbatch-entry.slurm cfg
       ```
    4) Complete your job directory by preparing config.yaml, sbatch-entry.slurm, and data
       
    5) Run the sbatch in the job directory
       ```
       cd       $PROJHOME/data/$JOB_NAME
-      sbatch -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out -e logs/%x-%j.err sbatch-entry.slurm
+      sbatch   -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out \
+               -e logs/%x-%j.err sbatch-entry.slurm
       ```
 ## The contents of `sbatch-entry.slurm`
    ```
@@ -38,8 +41,10 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
    export GUARD_TIME="${GUARD_TIME:-0-01:00:00}"
    source base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
    ```
-   
-## The automation you get from `sbatch-tail.sh` 
+   JOB_ARGS will not contain any pytorch flags.  They are
+   added automatically by `sbatch-tail.sh`.
+
+## The automation you get for free with `sbatch-tail.sh` 
 
    - A well-though wrapper for node-specific executions under `srun`
      (`base/mammoth-helper/helper/bin/slurm/6-task-wrapper.sh`)

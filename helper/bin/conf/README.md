@@ -38,26 +38,21 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
    export GITHOME=$PROJHOME/git
    ```
 
-2. Choose a base for your software and data, and link them
+2. Make the directories and link them
    ```
-   export PROJHOME=your-readily-built-base-dir    # base dir
-   export PROJDATA=your-readily-built-work-dir    # your place to store data and models
-   mkdir -p $PROJDATA
+   source ~/.profile
+   mkdir -p $PROJDATA $PROJHOME $GITHOME
    ln -s $PROJDATA $PROJHOME/data
    ```
-      
-3. Choose your a base for your repositories and get the main branch and the helper branch
-   (they are not yet merged)
+3. Clone the main branch and check out the helper branch -- (they are not yet merged)
    ```
-   export GITHOME=your-readily-built-base-dir/git   # recommended
-   mkdir -p $GITHOME
-   cd       $GITHOME
+   cd  $GITHOME
    git clone https://github.com/Helsinki-NLP/mammoth.git mammoth
    cd mammoth
    git fetch origin feat/helper
    git worktree add --track -b feat/helper ../mammoth-helper origin/feat/helper
    ```
-4. Complete your inhertable `base` directory (that contains and extends your venv)
+4. Build the inheritable `base` directory `$PROJHOME/base` (that extends your venv)
    ```
    $GITHOME/mammoth-helper/helper/bin/conf/build-venv-mammoth-hf.sh
    ```

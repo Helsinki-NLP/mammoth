@@ -4,39 +4,25 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
 
 ## Usage:
 
-   1) Choose a base for your software and data, and link them
-      ```
-      export PROJHOME=your-readily-built-base-dir    # base dir
-      export PROJDATA=your-readily-built-work-dir    # your place to store data and models
-      mkdir -p $PROJDATA
-      ln -s $PROJDATA $PROJHOME/data
-      ```      
-   2) Choose your a base for your repositories and get the helper 
-      ```
-      export GITHOME=your-readily-built-base-dir/git   # recommended
-      mkdir -p $GITHOME
-      cd       $GITHOME
-      git clone --branch feat/helper --single-branch https://github.com/Helsinki-NLP/mammoth.git mammoth-helper
-      ```
-   3) Complete your inhertable `base` directory (that contains and extends your venv)
-      ```
-      $GITHOME/mammoth-helper/helper/bin/conf/build-venv-mammoth-hf.sh
-      ```      
-   4) give a *name* to your project(directory), and make it inhert the `base`
+   1) Follow instructions in
+      [](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
+      to install this branch of MAMMOTH and the create the environment.
+
+   2) give a *name* to your project(directory), and make it inhert the `base`
       ```
       export JOB_NAME=your-job-name
       mkdir -p $PROJHOME/data/$JOB_NAME
       ln    -s $PROJHOME/base $PROJHOME/data/$JOB_NAME  # inherits all except itself
       ```
-   5) Add `sbatch-entry.sh` and other subdirectories
+   3) Add `sbatch-entry.sh` and other subdirectories
       ```
       cd       $PROJHOME/data/$JOB_NAME
       mkdir    logs models tensorboard
       cp       base/mammoth-helper/helper/bin/slurm/sbatch-entry.slurm .
       ```
-   6) Complete your job directory by preparing config.yaml, sbatch-entry.slurm, and data
+   4) Complete your job directory by preparing config.yaml, sbatch-entry.slurm, and data
       
-   7) Run the sbatch in the job directory
+   5) Run the sbatch in the job directory
       ```
       cd       $PROJHOME/data/$JOB_NAME
       sbatch -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out -e logs/%x-%j.err sbatch-entry.slurm

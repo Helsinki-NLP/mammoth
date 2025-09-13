@@ -43,6 +43,7 @@ job-specific local environment (directory trees and configurations)
 for your training (and other) jobs.  According to the current
 planning, your job directory structure should look like this.
 
+```
 $PROJHOME/data/example-job
 ├── base -> /project/project_462000964/members/aylijyra/base
 ├── cfg
@@ -60,6 +61,7 @@ $PROJHOME/data/example-job
     ├── metrics
     ├── models
     └── translations
+```
 
 For now, the slurm launch helpers are available.  The are still under
 testing.  Follow the instructions on page

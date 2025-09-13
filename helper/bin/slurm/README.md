@@ -43,9 +43,8 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
       ```
 ## The contents of `sbatch-entry.slum`
    ```
-   #SBATCH directives
-   ...
-   
+   #SBATCH ...
+   #SBATCH ...
    export JOB_PATTERN=slurm|torchrun
    export JOB_SCRIPT=your-python-script-path-in-the-helper-tree
    export JOB_ARGS=your-job-arguments-to-the-script

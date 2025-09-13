@@ -1,44 +1,48 @@
 # Slurm scripts for running Mammoth safely
 
 This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (constant).
-Usage:
 
-   1) Ensure you have the *places* for the helper and the experiments
+## Usage:
+
+   1) Choose a base for your software and data, and link them
       ```
       export PROJHOME=your-readily-built-base-dir    # base dir
       export PROJDATA=your-readily-built-work-dir    # your place to store data and models
-      export GITHOME=your-readily-built-base-dir/git # your git root 
-      cd       $PROJHOME
-      ln -s    $PROJDATA          data               # link data to projhome
-      mkdir    $PROJDATA/base                        # for partial inhertance to avoid cycles
-      cd       $PROJDATA/base
-      ln -s    ../venv            .
-      ln -s    $GITHOME           git                # or ln -s ../git .  if that is the $GITHOME
-      ln -s    git/mammoth-hf     mammoth            # tentative branch
-      ln -s    git/mammoth-helper .                  # until we join the branches
+      mkdir -p $PROJDATA
+      ln -s $PROJDATA $PROJHOME/data
+      ```      
+   2) Choose your a base for your repositories and get the helper 
       ```
-   2) give a *name* to your project and create the job directory, with link to $PROJHOME
+      export GITHOME=your-readily-built-base-dir/git   # recommended
+      mkdir -p $GITHOME
+      cd       $GITHOME
+      git clone --branch feat/helper --single-branch https://github.com/Helsinki-NLP/mammoth.git mammoth-helper
+      ```
+   3) Complete your inhertable `base` directory (that contains and extends your venv)
+      ```
+      $GITHOME/mammoth-helper/helper/bin/conf/build-venv-mammoth-hf.sh
+      ```      
+   4) give a *name* to your project(directory), and make it inhert the `base`
       ```
       export JOB_NAME=your-job-name
       mkdir -p $PROJHOME/data/$JOB_NAME
-      cd       $PROJHOME/data/$JOB_NAME
-      ln    -s $PROJHOME/base .                      # inherits all except itself
+      ln    -s $PROJHOME/base $PROJHOME/data/$JOB_NAME  # inherits all except itself
       ```
-   3) Create and edit your own `sbatch-entry.sh`
-      cd       $PROJHOME/data/$JOB_NAME
-      cp       base/mammoth-helper/helper/bin/slurm/sbatch-entry.sh .
-      emacs    sbatch-entry.sh 
-      
-   4) Add other subdirectories to your job and link files there
+   5) Add `sbatch-entry.sh` and other subdirectories
+      ```
       cd       $PROJHOME/data/$JOB_NAME
       mkdir    logs models tensorboard
+      cp       base/mammoth-helper/helper/bin/slurm/sbatch-entry.slurm .
+      ```
+   6) Complete your job directory by preparing config.yaml, sbatch-entry.slurm, and data
       
-   5) Run the sbatch in the directory called .../$JOB_NAME
+   7) Run the sbatch in the job directory
+      ```
       cd       $PROJHOME/data/$JOB_NAME
-      sbatch -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out -e logs/%x-%j.err sbatch-entry.sh
-
-The contents of `sbatch-entry.sh`
-
+      sbatch -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out -e logs/%x-%j.err sbatch-entry.slurm
+      ```
+## The contents of `sbatch-entry.slum`
+   ```
    #SBATCH directives
    ...
    
@@ -48,32 +52,33 @@ The contents of `sbatch-entry.sh`
    export GUARD_MAX_NODES=4
    export GUARD_TIME="${GUARD_TIME:-0-01:00:00}"
    source base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
+   ```
+   
+## The automation you get from `sbatch-tail.sh` 
 
-The automation provided by `sbatch-tail.sh` (from back to the front):
-
-   - a well-though wrapper for node-specific executions under `srun`
+   - A well-though wrapper for node-specific executions under `srun`
      (`base/mammoth-helper/helper/bin/slurm/6-task-wrapper.sh`)
    
-   - setup of important machine specific environment variables for
+   - Setup of important machine specific environment variables for
      multi-processor communications
      (`base/mammoth-helper/helper/bin/slurm/5-comms-setup.sh`)
    
-   - launching the virtual environment from `venv/bin/activate`
+   - Launching the virtual environment from `venv/bin/activate`
    
-   - loading machine and partition specific modules
+   - Loading machine and partition specific modules
      (`base/mammoth-helper/helper/bin/slurm/4-module-loads.sh`)
 
-   - sanity checking of the SLURM parameters
+   - Sanity checking of the SLURM parameters
      (`base/mammoth-helper/helper/bin/slurm/3-sanity-checks.sh`)
 
-   - setting up the remaining multiprocessor parameters
+   - Setting up the remaining multiprocessor parameters
      (`base/mammoth-helper/helper/bin/slurm/2-distributed-setup.sh`)
    
-   - ingredity checks the scripts
+   - Ingredity checks the scripts
      (`base/mammoth-helper/helper/bin/slurm/1-integrity-checks.sh`)
 
-Authors
+## Authors:
    Anssi Yli-Jyrä (c) 2025
 
-Licence 
+##  Licence 
    CC-NC-BY

@@ -1,27 +1,29 @@
-(return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
 echo sanity-checks...
-
-set -euo pipefail  # make failures fatal and undefined vars errors (optional)
-: "${SYSTEM:?❌ SYSTEM is not set}"         
-: "${PATTERN:?❌ PATTERN is not set}"         
-: "${GUARD_MAX_NODES:?❌ GUARD_MAX_NODES is not set}"   
-: "${GUARD_TIME:?❌ GUARD_TIME is not set}"   
-: "${SLURM_CPUS_ON_NODE:?❌ SLURM_CPUS_ON_NODE is not set}"
-: "${SLURM_CPUS_PER_TASK:?❌ SLURM_CPUS_PER_TASK is not set}"
-: "${SLURM_GPUS_ON_NODE:?❌ SLURM_GPUS_ON_NODE is not set}"
-: "${SLURM_HINT:?❌ SLURM_HINT is not set}"
-: "${SLURM_JOB_ACCOUNT:?❌ missing \#SBATCH --account=...}"         # not SLURM_ACCOUNT
-: "${SLURM_JOB_CPUS_PER_NODE:?❌ SLURM_JOB_CPUS_PER_NODE is not set}"
-: "${SLURM_JOB_GPUS:?❌ SLURM_JOB_GPUS is not set}"
-: "${SLURM_JOB_ID:?❌ missing SLURM_JOB_ID - did you run `sbatch`}" # 
-: "${SLURM_JOB_NUM_NODES:?❌ missing \#SBATCH --nodes=...}"         #
-: "${SLURM_JOB_PARTITION:?❌ missing \#SBATCH --partition=...}"     # not SLURM_PARTITION
-: "${SLURM_NNODES:?❌ SLURM_NNODES is not set}"
-: "${SLURM_NODELIST:?❌ SLURM_NODELIST is not set}"
-: "${SLURM_NPROCS:?❌ SLURM_NPROCS is not set}"
-: "${SLURM_NTASKS:?❌ missing \#SBATCH --ntasks=...}"               # 
-: "${SLURM_NTASKS_PER_NODE:?❌ SLURM_NTASKS_PER_NODE is not set}"
-: "${SLURM_TASKS_PER_NODE:?❌ SLURM_TASKS_PER_NODE is not set}"
+(return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
+: "${SLURM_JOB_ID:?❌ missing SLURM_JOB_ID - did you run `sbatch`}" 
+: "${SLURM_JOB_ACCOUNT:?❌ missing \#SBATCH --account=...}"         
+: "${SLURM_JOB_NUM_NODES:?❌ missing \#SBATCH --nodes=...}"         
+: "${SLURM_JOB_PARTITION:?❌ missing \#SBATCH --partition=...}"     
+: "${SLURM_NTASKS:?❌ missing \#SBATCH --ntasks=...}"
+: "${INTEGRITY_CHECK_OK:?❌ you have not completed integrity-checks.sh yet}"
+is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
+require_set() {
+  local v
+  for v; do
+    # ${!v-} expands to empty if unset (safe with set -u)
+    if [[ -z "${!v-}" ]]; then
+      printf '❌ %s must be set\n' "$v" >&2
+      return 1
+    fi
+  done
+}
+require_vars INTEGRITY_CHECKS_OK SYSTEM JOB_PATTERN GUARD_MAX_NODES GUARD_TIME \
+	     SLURM_CPUS_ON_NODE SLURM_CPUS_PER_TASK SLURM_GPUS_ON_NODE \
+	     SLURM_HINT SLURM_JOB_ACCOUNT SLURM_JOB_CPUS_PER_NODE \
+	     SLURM_JOB_GPUS SLURM_JOB_ID SLURM_JOB_ACCOUNT SLURM_JOB_PARTITION \
+	     SLURM_JOB_NUM_NODES SLURM_NNODES SLURM_NODELIST SLURM_NPROCS \
+	     SLURM_NTASKS SLURM_NTASKS_PER_NODE SLURM_TASKS_PER_NODE \
+    || is_sourced && return 1 || exit 1;
 
 # ----- detect GPUs (env OR job/step record) and compute GPUS_TOTAL ---------
 JOBREC="$(scontrol show -d job  "${SLURM_JOB_ID:?}" 2>/dev/null | tr '\n' ' ')"
@@ -642,17 +644,22 @@ fi
 
 # ---------- final friendly summary ----------
 echo ==============================================
+echo " SYSTEM                    : $SYSTEM"
 echo " STDERR                    : $err"
 echo " STDOUT                    : $out"
 echo " TIMELIMIT                 : $tl"
+echo " JOB_PATTERN               : $JOB_PATTERN"
 echo " GUARD_TIME                : $GUARD_TIME"
-echo " SYSTEM                    : $SYSTEM"
 echo " GUARD_MAX_NODES           : $GUARD_MAX_NODES"
-echo " local PATTERN             : $PATTERN"
 echo " SLURM_JOB_ID              : $SLURM_JOB_ID"               
-echo " local NODES               : $NODES"
 echo " SLURM_NTASKS              : $NTASKS"
 echo " SLURM_NTASKS_PER_NODE     : $SLURM_NTASKS_PER_NODE"
+echo " SLURM_JOB_PARTITION       : $SLURM_JOB_PARTITION"
+echo " SLURM_MEM_PER_GPU         : ${SLURM_MEM_PER_GPU-}"
+echo " SLURM_MEM_PER_CPU         : ${SLURM_MEM_PER_CPU-}"
+echo " SLURM_MEM_PER_NODE        : ${SLURM_MEM_PER_NODE-}"
+echo " SLURM_CPUS_PER_TASK       : $SLURM_CPUS_PER_TASK"
+echo " local NODES               : $NODES"
 echo " local TASKS_PER_NODE (TPN): $TPN"
 echo " local GPUS_TOTAL          : $GPUS_TOTAL"
 echo " local GPUS_PER_NODE_MAX   : $GPUS_PER_NODE_MAX"
@@ -661,13 +668,8 @@ echo " local GPU_OK_REGEX        : $GPU_OK_REGEX"
 echo " local GRES_STR            : $GRES_STR"
 echo " local REC_CPUS_PER_GPU_MIN: $REC_CPUS_PER_GPU_MIN"
 echo " local REC_MEM_PER_GPU_GB  : $REC_MEM_PER_GPU_GB"
-echo " SLURM_CPUS_PER_TASK       : $SLURM_CPUS_PER_TASK"
-echo " GPUS_PER_TASK             : $GPUS_PER_TASK"
-echo " SLURM_JOB_PARTITION       : $SLURM_JOB_PARTITION"
-echo " SLURM_MEM_PER_GPU         : ${SLURM_MEM_PER_GPU-}"
-echo " SLURM_MEM_PER_CPU         : ${SLURM_MEM_PER_CPU-}"
-echo " SLURM_MEM_PER_NODE        : ${SLURM_MEM_PER_NODE-}"
 echo " local NODE_RAM_GB         : $NODE_RAM_GB"
+echo " local GPUS_PER_TASK       : $GPUS_PER_TASK"
 echo ==============================================
 
 
@@ -675,7 +677,8 @@ echo ==============================================
 # - The idea of writing this: Anssi Yli-Jyrä.
 # - The implementation:  This was written with the help of ChatGPT 5.  You are free to improve and publish.
 
-# Why these rules (quick refs)
+# Why these rules (quick refs)?
+#
 # GPU type per system:
 # - Puhti uses V100,
 # - Mahti uses A100 (plus slices on gpusmall),

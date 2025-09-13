@@ -1,43 +1,50 @@
-
-echo module-loads...
-# (c) 2025 Anssi Yli-Jyrä, CC-BY
-
-# usage: source module-loads.sh 
+echo module-loads.sh...
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
+is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
+require_set() {
+  local v
+  for v; do
+    # ${!v-} expands to empty if unset (safe with set -u)
+    if [[ -z "${!v-}" ]]; then
+      printf '❌ %s must be set\n' "$v" >&2
+      return 1
+    fi
+  done
+}
+require_set JOB_NODE_KIND || is_sourced && return 1 || exit 1;
 
-LOCAL_PROJHOME=$PROJHOME
-# LOCAL_PROJHOME=/project/$ACCOUNT/members/$USER
-
-# Manual override: export NODE_KIND=gpu (or cpu / login) if you ever need to force a stack.
+# Manual override (required) of node kind detection:
+#  export JOB_NODE_KIND=gpu (or cpu / login) if you ever need to force a stack.
 # Detection logic order:
-#  1. Respect NODE_KIND if set.
+#  1. Respect JOB_NODE_KIND if set.
 #  2. Use SLURM_JOB_PARTITION hints when available.
 #  3. Fall back to device presence (/dev/kfd or /dev/dri/renderD* ⇒ GPU).
 #  4. If in a Slurm job with no GPU devices ⇒ CPU compute.
 #  5. Otherwise ⇒ login node.
 # The checks are conservative and won’t require extra tooling before modules are loaded.
 #
-# Auto-sense node type (login / CPU compute / GPU compute) on LUMI and Puhti
-# and load a sensible module stack. On Puhti, use the standard 'pytorch' module.
+# Auto-senses the node type (login / CPU compute / GPU compute) on LUMI and Puhti
+# and loads a sensible module stack. On LUMI, the pytorch is inside an custom module
+# that loads a CSC-built container.  On Puhti, uses the standard 'pytorch' module.
 
 detect_node_kind () {
   # 1) Manual override (normalize to lowercase, validate, and echo)
-  if [[ -n "${NODE_KIND:-}" ]]; then
-    local override="${NODE_KIND,,}"   # bash lowercase
+  if [[ -n "${JOB_NODE_KIND:-}" ]]; then
+    local override="${JOB_NODE_KIND,,}"   # bash lowercase
     case "$override" in
       gpu|cpu|login) echo "$override"; return ;;
-      *) echo "Invalid NODE_KIND='$NODE_KIND' (use gpu|cpu|login)" >&2; return 1 ;;
+      *) echo "Invalid JOB_NODE_KIND='$JOB_NODE_KIND' (use gpu|cpu|login)" >&2
+	 is_sourced && return 1 || exit 1 ;;
     esac
   fi
 
-  # 2) From SLURM partition (safer than '*g*' / '*c*')
+  # 2) From SLURM partition
   if [[ -n "${SLURM_JOB_PARTITION:-}" ]]; then
-    local part="${SLURM_JOB_PARTITION,,}"
-    if [[ "$part" == *gpu* || "$part" =~ (^|[^a-z])g($|[^a-z]) ]]; then
-      echo "gpu"; return
-    elif [[ "$part" == *cpu* || "$part" =~ (^|[^a-z])c($|[^a-z]) ]]; then
-      echo "cpu"; return
-    fi
+    local part="${SLURM_JOB_PARTITION:-}"
+    part="${part%%,*}"; part="${part,,}"
+    case "$part" in
+       gputest|gpu|gpusmall|gpumedium|small-g|dev-g|debug) echo "gpu"; return ;;
+    esac
   fi
 
   # 3) Device presence → GPU
@@ -68,11 +75,10 @@ load_first_available () {
     return 1
 }
 
-
 if [[ "${SYSTEM:-}" == "lumi" ]]; then
     # --- Common module paths ---
-    module -q use /appl/local/containers/ai-modules     # AI-bindings
-    module -q use "${LOCAL_PROJHOME:-$HOME}/bin/modules" # pytorch-rocm-mammoth (fallback to $HOME if unset)
+    module -q use /appl/local/containers/ai-modules       # AI-bindings
+    module -q use base/mammoth-helper/helper/bin/modules" # pytorch-rocm-mammoth 
 
     # --- Base env (recommended by CSC; safe on all nodes) ---
     module -q load CrayEnv
@@ -108,7 +114,8 @@ elif [[ "${SYSTEM:-}" == "puhti" ]]; then
     # --- Common module paths (Puhti) ---
     # Keep these generic; they will only load if present.
     module -q use /appl/local/containers/ai-modules 2>/dev/null || true
-    module -q use "${LOCAL_PROJHOME:-$HOME}/bin/modules" 2>/dev/null || true
+    # shellcheck source=../modules
+    module -q use base/mammoth-helper/helper/bin/modules" 2>/dev/null || true
 
     # --- Base env (Puhti typically uses CSC defaults; load if available) ---
     load_first_available csc csc-env puhti

@@ -1,8 +1,17 @@
 echo Setting up distributed computing environment ...
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
-: "${SYSTEM:?❌ SYSTEM is not set}"
-
-# Do not hardcode CUDA_VISIBLE_DEVICES=0,1,2…. Let binding happen per task.
+is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
+require_set() {
+  local v
+  for v; do
+    # ${!v-} expands to empty if unset (safe with set -u)
+    if [[ -z "${!v-}" ]]; then
+      printf '❌ %s must be set\n' "$v" >&2
+      return 1
+    fi
+  done
+}
+require_vars SYSTEM INTEGRITY_CHECKS_OK || is_sourced && return 1 || exit 1;
 
 echo Retrospective summary of Slurm env variables
 echo ==============================================
@@ -39,6 +48,8 @@ else
   NODES="$(awk -F'[= ]' '/NumNodes=/{print $2; exit}' <<<"$JOBINFO")"
 fi
 : "${NODES:?could not determine node count}"
+
+# Do not hardcode CUDA_VISIBLE_DEVICES=0,1,2…. Let binding happen per task, see task-wrapper.sh
 
 # --- derive CPUS_PER_TASK and GPUS_PER_NODE from Slurm (if possible) ---------
 
@@ -144,6 +155,11 @@ export CPUS_PER_TASK
 
 export DISTR_OPS="--unbuffered --nodes=$NODES --ntasks-per-node=$GPUS_PER_NODE\
  --gpus-per-task=1 --cpus-per-task=$CPUS_PER_TASK $CPU_BIND_OPS $GPU_BIND_FLAG"
+# For Slurm, srun --unbuffered (you already have this in DISTR_OPS)
+# reduces output buffering between tasks and the collector. Handy for
+# debugging, but it adds overhead—use sparingly on big jobs.
+export DISTR_OPS="             --nodes=$NODES --ntasks-per-node=$GPUS_PER_NODE\
+ --gpus-per-task=1 --cpus-per-task=$CPUS_PER_TASK $CPU_BIND_OPS $GPU_BIND_FLAG"
 
 ######################################################
 # ---------- torchrun rendezvous (MASTER_*) ----------
@@ -153,17 +169,93 @@ export DISTR_OPS="--unbuffered --nodes=$NODES --ntasks-per-node=$GPUS_PER_NODE\
 export MASTER_ADDR="$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n1)"
 # Pick a port that collides less: 29500 + (JOBID mod 1000)
 export MASTER_PORT="${MASTER_PORT:-$((29500 + SLURM_JOB_ID % 1000))}"
+export MASTER_ARGS="--master_addr ${MASTER_ADDR} --master_port ${MASTER_PORT}"
+
+#####################################################
+# ---------- determining the JOB_NODE_KIND ----------
+#####################################################
+# derive_job_node_kind [SYSTEM] [PARTITION]
+# - SYSTEM: lumi|puhti|mahti (optional but improves heuristics)
+# - PARTITION: overrides $SLURM_JOB_PARTITION (optional)
+derive_job_node_kind() {
+  local system="${1:-${SYSTEM:-}}"
+  local part_in="${2:-${SLURM_JOB_PARTITION:-}}"
+
+  system="${system,,}"
+  # If a list was provided (e.g., "gpu,long"), take the first
+  local part="${part_in%%,*}"
+  local part_lc="${part,,}"
+
+  # If no partition and not in a job → login node
+  if [[ -z "$part_lc" && -z "${SLURM_JOB_ID:-}" ]]; then
+    echo login; return
+  fi
+
+  # 1) Ask Slurm: does this partition have GPU GRES?
+  if [[ -n "$part_lc" ]] && command -v scontrol >/dev/null 2>&1; then
+    if scontrol show partition "$part_lc" 2>/dev/null | grep -Eiq '(^|[[:space:]])Gres=.*gpu'; then
+      echo gpu; return
+    fi
+  fi
+  if [[ -n "$part_lc" ]] && command -v sinfo >/dev/null 2>&1; then
+    # %G = GRES of the partition; any 'gpu' → GPU
+    if sinfo -h -o "%G" -p "$part_lc" 2>/dev/null | grep -Eiq '(^|[^[:alnum:]])gpu([^[:alnum:]]|$)'; then
+      echo gpu; return
+    fi
+  fi
+
+  # 2) System-specific heuristics (fallback when Slurm queries aren’t available)
+  case "$system" in
+    lumi)
+      # GPU partitions often contain '-g' or 'gpu'
+      if [[ "$part_lc" == *gpu* || "$part_lc" =~ (^|[-_])g($|[-_]) ]]; then
+        echo gpu; return
+      fi
+      ;;
+    puhti)
+      # GPU queues include 'gpu', 'gpu-long', sometimes 'a100'
+      if [[ "$part_lc" == *gpu* || "$part_lc" == *a100* ]]; then
+        echo gpu; return
+      fi
+      ;;
+    mahti)
+      # Batch is CPU-only
+      ;;
+    *)
+      # Generic fallback—avoid matching random 'g' (e.g., 'debug')
+      if [[ "$part_lc" == *gpu* ]]; then
+        echo gpu; return
+      fi
+      ;;
+  esac
+
+  # 3) If we’re already on an allocated node, a last-resort device check
+  if [[ -n "${SLURM_JOB_ID:-}" ]]; then
+    if [[ -e /dev/kfd ]] || compgen -G "/dev/dri/renderD*" >/dev/null || command -v nvidia-smi >/dev/null; then
+      echo gpu; return
+    fi
+  fi
+
+  echo cpu
+}
+export JOB_NODE_KIND="$(derive_job_node_kind)"        # uses $SYSTEM and $SLURM_JOB_PARTITION if set
+# Explicit usage is also possible:
+# JOB_NODE_KIND="$(derive_job_node_kind "lumi" "dev-g")"
+# JOB_NODE_KIND="$(derive_job_node_kind "puhti" "gpu")"
+# JOB_NODE_KIND="$(derive_job_node_kind "mahti" "small")"
 
 echo ==============================================
-echo " SYSTEM              : $SYSTEM"
-echo " SLURM_JOB_NUM_NODES : $SLURM_JOB_NUM_NODES"
-echo " local NODES         : $NODES"
-echo " GPUS_PER_NODE       : $GPUS_PER_NODE"
-echo " CPUS_PER_TASK       : $CPUS_PER_TASK"
-echo " local CPU_BIND_OPS  : $CPU_BIND_OPS"
-echo " local GPU_BIND_FLAG : $GPU_BIND_FLAG"
-echo " DISTR_OPS           : $DISTR_OPS"
-echo " MASTER_PORT         : $MASTER_PORT"
-echo " MASTER_ADDR         : $MASTER_ADDR"
+echo " SYSTEM                     : $SYSTEM"
+echo " SLURM_JOB_NUM_NODES        : $SLURM_JOB_NUM_NODES"
+echo " local NODES         (srun) : $NODES"
+echo " GPUS_PER_NODE       (srun) : $GPUS_PER_NODE"
+echo " CPUS_PER_TASK       (srun) : $CPUS_PER_TASK"
+echo " local CPU_BIND_OPS  (srun) : $CPU_BIND_OPS"
+echo " local GPU_BIND_FLAG (srun) : $GPU_BIND_FLAG"
+echo " DISTR_OPS           (srun) : $DISTR_OPS"
+echo " MASTER_PORT     (torchrun) : $MASTER_PORT"
+echo " MASTER_ADDR     (torchrun) : $MASTER_ADDR"
+echo " MASTER_ARGS (slurm/python) : $MASTER_ARGS"
+echo " JOB_NODE_KIND              : $JOB_NODE_KIND"
 echo ==============================================
 

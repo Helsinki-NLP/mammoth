@@ -1,10 +1,17 @@
 echo comms-setup.sh...
-
-set -euo pipefail
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
-: "${SYSTEM:?❌ SYSTEM is not set}"
-: "${SLURM_JOB_ID:?❌ SLURM_JOB_ID is not set}"
-: "${SLURM_JOB_NODELIST:?❌ SLURM_JOB_NODELIST is not set}"
+is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
+require_set() {
+  local v
+  for v; do
+    # ${!v-} expands to empty if unset (safe with set -u)
+    if [[ -z "${!v-}" ]]; then
+      printf '❌ %s must be set\n' "$v" >&2
+      return 1
+    fi
+  done
+}
+require_set SYSTEM || is_sourced && return 1 || exit 1;
 
 # ---------- cluster-specific comm knobs (minimal, safe) ----------
 
@@ -21,8 +28,9 @@ if [[ "$SYSTEM" == "lumi" ]]; then
   unset NCCL_DMABUF_ENABLE  # intentionally unset by default
   export NCCL_NET_GDR_LEVEL=PHB
   export RCCL_ENABLE_OFI=1
-  export PLUGIN_DIR=$PROJHOME/rccl-lib3.10       # This has symlinks to /opt/aws-ofi-rccl/librccl-net.so
-  export LD_LIBRARY_PATH=$PROJHOME/rccl-lib3.10:$LD_LIBRARY_PATH
+  
+  export PLUGIN_DIR=base/mammoth-helper/helper/lib  # This has symlinks to /opt/aws-ofi-rccl/librccl-net.so
+  export LD_LIBRARY_PATH=base/mammoth-helper/helper/lib:$LD_LIBRARY_PATH
 
   # Cray HPE recommended: can sometimes be detrimental for performance at small
   # scale but useful to improve stability at large scale.
@@ -35,8 +43,6 @@ if [[ "$SYSTEM" == "lumi" ]]; then
 fi
 
 echo ==============================================
-echo " SLURM_JOB_ID              : $SLURM_JOB_ID"
-echo " SLURM_JOB_NODELIST        : $SLURM_JOB_NODELIST"
 echo " FI_PROVIDER (cxi)         : $FI_PROVIDER"
 echo " FI_HMEM (rocr)            : $FI_HMEM"
 echo " FI_LOG_LEVEL (warn)       : $FI_LOG_LEVEL"

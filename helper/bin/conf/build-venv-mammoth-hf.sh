@@ -11,11 +11,22 @@ log() { printf '%s %s\n' "[build-venv-mammoth-hf]" "$*"; }
 : "${PROJHOME:?❌ PROJHOME is not set (e.g., export PROJHOME=/project/$ACCOUNT/members/$USER)}" || exit 1
 : "${GITHOME:?❌ GITHOME is not set (e.g., export GITHOME=$HOME/git, or GITHOME=$PROJHOME/git)}" || exit 1
 
+check_under() {
+  local base="$1"; shift
+  local name f missing=0
+  for name in "$@"; do
+    f="$base/$name"
+    [[ -s "$f" ]] || { echo "❌ Missing/empty: $f" >&2; missing=1; }
+  done
+  (( missing == 0 )) || exit 1
+}
+
 MAMMOTH_REPO="$GITHOME/mammoth"
 HF_WT_DIR="$GITHOME/mammoth-hf"
 HELPER_WT_DIR="$GITHOME/mammoth-helper"
 HF_BRANCH="feat/hf_integration"
 HELPER_BRANCH="feat/helper"
+
 
 # --- Helpers ---------------------------------------------------------------------
 ensure_branch_exists () {
@@ -85,13 +96,16 @@ log "git worktree setup complete."
 # The script deletes/rebuilds $PROJHOME/venv/mammoth-hf
 
 mkdir -p "$PROJHOME"
-cd "$PROJHOME"
+mkdir -p "$PROJHOME/base"
 
-# Symlink the mammoth checkout (hf branch) as ./mammoth
-ln -sfn "$HF_WT_DIR" mammoth
+cd "$PROJHOME/base"
+ln -sfn $PROJHOME/venv     venv
+ln -sfn $GITHOME           git
+ln -sfn git/mammoth-hf     mammoth-hf
+ln -sfn git/mammoth-helper mammoth-helper
 
-# Symlink helper repo as ./helper
-ln -sfn "$HELPER_WT_DIR" mammoth-helper
+check_under "$PROJHOME/base/mammoth-helper/helper/bin/slurm/" 4-module-loads.sh
+check_under "$PROJHOME/base/mammoth-helper/helper/bin/conf/" setup-mammoth-hf.py
 
 log "symlink things done at $PROJHOME"
 
@@ -101,12 +115,11 @@ cd "$PROJHOME"
 # this script is run inside srun, partion/C or partition/G will be loaded
 export JOB_NODE_KIND=gpu  # Force partition/G stack even on login node
 # shellcheck source=../slurm/4-module-loads.sh
-source helper/bin/slurm/4-module-loads.sh
+source base/mammoth-helper/helper/bin/slurm/4-module-loads.sh
 # After this, python is a wrapper that launches a pytorch/rocm container and runs python.
 log "module loads done."
 
 # --- Use our own setup.py for the HF branch --------------------------------------
-cd "$PROJHOME/mammoth"
 
 # Build virtual environment for this particular branch (feat/hf_integration as mammoth-hf)
 # We use `pip -e .` to install mammoth to the virtual environment via symlinks,
@@ -115,37 +128,36 @@ cd "$PROJHOME/mammoth"
 # but rather setup-mammoth-hf.py provided in helper/bin/conf.  Rename and copy:
 
 # Backup the original setup.py only once
-if [ -f setup.py ] && [ ! -f setup.py.orig ]; then
-  cp -p setup.py setup.py.orig
+if [ -f base/mammoth-hf/setup.py ] && [ ! -f base/mammoth-hf/setup.py.orig ]; then
+  cp -p base/mammoth-hf/setup.py base/mammoth-hf/setup.py.orig
 fi
 
 # Replace with our custom setup if different
-CUSTOM_SETUP="$PROJHOME/helper/bin/conf/setup-mammoth-hf.py"
+CUSTOM_SETUP="base/mammoth-helper/helper/bin/conf/setup-mammoth-hf.py"
 if [ ! -f "$CUSTOM_SETUP" ]; then
   echo "❌ Custom setup file not found: $CUSTOM_SETUP"; exit 1
 fi
 # Copy only if contents differ
-if ! cmp -s "$CUSTOM_SETUP" setup.py; then
-  cp -p "$CUSTOM_SETUP" setup.py
+if ! cmp -s "$CUSTOM_SETUP" base/mammoth-hf/setup.py; then
+  cp -p "$CUSTOM_SETUP" base/mammoth-hf/setup.py
   log "using our own setup.py"
 else
-  log "custom setup.py already in place"
+  log "custom base/mammoth-hf/setup.py already in place"
 fi
 
 # --- Build (clean) virtual environment -------------------------------------------
 # Python/pip will run now in a modulerized-container with GPU-enabled pytorch and rocm libraries
 # There is no need to do installation inside `srun` nor singularity, but partition/G is useful.
 # We create virtual environment so that it inherits pytorch etc in the container
-cd "$PROJHOME"
 rm -rf venv/mammoth-hf
 python-silent -m venv --system-site-packages venv/mammoth-hf
 # shellcheck disable=SC1091
-source $PROJHOME/venv/mammoth-hf/bin/activate
+source venv/mammoth-hf/bin/activate
 log "created and activated venv."
 
 venv/mammoth-hf/bin/python -m pip install --upgrade pip
 export PIP_USER=no
-cd "$PROJHOME/mammoth"
+cd base/mammoth-hf
 $PROJHOME/venv/mammoth-hf/bin/python -m pip install -e .
 deactivate
 

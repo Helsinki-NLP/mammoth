@@ -21,9 +21,9 @@ ROCm-enabled PyTorch version %s for Python and MAMMOTH venv
 
 family("python_ml_env")
 
-prepend_path('PATH', pathJoin(gparent .. 'wrappers'))
+prepend_path('PATH', pathJoin(gparent .. '/wrappers'))
 
-setenv('SING_IMAGE', pathJoin(gparent .. 'images' .. singName))
+setenv('SING_IMAGE', pathJoin(ggparent .. '/images/' .. singName))
 
 
 setenv('NCCL_SOCKET_IFNAME', 'hsn0,hsn1,hsn2,hsn3')  -- use only high speed network

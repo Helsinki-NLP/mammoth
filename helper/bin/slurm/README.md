@@ -5,29 +5,36 @@ Usage:
 
    1) Ensure you have the *places* for the helper and the experiments
       ```
-      export PROJBASE=your-readily-built-helper-dir # helper base
-      export PROJDATA=your-readily-built-work-dir   # your place to store data and models
-      ln -s  $PROJDATA $PROJBASE/data               # link them together
-      ln -s  $PROJBASE $PROJDATA/base               # link them together
+      export PROJHOME=your-readily-built-base-dir    # base dir
+      export PROJDATA=your-readily-built-work-dir    # your place to store data and models
+      export GITHOME=your-readily-built-base-dir/git # your git root 
+      cd       $PROJHOME
+      ln -s    $PROJDATA          data               # link data to projhome
+      mkdir    $PROJDATA/base                        # for partial inhertance to avoid cycles
+      cd       $PROJDATA/base
+      ln -s    ../venv            .
+      ln -s    $GITHOME           git                # or ln -s ../git .  if that is the $GITHOME
+      ln -s    git/mammoth-hf     mammoth            # tentative branch
+      ln -s    git/mammoth-helper .                  # until we join the branches
       ```
-   2) give a *name* to your project and create the job directory, with link to $PROJBASE
+   2) give a *name* to your project and create the job directory, with link to $PROJHOME
       ```
       export JOB_NAME=your-job-name
-      mkdir -p $PROJBASE/data/$JOB_NAME
-      cd       $PROJBASE/data/$JOB_NAME
-      ln -s    $PROJBASE base
+      mkdir -p $PROJHOME/data/$JOB_NAME
+      cd       $PROJHOME/data/$JOB_NAME
+      ln    -s $PROJHOME/base .                      # inherits all except itself
       ```
    3) Create and edit your own `sbatch-entry.sh`
-      cd       $PROJBASE/data/$JOB_NAME
-      cp       helper/bin/slurm/sbatch-entry.sh .
+      cd       $PROJHOME/data/$JOB_NAME
+      cp       base/mammoth-helper/helper/bin/slurm/sbatch-entry.sh .
       emacs    sbatch-entry.sh 
       
    4) Add other subdirectories to your job and link files there
-      cd       $PROJBASE/data/$JOB_NAME
+      cd       $PROJHOME/data/$JOB_NAME
       mkdir    logs models tensorboard
       
    5) Run the sbatch in the directory called .../$JOB_NAME
-      cd       $PROJBASE/data/$JOB_NAME
+      cd       $PROJHOME/data/$JOB_NAME
       sbatch -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out -e logs/%x-%j.err sbatch-entry.sh
 
 The contents of `sbatch-entry.sh`

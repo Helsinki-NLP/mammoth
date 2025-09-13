@@ -15,7 +15,7 @@ We thank the NVIDIA AI Technology Center Finland for their help with the multi-g
 
 ### Quick Installation:
 
-Follow the instructions on page [](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/conf).
+Follow the instructions on [this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/conf).
 This will create the virtual environment and a useful directory tree containing your MAMMOTH software.  The directory structure of your project home will look like this:
 ```
 .
@@ -64,8 +64,8 @@ $PROJHOME/data/example-job
 ```
 
 For now, the slurm launch helpers are available.  The are still under
-testing.  Follow the instructions on page
-[](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
+testing.  Follow the instructions on [this
+page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
 to use the readily made execution scripts and to create shorter and
 safer slurm scripts with the helper feature.
 

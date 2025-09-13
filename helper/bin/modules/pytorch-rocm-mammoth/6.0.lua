@@ -1,19 +1,29 @@
+-- dirname helper (no external libs)
+local function dirname(p)
+  return (p:match("(.+)/[^/]+$")) or "."
+end
+
+-- Where is this modulefile?
+local mf      = myFileName()           -- e.g. /path/to/modulefiles/foo/1.2.lua
+local mfDir   = dirname(mf)            -- …/modulefiles/foo
+local parent  = dirname(mfDir)         -- …/modulefiles
+local gparent = dirname(parent)        -- …/ (parent-parent)
+local ggparent = dirname(gparent)        -- …/ (parent-parent-parent)
+
 local singName = 'lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif'
 local pytorchVersion = '2.7.1'
-local loadTxt = capture('cat ' .. os.getenv('PROJHOME') .. '/bin/modules/load-pytorch-rocm-mammoth.txt')
+local loadTxt = capture('cat ' .. parent .. '/load-pytorch-rocm-mammoth.txt')
 
 help(string.format([[
 ROCm-enabled PyTorch version %s for Python and MAMMOTH venv
 
 ]], pytorchVersion))
 
-local singRoot = os.getenv('PROJHOME') 
-
 family("python_ml_env")
 
-prepend_path('PATH', pathJoin(os.getenv('PROJHOME'), 'bin', 'wrappers'))
+prepend_path('PATH', pathJoin(gparent .. 'wrappers'))
 
-setenv('SING_IMAGE', pathJoin(singRoot, 'images', singName))
+setenv('SING_IMAGE', pathJoin(gparent .. 'images' .. singName))
 
 
 setenv('NCCL_SOCKET_IFNAME', 'hsn0,hsn1,hsn2,hsn3')  -- use only high speed network

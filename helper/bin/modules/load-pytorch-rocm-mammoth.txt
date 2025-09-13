@@ -5,4 +5,6 @@ This local module has been *derived* from a module (pytorch) provided by CSC and
 is based on a singularity container provided by CSC.
 
 Documentation: https://docs.csc.fi/apps/pytorch/
-Support: https://docs.csc.fi/support/contact/
+Support: 1) https://docs.csc.fi/support/contact/ (the sif image)
+	 2) https://docs.csc.fi/support/contact/ (the original pytorch module)
+         2) anssi.yli-jyra@helsinki.fi (the derived module)

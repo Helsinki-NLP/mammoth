@@ -11,7 +11,19 @@ require_set() {
     fi
   done
 }
-require_set JOB_NODE_KIND || is_sourced && return 1 || exit 1;
+require_set JOB_NODE_KIND || { is_sourced && return 1 || exit 1; }
+
+check_under() {
+  local base="$1"; shift
+  local name f missing=0
+  for name in "$@"; do
+    f="$base/$name"
+    [[ -s "$f" ]] || { echo "❌ Missing/empty: $f" >&2; missing=1; }
+  done
+  (( missing == 0 )) || exit 1
+}
+check_under "base/mammoth-helper/helper/bin/modules" \
+   pytorch-rocm-mammoth/6.0.lua
 
 # Manual override (required) of node kind detection:
 #  export JOB_NODE_KIND=gpu (or cpu / login) if you ever need to force a stack.
@@ -33,7 +45,7 @@ detect_node_kind () {
     local override="${JOB_NODE_KIND,,}"   # bash lowercase
     case "$override" in
       gpu|cpu|login) echo "$override"; return ;;
-      *) echo "Invalid JOB_NODE_KIND='$JOB_NODE_KIND' (use gpu|cpu|login)" >&2
+      *) echo "Invalid JOB_NODE_KIND='$JOB_NODE_KIND' (use gpu|cpu|login)" >&2;
 	 is_sourced && return 1 || exit 1 ;;
     esac
   fi
@@ -63,6 +75,9 @@ detect_node_kind () {
 
 module --force purge
 
+NODE_KIND="$(detect_node_kind)"
+echo "LUMI node kind detected: ${NODE_KIND} (SLURM_JOB_PARTITION=${SLURM_JOB_PARTITION:--})"
+
 # Helper: load first module that exists (Lmod)
 load_first_available () {
     for m in "$@"; do
@@ -77,21 +92,21 @@ load_first_available () {
 
 if [[ "${SYSTEM:-}" == "lumi" ]]; then
     # --- Common module paths ---
+    echo ...paths...
     module -q use /appl/local/containers/ai-modules       # AI-bindings
-    module -q use base/mammoth-helper/helper/bin/modules" # pytorch-rocm-mammoth 
+    module -q use base/mammoth-helper/helper/bin/modules  # pytorch-rocm-mammoth 
 
     # --- Base env (recommended by CSC; safe on all nodes) ---
+    echo ...CrayEnv...
     module -q load CrayEnv
+    echo ...LUMI...
     module -q load LUMI
 
-    NODE_KIND="$(detect_node_kind)"
-    echo "LUMI node kind detected: ${NODE_KIND} (SLURM_JOB_PARTITION='${SLURM_JOB_PARTITION:--}')"
-
+    echo ...partition...
     # --- Load partition stack based on detection -----------------------------
     case "$NODE_KIND" in
         login)
             module -q load partition/L      # Works on login & compute
-	    module -q load systools         # 'tree', etc. (optional)
             ;;
         cpu)
             module -q load partition/C      # LUMI-C CPU compute nodes
@@ -106,7 +121,11 @@ if [[ "${SYSTEM:-}" == "lumi" ]]; then
     esac
 
     # --- Your workload-specific modules --------------------------------------
+    echo ...systools...
+    module -q load systools                  # 'tree', etc. (optional)
+    echo ...singularity-AI-bindings...
     module -q load singularity-AI-bindings   # Needed for AI container bindings
+    echo ...pytorch-rocm-mammoth...
     module -q load pytorch-rocm-mammoth      # Lazy PyTorch (ROCm) module
 
 
@@ -115,13 +134,10 @@ elif [[ "${SYSTEM:-}" == "puhti" ]]; then
     # Keep these generic; they will only load if present.
     module -q use /appl/local/containers/ai-modules 2>/dev/null || true
     # shellcheck source=../modules
-    module -q use base/mammoth-helper/helper/bin/modules" 2>/dev/null || true
+    module -q use base/mammoth-helper/helper/bin/modules 2>/dev/null || true
 
     # --- Base env (Puhti typically uses CSC defaults; load if available) ---
     load_first_available csc csc-env puhti
-
-    NODE_KIND="$(detect_node_kind)"
-    echo "Puhti node kind detected: ${NODE_KIND} (SLURM_JOB_PARTITION='${SLURM_JOB_PARTITION:--}')"
 
     # Try multiple aliases for partition modules to be cross-cluster friendly.
     case "$NODE_KIND" in

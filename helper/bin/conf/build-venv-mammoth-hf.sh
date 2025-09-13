@@ -8,8 +8,8 @@ log() { printf '%s %s\n' "[build-venv-mammoth-hf]" "$*"; }
 # --- Required env ----------------------------------------------------------------
 # This script assumes $GITHOME
 # This script assumes $PROJHOME
-: "${PROJHOME:?❌ PROJHOME is not set (e.g., export PROJHOME=/project/$ACCOUNT/members/$USER)}"
-: "${GITHOME:?❌ GITHOME is not set (e.g., export GITHOME=$HOME/git, or GITHOME=$PROJHOME/git)}"
+: "${PROJHOME:?❌ PROJHOME is not set (e.g., export PROJHOME=/project/$ACCOUNT/members/$USER)}" || exit 1
+: "${GITHOME:?❌ GITHOME is not set (e.g., export GITHOME=$HOME/git, or GITHOME=$PROJHOME/git)}" || exit 1
 
 MAMMOTH_REPO="$GITHOME/mammoth"
 HF_WT_DIR="$GITHOME/mammoth-hf"
@@ -74,6 +74,7 @@ git -C "$MAMMOTH_REPO" pull --ff-only
 ensure_branch_exists "$MAMMOTH_REPO" "$HF_BRANCH"
 ensure_branch_exists "$MAMMOTH_REPO" "$HELPER_BRANCH"
 
+# uh, this is hard to read... but the purpose is to have it idempotent 
 ensure_worktree "$MAMMOTH_REPO" "$HF_BRANCH"     "$HF_WT_DIR"
 ensure_worktree "$MAMMOTH_REPO" "$HELPER_BRANCH" "$HELPER_WT_DIR"
 
@@ -90,21 +91,7 @@ cd "$PROJHOME"
 ln -sfn "$HF_WT_DIR" mammoth
 
 # Symlink helper repo as ./helper
-ln -sfn "$HELPER_WT_DIR/helper" helper
-
-# Optionally expose helper/* at project root as symlinks (idempotent)
-# Create/update links only for regular files/dirs (skip existing same-target links)
-if compgen -G "helper/*" >/dev/null; then
-  for p in helper/*; do
-    base="$(basename "$p")"
-    # Don't clobber existing non-symlink files
-    if [ -e "$base" ] && [ ! -L "$base" ]; then
-      log "Skipping link for $base (exists and not a symlink)"
-      continue
-    fi
-    ln -sfn "$p" "$base"
-  done
-fi
+ln -sfn "$HELPER_WT_DIR" mammoth-helper
 
 log "symlink things done at $PROJHOME"
 
@@ -112,9 +99,9 @@ log "symlink things done at $PROJHOME"
 cd "$PROJHOME"
 # By default, load the partition/L software stack since we are running on login node but if
 # this script is run inside srun, partion/C or partition/G will be loaded
-export NODE_KIND=gpu  # Force partition/G stack even on login node
-# shellcheck disable=SC1091
-source helper/bin/slurm/module-loads.sh
+export JOB_NODE_KIND=gpu  # Force partition/G stack even on login node
+# shellcheck source=../slurm/4-module-loads.sh
+source helper/bin/slurm/4-module-loads.sh
 # After this, python is a wrapper that launches a pytorch/rocm container and runs python.
 log "module loads done."
 
@@ -163,16 +150,4 @@ $PROJHOME/venv/mammoth-hf/bin/python -m pip install -e .
 deactivate
 
 log "installed mammoth and the requirements"
-
-# Expect something like this on LUMI:
-
-# ERROR: pip's dependency resolver does not currently take into account all the packages that are installed.
-#        This behaviour is the source of the following dependency conflicts.
-# datasets 4.0.0 requires fsspec[http]<=2025.3.0,>=2023.1.0, but you have fsspec 2025.7.0 which is incompatible.
-# lightning 2.5.1 requires packaging<25.0,>=20.0, but you have packaging 25.0 which is incompatible.
-# vllm 0.10.1+rocm624 requires setuptools<80,>=77.0.3; python_version > "3.11", but you have setuptools 80.9.0 which is incompatible.
-# vllm 0.10.1+rocm624 requires setuptools<80.0.0,>=77.0.3, but you have setuptools 80.9.0 which is incompatible.
-
-# Successfully installed ConfigArgParse-1.7.1 MarkupSafe-3.0.2 certifi-2025.8.3 charset-normalizer-3.4.3 einx-0.3.0 frozendict-2.4.6 fsspec-2025.7.0 idna-3.10 loguru-0.7.3 networkx-3.5 packaging-25.0 protobuf-6.32.0 setuptools-80.9.0 sympy-1.14.0 tensorboard-2.20.0 transformers-4.55.4 typing_extensions-4.14.1 urllib3-2.5.0
-
 

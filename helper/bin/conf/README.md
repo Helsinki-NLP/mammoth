@@ -71,5 +71,5 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
    and - importantly - you also have helper features.
 
 Now you can follow up to
-[](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
+[this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
 to learn how to create a job directory and use the installed software with it.

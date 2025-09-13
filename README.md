@@ -45,7 +45,7 @@ planning, your job directory structure should look like this.
 
 ```
 $PROJHOME/data/example-job
-├── base -> /project/project_462000964/members/aylijyra/base
+├── base -> /project/$PROJECT/members/$USER/base
 ├── cfg
 │   ├── conf.yml
 │   └── sbatch-entry.slurm

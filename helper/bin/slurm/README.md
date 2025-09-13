@@ -27,7 +27,7 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
       cd       $PROJHOME/data/$JOB_NAME
       sbatch -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out -e logs/%x-%j.err sbatch-entry.slurm
       ```
-## The contents of `sbatch-entry.slum`
+## The contents of `sbatch-entry.slurm`
    ```
    #SBATCH ...
    #SBATCH ...
@@ -59,7 +59,7 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
    - Setting up the remaining multiprocessor parameters
      (`base/mammoth-helper/helper/bin/slurm/2-distributed-setup.sh`)
    
-   - Ingredity checks the scripts
+   - Integrity checks of the script combo, covering also your `sbatch-entry.slurm`
      (`base/mammoth-helper/helper/bin/slurm/1-integrity-checks.sh`)
 
 ## Authors:

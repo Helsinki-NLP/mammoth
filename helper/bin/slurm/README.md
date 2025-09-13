@@ -4,8 +4,8 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
 
 ## Usage:
 
-   1) Follow instructions in
-      [](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
+   1) Follow instructions on
+      [this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
       to install this branch of MAMMOTH and the create the environment.
 
    2) give a *name* to your project(directory), and make it inhert the `base`

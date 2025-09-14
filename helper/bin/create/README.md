@@ -10,7 +10,7 @@ is `Task-SystemNodesGpusTime-Lang[-Spec]`, where
   * `System` is `L/P/R/M` (referring to LUMI, Puhti ,Roihi, Mahti)
   * `NodesGpus` are of the form `1n1g`, `4n16g`, etc
   * `Time` is in minutes, hours, days: 10m, 1h, 2d
-  * `Lang` is a braced list of short language codes `{en,es}`
+  * `Lang` is a list of short language codes `[en,es]`
   * `Spec` is a free specifier.
 
 Example: `train-L-1n1g10m-{enes}-test`
@@ -30,10 +30,10 @@ making a job directory under $PROJHOME/data/
 =================================
 JOB_NAME   : train-L-1n1g10m-[en,es]-test
 JOB_TASK   : train
-JOB_SYSTEM : L
+JOB_SYSTEM : lumi
 JOB_NODES  : 1
 JOB_GPUS   : 1
-JOB_TIME   : 10
+JOB_TIME   : 0-00:10:00
 JOB_LANG   : [en,es]
 JOB_SPEC   : test
 =================================

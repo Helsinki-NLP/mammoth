@@ -51,8 +51,12 @@ diagnose_job_name() {
   if [[ ! $system =~ ^[LPRM]$ ]]; then
       printf '• System invalid: %-18s  (expected: one of L P R M)\n' "'$system'" >&2; bad=1
   else
-      JOB_SYSTEM=$system
-      #echo $JOB_SYSTEM
+      case "$system" in
+	  L)      JOB_SYSTEM="lumi"  ;;
+	  R)      JOB_SYSTEM="roihu" ;;
+	  P)      JOB_SYSTEM="puhti" ;;
+	  M)      JOB_SYSTEM="mahti" ;;
+      esac
   fi
   
   if [[ ! $ngt =~ ^([0-9]+)n([0-9]+)g([0-9]+)([smhd])$ ]]; then
@@ -62,7 +66,24 @@ diagnose_job_name() {
   else
       JOB_NODES="${BASH_REMATCH[1]}"        # e.g. 1
       JOB_GPUS="${BASH_REMATCH[2]}"         # e.g. 1
-      JOB_TIME="${BASH_REMATCH[3]}"         # e.g. 10m / 1h / 2d
+      N="${BASH_REMATCH[3]}"         # e.g. 10
+      U="${BASH_REMATCH[4]}"         # e.g. m/h/d
+
+      # Convert to total seconds
+      local sec
+      case "$U" in
+	  s) sec=$((N)) ;;
+	  m) sec=$((N*60)) ;;
+	  h) sec=$((N*3600)) ;;
+	  d) sec=$((N*86400)) ;;
+      esac
+
+      # Format as D-HH:MM:SS (omit D- when zero days)
+      local d=$((sec/86400)); local r=$((sec%86400))
+      local h=$((r/3600));    r=$((r%3600))
+      local m=$((r/60));      local s=$((r%60))
+      
+      printf -v JOB_TIME '%d-%02d:%02d:%02d' "$d" "$h" "$m" "$s"
       #echo $JOB_NODES
       #echo $JOB_GPUS
       #echo $JOB_TIME

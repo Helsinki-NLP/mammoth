@@ -16,7 +16,7 @@ We thank the NVIDIA AI Technology Center Finland for their help with the multi-g
 ### Quick Installation:
 
 Follow the instructions on [this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/conf).
-This will create the virtual environment and a useful directory tree containing your MAMMOTH software.  The directory structure of your project home will look like this:
+This will create the virtual environment and a directory tree containing the MAMMOTH software.  The directory structure of your project home will look like this:
 ```
 .
 ├── base
@@ -35,17 +35,24 @@ This will create the virtual environment and a useful directory tree containing 
 
 ### Running Training Jobs
 
-The helper features of MAMMOTH is meant for guarded, sanity-checked
-and optimized deployment of supercomputers for MAMMOTH.
+The helper features of MAMMOTH are new and meant for guarded,
+sanity-checked and optimized deployment of supercomputers for MAMMOTH,
+as well as cumulative creation of advancing job configurations
+(directories, slurm scripts, datafiles, and yaml files).
 
-We are writing scripts that would facilitate the creation of the
-job-specific local environment (directory trees and configurations)
-for your training (and other) jobs.  According to the current
-planning, your job directory structure should look like this.
+That means that we are currently testing scripts that would facilitate
+the creation of the job-specific local environment (directory trees
+and configurations) for your training (and other) jobs.  According to
+the current planning, the structure of a prototypical job will look
+like this:
 
 ```
 $PROJHOME/data/example-job
 ├── base -> /project/$PROJECT/members/$USER/base
+│   ├── git -> /project/project_462000964/members/aylijyra/git
+│   ├── mammoth-helper -> git/mammoth-helper
+│   ├── mammoth-hf -> git/mammoth-hf
+│   └── venv -> /project/project_462000964/members/aylijyra/venv
 ├── cfg
 │   ├── conf.yml
 │   └── sbatch-entry.slurm
@@ -63,8 +70,8 @@ $PROJHOME/data/example-job
     └── translations
 ```
 
-For now, the slurm launch helpers are available.  The are still under
-testing.  Follow the instructions on [this
+The slurm launch helpers are available, but they are under testing.
+Follow the instructions on [this
 page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)
 to use the readily made execution scripts and to create shorter and
 safer slurm scripts with the helper feature.

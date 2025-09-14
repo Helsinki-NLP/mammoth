@@ -4,27 +4,16 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
 
 ## Usage:
 
-   1) Follow instructions on
+   1) Install feat/helper branch of MAMMOTH following the instructions on
       [this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/conf)
-      to install this branch of MAMMOTH and the create the environment.
 
-   2) Give a *name* to your project(directory), and make it inherit the `base`
+   2) Create a job directory under `$PROJHOME/data` using `mkjob.sh`:
       ```
-      export JOB_NAME=your-job-name
-      mkdir -p $PROJHOME/data/$JOB_NAME
-      ln    -s $PROJHOME/base $PROJHOME/data/$JOB_NAME  # inherits all except itself
+      sh $PROJHOME/base/mammoth-helper/helper/bin/create/mkjob.sh train-L-1n1g10m-[en,es]-test
       ```
-   3) Add the subdirectories and copy `sbatch-entry.slurm`:
-      ```
-      cd       $PROJHOME/data/$JOB_NAME
-      mkdir    cfg in out logs
-      mkdir    in/data in/models in/vocab log/slurm log/tb
-      mkdir    out/checkpoints out/metrics out/models out/translations
-      cp       base/mammoth-helper/helper/bin/slurm/sbatch-entry.slurm cfg
-      ```
-   4) Complete your job directory by preparing config.yaml, sbatch-entry.slurm, and data
+   3) Complete your job directory by preparing config.yaml, sbatch-entry.slurm, and data
       
-   5) Run the sbatch in the job directory
+   4) Run the sbatch in the job directory
       ```
       cd       $PROJHOME/data/$JOB_NAME
       sbatch   -J "$JOB_NAME" -A "$ACCOUNT" -o logs/%x-%j.out \

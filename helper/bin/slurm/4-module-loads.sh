@@ -17,13 +17,38 @@ check_under() {
   local base="$1"; shift
   local name f missing=0
   for name in "$@"; do
-    f="$base/$name"
-    [[ -s "$f" ]] || { echo "❌ Missing/empty: $f" >&2; missing=1; }
+      f="$base/$name"
+      echo testing file "$f"
+      [[ -s "$f" ]] || { echo "❌ Missing/empty: $f" >&2; missing=1; }
   done
-  (( missing == 0 )) || exit 1
+  (( missing == 0 )) 
 }
-check_under "base/mammoth-helper/helper/bin/modules" \
-   pytorch-rocm-mammoth/6.0.lua
+
+# It is important to cover alternative situations:
+# 1) we do not have $PROJHOME/base when running build-env.sh
+# 2) we may also be running this interactively in any directory; require $PROJHOME
+# 3) we may run this inside sbatch-tail.sh; use relative location `base`
+
+# Decide BASE
+if [[ -d "base/git/mammoth-helper/helper/bin/modules" ]]; then
+  BASE="base"
+else
+  : "${PROJHOME:?❌ PROJHOME is not set (e.g. /project/$ACCOUNT/members/$USER)}"
+  BASE="$PROJHOME"
+  # (optional) sanity check that the expected path exists under PROJHOME
+  if [[ ! -d "$BASE/git/mammoth-helper/helper/bin/modules" ]]; then
+    echo "❌ Not found: $BASE/git/mammoth-helper/helper/bin/modules" >&2
+    { is_sourced && return 1 || exit 1; }
+  fi
+fi
+echo "This file lives in the helper tree: $BASE/git/mammoth-helper/helper"
+echo "From this tree, I will find have to find various parts of the module"
+check_under "$BASE/git/mammoth-helper/helper" \
+   bin/modules/pytorch-rocm-mammoth/6.0.lua \
+   bin/modules/load-pytorch-rocm-mammoth.txt \
+   bin/wrappers/python \
+   images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
+   lib/README.md || { is_sourced && return 1 || exit 1; }
 
 # Manual override (required) of node kind detection:
 #  export JOB_NODE_KIND=gpu (or cpu / login) if you ever need to force a stack.
@@ -94,7 +119,7 @@ if [[ "${SYSTEM:-}" == "lumi" ]]; then
     # --- Common module paths ---
     echo ...paths...
     module -q use /appl/local/containers/ai-modules       # AI-bindings
-    module -q use base/mammoth-helper/helper/bin/modules  # pytorch-rocm-mammoth 
+    module -q use "$BASE/mammoth-helper/helper/bin/modules"  # pytorch-rocm-mammoth 
 
     # --- Base env (recommended by CSC; safe on all nodes) ---
     echo ...CrayEnv...
@@ -124,11 +149,11 @@ if [[ "${SYSTEM:-}" == "lumi" ]]; then
     esac
 
     # --- Your workload-specific modules --------------------------------------
-    echo ...systools...
+    echo "...systools..."
     module -q load systools                  # 'tree', etc. (optional)
-    echo ...singularity-AI-bindings...
+    echo "...singularity-AI-bindings..."
     module -q load singularity-AI-bindings   # Needed for AI container bindings
-    echo ...pytorch-rocm-mammoth (uses lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif)...
+    echo "...pytorch-rocm-mammoth (uses lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif)..."
     module -q load pytorch-rocm-mammoth      # Lazy PyTorch (ROCm) module
 
 
@@ -158,7 +183,7 @@ elif [[ "${SYSTEM:-}" == "puhti" ]]; then
 else
     echo "module loads for ${SYSTEM:-<unset>} are not yet specified in module-load.sh"
     echo "please add them in this script!"
-    exit 1
+    { is_sourced && return 1 || exit 1; }
 fi
 
 echo ============================================================================

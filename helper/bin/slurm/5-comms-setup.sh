@@ -11,7 +11,7 @@ require_set() {
     fi
   done
 }
-require_set SYSTEM || is_sourced && return 1 || exit 1;
+require_set SYSTEM || { is_sourced && return 1 || exit 1 };
 
 # ---------- cluster-specific comm knobs (minimal, safe) ----------
 

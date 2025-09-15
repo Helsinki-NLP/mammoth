@@ -11,9 +11,9 @@ require_set() {
     fi
   done
 }
-require_set SYSTEM SLURM_JOB_NAME SLURM_SUBMIT_DIR || is_sourced && return 1 || exit 1;
-require_set JOB_NAME JOB_PATTERN JOB_SCRIPT JOB_ARGS || is_sourced && return 1 || exit 1;
-require_set GUARD_TIME GUARD_MAX_NODES || is_sourced && return 1 || exit 1;
+require_set SYSTEM SLURM_JOB_NAME SLURM_SUBMIT_DIR || { is_sourced && return 1 || exit 1 };
+require_set JOB_NAME JOB_PATTERN JOB_SCRIPT JOB_ARGS || { is_sourced && return 1 || exit 1 };
+require_set GUARD_TIME GUARD_MAX_NODES || { is_sourced && return 1 || exit 1 };
 
 SUBMIT_DIR="${SLURM_SUBMIT_DIR:-$(pwd -P)}"
 SUBMIT_BASENAME="$(basename -- "$SUBMIT_DIR")"
@@ -57,7 +57,7 @@ check_under() {
     f="$base/$name"
     [[ -s "$f" ]] || { echo "❌ Missing/empty: $f" >&2; missing=1; }
   done
-  (( missing == 0 )) || exit 1
+  (( missing == 0 ))
 }
 check_under "$JOB_SLURM" \
   1-integrity-checks.sh \
@@ -66,9 +66,9 @@ check_under "$JOB_SLURM" \
   4-module-loads.sh \
   5-comms-setup.sh \
   6-task-wrapper.sh \
-  7-local-setup.sh
+  7-local-setup.sh  || { is_sourced && return 1 || exit 1; }
 check_under "$JOB_VENV" \
-  activate  
+  activate  || { is_sourced && return 1 || exit 1; } 
 
 INTEGRITY_CHECKS_OK=1
 

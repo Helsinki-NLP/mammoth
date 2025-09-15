@@ -23,7 +23,7 @@ require_vars INTEGRITY_CHECKS_OK SYSTEM JOB_PATTERN GUARD_MAX_NODES GUARD_TIME \
 	     SLURM_JOB_GPUS SLURM_JOB_ID SLURM_JOB_ACCOUNT SLURM_JOB_PARTITION \
 	     SLURM_JOB_NUM_NODES SLURM_NNODES SLURM_NODELIST SLURM_NPROCS \
 	     SLURM_NTASKS SLURM_NTASKS_PER_NODE SLURM_TASKS_PER_NODE \
-    || is_sourced && return 1 || exit 1;
+    || { is_sourced && return 1 || exit 1 };
 
 # ----- detect GPUs (env OR job/step record) and compute GPUS_TOTAL ---------
 JOBREC="$(scontrol show -d job  "${SLURM_JOB_ID:?}" 2>/dev/null | tr '\n' ' ')"

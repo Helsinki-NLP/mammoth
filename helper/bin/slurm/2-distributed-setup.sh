@@ -11,7 +11,7 @@ require_set() {
     fi
   done
 }
-require_vars SYSTEM INTEGRITY_CHECKS_OK || is_sourced && return 1 || exit 1;
+require_vars SYSTEM INTEGRITY_CHECKS_OK || { is_sourced && return 1 || exit 1 };
 
 echo Retrospective summary of Slurm env variables
 echo ==============================================

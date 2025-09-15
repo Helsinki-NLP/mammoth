@@ -38,7 +38,7 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create
    | Generalizing and organizing the constant cross-machine know-how of SBATCH jobs | **`sbatch-tail.sh`**      |
    | - Integrity checks of the script combo, covering also your `sbatch-entry.slurm` | **`1-integrity-checks.sh`** |
    | - Setting up the remaining multiprocessor parameters              | **`2-distributed-setup.sh`** |
-   | - Sanity checking of the SLURM parameters                         | **`3-sanity-checks.sh`|
+   | - Sanity checking of the SLURM parameters                         | **`3-sanity-checks.sh`** |
    | - Loading machine and partition specific modules                  | **`4-module-loads.sh`** |
    | - Launching the virtual environment from `venv/bin/activate`      |                     |
    | - Adjusting important variables for  multi-processor communications | **`5-comms-setup.sh`** |

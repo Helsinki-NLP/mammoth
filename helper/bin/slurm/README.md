@@ -30,15 +30,20 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create
 
    | Functionality                                                   | Script Component    |
    |-----------------------------------------------------------------|---------------------|
-   | A well-though wrapper for node-specific executions under `srun` | `6-task-wrapper.sh` |
-   | Setup of important machine specific environment variables for  multi-processor communications | `5-comms-setup.sh` |
-   | Launching the virtual environment from `venv/bin/activate`      |                     |
-   | Loading machine and partition specific modules                  | `4-module-loads.sh` |
-   | Sanity checking of the SLURM parameters                         | `3-sanity-checks.sh`|
-   | Setting up the remaining multiprocessor parameters              | `2-distributed-setup.sh` |
-   | Integrity checks of the script combo, covering also your `sbatch-entry.slurm` | `1-integrity-checks.sh` |
-   | Generalizing and organizing the constant knowhow of SBATCH jobs | **`sbatch-tail.sh`**      |
-   | Variable, **user-editable setings** of SBATCH jobs              | **`sbatch-entry.sh`**   |
+   | Quick creation of the local environment for SBATCH jobs         | **`mkjobdir.sh`**       |
+   | Quick linking of the input files for SBATCH jobs                | **`mkinputs.sh`** (N/A) |
+   | Quick creation of the MAMMOTH config files for SBATCH jobs      | **`mkconfig.sh`** (N/A) |
    | Quick creation of SBATCH scripts                                | **`mksbatch.sh`**       |
+   | Variable, **user-editable setings** of SBATCH jobs              | **`sbatch-entry.sh`**   |
+   | Generalizing and organizing the constant cross-machine know-how of SBATCH jobs | **`sbatch-tail.sh`**      |
+   | - Integrity checks of the script combo, covering also your `sbatch-entry.slurm` | **`1-integrity-checks.sh`** |
+   | - Setting up the remaining multiprocessor parameters              | **`2-distributed-setup.sh`** |
+   | - Sanity checking of the SLURM parameters                         | **`3-sanity-checks.sh`|
+   | - Loading machine and partition specific modules                  | **`4-module-loads.sh`** |
+   | - Launching the virtual environment from `venv/bin/activate`      |                     |
+   | - Adjusting important variables for  multi-processor communications | **`5-comms-setup.sh`** |
+   | - A well-though wrapper for node-specific executions under `srun` | **`6-task-wrapper.sh`** |
+   | Switching between machines, directories, and project accounts     | **.profile** |
+   
 
 

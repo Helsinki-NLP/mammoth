@@ -10,13 +10,13 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
    2) Install common datasets by following the instructions on [this
 page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/gets)
 
-   3) Create a job directory under `$PROJHOME/data` using `mkjobdir.sh`:
-      For more information follow the instructions on [this
+   3) Create a job directory under `$PROJHOME/data` using
+`mkjobdir.sh`.  Follow the instructions on [this
 page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create)
 
-   4) Create a sbatch file for your job directory using ``mksbatch.sh`
-      For more information follow the instructions on [this
-page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create)
+   4) Create a sbatch file for your job directory using `mksbatch.sh`.
+      Follow the instructions on [this
+      page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create)
       
    5) Complete your job directory by preparing config.yaml, and linking the datasets
       to the job directory.  (We are working on the related helper scripts.)
@@ -26,7 +26,7 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create
       sbatch   sbatch-entry.slurm
       ```
       
-## The automation you get for free with `sbatch-tail.sh` 
+## The Added Value 
 
    | Functionality                                                   | Script Component    |
    |-----------------------------------------------------------------|---------------------|
@@ -37,5 +37,8 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create
    | Sanity checking of the SLURM parameters                         | `3-sanity-checks.sh`|
    | Setting up the remaining multiprocessor parameters              | `2-distributed-setup.sh` |
    | Integrity checks of the script combo, covering also your `sbatch-entry.slurm` | `1-integrity-checks.sh` |
+   | Generalizing and organizing the constant knowhow of SBATCH jobs | **`sbatch-tail.sh`**      |
+   | Variable, **user-editable setings** of SBATCH jobs              | **`sbatch-entry.sh`**   |
+   | Quick creation of SBATCH scripts                                | **`mksbatch.sh`**       |
 
 

@@ -40,12 +40,12 @@ bash setup_env.sh
 
 ```bash
 # Edit the script to set your project ID and paths
+cp lumi/env_setup.sh ./training.sh
 nano training.sh
 ```
 
 Update the following in `training.sh`:
 
-- `#SBATCH -A project_` → `#SBATCH -A project_YOUR_PROJECT_ID`
 - Replace path placeholders with your actual paths
 - Adjust resource requirements (nodes, memory, time) as needed
 
@@ -58,8 +58,6 @@ sbatch training.sh
 # Check job status
 squeue -u YOUR_USERNAME
 
-# Monitor job output
-tail -f log/training.JOBID.out
 ```
 
 ## Translation/Inference on LUMI
@@ -68,6 +66,7 @@ tail -f log/training.JOBID.out
 
 ```bash
 # Edit the script to set your project ID and paths
+cp lumi/translation.sh ./translation.sh
 nano translation.sh
 ```
 

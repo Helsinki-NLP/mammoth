@@ -83,13 +83,15 @@ the allocated resources (to help avoid over-allocations).
 
 # ---- sbatch directives ----------------------------------------------------
 #SBATCH --job-name=train-L-1n1g10m-en:es-test
-# Tip: keep account out of file/CLI with: export SBATCH_ACCOUNT="$ACCOUNT"
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --partition=dev-g
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=7
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=7
 #SBATCH --gpus-per-task=1
 #SBATCH --gres=gpu:mi250:1
 #SBATCH --time=0-00:10:00
@@ -118,7 +120,7 @@ source base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
 # ┌──────────┐
 # │ Task 0   │
 # │ GPU  0   │
-# │ CPU 0–7  │
+# │ CPU 0–6  │
 # └──────────┘
 # On LUMI: 7 CPUs per GPU → 4 GPUs use 28 CPUs; the other 4 GPUs can still be scheduled.
 # If you want to own the node, export JOB_EXCLUSIVE=1 (or JOB_CPU_SPLIT_POLICY=used) and take more.

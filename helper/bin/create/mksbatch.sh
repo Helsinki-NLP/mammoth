@@ -7,40 +7,108 @@ set -euo pipefail
 # Optional: PARAMS="$JOB_DIR/cfg/params.sh" (sourced if file exists)
 # Output  : "$JOB_DIR/cfg/sbatch-entry.slurm" (use OVERWRITE=1 to replace)
 
+# ---- required baseline ----
 : "${PROJHOME:?❌ PROJHOME not set}"
 : "${JOB_NAME:?❌ JOB_NAME not set}"
 JOB_DIR="$PROJHOME/data/$JOB_NAME"
 PARAMS="$JOB_DIR/cfg/params.sh"  # we are taking the risk of reading file instead of studying the JOB_NAME
 [[ -r "$PARAMS" ]] && . "$PARAMS"
 JOB_GPUS_PER_NODE=$JOB_GPUS
-
-# ---- required baseline ----
+JOB_SYSTEM="${JOB_SYSTEM,,}"          # normalize
+JOB_PATTERN="${JOB_PATTERN:-slurm}"   # slurm|torchrun
 need(){ for v; do [[ -n "${!v-}" ]] || { echo "❌ $v missing" >&2; exit 1; }; done; }
-need JOB_NAME JOB_SYSTEM JOB_NODES JOB_TIME
-JOB_SYSTEM="${JOB_SYSTEM,,}"   # normalize
+need JOB_DIR JOB_SYSTEM JOB_NODES JOB_GPUS_PER_NODE JOB_TIME
+
 
 #!/usr/bin/env bash
-# mk_sbatch.sh — generate $JOB_DIR/cfg/sbatch-entry.slurm from JOB_* env/params
+# Minimal, predictable defaults (+ small knobs)
+
 set -euo pipefail
 
-: "${JOB_DIR:?❌ JOB_DIR not set}"
-PARAMS="${PARAMS:-$JOB_DIR/cfg/params.sh}"
-[[ -r "$PARAMS" ]] && . "$PARAMS"
+# ---- REQUIRED env -----------------------------------------------------------
+: "${JOB_SYSTEM:?set JOB_SYSTEM=lumi|puhti|mahti|roihu}"
+: "${JOB_NODES:?set JOB_NODES}"
+: "${JOB_GPUS_PER_NODE:?set JOB_GPUS_PER_NODE (0 for CPU-only)}"
+: "${JOB_TIME:?set JOB_TIME (HH:MM:SS or D-HH:MM:SS)}"
+JOB_PATTERN="${JOB_PATTERN:-slurm}"             # slurm|torchrun
 
-need(){ for v; do [[ -n "${!v-}" ]] || { echo "❌ $v missing" >&2; exit 1; }; done; }
+# ---- POLICY (tiny knobs you may tune) ---------------------------------------
+JOB_CPU_SPLIT_POLICY="${JOB_CPU_SPLIT_POLICY:-max}"  # max=share by node max GPUs; used=share by GPUs-in-use
+# Floors/caps per GPU (conservative, tweak if you want)
+PER_GPU_CPU_CAP_LUMI=14;  MIN_CPU_PER_GPU_LUMI=7
+PER_GPU_CPU_CAP_PUHTI=10; MIN_CPU_PER_GPU_PUHTI=8
+PER_GPU_CPU_CAP_MAHTI=14; MIN_CPU_PER_GPU_MAHTI=8
 
-# ---- required baseline ----
-need JOB_NAME JOB_SYSTEM JOB_NODES JOB_TIME
-JOB_SYSTEM="${JOB_SYSTEM,,}"   # normalize
-
-# ---- node profiles & tunables (adjust for your site) -----------------------
-case "$JOB_SYSTEM" in
-  lumi)  CPUS_NODE=64; MEM_NODE=240; MAX_GPN=8;  GPU_TYPE="mi250"; CPU_HEAD=8; MEM_HEAD=8;  MIN_CPU_PER_GPU=8;  MEM_MIN_PER_GPU=30 ;;
-  puhti) CPUS_NODE=40; MEM_NODE=180; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=2; MEM_HEAD=8;  MIN_CPU_PER_GPU=10; MEM_MIN_PER_GPU=45 ;;
-  mahti) CPUS_NODE=64; MEM_NODE=240; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=4; MEM_HEAD=8;  MIN_CPU_PER_GPU=12; MEM_MIN_PER_GPU=60 ;;
-  roihu) CPUS_NODE=40; MEM_NODE=180; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=2; MEM_HEAD=8;  MIN_CPU_PER_GPU=10; MEM_MIN_PER_GPU=45 ;;
-  *)     CPUS_NODE=40; MEM_NODE=180; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=2; MEM_HEAD=8;  MIN_CPU_PER_GPU=10; MEM_MIN_PER_GPU=40 ;;
+# ---- NODE PROFILES ----------------------------------------------------------
+case "${JOB_SYSTEM,,}" in
+  lumi)  CPUS_NODE=64; MEM_NODE=240; MAX_GPN=8;  GPU_TYPE="mi250"; CPU_HEAD=8; MEM_HEAD=8;
+         PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_LUMI;  MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_LUMI;  MEM_MIN_PER_GPU=30 ;;
+  puhti) CPUS_NODE=40; MEM_NODE=180; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=2; MEM_HEAD=8;
+         PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_PUHTI; MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_PUHTI; MEM_MIN_PER_GPU=45 ;;
+  mahti) CPUS_NODE=64; MEM_NODE=240; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=4; MEM_HEAD=8;
+         PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_MAHTI; MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_MAHTI; MEM_MIN_PER_GPU=60 ;;
+  roihu) CPUS_NODE=40; MEM_NODE=180; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=2; MEM_HEAD=8;
+         PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_PUHTI; MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_PUHTI; MEM_MIN_PER_GPU=45 ;;
+  *)     echo "❌ Unknown JOB_SYSTEM: $JOB_SYSTEM" >&2; exit 1 ;;
 esac
+
+usable_cores=$(( CPUS_NODE - CPU_HEAD ))
+usable_mem=$(( MEM_NODE - MEM_HEAD  ))
+(( usable_cores > 0 )) || usable_cores=1
+(( usable_mem  > 0 ))  || usable_mem=1
+
+GPN="${JOB_GPUS_PER_NODE}"
+
+# ---- MEMORY (GiB per node) --------------------------------------------------
+if (( GPN == 0 )); then
+  # CPU-only default: half the node unless user overrides
+  : "${JOB_MEM:=$(( usable_mem / 2 ))G}"
+else
+  per_gpu_share=$(( usable_mem / MAX_GPN ))          # share-friendly by MAX_GPN
+  (( per_gpu_share < MEM_MIN_PER_GPU )) && per_gpu_share=$MEM_MIN_PER_GPU
+  want_mem=$(( per_gpu_share * GPN ))
+  (( want_mem > usable_mem )) && want_mem=$usable_mem
+  : "${JOB_MEM:=${want_mem}G}"
+fi
+
+# ---- CPUs & tasks -----------------------------------------------------------
+if [[ "$JOB_CPU_SPLIT_POLICY" == "max" ]]; then
+  denom=$(( MAX_GPN > 0 ? MAX_GPN : 1 ))            # share by max GPUs/node
+else
+  denom=$(( GPN    > 0 ? GPN    : 1 ))              # share by GPUs-in-use
+fi
+
+base_per_gpu=$(( usable_cores / denom ))            # floor
+
+if [[ "$JOB_PATTERN" == "torchrun" ]]; then
+  NTASKS_PER_NODE=1
+  GPUS_PER_NODE="$GPN"; GPUS_PER_TASK=""
+  if (( GPN == 0 )); then
+    : "${JOB_CPUS_PER_TASK:=$usable_cores}"
+  else
+    want=$(( base_per_gpu * GPN ))
+    cap=$(( PER_GPU_CPU_CAP * GPN ))
+    (( want > cap )) && want=$cap
+    floor=$(( MIN_CPU_PER_GPU * GPN ))
+    (( want < floor )) && want=$floor
+    (( want > usable_cores )) && want=$usable_cores
+    : "${JOB_CPUS_PER_TASK:=$want}"
+  fi
+else
+  if (( GPN == 0 )); then
+    NTASKS_PER_NODE="${NTASKS_PER_NODE:-1}"
+    GPUS_PER_TASK=""; GPUS_PER_NODE=""
+    : "${JOB_CPUS_PER_TASK:=$usable_cores}"
+  else
+    NTASKS_PER_NODE="$GPN"
+    GPUS_PER_TASK=1; GPUS_PER_NODE=""
+    cpt="$base_per_gpu"
+    (( cpt > PER_GPU_CPU_CAP )) && cpt=$PER_GPU_CPU_CAP
+    (( cpt < MIN_CPU_PER_GPU )) && cpt=$MIN_CPU_PER_GPU
+    : "${JOB_CPUS_PER_TASK:=$cpt}"
+  fi
+fi
+
 
 # ---- GPU request normalization --------------------------------------------
 # Accept JOB_GPUS_PER_NODE or JOB_GPUS_TOTAL; set JOB_GPUS (per node) and JOB_GPUS_TOTAL
@@ -64,6 +132,7 @@ normalize_gpu_request() {
   JOB_GPUS_TOTAL=$(( JOB_NODES * JOB_GPUS ))
 }
 normalize_gpu_request
+
 
 # ---- time helpers & partition choice ---------------------------------------
 time_to_minutes(){
@@ -248,7 +317,6 @@ out="$JOB_DIR/cfg/sbatch-entry.slurm"; tmp="$out.new"
 
 # ---- sbatch directives ----------------------------------------------------
 #SBATCH --job-name=${JOB_NAME}
-# Tip: keep account out of file/CLI with: export SBATCH_ACCOUNT="\$ACCOUNT"
 #SBATCH --output=logs/%x-%j.out
 #SBATCH --error=logs/%x-%j.err
 #SBATCH --partition=${JOB_PARTITION}
@@ -258,30 +326,33 @@ out="$JOB_DIR/cfg/sbatch-entry.slurm"; tmp="$out.new"
 EOF
 
   # GPU lines
-  if (( JOB_GPUS > 0 )); then
-    if [[ -n "${GPUS_PER_TASK:-}" ]]; then
-      echo "#SBATCH --gpus-per-task=${GPUS_PER_TASK}"
-      if [[ "$JOB_SYSTEM" = "lumi" ]]; then
-        echo "#SBATCH --gres=gpu:${GPU_TYPE}:${JOB_GPUS}"
+  echo "#SBATCH --nodes=$JOB_NODES"
+  echo "#SBATCH --ntasks-per-node=$NTASKS_PER_NODE"
+  echo "#SBATCH --cpus-per-task=$JOB_CPUS_PER_TASK"
+  if (( GPN > 0 )); then
+      if [[ -n "${GPUS_PER_TASK:-}" ]]; then
+	  echo "#SBATCH --gpus-per-task=$GPUS_PER_TASK"
+	  if [[ -n "$GPU_TYPE" ]]; then
+	      echo "#SBATCH --gres=gpu:$GPU_TYPE:$GPN"
+	  else
+	      echo "#SBATCH --gres=gpu:$GPN"
+	  fi
       else
-        echo "#SBATCH --gres=gpu:${JOB_GPUS}"
+	  if [[ -n "$GPU_TYPE" ]]; then
+	      echo "#SBATCH --gpus-per-node=$GPU_TYPE:$GPN"
+	      echo "#SBATCH --gres=gpu:$GPU_TYPE:$GPN"
+	      echo "#SBATCH --hint=nomultithread"   # like your LUMI headers
+	  else
+	      echo "#SBATCH --gpus-per-node=$GPN"
+	      echo "#SBATCH --gres=gpu:$GPN"
+	  fi
       fi
-    else
-      if [[ "$JOB_SYSTEM" = "lumi" && -n "$GPU_TYPE" ]]; then
-        echo "#SBATCH --gpus-per-node=${GPU_TYPE}:${JOB_GPUS}"
-        echo "#SBATCH --gres=gpu:${GPU_TYPE}:${JOB_GPUS}"
-        echo "#SBATCH --hint=nomultithread"
-      else
-        echo "#SBATCH --gpus-per-node=${JOB_GPUS}"
-        echo "#SBATCH --gres=gpu:${JOB_GPUS}"
-      fi
-    fi
   fi
   [[ "${JOB_EXCLUSIVE:-0}" = "1" ]] && echo "#SBATCH --exclusive"
+  echo "#SBATCH --time=$JOB_TIME"
+  echo "#SBATCH --mem=$JOB_MEM"
 
   cat <<EOF
-#SBATCH --time=${JOB_TIME}
-#SBATCH --mem=${JOB_MEM}
 
 # ---- guards for stopping accidental heavy jobs-----------------------------
 export GUARD_MAX_NODES=4                       # do not change unless you need to
@@ -304,10 +375,14 @@ $(viz_block)
 EOF
 } > "$tmp"
 
+# ---- (Optional) One-line sanity to stderr -----------------------------------
+printf '[mk] system=%s usable=%d cores, policy=%s, gpn=%d -> cpt=%d, mem=%s\n' \
+  "$JOB_SYSTEM" "$usable_cores" "$JOB_CPU_SPLIT_POLICY" "$GPN" "$JOB_CPUS_PER_TASK" "$JOB_MEM" >&2
+
 if [[ ! -f "$out" || "${OVERWRITE:-0}" = "1" ]]; then
     mv -f "$tmp" "$out"; chmod +x "$out"
-    echo "Wrote $out"
+    echo "[mk] Wrote $out"
 else
-    echo "Kept existing: $out"
-    echo "New version  : $tmp"
+    echo "[mk] Kept existing: $out"
+    echo "[mk] New version  : $tmp"
 fi

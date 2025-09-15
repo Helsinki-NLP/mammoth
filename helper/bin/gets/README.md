@@ -1,4 +1,4 @@
-# Data Handling with MAMMOTH
+# Data Handling with MAMMOTH Helpers
 
 This directory contains tools that can be used to download, stat, and
 remove datasets.  Later, we may include conversions and other

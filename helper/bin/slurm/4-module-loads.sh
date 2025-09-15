@@ -102,20 +102,23 @@ if [[ "${SYSTEM:-}" == "lumi" ]]; then
     echo ...LUMI...
     module -q load LUMI
 
-    echo ...partition...
     # --- Load partition stack based on detection -----------------------------
     case "$NODE_KIND" in
         login)
+	    echo ...partition/L...
             module -q load partition/L      # Works on login & compute
             ;;
         cpu)
+	    echo ...partition/C...
             module -q load partition/C      # LUMI-C CPU compute nodes
             ;;
         gpu)
+	    echo ...partition/G...
             module -q load partition/G      # LUMI-G AMD GPU compute nodes
             ;;
         *)
             echo "Could not determine node kind. Defaulting to partition/L."
+	    echo ...partition/L...
             module -q load partition/L
             ;;
     esac
@@ -125,7 +128,7 @@ if [[ "${SYSTEM:-}" == "lumi" ]]; then
     module -q load systools                  # 'tree', etc. (optional)
     echo ...singularity-AI-bindings...
     module -q load singularity-AI-bindings   # Needed for AI container bindings
-    echo ...pytorch-rocm-mammoth...
+    echo ...pytorch-rocm-mammoth (uses lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif)...
     module -q load pytorch-rocm-mammoth      # Lazy PyTorch (ROCm) module
 
 

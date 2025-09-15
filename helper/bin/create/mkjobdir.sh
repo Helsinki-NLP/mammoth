@@ -89,8 +89,8 @@ diagnose_job_name() {
       #echo $JOB_TIME
   fi
   
-  if [[ ! $lang =~ ^\[[a-z,]*\]$ ]]; then
-      printf '• Lang invalid: %-19s  (expected: lowercase, or comma, e.g., [en], [en,es])\n' "'$lang'" >&2; bad=1
+  if [[ ! $lang =~ ^[a-z:]*$ ]]; then
+      printf '• Lang invalid: %-19s  (expected: lowercase, or comma, e.g., en, en:es)\n' "'$lang'" >&2; bad=1
   else
       JOB_LANG=$lang
       #echo $JOB_LANG
@@ -107,7 +107,7 @@ diagnose_job_name() {
   fi
 
   if (( bad )); then
-    printf '— Example: train-L-1n1g10m-[en,es]-test\n' >&2
+    printf '— Example: train-L-1n1g10m-en:es-test\n' >&2
     return 1
   fi
 }
@@ -125,18 +125,27 @@ if diagnose_job_name "$JOB_NAME"; then
     echo =================================
 else
   echo "❌ Invalid JOB_NAME. Expected: Task-SystemNodesGpusTime-Lang[-Spec]" >&2
-  echo "   Example: train-L-1n1g10m-{en,es}-test" >&2
+  echo "   Example: train-L-1n1g10m-en:es-test" >&2
   # Task  : train, convert, diag, trans, ...
   # System: C=L(umi), P(uhti), R(oihu), M(ahti)
   # Nodes : -1n -2n 16n etc
   # Gpus  : 1g 2g 4g 8g 1g6 ect
   # Time  : 10m 1h ...
-  # Lang  : {en,es}
+  # Lang  : en:es
   # Spec  : free specifiers
   exit 1
 fi
 export JOB_NAME
 export JOB_DIR=$PROJHOME/data/$JOB_NAME
+
+echo "export JOB_NAME=$JOB_NAME"     > $JOB_DIR/cfg/params.sh
+echo "export JOB_TASK=$JOB_TASK"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_SYSTEM=$JOB_SYSTEM">> $JOB_DIR/cfg/params.sh
+echo "export JOB_NODES=$JOB_NODES"  >> $JOB_DIR/cfg/params.sh
+echo "export JOB_GPUS=$JOB_GPUS"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_TIME=$JOB_TIME"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_LANG=$JOB_LANG"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_SPEC=$JOB_SPEC"    >> $JOB_DIR/cfg/params.sh
 
 BASE_SRC="${BASE_SRC:-$PROJHOME/base}"
 
@@ -198,3 +207,6 @@ module load systools
 cd $PROJHOME/data/
 tree $JOB_NAME
 echo =================================
+
+export JOB_DIR
+echo $JOB_DIR

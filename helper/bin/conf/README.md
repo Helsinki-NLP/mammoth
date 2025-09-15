@@ -36,6 +36,7 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
    export PROJHOME=/project/$ACCOUNT/members/$USER
    export PROJDATA=/scratch/$ACCOUNT/members/$USER
    export GITHOME=$PROJHOME/git
+   export SBATCH_ACCOUNT="$ACCOUNT # sbatch honors SBATCH_* env vars as defaults
    ```
 
 2. Make the directories and link them

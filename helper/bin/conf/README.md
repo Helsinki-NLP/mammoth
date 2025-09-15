@@ -44,7 +44,8 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
    source ~/.profile
    mkdir -p $PROJDATA $PROJHOME $GITHOME
    ln -s $PROJDATA $PROJHOME/data
-   ```
+   ```  
+
 3. Clone the main branch and check out the helper branch -- (they are not yet merged)
    ```
    cd  $GITHOME
@@ -65,6 +66,24 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
 
    This means that MAMMOTH and its requirements have been installed,
    and - importantly - you also have helper features.
+
+5. The directory structure of your project home will look like this:
+
+```
+.
+├── base
+│   ├── git -> /project/project_462000964/members/aylijyra/git
+│   ├── mammoth-helper -> git/mammoth-helper
+│   ├── mammoth-hf -> git/mammoth-hf
+│   └── venv -> /project/project_462000964/members/aylijyra/venv
+├── data -> /scratch/project_462000964/members/aylijyra
+├── git
+│   ├── mammoth
+│   ├── mammoth-helper
+│   └── mammoth-hf
+└── venv
+    └── mammoth-hf
+```
 
 Now you can follow up to
 [this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/slurm)

@@ -13,62 +13,36 @@ FINAL NOTE: We would appreciate it A LOT if you report issues with this repo and
 ### Acknowledgements
 We thank the NVIDIA AI Technology Center Finland for their help with the multi-gpu/node implementation.
 
-### Quick Installation:
+### Quick Installation of MAMMOTH with Helper Features
+
+The NEW **helper features** of MAMMOTH are meant for guarded,
+sanity-checked and optimized deployment of supercomputers for MAMMOTH
+workflows, as well as cumulative, idempotent, backupped, and
+replicable creation of new job configurations (directories, slurm
+scripts, datafiles, and yaml files).
 
 Follow the instructions on [this page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/conf).
-This will create the virtual environment and a directory tree containing the MAMMOTH software.  The directory structure of your project home will look like this:
-```
-.
-├── base
-│   ├── git -> /project/project_462000964/members/aylijyra/git
-│   ├── mammoth-helper -> git/mammoth-helper
-│   ├── mammoth-hf -> git/mammoth-hf
-│   └── venv -> /project/project_462000964/members/aylijyra/venv
-├── data -> /scratch/project_462000964/members/aylijyra
-├── git
-│   ├── mammoth
-│   ├── mammoth-helper
-│   └── mammoth-hf
-└── venv
-    └── mammoth-hf
-```
+This will create the virtual environment and a directory tree containing the MAMMOTH software.  
+
+### Downloading Datasets
+
+Follow the instructions on [this
+page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/gets)
+for the easy downloading and management of commonly used datasets.
+
+### Setting Up Experiments
+
+Follow the instructions on [this
+page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create)
+for the easy creation of job directories and their sbatch files.
+(We will also support the easy creation of `config.yaml` files and the easy
+setup of input files for your jobs.)
 
 ### Running Training Jobs
 
-The helper features of MAMMOTH are new and meant for guarded,
-sanity-checked and optimized deployment of supercomputers for MAMMOTH,
-as well as cumulative creation of advancing job configurations
-(directories, slurm scripts, datafiles, and yaml files).
-
 That means that we are currently testing scripts that would facilitate
 the creation of the job-specific local environment (directory trees
-and configurations) for your training (and other) jobs.  According to
-the current planning, the structure of a prototypical job will look
-like this:
-
-```
-$PROJHOME/data/example-job
-├── base -> /project/$PROJECT/members/$USER/base
-│   ├── git -> /project/project_462000964/members/aylijyra/git
-│   ├── mammoth-helper -> git/mammoth-helper
-│   ├── mammoth-hf -> git/mammoth-hf
-│   └── venv -> /project/project_462000964/members/aylijyra/venv
-├── cfg
-│   ├── conf.yml
-│   └── sbatch-entry.slurm
-├── in
-│   ├── data
-│   ├── models
-│   └── vocab
-├── log
-│   ├── slurm
-│   └── tb
-└── out
-    ├── checkpoints
-    ├── metrics
-    ├── models
-    └── translations
-```
+and configurations) for your training (and other) jobs.
 
 The slurm launch helpers are available, but they are under testing.
 Follow the instructions on [this

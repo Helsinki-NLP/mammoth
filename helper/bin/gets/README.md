@@ -7,12 +7,12 @@ preprocessing tools for datasets to this very directory.
 ## Set a Shared Location for the Project's Data
 
 You need to choose where to store your datasets.  Set the environment
-variable PROJCOMM to point to the shared data files.  The recommended
+variable SHARDATA to point to the shared data files.  The recommended
 location on CSC machines is `/scratch/$ACCOUNT/shared`.
 ```
-export DATACOMM=/scratch/$ACCOUNT/shared
-mkdir $DATACOMM
-ln -s $DATACOMM $PROJHOME/shared
+export SHARDATA=/scratch/$ACCOUNT/shared
+mkdir -p $SHARDATA
+ln -s $SHARDATA $PROJHOME/shared
 ln -s ../shared $PROJHOME/base/
 ```
 
@@ -44,13 +44,13 @@ Downloadable datasets are shown with `--list`:
 
 ```
 Available datasets:
-  europarl-3langs     → $PROJCOMM/europarl/3langs
+  europarl-3langs     → $SHARDATA/europarl/3langs
   europarl-all|europarl
-                       → $PROJCOMM/europarl/all
-  vocab-opusTC.mul     → $PROJCOMM/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
-  tatoeba              → $PROJCOMM/tatoeba/Tatoeba-Challenge (git)
-  opus100-de-en        → $PROJCOMM/opus100/de-en
-  opus100-zeroshot     → $PROJCOMM/opus100/zeroshot
+                       → $SHARDATA/europarl/all
+  vocab-opusTC.mul     → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
+  tatoeba              → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
+  opus100-de-en        → $SHARDATA/opus100/de-en
+  opus100-zeroshot     → $SHARDATA/opus100/zeroshot
 ```
 
 ### Planning

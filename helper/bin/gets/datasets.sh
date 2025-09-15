@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# datasets.sh — manage shared datasets under $PROJCOMM
+# datasets.sh — manage shared datasets under $SHARDATA
 # Actions:
 #   --check  (default)  Show space/quota + plan + cost estimates (no changes)
 #   --get               Download/extract/clone the chosen dataset
@@ -7,17 +7,17 @@
 #   --stat              Print on-disk stats + costs for already-downloaded data
 #
 # Datasets (choose one):
-#   europarl-3langs   → $PROJCOMM/europarl/3langs
-#   vocab-opusTC.mul  → $PROJCOMM/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
-#   tatoeba           → $PROJCOMM/tatoeba/Tatoeba-Challenge (git)
-#   opus100-de-en     → $PROJCOMM/opus100/de-en
-#   opus100-zeroshot  → $PROJCOMM/opus100/zeroshot
+#   europarl-3langs   → $SHARDATA/europarl/3langs
+#   vocab-opusTC.mul  → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
+#   tatoeba           → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
+#   opus100-de-en     → $SHARDATA/opus100/de-en
+#   opus100-zeroshot  → $SHARDATA/opus100/zeroshot
 #
 # Examples:
-#   SYSTEM=lumi  PROJCOMM=/proj/xxx/shared ./datasets.sh --check europarl-3langs
-#   SYSTEM=puhti PROJCOMM=/proj/yyy/shared ./datasets.sh --get   vocab-opusTC.mul
-#   SYSTEM=lumi  PROJCOMM=/proj/xxx/shared ./datasets.sh --stat  tatoeba
-#   SYSTEM=roihu PROJCOMM=/proj/zzz/shared ./datasets.sh --rm    opus100-de-en
+#   SYSTEM=lumi  SHARDATA=/proj/xxx/shared ./datasets.sh --check europarl-3langs
+#   SYSTEM=puhti SHARDATA=/proj/yyy/shared ./datasets.sh --get   vocab-opusTC.mul
+#   SYSTEM=lumi  SHARDATA=/proj/xxx/shared ./datasets.sh --stat  tatoeba
+#   SYSTEM=roihu SHARDATA=/proj/zzz/shared ./datasets.sh --rm    opus100-de-en
 #
 # Notes:
 # - Idempotent: re-running --get won’t overwrite existing files; extracts only if needed.
@@ -40,7 +40,7 @@ set -euo pipefail
 : "${LUMI_BU_PER_TIBH:=}"  # e.g. export LUMI_BU_PER_TIBH=1.2  (EXAMPLE ONLY; leave empty if unknown)
 
 # ───────────────────────────────── Helpers ───────────────────────────────────
-: "${PROJCOMM:?❌ PROJCOMM is not set (root of shared datasets)}"
+: "${SHARDATA:?❌ SHARDATA is not set (root of shared datasets)}"
 : "${SYSTEM:?❌ SYSTEM is not set (use: lumi|puhti|mahti|roihu)}"
 SYSTEM="${SYSTEM,,}"
 
@@ -72,14 +72,14 @@ content_length(){
 
 show_space_quota(){
     echo
-    echo "== Space & quota for $SYSTEM on $PROJCOMM =="
-    df -h "$PROJCOMM" || true
+    echo "== Space & quota for $SYSTEM on $SHARDATA =="
+    df -h "$SHARDATA" || true
     case "$SYSTEM" in
 	lumi|puhti|mahti|roihu)
 	    if have lfs; then
 		echo
 		echo "== lfs quota =="
-		lfs quota -h "$PROJCOMM" || true
+		lfs quota -h "$SHARDATA" || true
 	    fi
 	    ;;
     esac
@@ -267,19 +267,19 @@ pick_dataset(){
   case "$name" in
       europarl-all|europarl)
 	  KIND="parallel"
-	  TARGET_DIR="$PROJCOMM/europarl/all"
+	  TARGET_DIR="$SHARDATA/europarl/all"
 	  URLS=( "https://mammoth101.a3s.fi/europarl.tar.gz" )
 	  EXTRACT_TGZ=1
 	  ;;
       europarl-3langs)
 	  KIND="parallel"
-	  TARGET_DIR="$PROJCOMM/europarl/3langs"
+	  TARGET_DIR="$SHARDATA/europarl/3langs"
 	  URLS=( "https://mammoth101.a3s.fi/europarl-3langs.tar.gz" )
 	  EXTRACT_TGZ=1
 	  ;;
       vocab-opusTC.mul)
 	  KIND="vocab"
-	  TARGET_DIR="$PROJCOMM/vocab"
+	  TARGET_DIR="$SHARDATA/vocab"
 	  URLS=(
               "https://mammoth101.a3s.fi/opusTC.mul.64k.spm"
               "https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt"
@@ -288,20 +288,20 @@ pick_dataset(){
 	  ;;
       tatoeba)
 	  KIND="parallel"
-	  TARGET_DIR="$PROJCOMM/tatoeba/Tatoeba-Challenge"
+	  TARGET_DIR="$SHARDATA/tatoeba/Tatoeba-Challenge"
 	  URLS=("https://object.pouta.csc.fi/Tatoeba-Challenge-devtest/devtest.tar")
 	  EXTRACT_TAR=0
 	  # GIT_CLONE="https://github.com/Helsinki-NLP/Tatoeba-Challenge.git"
 	  ;;
       opus100-de-en)
 	  KIND="parallel"
-	  TARGET_DIR="$PROJCOMM/opus100/de-en"
+	  TARGET_DIR="$SHARDATA/opus100/de-en"
 	  URLS=( "https://object.pouta.csc.fi/OPUS-100/v1.0/opus-100-corpus-de-en-v1.0.tar.gz" )
 	  EXTRACT_TGZ=1
 	  ;;
       opus100-zeroshot)
 	  KIND="parallel"
-	  TARGET_DIR="$PROJCOMM/opus100/zeroshot"
+	  TARGET_DIR="$SHARDATA/opus100/zeroshot"
 	  URLS=( "https://object.pouta.csc.fi/OPUS-100/v1.0/opus-100-corpus-zeroshot-v1.0.tar.gz" )
 	  EXTRACT_TGZ=1
 	  ;;
@@ -316,13 +316,13 @@ prog="${0##*/}"
 list_datasets() {
   cat <<'DS'
 Available datasets:
-  europarl-3langs     → $PROJCOMM/europarl/3langs
+  europarl-3langs     → $SHARDATA/europarl/3langs
   europarl-all|europarl
-                       → $PROJCOMM/europarl/all
-  vocab-opusTC.mul     → $PROJCOMM/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
-  tatoeba              → $PROJCOMM/tatoeba/Tatoeba-Challenge (git)
-  opus100-de-en        → $PROJCOMM/opus100/de-en
-  opus100-zeroshot     → $PROJCOMM/opus100/zeroshot
+                       → $SHARDATA/europarl/all
+  vocab-opusTC.mul     → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
+  tatoeba              → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
+  opus100-de-en        → $SHARDATA/opus100/de-en
+  opus100-zeroshot     → $SHARDATA/opus100/zeroshot
 DS
 }
 
@@ -338,14 +338,14 @@ Usage:
 
 Required environment:
   SYSTEM=lumi|puhti|mahti|roihu
-  PROJCOMM=/path/to/shared/project/area
+  SHARDATA=/path/to/shared/project/area
 Optional:
   ACCOUNT=project_...       # for lumi-quota; on LUMI: module load lumi-tools
 
 Examples:
-  SYSTEM=lumi  PROJCOMM=/proj/xxx/shared $prog --check europarl-all
-  SYSTEM=puhti PROJCOMM=/proj/xxx/shared $prog --get   vocab-opusTC.mul
-  SYSTEM=lumi  PROJCOMM=/proj/xxx/shared $prog --stat  tatoeba
+  SYSTEM=lumi  SHARDATA=/proj/xxx/shared $prog --check europarl-all
+  SYSTEM=puhti SHARDATA=/proj/xxx/shared $prog --get   vocab-opusTC.mul
+  SYSTEM=lumi  SHARDATA=/proj/xxx/shared $prog --stat  tatoeba
 
 EOF
   list_datasets
@@ -480,8 +480,8 @@ if [[ "$ACTION" == "check" ]]; then
   else
     for u in "${URLS[@]}"; do echo "url    : $u"; done
     bytes=$(estimate_download_size || true)
-    # Free space (bytes) on the filesystem hosting $PROJCOMM
-    avail_bytes=$(df -PB1 "$PROJCOMM" | awk 'NR==2{print $4}')
+    # Free space (bytes) on the filesystem hosting $SHARDATA
+    avail_bytes=$(df -PB1 "$SHARDATA" | awk 'NR==2{print $4}')
     if [[ -n "${bytes:-}" && "$bytes" -gt 0 && "$avail_bytes" -lt "$bytes" ]]; then
 	echo "❌ Not enough free space: need ~$(bytes_to_h "$bytes"), have $(bytes_to_h "$avail_bytes")" >&2
 	exit 1
@@ -561,7 +561,7 @@ case "$ACTION" in
       clone_or_update "$GIT_CLONE" "$TARGET_DIR"
     else
       ensure_dir "$TARGET_DIR"
-      tmp="$PROJCOMM/.tmp-datasets"; ensure_dir "$tmp"
+      tmp="$SHARDATA/.tmp-datasets"; ensure_dir "$tmp"
       for u in "${URLS[@]}"; do
         base="$(basename "$u")"
         part="$tmp/$base"
@@ -682,13 +682,13 @@ exit 0
 # -----------------------------------------------------------------------------
 # • Idempotent behavior
 #   - Re-running --get won’t overwrite existing files:
-#     * archives download once to $PROJCOMM/.tmp-datasets
+#     * archives download once to $SHARDATA/.tmp-datasets
 #     * extraction runs only if the target directory looks empty
 #     * git datasets run `git fetch` if already cloned
 #
 # • Space & quota visibility
-#   - Always shows filesystem space:   df -h "$PROJCOMM"
-#   - On CSC Lustre (LUMI/Puhti/Mahti/Roihu): tries `lfs quota -h "$PROJCOMM"`
+#   - Always shows filesystem space:   df -h "$SHARDATA"
+#   - On CSC Lustre (LUMI/Puhti/Mahti/Roihu): tries `lfs quota -h "$SHARDATA"`
 #   - Also shows user quota if `quota -s` exists
 #
 # • Size estimation before download
@@ -709,11 +709,11 @@ exit 0
 #     subtract that before computing BU; not enabled by default
 #
 # • Targets / where files go
-#   - europarl-3langs   → $PROJCOMM/europarl/3langs
-#   - vocab-opusTC.mul  → $PROJCOMM/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
-#   - tatoeba           → $PROJCOMM/tatoeba/Tatoeba-Challenge (git)
-#   - opus100-de-en     → $PROJCOMM/opus100/de-en
-#   - opus100-zeroshot  → $PROJCOMM/opus100/zeroshot
+#   - europarl-3langs   → $SHARDATA/europarl/3langs
+#   - vocab-opusTC.mul  → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
+#   - tatoeba           → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
+#   - opus100-de-en     → $SHARDATA/opus100/de-en
+#   - opus100-zeroshot  → $SHARDATA/opus100/zeroshot
 #
 # • Actions / flags
 #   - --check (default): print quota/space, download plan, and cost estimates
@@ -722,17 +722,17 @@ exit 0
 #   - --stat           : show on-disk stats + cost comparison
 #
 # • Usage examples
-#   SYSTEM=lumi  PROJCOMM=/proj/xxx/shared ./datasets.sh --check europarl-3langs
-#   SYSTEM=puhti PROJCOMM=/proj/xxx/shared ./datasets.sh --g
+#   SYSTEM=lumi  SHARDATA=/proj/xxx/shared ./datasets.sh --check europarl-3langs
+#   SYSTEM=puhti SHARDATA=/proj/xxx/shared ./datasets.sh --g
 #
 #   Just inspect plan + cost first
-#   SYSTEM=lumi  PROJCOMM=/proj/xxx/shared ./datasets.sh --check europarl-all
+#   SYSTEM=lumi  SHARDATA=/proj/xxx/shared ./datasets.sh --check europarl-all
 #
 #   Download/extract full Europarl
-#   SYSTEM=lumi  PROJCOMM=/proj/xxx/shared ./datasets.sh --get   europarl-all
+#   SYSTEM=lumi  SHARDATA=/proj/xxx/shared ./datasets.sh --get   europarl-all
 #
 #   Stats + cost after it’s on disk
-#   SYSTEM=lumi  PROJCOMM=/proj/xxx/shared ./datasets.sh --stat  europarl
+#   SYSTEM=lumi  SHARDATA=/proj/xxx/shared ./datasets.sh --stat  europarl
 #
 
 

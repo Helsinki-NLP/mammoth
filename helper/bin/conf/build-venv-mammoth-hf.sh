@@ -99,8 +99,8 @@ mkdir -p "$PROJHOME"
 mkdir -p "$PROJHOME/base"
 
 cd "$PROJHOME/base"
-ln -sfn $PROJHOME/venv     venv
-ln -sfn $GITHOME           git
+ln -sfn ../venv            venv
+ln -sfn ../git             git
 ln -sfn git/mammoth-hf     mammoth-hf
 ln -sfn git/mammoth-helper mammoth-helper
 

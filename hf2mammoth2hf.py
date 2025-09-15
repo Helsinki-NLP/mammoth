@@ -617,10 +617,13 @@ def push_to_hub(model, config, tokenizer, hub_model_id):
         print("Uploading model...")
         model.push_to_hub(hub_model_id)
 
+        print("Uploading config...")
+        config.push_to_hub(hub_model_id)
+
         print("Uploading tokenizer...")
         tokenizer.push_to_hub(hub_model_id)
 
-        print(f"✓ Model successfully pushed Hugging Face Model Hub")
+        print(f"✓ Model, config, and tokenizer successfully pushed Hugging Face Model Hub")
         return True
 
     except Exception as e:

@@ -10,19 +10,13 @@ This directory contains `sbatch-entry.sh` (template) and `sbatch-tail.sh` (const
    2) Install common datasets by following the instructions on [this
 page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/gets)
 
-   3) Create a job directory under `$PROJHOME/data` using `mkjob.sh`:
-      ```
-      export JOB_NAME=train-L-1n1g10m-en:es-test
-      sh $PROJHOME/base/mammoth-helper/helper/bin/create/mkjob.sh $JOB_NAME
-      ```
+   3) Create a job directory under `$PROJHOME/data` using `mkjobdir.sh`:
       For more information follow the instructions on [this
-page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/creat)
+page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create)
 
    4) Create a sbatch file for your job directory using ``mksbatch.sh`
-      ```
-      sh $PROJHOME/base/mammoth-helper/helper/bin/create/mksbatch.sh
-      cd       $PROJHOME/data/$JOB_NAME
-      mv       sbatch-entry.slurm.new sbatch-entry.slurm
+      For more information follow the instructions on [this
+page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create)
       ```
       
    5) Complete your job directory by preparing config.yaml, and linking the datasets

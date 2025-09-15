@@ -38,8 +38,7 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/creat)
    | Functionality                                                   | Script Component    |
    |-----------------------------------------------------------------|---------------------|
    | A well-though wrapper for node-specific executions under `srun` | `6-task-wrapper.sh` |
-   | Setup of important machine specific environment variables for  multi-processor communications | 
-     `5-comms-setup.sh` |
+   | Setup of important machine specific environment variables for  multi-processor communications | `5-comms-setup.sh` |
    | Launching the virtual environment from `venv/bin/activate`      |                     |
    | Loading machine and partition specific modules                  | `4-module-loads.sh` |
    | Sanity checking of the SLURM parameters                         | `3-sanity-checks.sh`|

@@ -117,6 +117,7 @@ This dataset for 30 days : 0.04 TiB·h
 ```
 
 ### Obtained Directory Tree:
+```
 /scratch/project_462000964/common
 ├── europarl
 │   └── all
@@ -133,7 +134,7 @@ This dataset for 30 days : 0.04 TiB·h
 └── vocab
     ├── opusTC.mul.64k.spm
     └── opusTC.mul.vocab.onmt
-
+```
 
 ### Status: `./datasets.sh --stat europarl` gives the ouput:
 ```

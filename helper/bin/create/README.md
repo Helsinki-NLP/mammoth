@@ -89,9 +89,6 @@ the allocated resources (to help avoid over-allocations).
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=7
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=7
 #SBATCH --gpus-per-task=1
 #SBATCH --gres=gpu:mi250:1
 #SBATCH --time=0-00:10:00

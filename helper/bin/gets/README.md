@@ -19,11 +19,15 @@ ln -s ../shared $PROJHOME/base/
 ## Dataset Download, Stat and Removal
 
 Script `datatsets.sh` is handy for planning, downloading, stating and
-stop downloaded datasets.
+stop downloaded datasets.  On LUMI, you need to have `module load
+lumi-tools` before using the tool.
 
-### Usage: If you do not remember how to use it, just
-write `cd $PROJHOME/base/mammoth-helper/helper/bin/gets/; ./dataset.sh`
-and this will list the usage information:
+### Usage
+
+If you do not remember how to use it, just write `cd
+$PROJHOME/base/mammoth-helper/helper/bin/gets/; ./dataset.sh` and this
+will list the usage information:
+
 ```
 Usage:
   getdata.sh --check <dataset>   # show quota/space, plan, cost (default if <dataset> only)
@@ -34,7 +38,10 @@ Usage:
   getdata.sh --help              # this help
 ```
 
-### Downloadable datasets are shown with `--list`:
+### Datasets
+
+Downloadable datasets are shown with `--list`:
+
 ```
 Available datasets:
   europarl-3langs     → $PROJCOMM/europarl/3langs
@@ -46,11 +53,12 @@ Available datasets:
   opus100-zeroshot     → $PROJCOMM/opus100/zeroshot
 ```
 
-On LUMI, you need to have `module load lumi-tools` before using the tool.
+### Planning
 
-### Planning: ./datasets.sh --check opus100-de-en
+One of the key functionalities of the tool is to check the space usage and the remaining resources of the project.
+Just write `./datasets.sh --check opus100-de-en` to get the resouce analysis and action recommendation:
+
 ```
-
 == Space & quota for lumi on /scratch/project_462000964/common ==
 Filesystem                                                                             Size  Used Avail Use% Mounted on
 10.253.241.4@tcp16,10.253.241.5@tcp16:10.253.241.6@tcp16,10.253.241.7@tcp16:/lustrep1  500T  435T   66T  87% /pfs/lustrep1
@@ -92,7 +100,13 @@ This dataset for 30 days : 0.04 TiB·h
 ✔ Fits in budget for ~76266678.8 month(s) at current size.
 ```
 
-### Download vocabulary: `/datasets.sh --get vocab-opusTC.mul` gives the output:
+### Downloads
+
+We [Helsinki NLP] have trained a SentencePiece tokenizer on OPUS
+Tatoeba Challenge data with 64k vocabulary size.  To download the
+SentencePiece model and the vocabulary, you just write `/datasets.sh
+--get vocab-opusTC.mul`.  This gives the output:
+
 ```
 [datasets] curl -fL --retry 3 -o /scratch/project_462000964/common/.tmp-datasets/opusTC.mul.64k.spm https://mammoth101.a3s.fi/opusTC.mul.64k.spm
   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
@@ -105,7 +119,9 @@ This dataset for 30 days : 0.04 TiB·h
 [datasets] done (--get vocab-opusTC.mul)
 ```
 
-### Downloads: `./datasets.sh --get europarl` gives the output:
+To download all languages of the Europarl dataset, give the command
+`./datasets.sh --get europarl`.  This gives the output:
+
 ```
 [datasets] mkdir -p /scratch/project_462000964/common/europarl/all
 [datasets] curl -fL --retry 3 -o /scratch/project_462000964/common/.tmp-datasets/europarl.tar.gz https://mammoth101.a3s.fi/europarl.tar.gz
@@ -116,7 +132,7 @@ This dataset for 30 days : 0.04 TiB·h
 [datasets] done (--get europarl)
 ```
 
-### Obtained Directory Tree:
+Here is the obtained directory tree:
 ```
 /scratch/project_462000964/common
 ├── europarl
@@ -136,7 +152,12 @@ This dataset for 30 days : 0.04 TiB·h
     └── opusTC.mul.vocab.onmt
 ```
 
-### Status: `./datasets.sh --stat europarl` gives the ouput:
+### Status
+
+If you want to check if the Europarl dataset consumes too much
+resources from the project, you can do `./datasets.sh --stat europarl`
+to get the ouput:
+
 ```
 == stats for /scratch/project_462000964/common/europarl/all ==
 19G	/scratch/project_462000964/common/europarl/all
@@ -158,6 +179,10 @@ Project TiB·h (remaining): 3050667.15
 Current data for 30 days : 13.26 TiB·h
 ✔ Fits in budget for ~230065.4 month(s) at current size.
 ```
+
+### Removing Datasets
+
+You can also remove the Europarl dataset with the command `./datasets.sh --rm europarl`.
 
 
 

@@ -6,6 +6,19 @@ This update introduces HuggingFace model integration capabilities to Mammoth, en
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (15-Sep-2025)
+
+**LUMI Supercomputer Support**
+
+- Added LUMI environment setup script (`lumi/env_setup.sh`) for PyTorch virtual environment configuration
+- Added SLURM batch scripts for training (`lumi/train.sh`) and translation (`lumi/translate.sh`) on LUMI
+- Minimal requirements file (`requirements_lumi.txt`) for LUMI deployment with essential dependencies
+
+**Improvements**
+
+- Added early validation for save_model path with proper error handling and directory creation. So the destination directory will be validated before the training starts.
+- Improved error messages for save_model path validation
+
 ## What Was Updated (05-Sep-2025)
 
 **HuggingFace Converter Enhancement (`hf2mammoth2hf.py`)**
@@ -23,7 +36,7 @@ For usage instructions, please refer to README.md.
 **Training Configuration Updates**
 
 - Added `--valid_metrics` parameter to training configuration to enable in-training validation with metrics
-- Added "BLEU" metric from `sacrebleu` library as an option for `--valid_metrics`. By default, this returns the corpus BLEU score against the reference. 
+- Added "BLEU" metric from `sacrebleu` library as an option for `--valid_metrics`. By default, this returns the corpus BLEU score against the reference.
 
 ## What Was Updated (22-Aug-2025)
 

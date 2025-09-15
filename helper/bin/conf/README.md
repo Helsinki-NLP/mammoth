@@ -56,7 +56,7 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
    ```
 4. Build the inheritable `base` directory `$PROJHOME/base` (that extends your venv)
    ```
-   $GITHOME/mammoth-helper/helper/bin/conf/build-venv-mammoth-hf.sh
+   $GITHOME/mammoth-helper/helper/bin/conf/build-venv.sh
    ```
    Running this takes a couple of minutes. Now you should see:
    ```

@@ -54,4 +54,8 @@ safer slurm scripts with the helper feature.
 
 We are working on extending the domain of the helper features.
 
+## Metadata of the Helper Features (Added on the Top of MAMMOTH NLP)
+
+Authors: Anssi Yli-Jyrä (c) 2025
+License: CC-NC-BY
 

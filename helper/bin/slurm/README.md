@@ -45,8 +45,4 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/creat)
    | Setting up the remaining multiprocessor parameters              | `2-distributed-setup.sh` |
    | Integrity checks of the script combo, covering also your `sbatch-entry.slurm` | `1-integrity-checks.sh` |
 
-## Metadata of the Helper Features
-
-Authors: Anssi Yli-Jyrä (c) 2025
-License: CC-NC-BY
 

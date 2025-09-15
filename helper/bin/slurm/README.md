@@ -28,22 +28,23 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create
       
 ## The Added Value 
 
-   | Functionality                                                   | Script Component    |
-   |-----------------------------------------------------------------|---------------------|
-   | Switching between machines, directories, and project accounts     | **`.profile`** |
-   | Creating the virtual environment from `venv/bin/activate`         | **`build-venv.sh`**     |
-   | Quick creation of the local environment for SBATCH jobs         | **`mkjobdir.sh`**       |
-   | Quick linking of the input files for SBATCH jobs                | **`mkinputs.sh`** (N/A) |
-   | Quick creation of the MAMMOTH config files for SBATCH jobs      | **`mkconfig.sh`** (N/A) |
-   | Quick creation of SBATCH scripts                                | **`mksbatch.sh`**       |
-   | Variable, **user-editable setings** of SBATCH jobs              | **`sbatch-entry.sh`**   |
-   | Generalizing and organizing the constant cross-machine know-how of SBATCH jobs | **`sbatch-tail.sh`**      |
-   | - Integrity checks of the script combo, covering also your `sbatch-entry.slurm` | **`1-integrity-checks.sh`** |
-   | - Setting up the remaining multiprocessor parameters              | **`2-distributed-setup.sh`** |
-   | - Sanity checking of the SLURM parameters                         | **`3-sanity-checks.sh`** |
-   | - Loading machine and partition specific modules                  | **`4-module-loads.sh`** |
-   | - Adjusting important variables for  multi-processor communications | **`5-comms-setup.sh`** |
-   | - A well-though wrapper for node-specific executions under `srun` | **`6-task-wrapper.sh`** |
+   | Functionality                                                   | Script Component    | Group |
+   |-----------------------------------------------------------------|---------------------|-------|
+   | Switching between machines, directories, and project accounts     | **`.profile`** | **conf** |
+   | Creating the virtual environment with rocm-pytorch and packages      | **`build-venv.sh`**  | **conf** |
+   | Downloading and managing shared data directories                | **`datasets.sh`**       | **gets** |
+   | Quick creation of the local environment for SBATCH jobs         | **`mkjobdir.sh`**       | **create** |
+   | Quick linking of the input files for SBATCH jobs                | **`mkinputs.sh`** (N/A) | **create** |
+   | Quick creation of the MAMMOTH config files for SBATCH jobs      | **`mkconfig.sh`** (N/A) | **create** |
+   | Quick creation of SBATCH scripts                                | **`mksbatch.sh`**       | **create** |
+   | Variable, **user-editable setings** of SBATCH jobs              | **`sbatch-entry.sh`**   | **slurm** |
+   | Generalizing and organizing the constant cross-machine know-how of SBATCH jobs | **`sbatch-tail.sh`**      | **slurm** |
+   | - Integrity checks of the script combo, covering also your `sbatch-entry.slurm` | **`1-integrity-checks.sh`** | **slurm** |
+   | - Setting up the remaining multiprocessor parameters              | **`2-distributed-setup.sh`** | **slurm** |
+   | - Sanity checking of the SLURM parameters                         | **`3-sanity-checks.sh`** | **slurm** |
+   | - Loading machine and partition specific modules                  | **`4-module-loads.sh`** | **slurm** |
+   | - Adjusting important variables for  multi-processor communications | **`5-comms-setup.sh`** | **slurm** |
+   | - A well-though wrapper for node-specific executions under `srun` | **`6-task-wrapper.sh`** | **slurm** |
    
 
 

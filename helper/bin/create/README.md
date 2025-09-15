@@ -55,6 +55,7 @@ train-L-1n1g10m-en:es-test
     └── translations
 15 directories, 1 file
 =================================
+```
 
 ## Listing all job directories
 ```

@@ -326,9 +326,6 @@ out="$JOB_DIR/cfg/sbatch-entry.slurm"; tmp="$out.new"
 EOF
 
   # GPU lines
-  echo "#SBATCH --nodes=$JOB_NODES"
-  echo "#SBATCH --ntasks-per-node=$NTASKS_PER_NODE"
-  echo "#SBATCH --cpus-per-task=$JOB_CPUS_PER_TASK"
   if (( GPN > 0 )); then
       if [[ -n "${GPUS_PER_TASK:-}" ]]; then
 	  echo "#SBATCH --gpus-per-task=$GPUS_PER_TASK"

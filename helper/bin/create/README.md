@@ -122,3 +122,12 @@ source base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
 # On LUMI: 7 CPUs per GPU → 4 GPUs use 28 CPUs; the other 4 GPUs can still be scheduled.
 # If you want to own the node, export JOB_EXCLUSIVE=1 (or JOB_CPU_SPLIT_POLICY=used) and take more.
 ```
+
+## Data Importing Scripts
+
+There are scripts that will bring selected input data files to your job directory (via symblinks).
+Currently, they are rudimentary and will be generalized later.
+
+...
+
+

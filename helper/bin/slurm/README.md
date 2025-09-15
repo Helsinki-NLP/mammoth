@@ -30,7 +30,7 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create
 
    | Functionality                                                   | Script Component    |
    |-----------------------------------------------------------------|---------------------|
-   | Switching between machines, directories, and project accounts     | **.profile** |
+   | Switching between machines, directories, and project accounts     | **`.profile`** |
    | Creating the virtual environment from `venv/bin/activate`         | **`build-venv.sh`**     |
    | Quick creation of the local environment for SBATCH jobs         | **`mkjobdir.sh`**       |
    | Quick linking of the input files for SBATCH jobs                | **`mkinputs.sh`** (N/A) |

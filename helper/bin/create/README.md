@@ -64,7 +64,7 @@ sh showjobs.sh
 
 ## Creating the SBATCH file
 
-If you set `export JOB_DIR=$PROJHOME/data/train-L-1n1g10m-en:es-test`,
+If you set PROJHOME and `export JOB_NAME=train-L-1n1g10m-en:es-test`,
 you can continue using other scripts to furnish the job directory.
 For example, `sh mksbatch.sh` will prepare you a new sbatch file
 called `cfg/sbatch-entry.slurm.new`.  It contains the directives, the

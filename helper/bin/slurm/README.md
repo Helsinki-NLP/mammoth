@@ -17,7 +17,6 @@ page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create
    4) Create a sbatch file for your job directory using ``mksbatch.sh`
       For more information follow the instructions on [this
 page](https://github.com/Helsinki-NLP/mammoth/tree/feat/helper/helper/bin/create)
-      ```
       
    5) Complete your job directory by preparing config.yaml, and linking the datasets
       to the job directory.  (We are working on the related helper scripts.)

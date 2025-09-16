@@ -31,7 +31,7 @@ cp lumi/env_setup.sh ./setup_env.sh
 nano setup_env.sh
 
 # Run the setup
-bash setup_env.sh
+source setup_env.sh
 ```
 
 ## Training on LUMI

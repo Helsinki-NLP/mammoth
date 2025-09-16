@@ -40,6 +40,8 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
    export SHARDATA=/scratch/$ACCOUNT/shared
    export GITHOME=$PROJHOME/git
    export SBATCH_ACCOUNT="$ACCOUNT # sbatch honors SBATCH_* env vars as defaults
+   export SBATCH_MAIL_TYPE=ALL
+   export SBATCH_MAIL_USER="${USER}@helsinki.fi"  # set your correct email here
    ```
 
 2. Make the directories and link them

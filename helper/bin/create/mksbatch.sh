@@ -1,36 +1,45 @@
 #!/usr/bin/env bash
-set -euo pipefail
-
 # ---------- inputs ----------
 # Required: JOB_DIR, JOB_NAME, JOB_SYSTEM (lumi|puhti|mahti|roihu), JOB_NODES, JOB_GPUS, JOB_TIME
 # Optional: JOB_PATTERN (slurm|torchrun), JOB_PARTITION, JOB_CPUS_PER_TASK, JOB_MEM
 # Optional: PARAMS="$JOB_DIR/cfg/params.sh" (sourced if file exists)
 # Output  : "$JOB_DIR/cfg/sbatch-entry.slurm" (use OVERWRITE=1 to replace)
 
+is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
+require_set() {
+  local v
+  for v; do
+    # ${!v-} expands to empty if unset (safe with set -u)
+    if [[ -z "${!v-}" ]]; then
+      printf '❌ %s must be set\n' "$v" >&2
+      return 1
+    fi
+  done
+}
+
 # ---- required baseline ----
-: "${PROJHOME:?❌ PROJHOME not set}"
-: "${JOB_NAME:?❌ JOB_NAME not set}"
+require_set PROJHOME JOB_NAME || { is_sourced && return 1 || exit 1; }
+
+
 JOB_DIR="$PROJHOME/data/$JOB_NAME"
 PARAMS="$JOB_DIR/cfg/params.sh"  # we are taking the risk of reading file instead of studying the JOB_NAME
 [[ -r "$PARAMS" ]] && . "$PARAMS"
 JOB_GPUS_PER_NODE=$JOB_GPUS
 JOB_SYSTEM="${JOB_SYSTEM,,}"          # normalize
 JOB_PATTERN="${JOB_PATTERN:-slurm}"   # slurm|torchrun
-need(){ for v; do [[ -n "${!v-}" ]] || { echo "❌ $v missing" >&2; exit 1; }; done; }
-need JOB_DIR JOB_SYSTEM JOB_NODES JOB_GPUS_PER_NODE JOB_TIME
+need() {
+  local v
+  for v; do
+    # ${!v-} expands to empty if unset (safe with set -u)
+    if [[ -z "${!v-}" ]]; then
+      printf '❌ %s must be set\n' "$v" >&2
+      return 1
+    fi
+  done
+}
+need JOB_DIR JOB_SYSTEM JOB_NODES JOB_GPUS_PER_NODE JOB_TIME || { is_sourced && return 1 || exit 1; };
 
-
-#!/usr/bin/env bash
-# Minimal, predictable defaults (+ small knobs)
-
-set -euo pipefail
-
-# ---- REQUIRED env -----------------------------------------------------------
-: "${JOB_SYSTEM:?set JOB_SYSTEM=lumi|puhti|mahti|roihu}"
-: "${JOB_NODES:?set JOB_NODES}"
-: "${JOB_GPUS_PER_NODE:?set JOB_GPUS_PER_NODE (0 for CPU-only)}"
-: "${JOB_TIME:?set JOB_TIME (HH:MM:SS or D-HH:MM:SS)}"
-JOB_PATTERN="${JOB_PATTERN:-slurm}"             # slurm|torchrun
+FORCE_MEM_PER_GPU=1
 
 # ---- POLICY (tiny knobs you may tune) ---------------------------------------
 JOB_CPU_SPLIT_POLICY="${JOB_CPU_SPLIT_POLICY:-max}"  # max=share by node max GPUs; used=share by GPUs-in-use
@@ -41,15 +50,16 @@ PER_GPU_CPU_CAP_MAHTI=14; MIN_CPU_PER_GPU_MAHTI=8
 
 # ---- NODE PROFILES ----------------------------------------------------------
 case "${JOB_SYSTEM,,}" in
-  lumi)  CPUS_NODE=64; MEM_NODE=240; MAX_GPN=8;  GPU_TYPE="mi250"; CPU_HEAD=8; MEM_HEAD=8;
-         PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_LUMI;  MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_LUMI;  MEM_MIN_PER_GPU=30 ;;
+  lumi)  CPUS_NODE=64; MEM_NODE=240; MAX_GPN=8;  GPU_TYPE="mi250"; CPU_HEAD=8; MEM_HEAD=16;   # MEM_HEAD 8→16 → 28 GiB/GPU
+         PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_LUMI;  MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_LUMI;  MEM_MIN_PER_GPU=28 ;;
   puhti) CPUS_NODE=40; MEM_NODE=180; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=2; MEM_HEAD=8;
          PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_PUHTI; MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_PUHTI; MEM_MIN_PER_GPU=45 ;;
   mahti) CPUS_NODE=64; MEM_NODE=240; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=4; MEM_HEAD=8;
          PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_MAHTI; MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_MAHTI; MEM_MIN_PER_GPU=60 ;;
   roihu) CPUS_NODE=40; MEM_NODE=180; MAX_GPN=4;  GPU_TYPE="";       CPU_HEAD=2; MEM_HEAD=8;
          PER_GPU_CPU_CAP=$PER_GPU_CPU_CAP_PUHTI; MIN_CPU_PER_GPU=$MIN_CPU_PER_GPU_PUHTI; MEM_MIN_PER_GPU=45 ;;
-  *)     echo "❌ Unknown JOB_SYSTEM: $JOB_SYSTEM" >&2; exit 1 ;;
+  *)     echo "❌ Unknown JOB_SYSTEM: $JOB_SYSTEM" >&2
+	 { is_sourced && return 1 || exit 1 ;}  ;;
 esac
 
 usable_cores=$(( CPUS_NODE - CPU_HEAD ))
@@ -101,7 +111,7 @@ else
     : "${JOB_CPUS_PER_TASK:=$usable_cores}"
   else
     NTASKS_PER_NODE="$GPN"
-    GPUS_PER_TASK=1; GPUS_PER_NODE=""
+    GPUS_PER_TASK=""; GPUS_PER_NODE="$gpn"   # << prefer per-node GPUs (was GPUS_PER_TASK=1)
     cpt="$base_per_gpu"
     (( cpt > PER_GPU_CPU_CAP )) && cpt=$PER_GPU_CPU_CAP
     (( cpt < MIN_CPU_PER_GPU )) && cpt=$MIN_CPU_PER_GPU
@@ -135,6 +145,10 @@ normalize_gpu_request
 
 
 # ---- time helpers & partition choice ---------------------------------------
+
+# turn "28G" → 28 (GiB as integer)
+gib_num(){ local x="${1:-}"; x="${x%G}"; x="${x%g}"; printf '%d' "${x:-0}"; }
+
 time_to_minutes(){
   local t="$1" d=0 h=0 m=0 s=0
   if [[ "$t" =~ ^([0-9]+)-([0-9]{1,2}):([0-9]{2}):([0-9]{2})$ ]]; then
@@ -142,7 +156,8 @@ time_to_minutes(){
   elif [[ "$t" =~ ^([0-9]{1,2}):([0-9]{2}):([0-9]{2})$ ]]; then
     h=${BASH_REMATCH[1]}; m=${BASH_REMATCH[2]}; s=${BASH_REMATCH[3]}
   else
-    echo "❌ JOB_TIME '$t' not in HH:MM:SS or D-HH:MM:SS" >&2; exit 1
+      echo "❌ JOB_TIME '$t' not in HH:MM:SS or D-HH:MM:SS" >&2
+      { is_sourced && return 1 || exit 1 ; }
   fi
   echo $(( d*1440 + h*60 + m + (s>0 ? 1 : 0) ))
 }
@@ -232,7 +247,7 @@ choose_defaults() {
     # per-GPU tasks
     if (( gpn > 0 )); then
       NTASKS_PER_NODE="$gpn"
-      GPUS_PER_TASK=1; GPUS_PER_NODE=""
+      GPUS_PER_TASK=""; GPUS_PER_NODE="$gpn"   # << prefer per-node GPUs (was GPUS_PER_TASK=1)
       if [[ -z "${JOB_CPUS_PER_TASK:-}" ]]; then
         local cpt=$base_per_gpu
         (( cpt > PER_GPU_CPU_CAP )) && cpt=$PER_GPU_CPU_CAP
@@ -325,35 +340,42 @@ out="$JOB_DIR/cfg/sbatch-entry.slurm"; tmp="$out.new"
 #SBATCH --cpus-per-task=${JOB_CPUS_PER_TASK}
 EOF
 
-  # GPU lines
+  # GPU lines (always prefer per-node typed GPUs)
   if (( GPN > 0 )); then
-      if [[ -n "${GPUS_PER_TASK:-}" ]]; then
-	  echo "#SBATCH --gpus-per-task=$GPUS_PER_TASK"
-	  if [[ -n "$GPU_TYPE" ]]; then
-	      echo "#SBATCH --gres=gpu:$GPU_TYPE:$GPN"
-	  else
-	      echo "#SBATCH --gres=gpu:$GPN"
-	  fi
+      if [[ -n "$GPU_TYPE" ]]; then
+          echo "#SBATCH --gpus-per-node=$GPU_TYPE:$GPN"
+          echo "#SBATCH --gres=gpu:$GPU_TYPE:$GPN"
+          echo "#SBATCH --hint=nomultithread"
       else
-	  if [[ -n "$GPU_TYPE" ]]; then
-	      echo "#SBATCH --gpus-per-node=$GPU_TYPE:$GPN"
-	      echo "#SBATCH --gres=gpu:$GPU_TYPE:$GPN"
-	      echo "#SBATCH --hint=nomultithread"   # like your LUMI headers
-	  else
-	      echo "#SBATCH --gpus-per-node=$GPN"
-	      echo "#SBATCH --gres=gpu:$GPN"
-	  fi
+          echo "#SBATCH --gpus-per-node=$GPN"
+          echo "#SBATCH --gres=gpu:$GPN"
       fi
   fi
   [[ "${JOB_EXCLUSIVE:-0}" = "1" ]] && echo "#SBATCH --exclusive"
   echo "#SBATCH --time=$JOB_TIME"
-  echo "#SBATCH --mem=$JOB_MEM"
+
+  # ---- memory: prefer --mem-per-gpu for multi-node (or when forced) ----
+  if (( GPN > 0 )) && { (( JOB_NODES > 1 )) || [[ "${FORCE_MEM_PER_GPU:-0}" = "1" ]]; }; then
+      # If user provided JOB_MEM_PER_GPU (e.g. "28G"), use it; otherwise derive from per-node JOB_MEM.
+      if [[ -n "${JOB_MEM_PER_GPU:-}" ]]; then
+	  echo "#SBATCH --mem-per-gpu=${JOB_MEM_PER_GPU}    # CPU memory per GPU"
+      else
+	  # derive per-gpu from per-node total: ceil(JOB_MEM / GPN)
+	  _mem_gib="$(gib_num "$JOB_MEM")"
+	  _ppg=$(( (_mem_gib + GPN - 1) / GPN ))
+	  ((_ppg<1)) && _ppg=1
+	  echo "#SBATCH --mem-per-gpu=${_ppg}G    # CPU memory per GPU, with 4GiB headroom"
+      fi
+  else
+      # single-node (or CPU-only) keeps the node-total memory request
+      echo "#SBATCH --mem=$JOB_MEM      # total CPU memory per node"
+  fi
 
   cat <<EOF
 
 # ---- guards for stopping accidental heavy jobs-----------------------------
 export GUARD_MAX_NODES=4                       # do not change unless you need to
-export GUARD_TIME="${GUARD_TIME:-0-01:00:00}"  # do not change unless you need to
+export GUARD_TIME="\${GUARD_TIME:-0-01:00:00}"  # do not change unless you need to
 # examples: GUARD_TIME="12:00:00" (12h) or GUARD_TIME="2-00:00:00" (2 days).
 
 # ---- job payload (adjust as needed) ---------------------------------------
@@ -366,8 +388,8 @@ EOF
 
 # ---- constant, machine independent sbatch tail ----------------------------
 TAIL=base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
-[[ -s "$TAIL" ]] || { echo "❌ Missing/empty: $TAIL; Try to cd." >&2; exit 1 }
-source $TAIL
+[[ -s "\$TAIL" ]] || { echo "❌ Missing/empty: \$TAIL; Try to cd." >&2; { is_sourced && return 1 || exit 1; }; }
+source \$TAIL
 
 # ---- visualization for a quick review "is this sensible?" -----------------
 $(viz_block)

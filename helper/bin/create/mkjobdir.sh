@@ -1,10 +1,10 @@
 #!/usr/bin/bash
-set -euo pipefail
+
 prog=${0##*/}
 if (( $# < 1 )); then
   printf '❌ expecting a job name argument\n' >&2
   printf 'Usage Example: %s train-L-1n1g10m-{en,es}-test\n' "$prog" >&2
-  exit 2
+  exit 1
 fi
 : "${PROJHOME:?❌ PROJHOME not set}"
 JOB_NAME=$1
@@ -138,15 +138,6 @@ fi
 export JOB_NAME
 export JOB_DIR=$PROJHOME/data/$JOB_NAME
 
-echo "export JOB_NAME=$JOB_NAME"     > $JOB_DIR/cfg/params.sh
-echo "export JOB_TASK=$JOB_TASK"    >> $JOB_DIR/cfg/params.sh
-echo "export JOB_SYSTEM=$JOB_SYSTEM">> $JOB_DIR/cfg/params.sh
-echo "export JOB_NODES=$JOB_NODES"  >> $JOB_DIR/cfg/params.sh
-echo "export JOB_GPUS=$JOB_GPUS"    >> $JOB_DIR/cfg/params.sh
-echo "export JOB_TIME=$JOB_TIME"    >> $JOB_DIR/cfg/params.sh
-echo "export JOB_LANG=$JOB_LANG"    >> $JOB_DIR/cfg/params.sh
-echo "export JOB_SPEC=$JOB_SPEC"    >> $JOB_DIR/cfg/params.sh
-
 BASE_SRC="${BASE_SRC:-$PROJHOME/base}"
 
 log(){ printf '[job:%s] %s\n' "$JOB_NAME" "$*"; }
@@ -200,6 +191,15 @@ done
 # template file into cfg/ (only if missing)
 ensure_copy "$BASE_SRC/mammoth-helper/helper/bin/slurm/sbatch-entry.slurm" \
             "$JOB_DIR/cfg/sbatch-entry.slurm"
+
+echo "export JOB_NAME=$JOB_NAME"     > $JOB_DIR/cfg/params.sh
+echo "export JOB_TASK=$JOB_TASK"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_SYSTEM=$JOB_SYSTEM">> $JOB_DIR/cfg/params.sh
+echo "export JOB_NODES=$JOB_NODES"  >> $JOB_DIR/cfg/params.sh
+echo "export JOB_GPUS=$JOB_GPUS"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_TIME=$JOB_TIME"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_LANG=$JOB_LANG"    >> $JOB_DIR/cfg/params.sh
+echo "export JOB_SPEC=$JOB_SPEC"    >> $JOB_DIR/cfg/params.sh
 
 module load LUMI
 module load systools

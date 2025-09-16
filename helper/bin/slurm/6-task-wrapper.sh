@@ -239,4 +239,5 @@ echo ===========================================================================
 echo " EXECUTING         : ${RUNTIME} ${RUNTIME_ARGS[@]} "$@" ${POST_ARGS[@]}"
 echo =========================================================================================
 echo
+echo "Starting ${RUNTIME} and the Python script at `date`"
 exec ${RUNTIME} ${RUNTIME_ARGS[@]} "$@" ${POST_ARGS[@]}

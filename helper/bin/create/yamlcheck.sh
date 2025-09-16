@@ -3,8 +3,6 @@
 # Usage:  ./check-config-paths.sh /path/to/config.yaml
 # Exit codes: 0 = all OK, 1 = usage error, 2 = missing paths
 
-set -euo pipefail
-
 usage() {
   cat <<EOF
 Usage: ${0##*/} CONFIG.yaml
@@ -20,7 +18,8 @@ EOF
 [[ $# -eq 1 ]] || { usage >&2; exit 1; }
 CONFIG="$1"
 [[ -f "$CONFIG" ]] || { echo "❌ No such file: $CONFIG" >&2; exit 1; }
-CONFIG_DIR="$(cd "$(dirname "$CONFIG")" && pwd -P)"
+JOB_DIR="$(cd "$(dirname "$CONFIG")" && pwd -P)"
+JOB_DIR="$(pwd -P)"
 
 # --- Run an embedded Python scanner to extract candidate paths ----------------
 # Output format (TSV): KIND<TAB>KEYPATH<TAB>RAWVALUE
@@ -129,13 +128,13 @@ if [[ -z "$MAP_OUTPUT" ]]; then
 fi
 
 # --- Normalize, resolve, and validate ----------------------------------------
-# We resolve relative RAWVALUE against CONFIG_DIR.
+# We resolve relative RAWVALUE against JOB_DIR.
 # We print a deduplicated list and a validation report.
 
 # Store to temp arrays
 declare -A SEEN
 declare -i missing=0 present=0
-printf '### Paths referenced in %s (resolved against %s)\n' "$CONFIG" "$CONFIG_DIR"
+printf '### Paths referenced in %s (resolved against %s)\n' "$CONFIG" "$JOB_DIR"
 
 # Build an array of "kind<TAB>key<TAB>raw<TAB>resolved"
 ALL=()
@@ -145,7 +144,7 @@ while IFS=$'\t' read -r KIND KEYP RAW; do
   if [[ "$RAW" = /* ]]; then
     RES="$RAW"
   else
-    RES="$CONFIG_DIR/$RAW"
+    RES="$JOB_DIR/$RAW"
   fi
   # Collapse .. and .
   RES="$(python3 - <<'PY' "$RES"

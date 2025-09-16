@@ -1,4 +1,5 @@
-echo sbatch-tail.sh ...
+echo "Starting sbatch-tail.sh at `date`..."
+set -e # stops the script when encountering an error
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
 is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
 require_set() {
@@ -11,7 +12,6 @@ require_set() {
     fi
   done
 }
-
 
 source base/mammoth-helper/helper/bin/slurm/1-integrity-checks.sh
 # Check that scripts and variables are in place
@@ -36,6 +36,8 @@ require_set FI_PROVIDER FI_HMEM FI_LOG_LEVEL FI_LOG_PROV NCCL_SOCKET_IFNAME \
      || { is_sourced && return 1 || exit 1 } ;
 
 echo running the srun...
+echo "Starting task-wrapper.sh at `date`"
 srun $DISTR_OPS base/mammoth-helper/helper/bin/slurm/6-task-wrapper.sh ${RUN_SCRIPT} ${RUN_ARGS}
+echo "Finishing the whole sbatch at `date`"
 
 

@@ -30,5 +30,7 @@ export GUARD_MAX_NODES=4                       # do not change unless you need t
 export GUARD_TIME="${GUARD_TIME:-0-01:00:00}"  # do not change unless you need to
 # examples: GUARD_TIME="12:00:00" (12h) or GUARD_TIME="2-00:00:00" (2 days).
 
-source base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
+TAIL=base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
+[[ -s "$TAIL" ]] || { echo "❌ Missing/empty: $TAIL; Try to cd." >&2; exit 1 }
+source $TAIL
 

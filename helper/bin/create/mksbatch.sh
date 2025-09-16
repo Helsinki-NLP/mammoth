@@ -363,7 +363,11 @@ EOF
   cat <<EOF
 # export JOB_SCRIPT="..."
 # export JOB_ARGS="..."
-source base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
+
+# ---- constant, machine independent sbatch tail ----------------------------
+TAIL=base/mammoth-helper/helper/bin/slurm/sbatch-tail.sh
+[[ -s "$TAIL" ]] || { echo "❌ Missing/empty: $TAIL; Try to cd." >&2; exit 1 }
+source $TAIL
 
 # ---- visualization for a quick review "is this sensible?" -----------------
 $(viz_block)

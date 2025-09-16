@@ -25,16 +25,19 @@ supercomputers: puhti.csc.fi, mahti.csc.fi, lumi.csc.fi, (and roihu.csc.fi).  Th
         elif [[ "$HOSTNAME" == puhti* ]]; then
             export SYSTEM=puhti
             export ACCOUNT=project_2005099
-        elif grep -q 'lumi-super' /etc/motd; then
+        elif egrep -q 'lumi|LUMI' /etc/motd; then
             export SYSTEM=lumi
             export ACCOUNT=project_462000964
         else
-            echo "⚠️ Unknown system: $HOSTNAME. Please edit this script (detect_system.sh) manually."
-            exit 1
+            export SYSTEM=unknown
+            export ACCOUNT=project_462000964
+            echo "⚠️ Unknown system: $HOSTNAME."
+            egrep 'lumi-super|LUMI' /etc/motd
         fi
    fi
    export PROJHOME=/project/$ACCOUNT/members/$USER
    export PROJDATA=/scratch/$ACCOUNT/members/$USER
+   export SHARDATA=/scratch/$ACCOUNT/shared
    export GITHOME=$PROJHOME/git
    export SBATCH_ACCOUNT="$ACCOUNT # sbatch honors SBATCH_* env vars as defaults
    ```

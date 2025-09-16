@@ -10,7 +10,7 @@
 #   europarl-3langs   → $SHARDATA/europarl/3langs
 #   vocab-opusTC.mul  → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
 #   tatoeba           → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
-#   opus100-de-en     → $SHARDATA/opus100/de-en
+#   opus100-de-en     → $SHARDATA/opus100/de-en (example languages)
 #   opus100-zeroshot  → $SHARDATA/opus100/zeroshot
 #
 # Examples:
@@ -299,6 +299,33 @@ pick_dataset(){
 	  URLS=( "https://object.pouta.csc.fi/OPUS-100/v1.0/opus-100-corpus-de-en-v1.0.tar.gz" )
 	  EXTRACT_TGZ=1
 	  ;;
+      opus100-en-es)
+	  KIND="parallel"
+	  TARGET_DIR="$SHARDATA/opus100/en-es"
+	  URLS=( "https://object.pouta.csc.fi/OPUS-100/v1.0/opus-100-corpus-en-es-v1.0.tar.gz" )
+	  EXTRACT_TGZ=1
+	  ;;
+      opus100-*-*)
+	  # Accept any pair as opus100-<src>-<tgt>
+	  local pair="${name#opus100-}"
+	  local src="${pair%%-*}"
+	  local tgt="${pair#*-}"
+	  src="${src,,}"; tgt="${tgt,,}"
+	  
+	  # minimal sanity
+	  if [[ -z "$src" || -z "$tgt" || "$src" == "$tgt" ]]; then
+	      err "Bad OPUS-100 pair: '$pair' (expected opus100-<src>-<tgt>)"; exit 2
+	  fi
+	  # Optional: restrict to simple language codes (2–3 letters) + optional region (en, de, pt-br, zh-cn, …)
+	  if [[ ! "$src" =~ ^[a-z]{2,3}(-[a-z0-9]+)?$ || ! "$tgt" =~ ^[a-z]{2,3}(-[a-z0-9]+)?$ ]]; then
+	      warn "Unusual language code(s): $src / $tgt (continuing anyway)"
+	  fi
+	  
+	  KIND="parallel"
+	  TARGET_DIR="${SHARDATA:-$PROJCOMM}/opus100/${src}-${tgt}"
+	  URLS=( "https://object.pouta.csc.fi/OPUS-100/v1.0/opus-100-corpus-${src}-${tgt}-v1.0.tar.gz" )
+	  EXTRACT_TGZ=1
+	  ;;
       opus100-zeroshot)
 	  KIND="parallel"
 	  TARGET_DIR="$SHARDATA/opus100/zeroshot"
@@ -315,13 +342,13 @@ prog="${0##*/}"
 
 list_datasets() {
   cat <<'DS'
-Available datasets:
+[OAvailable datasets:
   europarl-3langs     → $SHARDATA/europarl/3langs
   europarl-all|europarl
                        → $SHARDATA/europarl/all
   vocab-opusTC.mul     → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
   tatoeba              → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
-  opus100-de-en        → $SHARDATA/opus100/de-en
+  opus100-de-en        → $SHARDATA/opus100/de-en (example languages)
   opus100-zeroshot     → $SHARDATA/opus100/zeroshot
 DS
 }
@@ -496,22 +523,30 @@ if [[ "$ACTION" == "check" ]]; then
     fi
 
     # ---- LUMI capacity-based recommendation (no TiB·h needed) ----
-    if [[ "${SYSTEM,,}" == "lumi" && -n "${bytes:-}" && "$bytes" -gt 0 ]]; then
+    if [ "$(printf %s "${SYSTEM}" | tr '[:upper:]' '[:lower:]')" = "lumi" ] && \
+	   [ -n "${bytes:-}" ] && [ "$bytes" -gt 0 ]; then
 	echo
 	echo "== capacity recommendation (from lumi-quota) =="
-	if command -v lumi-quota >/dev/null 2>&1 && [[ -n "${ACCOUNT:-}" ]]; then
+	if command -v lumi-quota >/dev/null 2>&1 && [ -n "${ACCOUNT:-}" ]; then
 	    best_area=""; best_fit=0; chosen_bytes=0
-	    while read -r area avail; do
+	    tmpfile=$(mktemp) || exit 1
+	    get_lumi_quota_avail > "$tmpfile"
+	    while IFS=' ' read -r area avail; do
+		[ -n "$area" ] || continue
 		# pick the area with the largest headroom that still fits
-		if (( avail > bytes )); then
-		    if (( avail > best_fit )); then best_fit="$avail"; best_area="$area"; fi
+		if [ "$avail" -gt "$bytes" ]; then
+		    if [ "$avail" -gt "$best_fit" ]; then
+			best_fit="$avail"; best_area="$area"
+		    fi
 		fi
 		# remember the absolute biggest for a hint even if none fit
-		(( avail > chosen_bytes )) && chosen_bytes="$avail"
-		printf "  %-8s free: %8s (need ~%s)\n" "$area" "$(bytes_to_h "$avail")" "$(bytes_to_h "$bytes")"
-	    done < <(get_lumi_quota_avail)
-	    
-	    if [[ -n "$best_area" ]]; then
+		[ "$avail" -gt "$chosen_bytes" ] && chosen_bytes="$avail"
+		printf "  %-8s free: %8s (need ~%s)\n" \
+		       "$area" "$(bytes_to_h "$avail")" "$(bytes_to_h "$bytes")"
+	    done < "$tmpfile"
+	    rm -f "$tmpfile"
+
+	    if [ -n "$best_area" ]; then
 		echo "✔ Recommend storing on: /$best_area (enough free space)."
 	    else
 		echo "❗ None of the areas have enough free capacity for this dataset."
@@ -522,7 +557,6 @@ if [[ "$ACTION" == "check" ]]; then
 	    echo "  module load lumi-tools; export ACCOUNT=<project_account>"
 	fi
     fi
-
 
     # ---- TiB·hour budget recommendation (based on the download plan) ----
     if [[ -n "$bytes" && "$bytes" -gt 0 ]]; then
@@ -611,23 +645,32 @@ case "$ACTION" in
       bytes_on_disk=$(du -sb "$TARGET_DIR" | awk '{print $1}')
       print_storage_comparison "$bytes_on_disk"
 
+
       # ---- LUMI capacity-based recommendation (no TiB·h needed) ----
-      if [[ "${SYSTEM,,}" == "lumi" && -n "${bytes_on_disk:-}" && "$bytes_on_disk" -gt 0 ]]; then
+      if [ "$(printf %s "${SYSTEM}" | tr '[:upper:]' '[:lower:]')" = "lumi" ] && \
+	     [ -n "${bytes_on_disk:-}" ] && [ "$bytes_on_disk" -gt 0 ]; then
 	  echo
 	  echo "== capacity recommendation (from lumi-quota) =="
-	  if command -v lumi-quota >/dev/null 2>&1 && [[ -n "${ACCOUNT:-}" ]]; then
+	  if command -v lumi-quota >/dev/null 2>&1 && [ -n "${ACCOUNT:-}" ]; then
 	      best_area=""; best_fit=0; chosen_bytes=0
-	      while read -r area avail; do
+	      tmpfile=$(mktemp) || exit 1
+	      get_lumi_quota_avail > "$tmpfile"
+	      while IFS=' ' read -r area avail; do
+		  [ -n "$area" ] || continue
 		  # pick the area with the largest headroom that still fits
-		  if (( avail > bytes_on_disk )); then
-		      if (( avail > best_fit )); then best_fit="$avail"; best_area="$area"; fi
+		  if [ "$avail" -gt "$bytes_on_disk" ]; then
+		      if [ "$avail" -gt "$best_fit" ]; then
+			  best_fit="$avail"; best_area="$area"
+		      fi
 		  fi
 		  # remember the absolute biggest for a hint even if none fit
-		  (( avail > chosen_bytes )) && chosen_bytes="$avail"
-		  printf "  %-8s free: %8s (need ~%s)\n" "$area" "$(bytes_to_h "$avail")" "$(bytes_to_h "$bytes_on_disk")"
-	      done < <(get_lumi_quota_avail)
+		  [ "$avail" -gt "$chosen_bytes" ] && chosen_bytes="$avail"
+		  printf "  %-8s free: %8s (need ~%s)\n" \
+			 "$area" "$(bytes_to_h "$avail")" "$(bytes_to_h "$bytes_on_disk")"
+	      done < "$tmpfile"
+	      rm -f "$tmpfile"
 
-	      if [[ -n "$best_area" ]]; then
+	      if [ -n "$best_area" ]; then
 		  echo "✔ Recommend storing on: /$best_area (enough free space)."
 	      else
 		  echo "❗ None of the areas have enough free capacity for this dataset."
@@ -639,6 +682,7 @@ case "$ACTION" in
 	  fi
       fi
 
+      
       # ---- TiB·hour budget recommendation (based on on-disk size) ----
       if [[ -n "${bytes_on_disk:-}" && "$bytes_on_disk" -gt 0 ]]; then
 	  

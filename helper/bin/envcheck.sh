@@ -1,0 +1,1 @@
+diag/envcheck.sh

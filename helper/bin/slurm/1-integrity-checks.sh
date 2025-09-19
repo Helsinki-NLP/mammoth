@@ -1,7 +1,7 @@
 echo integrity-check.sh ...
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
 is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
-require_set() {
+require_set() {   
   local v
   for v; do
     # ${!v-} expands to empty if unset (safe with set -u)
@@ -11,9 +11,9 @@ require_set() {
     fi
   done
 }
-require_set SYSTEM SLURM_JOB_NAME SLURM_SUBMIT_DIR || { is_sourced && return 1 || exit 1 };
-require_set JOB_NAME JOB_PATTERN JOB_SCRIPT JOB_ARGS || { is_sourced && return 1 || exit 1 };
-require_set GUARD_TIME GUARD_MAX_NODES || { is_sourced && return 1 || exit 1 };
+require_set SYSTEM SLURM_JOB_NAME SLURM_SUBMIT_DIR || { is_sourced && return 1 || exit 1; };
+require_set JOB_NAME JOB_PATTERN JOB_SCRIPT JOB_ARGS || { is_sourced && return 1 || exit 1; };
+require_set GUARD_TIME GUARD_MAX_NODES || { is_sourced && return 1 || exit 1; };
 
 SUBMIT_DIR="${SLURM_SUBMIT_DIR:-$(pwd -P)}"
 SUBMIT_BASENAME="$(basename -- "$SUBMIT_DIR")"
@@ -43,7 +43,7 @@ export JOB_VENV=base/venv/mammoth-hf
 export JOB_LIB=base/helper/lib
 export JOB_LOGS=logs
 echo ==============================================
-echo " JOB_DIR (`pwd`)   : $JOB_DIR"
+echo " JOB_DIR (pwd)     : $JOB_DIR"
 echo " JOB_SLURM         : ./$JOB_SLURM"
 echo " JOB_VENV          : ./$JOB_VENV"
 echo " JOB_LIB           : ./$JOB_LIB"
@@ -65,10 +65,9 @@ check_under "$JOB_SLURM" \
   3-sanity-checks.sh \
   4-module-loads.sh \
   5-comms-setup.sh \
-  6-task-wrapper.sh \
-  7-local-setup.sh  || { is_sourced && return 1 || exit 1; }
+  6-task-wrapper.sh || { is_sourced && return 1 || exit 1; }
 check_under "$JOB_VENV" \
-  activate  || { is_sourced && return 1 || exit 1; } 
+  bin/activate  || { is_sourced && return 1 || exit 1; } 
 
 INTEGRITY_CHECKS_OK=1
 

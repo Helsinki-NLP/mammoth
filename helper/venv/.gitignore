@@ -1,0 +1,4 @@
+# Track nothing in this directory except these two files
+*
+!.gitignore
+!README.md

@@ -1,17 +1,17 @@
 #!/usr/bin/env -S -u BASH_ENV bash --noprofile --norc
 echo running task-wrapper.sh...
-
-# Use -u for Python, not for the bash wrapper.
-# In bash, -u means treat unset vars as an error (nounset). It has
-# nothing to do with buffering. It’s still a good safety flag for the
-echo "task-wrapper.sh..."
-set -euo pipefail
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
-
-# Usage:
-#   source $SLURM/local-setup.sh
-
-# --- must be inside an srun-launched task ---
+is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
+require_vars() {
+  local v
+  for v; do
+    # ${!v-} expands to empty if unset (safe with set -u)
+    if [[ -z "${!v-}" ]]; then
+      printf '❌ %s must be set\n' "$v" >&2
+      return 1
+    fi
+  done
+}
 require_vars SLURM_PROCID SLURM_LOCALID SLURM_NODEID SLURM_NTASKS
 require_vars SYSTEM JOB_PATTERN JOB_LOGS JOB_NAME
 require_vars MASTER_ADDR MASTER_PORT MASTER_ARGS
@@ -221,6 +221,9 @@ case "${PATTERN:-slurm}" in
         POST_ARGS=()
 	;;
 esac
+
+export PLUGIN_DIR=base/mammoth-helper/helper/lib  # This has symlinks to /opt/aws-ofi-rccl/librccl-net.so
+export LD_LIBRARY_PATH=base/mammoth-helper/helper/lib:$LD_LIBRARY_PATH
 
 echo ==============================================
 echo " RUNTIME           : $RUNTIME"

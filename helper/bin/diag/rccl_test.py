@@ -332,6 +332,7 @@ def run_test():
         "FI_LOG_LEVEL": "INFO",
         "HSA_ENABLE_DEBUG": "1",
         "MIOPEN_ENABLE_LOGGING":"1",
+        "LD_DEBUG":"libs,symbols",
         # "FI_PROVIDER": "cxi",
         # "FI_HMEM": "1",
         # "NCCL_NET_PLUGIN": "",

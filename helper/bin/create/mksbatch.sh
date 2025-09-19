@@ -344,11 +344,9 @@ EOF
   if (( GPN > 0 )); then
       if [[ -n "$GPU_TYPE" ]]; then
           echo "#SBATCH --gpus-per-node=$GPU_TYPE:$GPN"
-          echo "#SBATCH --gres=gpu:$GPU_TYPE:$GPN"
           echo "#SBATCH --hint=nomultithread"
       else
           echo "#SBATCH --gpus-per-node=$GPN"
-          echo "#SBATCH --gres=gpu:$GPN"
       fi
   fi
   [[ "${JOB_EXCLUSIVE:-0}" = "1" ]] && echo "#SBATCH --exclusive"

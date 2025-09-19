@@ -1,7 +1,7 @@
 echo module-loads.sh...
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
 is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
-require_set() {
+require_vars() {
   local v
   for v; do
     # ${!v-} expands to empty if unset (safe with set -u)
@@ -11,39 +11,37 @@ require_set() {
     fi
   done
 }
-require_set JOB_NODE_KIND || { is_sourced && return 1 || exit 1; }
+require_vars JOB_NODE_KIND || { is_sourced && return 1 || exit 1; }
 
 check_under() {
   local base="$1"; shift
   local name f missing=0
+  echo "Testing software integrity under $base:"
   for name in "$@"; do
       f="$base/$name"
-      echo testing file "$f"
       [[ -s "$f" ]] || { echo "❌ Missing/empty: $f" >&2; missing=1; }
+      echo "- found file $name" 
   done
   (( missing == 0 )) 
 }
 
-# It is important to cover alternative situations:
-# 1) we do not have $PROJHOME/base when running build-env.sh
-# 2) we may also be running this interactively in any directory; require $PROJHOME
-# 3) we may run this inside sbatch-tail.sh; use relative location `base`
-
-# Decide BASE
-if [[ -d "base/git/mammoth-helper/helper/bin/modules" ]]; then
-  BASE="base"
+# --- find this file's directory (absolute, symlinks resolved) ---
+if [ -n "${BASH_SOURCE-}" ]; then
+  THIS=${BASH_SOURCE[0]}                     # bash (sourced or executed)
+elif [ -n "${ZSH_VERSION-}" ]; then
+  eval 'THIS=${(%):-%N}'                     # zsh (sourced or executed)
+elif (eval 'test -n "${.sh.file-}"') 2>/dev/null; then
+  eval 'THIS=${.sh.file}'                    # ksh93
 else
-  : "${PROJHOME:?❌ PROJHOME is not set (e.g. /project/$ACCOUNT/members/$USER)}"
-  BASE="$PROJHOME"
-  # (optional) sanity check that the expected path exists under PROJHOME
-  if [[ ! -d "$BASE/git/mammoth-helper/helper/bin/modules" ]]; then
-    echo "❌ Not found: $BASE/git/mammoth-helper/helper/bin/modules" >&2
-    { is_sourced && return 1 || exit 1; }
-  fi
+  echo 1>&2 "Unsupported shell. Please use bash, ksh93 or zsh."
+  exit 2
+  # _src=$0                                   # POSIX sh (only reliable when executed)
 fi
-echo "This file lives in the helper tree: $BASE/git/mammoth-helper/helper"
-echo "From this tree, I will find have to find various parts of the module"
-check_under "$BASE/git/mammoth-helper/helper" \
+MYDIR=$(cd -P -- "$(dirname -- "$THIS")" && pwd) || { echo "cannot resolve MYDIR" >&2; return 1 2>/dev/null || exit 1; }
+echo "This file is in the directory $MYDIR"
+HELPER=$(cd -P -- "$MYDIR/../.." && pwd) || { echo "cannot resolve BASE" >&2; is_sourced && return 1 || exit 1; }
+echo "The helper functions' base is $HELPER"
+check_under "$HELPER" \
    bin/modules/pytorch-rocm-mammoth/6.0.lua \
    bin/modules/load-pytorch-rocm-mammoth.txt \
    bin/wrappers/python \
@@ -100,7 +98,7 @@ detect_node_kind () {
 
 module --force purge
 
-NODE_KIND="$(detect_node_kind)"
+NODE_KIND="$(detect_node_kind)"  # in fact will get its value from JOB_NODE_KIND
 echo "LUMI node kind detected: ${NODE_KIND} (SLURM_JOB_PARTITION=${SLURM_JOB_PARTITION:--})"
 
 # Helper: load first module that exists (Lmod)
@@ -118,8 +116,9 @@ load_first_available () {
 if [[ "${SYSTEM:-}" == "lumi" ]]; then
     # --- Common module paths ---
     echo ...paths...
-    module -q use /appl/local/containers/ai-modules       # AI-bindings
-    module -q use "$BASE/mammoth-helper/helper/bin/modules"  # pytorch-rocm-mammoth 
+    module -q use /appl/local/containers/ai-modules # AI-bindings
+    module    use "$HELPER/bin/modules"             # pytorch-rocm-mammoth
+    find $HELPER/bin/modules |egrep '\.lua'
 
     # --- Base env (recommended by CSC; safe on all nodes) ---
     echo ...CrayEnv...
@@ -153,16 +152,31 @@ if [[ "${SYSTEM:-}" == "lumi" ]]; then
     module -q load systools                  # 'tree', etc. (optional)
     echo "...singularity-AI-bindings..."
     module -q load singularity-AI-bindings   # Needed for AI container bindings
-    echo "...pytorch-rocm-mammoth (uses lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif)..."
-    module -q load pytorch-rocm-mammoth      # Lazy PyTorch (ROCm) module
 
+    echo =================INPUT========================
+    echo " PATH                      : $PATH"
+    echo " LD_LIBRARY_PATH           : $LD_LIBRARY_PATH"
+    echo " FI_PROVIDER (cxi)         : $FI_PROVIDER"
+    echo " FI_HMEM (rocr)            : $FI_HMEM"
+    echo " FI_LOG_LEVEL (warn)       : $FI_LOG_LEVEL"
+    echo " FI_LOG_PROV (cxi)         : $FI_LOG_PROV"
+    echo " PLUGIN_DIR                : $PLUGIN_DIR"
+    echo " RCC_ENABLE_OFI            : $RCCL_ENABLE_OFI"
+    echo " NCCL_SOCKET_IFNAME (hsn0) : $NCCL_SOCKET_IFNAME"
+    echo " NCCL_NET_GDR_LEVEL        : $NCCL_NET_GDR_LEVEL"
+    echo ==============================================
+    
+    echo "...pytorch-rocm-mammoth (uses lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif)..."
+    module    load pytorch-rocm-mammoth      # Lazy PyTorch (ROCm) module
+
+    $PROJHOME/venv/mammoth-hf/bin/python $HELPER/bin/slurm/torch-test.py
 
 elif [[ "${SYSTEM:-}" == "puhti" ]]; then
     # --- Common module paths (Puhti) ---
     # Keep these generic; they will only load if present.
-    module -q use /appl/local/containers/ai-modules 2>/dev/null || true
+    module -q use /appl/local/containers/ai-modules 2>/dev/null || true  # error is ok
     # shellcheck source=../modules
-    module -q use base/mammoth-helper/helper/bin/modules 2>/dev/null || true
+    module -q use "$HELPER/modules"  2>/dev/null || true   # error is ok
 
     # --- Base env (Puhti typically uses CSC defaults; load if available) ---
     load_first_available csc csc-env puhti

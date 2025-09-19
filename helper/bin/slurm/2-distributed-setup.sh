@@ -1,7 +1,7 @@
 echo Setting up distributed computing environment ...
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
 is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
-require_set() {
+require_vars() {
   local v
   for v; do
     # ${!v-} expands to empty if unset (safe with set -u)
@@ -11,7 +11,7 @@ require_set() {
     fi
   done
 }
-require_vars SYSTEM INTEGRITY_CHECKS_OK || { is_sourced && return 1 || exit 1 };
+require_vars SYSTEM INTEGRITY_CHECKS_OK || { is_sourced && return 1 || exit 1; };
 
 echo Retrospective summary of Slurm env variables
 echo ==============================================
@@ -51,13 +51,19 @@ fi
 
 # Do not hardcode CUDA_VISIBLE_DEVICES=0,1,2…. Let binding happen per task, see task-wrapper.sh
 
+# Extract the last integer from a string (handles "8", "mi250:8", "gpu:mi250:1")
+num_from() { printf '%s' "${1:-}" | grep -oE '[0-9]+' | tail -1 || true; }
+
 # --- derive CPUS_PER_TASK and GPUS_PER_NODE from Slurm (if possible) ---------
-
 # 1) Respect explicit Slurm env first
-[[ -n "${SLURM_CPUS_PER_TASK-}"   ]] && CPUS_PER_TASK="$SLURM_CPUS_PER_TASK"
-[[ -n "${SLURM_GPUS_PER_NODE-}"   ]] && GPUS_PER_NODE="$(grep -oE '^[0-9]+' <<<"$SLURM_GPUS_PER_NODE")"
-[[ -n "${SLURM_GPUS_ON_NODE-}"    && -z "${GPUS_PER_NODE-}" ]] && GPUS_PER_NODE="$(grep -oE '^[0-9]+' <<<"$SLURM_GPUS_ON_NODE")"
-
+if [[ -n "${SLURM_CPUS_PER_TASK:-}" ]]; then
+  CPUS_PER_TASK="$SLURM_CPUS_PER_TASK"
+fi
+if [[ -n "${SLURM_GPUS_PER_NODE:-}" ]]; then
+  if v="$(num_from "$SLURM_GPUS_PER_NODE")"; [[ -n "$v" ]]; then GPUS_PER_NODE="$v"; fi
+elif [[ -n "${SLURM_GPUS_ON_NODE:-}" ]]; then
+  if v="$(num_from "$SLURM_GPUS_ON_NODE")"; [[ -n "$v" ]]; then GPUS_PER_NODE="$v"; fi
+fi
 # 2) If still missing, query the job record
 JOBINFO="$(scontrol show -d job "${SLURM_JOB_ID:?}" 2>/dev/null || true)"
 
@@ -65,7 +71,6 @@ if [[ -z "${CPUS_PER_TASK-}" ]]; then
   CPT="$(awk -F'[= ]' '/Cpus\/Task=/{print $2; exit}' <<<"$JOBINFO")"
   [[ -n "$CPT" && "$CPT" != 0 ]] && CPUS_PER_TASK="$CPT"
 fi
-
 if [[ -z "${GPUS_PER_NODE-}" ]]; then
   # From GresPerNode, sum tokens gpu[:type]:N → N
   GPN="$(awk -F'[= ]' '/GresPerNode=/{print $2; exit}' <<<"$JOBINFO")"
@@ -158,7 +163,7 @@ export DISTR_OPS="--unbuffered --nodes=$NODES --ntasks-per-node=$GPUS_PER_NODE\
 # For Slurm, srun --unbuffered (you already have this in DISTR_OPS)
 # reduces output buffering between tasks and the collector. Handy for
 # debugging, but it adds overhead—use sparingly on big jobs.
-export DISTR_OPS="             --nodes=$NODES --ntasks-per-node=$GPUS_PER_NODE\
+export DISTR_OPS="--nodes=$NODES --ntasks-per-node=$GPUS_PER_NODE\
  --gpus-per-task=1 --cpus-per-task=$CPUS_PER_TASK $CPU_BIND_OPS $GPU_BIND_FLAG"
 
 ######################################################

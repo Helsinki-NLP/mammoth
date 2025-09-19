@@ -30,12 +30,17 @@ will list the usage information:
 
 ```
 Usage:
-  getdata.sh --check <dataset>   # show quota/space, plan, cost (default if <dataset> only)
-  getdata.sh --get   <dataset>   # download/extract/clone only that dataset
-  getdata.sh --rm    <dataset>   # remove dataset directory (asks to confirm)
-  getdata.sh --stat  <dataset>   # on-disk stats + costs
-  getdata.sh --list              # list supported datasets
-  getdata.sh --help              # this help
+  datasets.sh --check <dataset>   # show quota/space, plan, cost (default if <dataset> only)
+  datasets.sh --get   <dataset>   # download/extract/clone only that dataset
+  datasets.sh --rm    <dataset>   # remove dataset directory (asks to confirm)
+  datasets.sh --stat  <dataset>   # on-disk stats + costs
+  datasets.sh --list              # list supported datasets
+  datasets.sh --help              # this help
+Required environment:
+  SYSTEM=lumi|puhti|mahti|roihu
+  SHARDATA=/path/to/shared/project/area
+Optional:
+  ACCOUNT=project_...       # for lumi-quota; on LUMI: module load lumi-tools
 ```
 
 ### Datasets
@@ -44,13 +49,15 @@ Downloadable datasets are shown with `--list`:
 
 ```
 Available datasets:
-  europarl-3langs     → $SHARDATA/europarl/3langs
-  europarl-all|europarl
-                       → $SHARDATA/europarl/all
-  vocab-opusTC.mul     → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
-  tatoeba              → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
-  opus100-de-en        → $SHARDATA/opus100/de-en
-  opus100-zeroshot     → $SHARDATA/opus100/zeroshot
+  europarl-3langs           → $SHARDATA/europarl/3langs
+  europarl-all|europarl     → $SHARDATA/europarl/all
+  vocab-opusTC.mul          → $SHARDATA/vocab/{opusTC.mul.64k.spm, opusTC.mul.vocab.onmt}
+  tatoeba                   → $SHARDATA/tatoeba/Tatoeba-Challenge (git)
+  tatoeba-subsets           → $SHARDATA/tatoeba/Tatoeba-Challenge/data/subsets
+  uncorpus                  → $SHARDATA/uncorpus  (uses $SHARDATA/uncorpus/urls.txt manifest)
+  unpc-<src>-<tgt>[:fmt]    → $SHARDATA/uncorpus/<src>-<tgt>/<fmt>  (fmt=moses|tmx, via OpusTools)
+  opus100-<src>-<tgt>       → $SHARDATA/opus100/<src>-<tgt>
+  opus100-zeroshot          → $SHARDATA/opus100/zeroshot
 ```
 
 ### Planning

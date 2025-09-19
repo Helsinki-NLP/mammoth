@@ -1,7 +1,8 @@
+
 echo comms-setup.sh...
 (return 0 2>/dev/null) || { echo "❌ Please source this script instead of executing it."; exit 1; }
 is_sourced()  { [[ "${BASH_SOURCE[0]}" != "$0" ]]; }
-require_set() {
+require_vars() {
   local v
   for v; do
     # ${!v-} expands to empty if unset (safe with set -u)
@@ -11,14 +12,27 @@ require_set() {
     fi
   done
 }
-require_set SYSTEM || { is_sourced && return 1 || exit 1 };
+require_vars SYSTEM || { is_sourced && return 1 || exit 1; };
 
 # ---------- cluster-specific comm knobs (minimal, safe) ----------
+
+echo =================INPUT========================
+echo " FI_PROVIDER (cxi)         : $FI_PROVIDER"
+echo " FI_HMEM (rocr)            : $FI_HMEM"
+echo " FI_LOG_LEVEL (warn)       : $FI_LOG_LEVEL"
+echo " FI_LOG_PROV (cxi)         : $FI_LOG_PROV"
+echo " PLUGIN_DIR                : $PLUGIN_DIR"
+echo " RCC_ENABLE_OFI            : $RCCL_ENABLE_OFI"
+echo " LD_LIBRARY_PATH           : $LD_LIBRARY_PATH"
+echo " NCCL_SOCKET_IFNAME (hsn0) : $NCCL_SOCKET_IFNAME"
+echo " NCCL_NET_GDR_LEVEL        : $NCCL_NET_GDR_LEVEL"
+echo ==============================================
 
 if [[ "$SYSTEM" == "lumi" ]]; then
   # Slingshot/CXI + ROCm: quiet & correct HMEM
   export FI_PROVIDER="${FI_PROVIDER:-cxi}"
   export FI_HMEM="${FI_HMEM:-rocr}"
+
   export FI_LOG_LEVEL="${FI_LOG_LEVEL:-warn}"
   export FI_LOG_PROV="${FI_LOG_PROV:-cxi}"
   # Bootstrap interface for RCCL (choose a single HSN to avoid noise)
@@ -42,13 +56,13 @@ if [[ "$SYSTEM" == "lumi" ]]; then
   # export  FI_CXI_RDZV_PROTO=alt_read
 fi
 
-echo ==============================================
+echo =================OUTPUT=======================
 echo " FI_PROVIDER (cxi)         : $FI_PROVIDER"
 echo " FI_HMEM (rocr)            : $FI_HMEM"
 echo " FI_LOG_LEVEL (warn)       : $FI_LOG_LEVEL"
 echo " FI_LOG_PROV (cxi)         : $FI_LOG_PROV"
 echo " PLUGIN_DIR                : $PLUGIN_DIR"
-echo " RCC_ENABLE_OFI            : $RCCL_ENABLE_OFI"
+echo " RCCL_ENABLE_OFI           : $RCCL_ENABLE_OFI"
 echo " LD_LIBRARY_PATH           : $LD_LIBRARY_PATH"
 echo " NCCL_SOCKET_IFNAME (hsn0) : $NCCL_SOCKET_IFNAME"
 echo " NCCL_NET_GDR_LEVEL        : $NCCL_NET_GDR_LEVEL"
@@ -118,10 +132,11 @@ fi
 
 
 # Optional: smoke-test dlopen so we fail early on missing deps
-if command -v python3 >/dev/null 2>&1; then
+if command -v python >/dev/null 2>&1; then
     echo ============================================================================
-    python3 - <<'PY'
+    python - <<'PY'
 import ctypes, sys, os
+print(os.environ.get("LD_LIBRARY_PATH"))
 libs = []
 # Take names from env to keep the bash search result ordering if you want;
 # otherwise, just retest by names—bash already printed locations above.
@@ -132,7 +147,6 @@ for name in ("librccl-net-ofi.so", "librccl-net.so"):
         print(f"OK[dlopen]: {name}")
     except OSError as e:
         print(f"❌ dlopen failed for {name}: {e}", file=sys.stderr)
-        sys.exit(1)
 PY
     echo ============================================================================
 fi

@@ -48,12 +48,12 @@ have_remote_branch(){ git -C "$1" ls-remote --exit-code --heads origin "$2" >/de
 ensure_anchor(){
   local anchor="$1"
   if [[ -d "$anchor/.git" || -f "$anchor/.git" ]]; then
-      git -C "$anchor" remote set-url origin "$REPO_URL"
-      git -C "$anchor" fetch --prune --tags
+    git -C "$anchor" remote set-url origin "$REPO_URL"
+    git -C "$anchor" fetch --prune --tags
   else
-      [[ -e "$anchor" ]] && die "$anchor exists but is not a git repo"
-      git clone --no-tags "$REPO_URL" "$anchor"
-      git -C "$anchor" fetch --prune --tags
+    [[ -e "$anchor" ]] && die "$anchor exists but is not a git repo"
+    git clone --no-tags "$REPO_URL" "$anchor"
+    git -C "$anchor" fetch --prune --tags
   fi
 }
 
@@ -113,6 +113,14 @@ rebase_integration_into_helper(){
   fi
 }
 
+ensure_fetch_all(){
+  local repo="$1"
+  if ! git -C "$repo" config --get-all remote.origin.fetch \
+       | grep -q 'refs/heads/\*:refs/remotes/origin/\*'; then
+    git -C "$repo" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
+  fi
+}
+
 # ---- figure out workspace layout -------------------------------------------
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   # inside any worktree: derive anchor and workspace paths
@@ -136,9 +144,13 @@ echo
 
 # ---- do the work ------------------------------------------------------------
 ensure_anchor "$anchor_dir"
+ensure_fetch_all "$anchor_dir"
 
 ensure_worktree "$anchor_dir" "$integ_dir" "$INTEG_BRANCH" "origin/$INTEG_BRANCH"
 ensure_worktree "$anchor_dir" "$helper_dir" "$HELPER_BRANCH" "origin/$INTEG_BRANCH"
+
+ensure_fetch_all "$integ_dir"
+ensure_fetch_all "$helper_dir"
 
 # refresh integration (if clean) to latest origin
 if git_clean "$integ_dir"; then

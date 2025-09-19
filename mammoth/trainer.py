@@ -21,6 +21,12 @@ from mammoth.utils.logging import logger
 from mammoth.utils.loss import build_loss_function
 from mammoth.utils.statistics import Statistics
 
+try:
+    import sacrebleu
+    SACREBLEU_AVAILABLE = True
+except ImportError:
+    SACREBLEU_AVAILABLE = False
+
 
 class NanLossException(Exception):
     pass
@@ -105,6 +111,8 @@ def build_trainer(
         task_queue_manager=task_queue_manager,
         report_stats_from_parameters=opts.report_stats_from_parameters,
         report_training_accuracy=opts.report_training_accuracy,
+        valid_metrics=opts.valid_metrics,
+        vocabs_dict=vocabs_dict,
     )
     return trainer
 
@@ -152,6 +160,8 @@ class Trainer(object):
         task_queue_manager=None,
         report_stats_from_parameters=False,
         report_training_accuracy=False,
+        valid_metrics=None,
+        vocabs_dict=None,
     ):
         # Basic attributes.
         self.model = model
@@ -176,6 +186,8 @@ class Trainer(object):
         self.dropout_steps = dropout_steps
 
         self.task_queue_manager = task_queue_manager
+        self.valid_metrics = valid_metrics or []
+        self.vocabs_dict = vocabs_dict or {}
 
         self._data_state = {}
 
@@ -358,6 +370,23 @@ class Trainer(object):
             self.report_manager.report_end(step)
         return total_stats
 
+    def _compute_validation_metrics(self, predictions, references, valid_metrics):
+        """Compute additional validation metrics like BLEU."""
+        metrics = {}
+        
+        if not SACREBLEU_AVAILABLE and 'bleu' in valid_metrics:
+            logger.warning("sacrebleu not available, skipping BLEU computation")
+            return metrics
+            
+        if 'bleu' in valid_metrics and SACREBLEU_AVAILABLE:
+            try:
+                bleu_score = sacrebleu.corpus_bleu(predictions, [references])
+                metrics['bleu'] = bleu_score.score
+            except Exception as e:
+                logger.warning(f"Error computing BLEU: {e}")
+                
+        return metrics
+
     def validate(self, valid_iter, moving_average=None, task=None):
         """Validate model.
             valid_iter: validate data iterator
@@ -365,6 +394,11 @@ class Trainer(object):
             :obj:`nmt.Statistics`: validation loss statistics
         """
         valid_model = self.model
+        
+        # Initialize collections for BLEU computation if needed
+        predictions = []
+        references = []
+        compute_metrics = bool(self.valid_metrics)
         if moving_average:
             # swap model params w/ moving average
             # (and keep the original parameters)
@@ -423,6 +457,49 @@ class Trainer(object):
                     target,
                     padding_idx,
                 )
+                
+                # Collect predictions and references for additional metrics
+                if compute_metrics:
+                    # Get predicted tokens (argmax from logits)
+                    pred_tokens = logits.argmax(dim=-1)  # Shape: [seq_len, batch_size]
+                    
+                    # Get target vocab for decoding using the stored vocabs_dict
+                    tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))
+                    
+                    if tgt_vocab is not None:
+                        # Decode predictions and references to text
+                        for b in range(pred_tokens.size(1)):  # batch dimension
+                            # Get prediction tokens for this batch item
+                            pred_seq = pred_tokens[:, b].tolist()
+                            ref_seq = target[:, b, 0].tolist()
+                            
+                            # Convert tokens to words, filtering out padding and special tokens
+                            pred_words = []
+                            ref_words = []
+                            
+                            for token in pred_seq:
+                                if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                    word = tgt_vocab.itos[token]
+                                    # Skip special tokens like <s>, </s>, <pad>, <unk>
+                                    if not word.startswith('<') or not word.endswith('>'):
+                                        pred_words.append(word)
+                                        
+                            for token in ref_seq:
+                                if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                    word = tgt_vocab.itos[token]
+                                    # Skip special tokens like <s>, </s>, <pad>, <unk>  
+                                    if not word.startswith('<') or not word.endswith('>'):
+                                        ref_words.append(word)
+                            
+                            # Join words to create sentences, only if we have content
+                            if pred_words and ref_words:
+                                pred_text = ' '.join(pred_words)
+                                ref_text = ' '.join(ref_words)
+                                predictions.append(pred_text)
+                                references.append(ref_text)
+                    else:
+                        logger.warning(f"Could not find vocabulary for target language '{metadata.tgt_lang}', skipping BLEU computation for this batch")
+                
                 stats.update(batch_stats)
         if moving_average:
             for param_data, param in zip(model_params_data, self.model.parameters()):
@@ -430,6 +507,12 @@ class Trainer(object):
 
         # Set model back to training mode.
         valid_model.train()
+        
+        # Compute additional validation metrics
+        if compute_metrics and predictions and references:
+            metrics = self._compute_validation_metrics(predictions, references, self.valid_metrics)
+            if stats is not None:
+                stats.validation_metrics.update(metrics)
 
         return stats
 

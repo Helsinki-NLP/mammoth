@@ -82,9 +82,8 @@ def translate(opts):
         use_attention_bridge=False,     # (opts.ab_layers is not None and len(opts.ab_layers) != 0),
         new_group_func=lambda: None,
     )
-
+    
     translator = build_translator(opts, task_queue_manager, task, logger=logger, report_score=True)
-
     # data_reader = InferenceDataReader(opts.src, opts.tgt, opts.src_feats)
     src_shards = split_corpus(opts.src, opts.shard_size)
     tgt_shards = split_corpus(opts.tgt, opts.shard_size)
@@ -113,7 +112,7 @@ def translate(opts):
             batch_size=opts.batch_size,
             batch_type=opts.batch_type,
             attn_debug=opts.attn_debug,
-            align_debug=opts.align_debug
+            align_debug=opts.align_debug,
         )
 
 

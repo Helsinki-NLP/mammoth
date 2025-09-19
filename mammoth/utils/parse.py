@@ -28,8 +28,33 @@ class DataOptsCheckerMixin(object):
     @staticmethod
     def _validate_file(file_path, info):
         """Check `file_path` is valid or raise `IOError`."""
+        print(f"file_path:{file_path}")
         if not os.path.isfile(file_path):
             raise IOError(f"Please check path of your {info} file! {file_path}")
+
+    @classmethod
+    def _validate_save_model_path(cls, opts):
+        """Validate save_model path early to catch directory issues before training starts."""
+        save_model_path = os.path.abspath(opts.save_model)
+        save_dir = os.path.dirname(save_model_path)
+        
+        # Check if the directory exists or can be created
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            raise IOError(
+                f"Cannot create directory for save_model path '{save_model_path}'. "
+                f"Please check the path and permissions. Error: {e}"
+            )
+        
+        # Check if the directory is writable
+        if not os.access(save_dir, os.W_OK):
+            raise IOError(
+                f"Directory '{save_dir}' is not writable. "
+                f"Please check permissions for save_model path '{save_model_path}'"
+            )
+        
+        logger.info(f"Validated save_model path: {save_model_path}")
 
     @classmethod
     def _validate_adapters(cls, opts):
@@ -46,6 +71,8 @@ class DataOptsCheckerMixin(object):
         default_transforms = opts.transforms
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
+        print(f"opts.tasks: {opts.tasks}")
+        print(type(opts.tasks))
         corpora = yaml_or_dict(opts.tasks, name='opts.tasks')
         logger.info("Parsing corpora")
         n_without_node_gpu = 0
@@ -191,6 +218,8 @@ class DataOptsCheckerMixin(object):
                     assert feature in opts.src_feats_vocab, f"No vocab file set for feature {feature}"
 
         # validation when train:
+        print(f"src_vocab: {opts.src_vocab}")
+        print(type(opts.src_vocab))
         for key, vocab in opts.src_vocab.items():
             cls._validate_file(vocab, info=f'src vocab ({key})')
             cls._validate_file(vocab, info=f'tgt vocab ({key})')
@@ -291,11 +320,11 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         # Mammoth has a different default value than x-transformers,
         # but you can set these explicitly
         if 'use_simple_rmsnorm' not in opts_dict:
-            opts_dict['use_simple_rmsnorm'] = True
+            opts_dict['use_simple_rmsnorm'] = False
         if 'attn_flash' not in opts_dict:
-            opts_dict['attn_flash'] = True
+            opts_dict['attn_flash'] = False
         if 'ff_glu' not in opts_dict:
-            opts_dict['ff_glu'] = True
+            opts_dict['ff_glu'] = False
 
         opts.x_transformers_opts = opts_dict
 
@@ -325,6 +354,9 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
     def validate_train_opts(cls, opts):
         if opts.epochs:
             raise AssertionError("-epochs is deprecated please use -train_steps.")
+
+        # Validate save_model path early to catch directory issues before training starts
+        cls._validate_save_model_path(opts)
 
         if torch.cuda.is_available() and not opts.gpu_ranks:
             logger.warn("You have a CUDA device, should run with -gpu_ranks")

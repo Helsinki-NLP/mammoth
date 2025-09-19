@@ -74,7 +74,6 @@ class NMTModel(BaseModel):
             mask=src_mask,
             return_embeddings=True,
         )
-
         encoder_output, alphas = self.attention_bridge(encoder_output, src_mask)
         if self.attention_bridge.is_fixed_length:
             # turn off masking in the transformer decoder

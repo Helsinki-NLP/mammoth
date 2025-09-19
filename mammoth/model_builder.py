@@ -8,8 +8,8 @@ from collections import defaultdict, OrderedDict
 from functools import partial
 from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
-from x_transformers import TransformerWrapper
-from x_transformers.x_transformers import TokenEmbedding
+from mammoth.x_transformers import TransformerWrapper
+from mammoth.x_transformers.x_transformers import TokenEmbedding, AbsolutePositionalEmbedding
 
 from mammoth.distributed.components import (
     DistributedAdapter,
@@ -33,6 +33,7 @@ from mammoth.utils.misc import use_gpu
 
 TRANSFORMER_WRAPPER_OPTS = {
     'post_emb_norm',
+    'post_emb_norm_bias',
     'tie_embedding',
     'use_abs_pos_emb',
     'scaled_sinu_pos_emb',
@@ -295,6 +296,7 @@ def build_xcoder(
             attn_layers=adapted_attention_layers_stack,
             emb_dim=model_opts.model_dim,
             token_emb=token_embs[lang],
+            
             **transformer_wrapper_kwargs,
         )
         transformer_wrappers[task.corpus_id] = transformer_wrapper

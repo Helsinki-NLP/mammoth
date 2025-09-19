@@ -20,7 +20,13 @@ def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_ma
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
 
     model_saver = ModelSaver(
-        opts.save_model, model, model_opts, vocabs_dict, optim, opts.keep_checkpoint, task_queue_manager
+        opts.save_model,
+        model,
+        model_opts,
+        vocabs_dict,
+        optim,
+        opts.keep_checkpoint,
+        task_queue_manager,
     )
     return model_saver
 
@@ -35,12 +41,16 @@ def load_frame_checkpoint(checkpoint_path):
     """
     checkpoint = None
     if checkpoint_path:
-        if not checkpoint_path.endswith('.pt'):
-            frames = glob(os.path.join(checkpoint_path + '*frame*pt'))
-            frames.sort(key=lambda s: int(s.split('step_')[-1].split('_frame')[0]))
+        if not checkpoint_path.endswith(".pt"):
+            frames = glob(os.path.join(checkpoint_path + "*frame*pt"))
+            frames.sort(key=lambda s: int(s.split("step_")[-1].split("_frame")[0]))
             checkpoint_path = frames[-1]
-        logger.info('Loading frame checkpoint from %s' % checkpoint_path)
-        checkpoint = torch.load(checkpoint_path, map_location=lambda storage, loc: storage)
+        logger.info("Loading frame checkpoint from %s" % checkpoint_path)
+        checkpoint = torch.load(
+            checkpoint_path,
+            map_location=lambda storage, loc: storage,
+            weights_only=False,
+        )
     return checkpoint, checkpoint_path
 
 
@@ -80,68 +90,88 @@ def load_parameters_from_checkpoint(
     """
     if not frame_checkpoint_path:
         return
-    checkpoint_prefix = frame_checkpoint_path.removesuffix('_frame.pt')
+    checkpoint_prefix = frame_checkpoint_path.removesuffix("_frame.pt")
 
     my_components = task_queue_manager.get_my_distributed_components()
     all_ok = True
     for component in my_components:
         name = component.get_name()
-        checkpoint_path = f'{checkpoint_prefix}_{name}.pt'
+        checkpoint_path = f"{checkpoint_prefix}_{name}.pt"
         if os.path.isfile(checkpoint_path):
-            state_dict = torch.load(checkpoint_path)
-            incompatible_keys = component.load_state_dict(model=model, state_dict=state_dict)
+            state_dict = torch.load(
+                checkpoint_path,
+                map_location=lambda storage, loc: storage,
+                weights_only=False,
+            )
+            incompatible_keys = component.load_state_dict(
+                model=model, state_dict=state_dict
+            )
             if incompatible_keys.missing_keys or incompatible_keys.unexpected_keys:
-                logger.info(f'Module {name} incompatible keys: {incompatible_keys}')
+                logger.info(f"Module {name} incompatible keys: {incompatible_keys}")
                 all_ok = False
         else:
             logger.warning(
-                f'Could not find model checkpoint file {checkpoint_path}. Affected parameters are reinitialized.'
+                f"Could not find model checkpoint file {checkpoint_path}. Affected parameters are reinitialized."
             )
             all_ok = False
 
         if not reset_optim:
-            optimizer_path = f'{checkpoint_prefix}_{name}_optim.pt'
+            optimizer_path = f"{checkpoint_prefix}_{name}_optim.pt"
             if os.path.isfile(optimizer_path):
                 # The optimizer parameters are distributed the same way as the components
-                optim_state_dict = torch.load(optimizer_path)
-                incompatible_keys = optim.suboptimizers[name].load_state_dict(optim_state_dict)
-                if incompatible_keys and (incompatible_keys.missing_keys or incompatible_keys.unexpected_keys):
-                    logger.info(f'Optim {name} incompatible keys: {incompatible_keys}')
+                optim_state_dict = torch.load(
+                    optimizer_path,
+                    map_location=lambda storage, loc: storage,
+                    weights_only=False,
+                )
+                incompatible_keys = optim.suboptimizers[name].load_state_dict(
+                    optim_state_dict
+                )
+                if incompatible_keys and (
+                    incompatible_keys.missing_keys or incompatible_keys.unexpected_keys
+                ):
+                    logger.info(f"Optim {name} incompatible keys: {incompatible_keys}")
                     all_ok = False
             else:
                 logger.warning(
-                    f'Could not find optim checkpoint file {optimizer_path}. Affected parameters are reinitialized.'
+                    f"Could not find optim checkpoint file {optimizer_path}. Affected parameters are reinitialized."
                 )
                 all_ok = False
     if all_ok:
         if reset_optim:
-            logger.info(f'All modules restored from checkpoint {checkpoint_prefix}')
+            logger.info(f"All modules restored from checkpoint {checkpoint_prefix}")
             if optim is not None:
-                logger.info('Optimizer was reset')
+                logger.info("Optimizer was reset")
         else:
-            logger.info(f'All modules and optimizer restored from checkpoint {checkpoint_prefix}')
+            logger.info(
+                f"All modules and optimizer restored from checkpoint {checkpoint_prefix}"
+            )
     else:
         if yes_i_messed_with_the_checkpoint:
-            logger.warning('Proceeding with a partial checkpoint due to --yes_i_messed_with_the_checkpoint')
+            logger.warning(
+                "Proceeding with a partial checkpoint due to --yes_i_messed_with_the_checkpoint"
+            )
         else:
-            raise Exception('Some parameters are missing from the checkpoint.')
+            raise Exception("Some parameters are missing from the checkpoint.")
 
 
 def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):
     if task is None:
-        raise ValueError('Must set task')
+        raise ValueError("Must set task")
     if model_path is None:
         model_path = opts.models[0]
 
         # Load only the frame
-    frame, frame_checkpoint_path = load_frame_checkpoint(checkpoint_path=opts.train_from)
+    frame, frame_checkpoint_path = load_frame_checkpoint(
+        checkpoint_path=opts.train_from
+    )
 
     vocabs_dict = {
-        'src': frame["vocab"].get(('src', task.src_lang)),
-        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
+        "src": frame["vocab"].get(("src", task.src_lang)),
+        "tgt": frame["vocab"].get(("tgt", task.tgt_lang)),
     }
 
-    model_opts = ArgumentParser.checkpoint_model_opts(frame['opts'])
+    model_opts = ArgumentParser.checkpoint_model_opts(frame["opts"])
 
     model = build_model(
         model_opts,
@@ -265,14 +295,16 @@ class ModelSaver(ModelSaverBase):
 
         tmp_checkpoint_paths = []
 
-        module_state_dicts, optim_state_dicts = explode_model(model, self.optim, task_queue_manager)
+        module_state_dicts, optim_state_dicts = explode_model(
+            model, self.optim, task_queue_manager
+        )
 
         # The master device stores the frame
         if device_context.is_master():
-            module_state_dicts['frame'] = {
-                'vocab': self.vocabs_dict,
-                'opts': self.model_opts,
-                'global_training_step': self.optim.global_training_step,
+            module_state_dicts["frame"] = {
+                "vocab": self.vocabs_dict,
+                "opts": self.model_opts,
+                "global_training_step": self.optim.global_training_step,
             }
 
         # In a distributed context, aggregate all data states for corpus restoration
@@ -281,23 +313,31 @@ class ModelSaver(ModelSaverBase):
             torch.distributed.all_gather_object(data_states, data_state)
             data_state = {k: v for state in data_states for k, v in state.items()}
         if device_context.is_master():
-            module_state_dicts['frame']['data_state'] = data_state
+            module_state_dicts["frame"]["data_state"] = data_state
 
         for key, state_dict in module_state_dicts.items():
             # The exploded state_dicts across different devices only contain one copy of each module:
             # on the lowest ranked device having that module.
             # There is no race condition.
-            checkpoint_path = f'{self.base_path}_step_{step}_{key}.pt'
-            optimizer_path = f'{self.base_path}_step_{step}_{key}_optim.pt'
+            checkpoint_path = f"{self.base_path}_step_{step}_{key}.pt"
+            optimizer_path = f"{self.base_path}_step_{step}_{key}_optim.pt"
             if os.path.isfile(checkpoint_path):
-                logger.debug("{} - not saving {} as it is already present".format(device_context.id, checkpoint_path))
+                logger.debug(
+                    "{} - not saving {} as it is already present".format(
+                        device_context.id, checkpoint_path
+                    )
+                )
             else:
-                if key != 'frame' and key in optim_state_dicts:
-                    logger.info(f'Saving module checkpoint {checkpoint_path} and optimizer {optimizer_path}')
+                if key != "frame" and key in optim_state_dicts:
+                    logger.info(
+                        f"Saving module checkpoint {checkpoint_path} and optimizer {optimizer_path}"
+                    )
                     torch.save(optim_state_dicts[key], optimizer_path)
                     tmp_checkpoint_paths.append(optimizer_path)
                 else:
-                    logger.info(f'Saving module checkpoint {checkpoint_path} (no optimizer to save)')
+                    logger.info(
+                        f"Saving module checkpoint {checkpoint_path} (no optimizer to save)"
+                    )
                 torch.save(state_dict, checkpoint_path)
                 tmp_checkpoint_paths.append(checkpoint_path)
 
@@ -309,4 +349,4 @@ class ModelSaver(ModelSaverBase):
                 try:
                     os.remove(name)
                 except BaseException:
-                    logger.warning(f'Failed to delete {name}')
+                    logger.warning(f"Failed to delete {name}")

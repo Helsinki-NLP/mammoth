@@ -2,7 +2,7 @@
 
 
 class DefaultTokens(object):
-    PAD = '<blank>'
+    PAD = '<pad>'
     BOS = '<s>'
     EOS = '</s>'
     UNK = '<unk>'

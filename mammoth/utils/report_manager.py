@@ -182,14 +182,26 @@ class ReportMgr(ReportMgrBase):
             acc = valid_stats.accuracy()
             self.log('Validation perplexity: %g', ppl)
             self.log('Validation accuracy: %g', acc)
-            structured_logging({
+            
+            # Log additional validation metrics
+            if hasattr(valid_stats, 'validation_metrics') and valid_stats.validation_metrics:
+                for metric_name, metric_value in valid_stats.validation_metrics.items():
+                    self.log('Validation %s: %g', metric_name.upper(), metric_value)
+            
+            log_data = {
                 'type': 'validation',
                 'step': step,
                 # 'learning_rate': lr,
                 'perplexity': ppl,
                 'accuracy': acc,
                 'crossentropy': valid_stats.xent(),
-            })
+            }
+            
+            # Add validation metrics to structured logging
+            if hasattr(valid_stats, 'validation_metrics') and valid_stats.validation_metrics:
+                log_data.update(valid_stats.validation_metrics)
+                
+            structured_logging(log_data)
             self.maybe_log_tensorboard(valid_stats, "valid", lr, patience, step)
 
     def _report_end(self, step):

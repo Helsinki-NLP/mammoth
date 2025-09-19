@@ -1,10 +1,16 @@
-NOTE: This module uses Singularity. Some commands execute inside the container
-(e.g. python3, pip3).
-
 This local module has been *derived* from a module (pytorch) provided by CSC and it
-is based on a singularity container provided by CSC.
+is based on a singularity container also provided by CSC.
 
 Documentation: https://docs.csc.fi/apps/pytorch/
 Support: 1) https://docs.csc.fi/support/contact/ (the sif image)
 	 2) https://docs.csc.fi/support/contact/ (the original pytorch module)
          2) anssi.yli-jyra@helsinki.fi (the derived module)
+The module deploys lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif
+in /appl/local/containers/sif-images via a local symlink in helper/images/
+
+Provides:
+ Python (sys.version)      : 3.12.11 
+ torch                     : 2.7.1+rocm6.2.4
+ HIP version               : 6.2.41134-65d174c3e
+
+Python commands will execute inside the container (e.g. python3, pip3).

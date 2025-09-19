@@ -12,10 +12,12 @@ local ggparent = dirname(gparent)        -- …/ (parent-parent-parent)
 
 local singName = 'lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif'
 local pytorchVersion = '2.7.1'
+
 local loadTxt = capture('cat ' .. parent .. '/load-pytorch-rocm-mammoth.txt')
+-- I should not have big/many non-lua files in a module directory, but this is harmless
 
 help(string.format([[
-ROCm-enabled PyTorch version %s for Python and MAMMOTH venv
+ROCm-enabled PyTorch version with  local module loader / python wrapper
 
 ]], pytorchVersion))
 
@@ -25,8 +27,19 @@ prepend_path('PATH', pathJoin(gparent .. '/wrappers'))
 
 setenv('SING_IMAGE', pathJoin(ggparent .. '/images/' .. singName))
 
+setenv('SING_FLAGS', '-B /bin/ip:/bin/ip -B /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0 -B /opt/cray/libfabric/1.15.2.0/bin/fi_info:/bin/fi_info -B /usr/lib64/libcurl.so.4:/usr/lib/libcurl.so.4')
+--  REMOVE_CRAY_DEPS=rm -rf /opt/cray /opt/cray-deps /usr/lib64/libcxi.so*
+-- -B /opt/rocm/lib/librccl.so:/usr/local/lib/python3.10/dist-packages/torch/lib/librccl.so')
 
-setenv('NCCL_SOCKET_IFNAME', 'hsn0,hsn1,hsn2,hsn3')  -- use only high speed network
+setenv('SINGULARITY_CONTAINLIBS', '/usr/lib64/libcxi.so.1,/usr/lib64/libjson-c.so.3,/opt/rocm/lib/librocm_smi64.so.6')
+
+setenv("WITH_CONDA", "source /opt/conda/etc/profile.d/conda.sh && conda activate pytorch")
+-- ROCm/PyTorch environment hook (so users can `eval $WITH_CONDA`)
+-- The current container will clear this - in that case not needed anymore
+
+
+-- ############ from pytorch module #############
+setenv('NCCL_SOCKET_IFNAME', 'hsn')  -- use only high speed network
 
 setenv('MIOPEN_DISABLE_CACHE', '1')  -- disable cache
 setenv('MIOPEN_USER_DB_PATH', '')    -- disable userdb
@@ -38,38 +51,33 @@ setenv('CXI_FORK_SAFE_HP', '1')
 setenv('FI_CXI_DISABLE_CQ_HUGETLB', '1')
 
 setenv('NCCL_NET_GDR_LEVEL', 'PHB')
-setenv('RCCL_NET_GDR_LEVEL', 'PHB')       -- GPU Direct RDMA when GPUs & NICs share common Host Bridge
 setenv('NCCL_ENABLE_DMABUF_SUPPORT', '1')
 
 setenv('SLURM_MPI_TYPE', 'pmi2')
 
+-- ############ new choices / overrides #############
+setenv('FI_PROVIDER','cxi')                  -- This is only for Cray.  Avoid ambiguity with OFI
 setenv('FI_HMEM','rocr')
 setenv('FI_LOG_LEVEL','warn')
 setenv('FI_LOG_PROV','cxi')
-setenv('FI_PROVIDER','cxi')               -- This is only for Cray.  Avoid ambiguity with OFI
+setenv('PLUGIN_DIR', ggparent .. '/lib')     -- Safe: contains symlinks referring inside container
+setenv('NCCL_SOCKET_IFNAME', 'hsn0,hsn1,hsn2,hsn3')  -- use only high speed network
+
 setenv('HSA_ENABLE_DEBUG','0')
-
 --setenv('HSA_FORCE_FINE_GRAIN_PCIE','1')   -- Sets fine grained memory on ONLY if you need it
-
 setenv('RCCL_DEBUG','INFO')
-setenv('RCCL_ENABLE_DMABUF_PLUGIN','0')   -- Since containers lack device bindings for DMABUF
-setenv('RCCL_MSCCL_ENABLE','1')           -- Already set in the LUMI supported container; just to emphasize
+-- setenv('RCCL_ENABLE_DMABUF_PLUGIN','0')  -- Not supported
+-- setenv('RCCL_MSCCL_ENABLE','1')          -- RCCL on LUMI doesn’t rely on MSCCL. 
 setenv('RCCL_TRACE_PLUGIN','1')
 
--- setenv('PLUGIN_DIR','/opt/aws-ofi-rccl') -- Insider the container; Does not find!
+-- ############ will be overridden by sing ################
 -- setenv('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:/usr/local/lib:/opt/rocm/lib/:/usr/local/lib/python3.11/dist-packages/faiss:/opt/cray/libfabric/1.15.2.0/lib64')
+-- prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl') -- this is were the OFI plugin should be
+-- prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', ggparent .. '/lib')  -- this contains alternative names referring to it
 
-setenv('PLUGIN_DIR', os.getenv('PROJHOME') .. '/lib') -- Insider the container
-prepend_path('SINGULARITY_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:' .. os.getenv('PROJHOME') .. '/lib')
+-- prepend_path('LD_LIBRARY_PATH', '/opt/aws-ofi-rccl') -- this is were the OFI plugin should be
+-- prepend_path('LD_LIBRARY_PATH', ggparent .. '/lib')  -- this contains alternative names referring to it
 
-setenv('SING_FLAGS', '-B /opt/cray --bind /bin/ip:/bin/ip --bind /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0 \
-  --bind /opt/cray/libfabric/1.15.2.0/bin/fi_info:/bin/fi_info ')
--- -B /opt/rocm/lib/librccl.so:/usr/local/lib/python3.10/dist-packages/torch/lib/librccl.so')
-
-setenv('SINGULARITY_CONTAINLIBS', '/usr/lib64/libcxi.so.1,/usr/lib64/libjson-c.so.3,/opt/rocm/lib/librocm_smi64.so.6')
-
--- ROCm/PyTorch environment hook (so users can `eval $WITH_CONDA`)
-setenv("WITH_CONDA", "source /opt/conda/etc/profile.d/conda.sh && conda activate pytorch")
 
 if (mode() == "load") then
    LmodMessage(loadTxt)

@@ -6,15 +6,15 @@ set -euo pipefail
 # This script is for temporary need: it allows me to work on two-three
 # branches of MAMMOTH at the same time:
 #  
-#  main              - main branch; for reference/comparison only 
-#  feat/integration  - the newest MAMMOTH code; HF integration 
-#  feat/helper       - contains the helper-tree of auxiliary script 
+#  main                 - main branch; for reference/comparison only 
+#  feat/hf_integration  - the newest MAMMOTH code; HF integration 
+#  feat/helper          - contains the helper-tree of auxiliary script 
 #
 # These will be stored in the following directories, respectively:
 # <your-workspace>/
 # ├─ mammoth/                 # the "hosting" repo (has the full .git object DB)
 # │  └─ .git/                 # shared metadata + worktree registry
-# ├─ mammoth-hf/              # worktree checked out at feat/integration (dependent)
+# ├─ mammoth-hf/              # worktree checked out at feat/hf_integration (dependent)
 # ├─ mammoth-helper/          # worktree checked out at feat/helper (dependent)
 # ├─ some-other-repo/
 # └─ yet-another-repo/
@@ -25,17 +25,15 @@ set -euo pipefail
 # --- config ---------------------------------------------------------------
 REPO_SSH="git@github.com:Helsinki-NLP/mammoth.git"
 REPO_HTTPS="https://github.com/Helsinki-NLP/mammoth.git"
+INTEG_BRANCH="feat/hf_integration"
 HELPER_BRANCH="feat/helper"
-INTEG_BRANCH="feat/integration"
-MAIN_DIR="mammoth"
-HELPER_DIR="mammoth-helper"
+ANCHOR_DIR="mammoth"
 INTEG_DIR="mammoth-hf"
+HELPER_DIR="mammoth-helper"
 
-# Switch to https if requested
+# allow:  --https  (otherwise SSH)
 REPO_URL="$REPO_SSH"
-if [[ "${1:-}" == "--https" ]]; then
-  REPO_URL="$REPO_HTTPS"
-fi
+if [[ "${1:-}" == "--https" ]]; then shift; REPO_URL="$REPO_HTTPS"; fi
 
 # ---- helpers ----------------------------------------------------------------
 die(){ echo "❌ $*" >&2; exit 1; }
@@ -49,24 +47,25 @@ have_remote_branch(){ git -C "$1" ls-remote --exit-code --heads origin "$2" >/de
 
 ensure_anchor(){
   local anchor="$1"
-  if [[ -d "$anchor/.git" ]]; then
-    git -C "$anchor" remote set-url origin "$REPO_URL"
-    git -C "$anchor" fetch --prune --tags
+  if [[ -d "$anchor/.git" || -f "$anchor/.git" ]]; then
+      git -C "$anchor" remote set-url origin "$REPO_URL"
+      git -C "$anchor" fetch --prune --tags
   else
-    [[ -e "$anchor" ]] && die "$anchor exists but is not a git repo"
-    git clone --no-tags "$REPO_URL" "$anchor"
-    git -C "$anchor" fetch --prune --tags
+      [[ -e "$anchor" ]] && die "$anchor exists but is not a git repo"
+      git clone --no-tags "$REPO_URL" "$anchor"
+      git -C "$anchor" fetch --prune --tags
   fi
 }
 
 ensure_worktree(){
   # args: anchor_dir worktree_dir target_branch startpoint
   local anchor="$1" wdir="$2" br="$3" start="$4"
-  if [[ -d "$wdir/.git" ]]; then
-    # already a worktree; ensure it's on the right branch
+
+  # Accept both a standalone clone (.git directory) and a worktree (.git file)
+  if [[ -d "$wdir/.git" || -f "$wdir/.git" ]]; then
+    # already a repo/worktree; ensure it's on the right branch
     git -C "$wdir" checkout -q "$br" || true
     git -C "$wdir" fetch --prune || true
-    # only fast-forward if clean
     if git_clean "$wdir"; then
       git -C "$wdir" pull --ff-only || true
     else
@@ -74,7 +73,7 @@ ensure_worktree(){
     fi
   else
     if [[ -e "$wdir" ]]; then
-      die "$wdir exists but is not a git worktree"
+      die "$wdir exists but is not a git repo/worktree"
     fi
     if have_remote_branch "$anchor" "$br"; then
       git -C "$anchor" worktree add -B "$br" "$wdir" "origin/$br"
@@ -82,6 +81,7 @@ ensure_worktree(){
       git -C "$anchor" worktree add -B "$br" "$wdir" "$start"
     fi
   fi
+
   have_remote_branch "$anchor" "$br" && \
     git -C "$wdir" branch --set-upstream-to="origin/$br" "$br" >/dev/null 2>&1 || true
 }
@@ -122,11 +122,11 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   # not in a repo: use current dir as workspace
   workspace_dir=$(pwd -P)
-  anchor_dir="$workspace_dir/$ANCHOR_NAME"
+  anchor_dir="$workspace_dir/$ANCHOR_DIR"
 fi
 
-integ_dir="$workspace_dir/$INTEG_DIR_NAME"
-helper_dir="$workspace_dir/$HELPER_DIR_NAME"
+integ_dir="$workspace_dir/$INTEG_DIR"
+helper_dir="$workspace_dir/$HELPER_DIR"
 
 echo "Workspace   : $workspace_dir"
 echo "Anchor repo : $anchor_dir  (origin: $REPO_URL)"
@@ -153,3 +153,5 @@ rebase_integration_into_helper "$integ_dir" "$helper_dir" || true
 echo
 echo "Done."
 echo "Tip: commit/stash any local changes in '$helper_dir' or '$integ_dir' to allow auto fast-forward/rebase."
+
+

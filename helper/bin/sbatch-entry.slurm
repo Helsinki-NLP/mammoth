@@ -1,1 +1,0 @@
-slurm/sbatch-entry.slurm

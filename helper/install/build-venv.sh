@@ -12,57 +12,41 @@ set -euo pipefail
 # This script is idenpotent, but it has not been checked against
 # accidental overwriting of uncommitted files.
 
-# --- Helpers ---------------------------------------------------------------
-
-. $COMMON
-
 # --- config ---------------------------------------------------------------
 
-THIS="${BASH_SOURCE[0]}"  # /install/build-venv.sh"
-BASENAME=$(basename "$0")
-DIRNAME="$(cd -- "$(dirname -- "$THIS")" >/dev/null 2>&1 && pwd -P)"
+THIS="${BASH_SOURCE[0]}"   # THIS is the wrapper file path (argv0 label to show in ps/top).
+BASENAME=$(basename "$0")  # BASENAME becomes the name you invoked the wrapper as (e.g. python, pip).
+THISDIR=$(cd -P -- "$(dirname -- "$THIS")" && pwd) || { echo "cannot resolve THISDIR" >&2; return 1 2>/dev/null || exit 1; }
+BASEDIR=$(cd -P -- "$THISDIR/.." && pwd)           || { echo "cannot resolve BASEDIR" >&2; return 1 2>/dev/null || exit 1; }
+VENV="$BASEDIR/venv"
 
-COMMON="$DIRNAME/../install/common.sh"
-CLONE="$DIRNAME/../install/clone-branches.sh"
-LOADS="$DIRNAME/../bin/slurm/4-module-loads.sh"
-VENV="$DIRNAME/../venv"
-
-check_under "$DIRNAME" \
-	    "../install/common.sh" \
-	    "../install/clone-branches..." \
-	    "../bin/slurm/4-module-loads.sh" \
-	    "../venv/README.md"
-
-# --- Clean State------------------------------------------------------------
+source $BASEDIR/install/common.sh
+check_under "$BASEDIR" "venv/README.md" \
+	    "install/common.sh" "install/module-loads.sh" "install/requirements_lumi.txt"
+export DEBUG=1
+. $BASEDIR/install/module-loads.sh
 
 rm -rf $VENV/{bin,include,lib,lib64,pyvenv.cfg,share}
-$CLONE
+singularity exec "$SING_IMAGE" bash -lc '
+	    python -m venv --system-site-packages "'"$VENV"'"
+	    . "'"$VENV"'/bin/activate"
+	    export PIP_REQUIRE_VIRTUALENV=1
+	    python -m pip install --no-user -U pip
+	    python -m pip install --no-user -r "'"$THISDIR"'/requirements_lumi.txt"'
 
-# --- Inherit Site Packages--------------------------------------------------
+echo "Built venv $VENV. Now you can start using it, but you need to load modules first."
+echo "Usage 1:"
+echo "    . $BASEDIR/install/module-loads.sh"
+echo "    python"
+echo "    import loguru, frozendict, configargparse, einx"
+echo "    import torch"
+echo "Usage 2:"
+echo "    . $BASEDIR/install/module-loads.sh"
+echo "    sing-bash"
+echo "    python -m pip install --no-user -U pip"
+echo "    pip install   --no-user streamlit"
+echo "    pip uninstall loguru streamlit"
+echo "    exit"
 
-# always load site packages and python wrappers first
-JOB_NODE_KIND=gpu . $LOADS
 
-# then link them to the venv
-python -m venv --system-site-packages $VENV
-. $VENV/bin/activate
-
-# --- Add Packages and Close-------------------------------------------------
-
-# minimalistic approach of feat/integration branch
-export PIP_USER=no
-
-# We use `pip -e .` to install mammoth to the virtual environment via symlinks
-pip install -r $DIRNAME/requirements.txt
-
-deactivate
-
-# --- Usage-------------------------------------------------------------------
-
-# Now on, we do not need venv activation.  The venv will be activated
-# automatically by python wrapper that comes with
-# `pytorch-rocm-mammoth` module.
-
-# Any helper command will immediately know where is the other mammoth
-# directories.
 

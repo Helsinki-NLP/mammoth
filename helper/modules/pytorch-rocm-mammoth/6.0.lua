@@ -70,11 +70,14 @@ setenv('FI_CXI_DISABLE_CQ_HUGETLB', '1')
 setenv('NCCL_NET_GDR_LEVEL', 'PHB')
 setenv('NCCL_ENABLE_DMABUF_SUPPORT', '1')
 
--- setenv('SLURM_MPI_TYPE', 'pmi2')
--- AYJ: I commented out: On LUMI prefer PMIx via srun
+setenv('SLURM_MPI_TYPE', 'pmi2')
 
 -- ############ new choices / overrides #############
-setenv('SLURM_MPI_TYPE', 'pmix')
+-- setenv('SLURM_MPI_TYPE', 'pmix_v4')
+-- AYJ: On LUMI prefer PMIx via srun; module load cray-mpich for multi-rank DDP/torchrun
+-- For PyTorch/MAMMOTH multi-node runs: allocate normally, then launch your job with srun
+-- --mpi=pmix -n <tasks> ... so RCCL/OFI can use the PMI context. For single-rank testing, --mpi=none is fine.
+
 setenv('NCCL_DEBUG','INFO')
 
 setenv('FI_PROVIDER','cxi')                  -- This is only for Cray.  Avoid ambiguity with OFI
@@ -94,13 +97,14 @@ setenv('RCCL_DEBUG','INFO')
 -- setenv('RCCL_MSCCL_ENABLE','1')          -- RCCL on LUMI doesn’t rely on MSCCL. 
 setenv('RCCL_TRACE_PLUGIN','1')
 
--- ############ will be overridden by sing ################
--- setenv('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:/usr/local/lib:/opt/rocm/lib/:/usr/local/lib/python3.11/dist-packages/faiss:/opt/cray/libfabric/1.15.2.0/lib64')
+-- ############ providing rocm, librccl-net-ofi etc. ################
+
+setenv('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:/usr/local/lib:/opt/rocm/lib/:/usr/local/lib/python3.11/dist-packages/faiss:/opt/cray/libfabric/1.15.2.0/lib64')
+prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', ggparent .. '/lib')  -- this contains alternative names referring to it
+
 -- prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl') -- this is were the OFI plugin should be
 -- prepend_path('LD_LIBRARY_PATH', '/opt/aws-ofi-rccl') -- this is were the OFI plugin should be
-
-prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', ggparent .. '/lib')  -- this contains alternative names referring to it
-prepend_path('LD_LIBRARY_PATH', gparent .. '/lib')  -- this contains alternative names referring to it
+-- prepend_path('LD_LIBRARY_PATH', gparent .. '/lib')  -- this contains alternative names referring to it
 
 
 if (mode() == "load") then

@@ -120,7 +120,6 @@ debug_venv() {
 }
 export -f debug_venv
 export DEBUG
-
-singularity exec $SING_FLAGS "$SING_IMAGE" bash -lc 'debug_venv "$0"; exec "$0" "$@"' \
+singularity exec $SING_FLAGS "$SING_IMAGE" bash --noprofile --norc -c 'debug_venv "$0"; exec "$0" "$@"' \
 	    "$BASENAME" "$@"
 exit $?

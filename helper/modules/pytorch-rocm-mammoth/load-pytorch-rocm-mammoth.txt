@@ -1,11 +1,15 @@
 This module is `pytorch-rcom-mammoth` (by AYJ)
 - derived from https://docs.csc.fi/apps/pytorch/
-- based on a CSC provided singularity container
-  providing rocm6.2.4, Python 3.12.11, torch 2.7.1, 
-           HIP 6.2.41134-65d174c3e
-- contains important settings on the top of the container
-           FI_, -B, etc.
-- Python commands will execute via a wrapper that
-  launces the container and related settings
-- Load this before creating venv!
-  But afterwards asyncronous activation is OK
+
+- based on a CSC provided singularity container providing rocm6.2.4,
+  Python 3.12.11, torch 2.7.1, HIP 6.2.41134-65d174c3e.
+- contains important settings: FI_, -B, LD_LIBRARY_PATH etc.
+
+- To create venv: load this module (to activate the settings), launch
+  $SING_IMAGE, and create venv with --system-site-packages, activate
+  the environment, and install the requirements.
+  (mammoth/install/build-venv.sh)
+
+- Python commands will execute via a wrapper (mammoth/wrapper/python)
+  that does the image launching and the venv activation.
+  

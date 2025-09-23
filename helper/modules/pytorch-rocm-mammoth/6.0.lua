@@ -100,12 +100,7 @@ setenv('RCCL_TRACE_PLUGIN','1')
 -- ############ providing rocm, librccl-net-ofi etc. ################
 
 setenv('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:/usr/local/lib:/opt/rocm/lib/:/usr/local/lib/python3.11/dist-packages/faiss:/opt/cray/libfabric/1.15.2.0/lib64')
-prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', ggparent .. '/lib')  -- this contains alternative names referring to it
-
--- prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl') -- this is were the OFI plugin should be
--- prepend_path('LD_LIBRARY_PATH', '/opt/aws-ofi-rccl') -- this is were the OFI plugin should be
--- prepend_path('LD_LIBRARY_PATH', gparent .. '/lib')  -- this contains alternative names referring to it
-
+prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', gparent .. '/lib')  -- this contains alternative names referring to it
 
 if (mode() == "load") then
    LmodMessage(loadTxt)

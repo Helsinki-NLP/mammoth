@@ -266,7 +266,24 @@ python -m mammoth.bin.config_config config_all \
   --out_config 05-ready-augmented.yaml
 ```
 
+Runs the end-to-end pipeline: generate tasks
+(`complete_language_pairs`), weight/schedule (`corpora_schedule`),
+group languages (`cluster_languages`), apply weight-sharing
+(`sharing_groups`), allocate devices (`allocate_devices`), set
+transforms (`set_transforms`), attach adapters (`adapter_config`),
+(optionally) zero-shot (`translation_configs`), then strip helper keys
+(`remove_temporary_keys`). Measures and logs total runtime.
+
 ## `complete_language_pairs` - Determine which language pairs have data.
+
+Builds the `tasks` section by instantiating file-path templates for
+every `(src_lang, tgt_lang)` from the configured vocab maps, checking
+file existence, and adding only those pairs that have data. For
+same-language pairs, optionally adds autoencoder tasks (and dev sets
+if enabled), supporting multiple AE path templates. Also supports
+reversed parallel data via `{side_a, side_b}` variables when the
+sorted pair order differs from `src-tgt`. Finally, expands any
+`{src_lang}` / `{tgt_lang}` placeholders in vocab paths.
 
 The languages to consider as candidates are determined from the
 vocabulary keys.  An example input:
@@ -296,6 +313,14 @@ python -m mammoth.bin.config_config \
 Then add transforms.
 
 ## `cluster_languages`: Determine language groups by clustering.
+
+Produces a language→group mapping used elsewhere. Loads a symmetric
+distance matrix (or accepts groups already in config). Filters out
+languages not present in any `tasks` to avoid wasting clusters, then
+runs agglomerative clustering with average linkage on the precomputed
+distances. Assigns `group{i}` labels per language and stores them in
+`config_config.groups`. Supports either a fixed `n_groups` or a
+`cutoff_threshold`.
 
 An example of the input config:
 ```
@@ -378,11 +403,26 @@ This step can be easily skipped by leaving the `distance_matrix` unset.
 
 If the step is skipped, you should define the `config_config.groups` dict in the input yaml.
 ```
-
+# Manually provide groups instead of running `cluster_languages`
+config_config:
+  groups:
+    en: germanic
+    de: germanic
+    es: romance
+    fr: romance
 ```
 Combine this with the following task.
 
 ## `sharing_groups`: Apply the parameter sharing groups to tasks.
+
+Materializes per-task encoder/decoder sharing assignments for each
+layer. For a task’s `(src,tgt)`, it interprets spec tokens like
+`LANGUAGE`, `GROUP`, `FULL`, and prefixed variants (`SRC_LANGUAGE`,
+`TGT_GROUP`, …) into concrete IDs using the previously computed
+`groups`. It asserts layer counts match the sharing spec lengths and
+writes `enc_sharing_group` / `dec_sharing_group` arrays into each
+task.&#x20;
+
 
 ```    
 # Derive sharing groups from the clusters:
@@ -426,6 +466,16 @@ python -m mammoth.bin.config_config sharing_groups \
 `dec_sharing_group based` on your manual mapping.
 
 ## `allocate_devices`: Allocate tasks to nodes and gpus.
+
+Assigns each task to a `(node:gpu)` slot subject to cluster size, GPUs
+per node, and slots per GPU. If too few tasks initially start at step
+0, it shifts all `introduce_at_training_step` values down so that at
+least one task runs per GPU. For multi-GPU setups, it delegates
+placement to a GPU-assignment optimizer that tries to pack language
+pairs (optionally considering groups and “ready-to-start” status). It
+writes `node_gpu` for each task and sets `n_nodes`, `world_size`, and
+`gpu_ranks`. Finally, it normalizes curricula per device so every GPU
+has something starting at step 0.
 
 A local search procedure is used, taking into account parameter
 sharing groups and tasks delayed by curriculum weighting.
@@ -486,6 +536,15 @@ tgt_seq_length: 256
 
 ### `corpora_schedule`: Determine weighting and curriculum for the tasks.
 
+Computes corpus sampling weights and (optionally) curriculum start
+steps from corpus sizes. First, line counts for `path_src` are fetched
+(cached or via `wc`/`zcat`), then normalized and temperature-adjusted
+to get weights. Oversized corpora can be split into multiple “shards”
+with `stride/offset` to cap any single weight. Optionally takes the
+square root of weights for curriculum and shifts
+`introduce_at_training_step` so at least one task can start at step 0;
+weights for AE tasks can be scaled separately.
+
 Run once to build weights and cache counts:
 ```
 python -m mammoth.bin.config_config \
@@ -495,9 +554,15 @@ python -m mammoth.bin.config_config \
   --use_weight --use_introduce_at_training_step --temperature 1.0
 ```
 
-### `set_transforms`
+### `set_transforms` Apply the transforms to tasks
 
-Apply the transforms to tasks.
+Sets `transforms` per task, choosing between general transforms and
+AE-specific transforms for same-language tasks. If `prefix` is
+present, injects `<to_{tgt}>` (and optionally `<from_{src}>`) into
+`src_prefix` while setting a blank `tgt_prefix` (required by
+downstream tooling). If `use_src_lang_token` is requested without
+`prefix`, it hard-fails to avoid silent misconfiguration.
+
 
 ```                    
 python -m mammoth.bin.config_config \
@@ -507,9 +572,13 @@ python -m mammoth.bin.config_config \
   --transforms sentencepiece --ae_transforms sentencepiece
 ```
 
-#### `remove_temporary_keys`
+#### `remove_temporary_keys`: Remove any meta-parameters that are not accepted by OpenNMT.
 
-Remove any meta-parameters that are not accepted by OpenNMT. This should always be the last step.
+This should always be the last step.  Deletes the `config_config` key
+before saving to produce a clean final YAML consumable by the
+downstream trainer, which rejects unknown keys.
+
+
 
 ```
 python -m mammoth.bin.config_config \
@@ -518,9 +587,13 @@ python -m mammoth.bin.config_config \
   --out_config train.final.yaml
 ```
 
-### `translation_configs`
+### `translation_configs`: Generate the translation yaml configs.
 
-Generate the translation yaml configs.
+Reserved for generating zero-shot translation configs. When enabled,
+it would construct per-direction config files using the same
+stacks/transforms logic but without training/validation or
+scheduling/GPU allocation. (Currently a placeholder; logs timing and
+exits when `zero_shot` is false.)&#x20;
 
 #### Toggle zero-shot on
 Minimal example:
@@ -576,6 +649,14 @@ regenerating tasks or device allocations.
 expands symbolic adapter IDs into concrete per-task assignments.  You
 declare what kinds of adapters you want (language/group/full) and
 where they plug in; the step fills in the exact per-task assignments.
+
+If adapters are defined, expands abstract adapter ID spaces into
+concrete lists and attaches per-task adapter selections. For
+encoder/decoder separately, supports `ids ∈ {LANGUAGE, GROUP, FULL}`
+which expand over observed src/tgt language sets or their groups; for
+each task, it appends `[adapter_name, concrete_id]` to its side’s
+adapter list. Updates the top-level adapter specs with the resolved
+`ids`.
 
 #### Minimal Example
 ```
@@ -690,9 +771,24 @@ Notes: `adapter_config` assumes your model code will read
 `task.adapters` and the global `adapters` registry (with
 `layer_stack_index`) to wire things.
 
+## Other tasks
+### `extra_cpu`
+
+Turns a multi-GPU config into a single-CPU setup by deleting GPU/world-size fields and per-task `node_gpu` assignments, setting `n_nodes=1`. Useful for quick local debugging.&#x20;
+
+### `extra_fully_shared_hack`
+
+Transforms the config for a fully shared decoder “all-language” setup. Ensures a `prefix` transform exists (inserting before a trailing `filtertoolong` if needed) and sets `src_prefix` to route decoding. Forces `dec_sharing_group=['full']` and overwrites each task’s `src_tgt` to `all-all`. Replaces both `src_vocab` and `tgt_vocab` with a single joint vocab path.&#x20;
+
+### `extra_copy_gpu_assignment`
+
+Copies GPU assignments and cluster-wide device metadata from another config with identical `tasks`. Verifies task key sets match, then clones `node_gpu`, `n_nodes`, `world_size`, and `gpu_ranks`—useful to keep allocation stable across otherwise different configs.&#x20;
 
 ## Command line overrides
 
 Some parameters can also be given on the command line.  If a value is
 given both in the input yaml and on the command line, the command line
 takes precedence.
+
+
+

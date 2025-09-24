@@ -186,6 +186,35 @@ Include tasks with `src_tgt`, `path_src`, `path_tgt`, `path_valid_*`,
 and a small `config_config` section (temperature, clustering params,
 etc.). Keep absolute or workspace-root-relative paths.
 
+```
+# in_config.yaml
+languages: [en, es, de, fr]
+
+config_config:
+  groups:
+    en: g0
+    de: g0
+    es: g1
+    fr: g1
+
+# You may also list pairs or tasks; both are fine
+language_pairs: ["en-es", "de-fr"]
+
+# Defaults you might already want in place
+batch_type: tokens
+src_seq_length: 256
+tgt_seq_length: 256
+```
+Then
+```
+python -m mammoth.bin.config_config config_all \
+  --in_config in_config.yaml \
+  --use_weight \
+  --temperature 0.7 \
+  --n_nodes 1 --n_gpus_per_node 4 --n_slots_per_gpu 1 \
+  --out_config final.yaml
+```
+
 ## Stages
 
 The tool runs in multiple stages. It is possible to run the steps
@@ -356,7 +385,7 @@ Combine this with the following task.
 ## `sharing_groups`: Apply the parameter sharing groups to tasks.
 
 ```    
-# then derive sharing groups from those clusters
+# Derive sharing groups from the clusters:
 python -m mammoth.bin.config_config sharing_groups \
   --in_config 03-clustered.yaml \
   --out_config 03-sharing.yaml
@@ -366,6 +395,35 @@ python -m mammoth.bin.config_config \
   --in_config train.step2.yaml \
   --out_config train.step3.yaml
 ```
+
+Here are tiny, copy-pasteable examples of defining
+config_config.groups manually in your input YAML so you can skip
+cluster_languages.
+```
+# in_config.yaml
+languages: [en, es, fr, de]
+
+# Manually provide groups instead of running `cluster_languages`
+config_config:
+  groups:
+    en: germanic
+    de: germanic
+    es: romance
+    fr: romance
+
+# (Optional) tasks you’ll later complete with paths/templates
+tasks:
+  en_es: { src_tgt: "en-es" }
+  de_fr: { src_tgt: "de-fr" }
+```
+Now you can run only sharing_groups (and whatever else), skipping clustering:
+```
+python -m mammoth.bin.config_config sharing_groups \
+  --in_config in_config.yaml \
+  --out_config out.yaml
+```
+`out.yaml` will contain per-task `enc_sharing_group` /
+`dec_sharing_group based` on your manual mapping.
 
 ## `allocate_devices`: Allocate tasks to nodes and gpus.
 
@@ -464,9 +522,174 @@ python -m mammoth.bin.config_config \
 
 Generate the translation yaml configs.
 
-### `adapter_config`
+#### Toggle zero-shot on
+Minimal example:
+```
+tasks:
+  en_es: { src_tgt: "en-es" }
+  de_fr: { src_tgt: "de-fr" }
+```
+or:
+```
+tasks:
+  en_es: { src_tgt: "en-es" }
+  de_fr: { src_tgt: "de-fr" }
+zero_shot: false
+```
+with command:
+```
+python -m mammoth.bin.config_config translation_configs \
+  --in_config in.yaml \
+  --zero_shot true \
+  --out_config out.yaml
+```
+The result:
+```
+tasks:
+  en_es: { src_tgt: "en-es" }
+  de_fr: { src_tgt: "de-fr" }
+zero_shot: true
+```
+#### Turn zero-shot off (overrides any previous setting)
+Command:
+```
+python -m mammoth.bin.config_config translation_configs \
+  --in_config out.yaml \
+  --zero_shot false \
+  --out_config out2.yaml
+```
+Result:
+```
+tasks:
+  en_es: { src_tgt: "en-es" }
+  de_fr: { src_tgt: "de-fr" }
+zero_shot: false
+```
 
-Determine the adapter configuration.
+If a flag is omitted on the CLI, the existing value in the YAML is
+preserved.  You can re-run it anytime to flip the setting without
+regenerating tasks or device allocations.
+
+### `adapter_config`: Determine the adapter configuration.
+
+`adapter_config` is a YAML-driven step (no extra CLI flags) that
+expands symbolic adapter IDs into concrete per-task assignments.  You
+declare what kinds of adapters you want (language/group/full) and
+where they plug in; the step fills in the exact per-task assignments.
+
+#### Minimal Example
+```
+# Languages and groups (either computed earlier or set manually)
+config_config:
+  groups:
+    en: g0
+    de: g0
+    es: g1
+    fr: g1
+# You must have config_config.groups ready before adapter_config,
+# because GROUP expansion depends on it. If you skip clustering,
+# define the mapping manually.
+
+# Model depth (needed elsewhere; shown for context)
+enc_layers: [6]
+dec_layers: [6]
+
+# Tasks (at least one, with src_tgt)
+tasks:
+  en_es:
+    src_tgt: "en-es"
+    path_src: data/en_train.txt
+    path_tgt: data/es_train.txt
+  de_fr:
+    src_tgt: "de-fr"
+    path_src: data/de_train.txt
+    path_tgt: data/fr_train.txt
+
+# Declare adapter groups. Each group has a name and a layer_stack_index
+# (which layer stack it’s meant for; an index you define).
+adapters:
+  encoder:
+    enc_lang_adapter:
+      layer_stack_index: 0
+      ids: LANGUAGE   # will expand to ['de','en'] based on src langs in tasks
+    enc_group_adapter:
+      layer_stack_index: 2
+      ids: GROUP      # will expand to ['g0','g1'] using config_config.groups
+    enc_full_adapter:
+      layer_stack_index: 5
+      ids: FULL       # will become ['full']
+  decoder:
+    dec_lang_adapter:
+      layer_stack_index: 0
+      ids: LANGUAGE   # expands using tgt langs
+    dec_group_adapter:
+      layer_stack_index: 2
+      ids: GROUP
+```
+Command
+```
+python -m mammoth.bin.config_config adapter_config \
+  --in_config in.yaml \
+  --out_config out.yaml
+```
+
+The tool expands the tasks by replacing the files with adapters:
+```
+tasks:
+  en_es:
+    src_tgt: "en-es"
+    path_src: data/en_train.txt
+    path_tgt: data/es_train.txt
+    adapters:
+      encoder:
+        - [enc_lang_adapter, en]
+        - [enc_group_adapter, g0]
+        - [enc_full_adapter, full]
+      decoder:
+        - [dec_lang_adapter, es]
+        - [dec_group_adapter, g1]
+  de_fr:
+    src_tgt: "de-fr"
+    path_src: data/de_train.txt
+    path_tgt: data/fr_train.txt
+    adapters:
+      encoder:
+        - [enc_lang_adapter, de]
+        - [enc_group_adapter, g0]
+        - [enc_full_adapter, full]
+      decoder:
+        - [dec_lang_adapter, fr]
+        - [dec_group_adapter, g1]
+```
+
+Notes: `adapter_config` adds per-task adapters but does not change
+layers.  The tool also replaces the symbolic ids (`LANGUAGE`,`GROUP`, and
+`FULL`) with the expanded lists:
+
+```
+adapters:
+  encoder:
+    enc_lang_adapter:
+      layer_stack_index: 0
+      ids: [de, en]
+    enc_group_adapter:
+      layer_stack_index: 2
+      ids: [g0, g1]
+    enc_full_adapter:
+      layer_stack_index: 5
+      ids: [full]
+  decoder:
+    dec_lang_adapter:
+      layer_stack_index: 0
+      ids: [es, fr]
+    dec_group_adapter:
+      layer_stack_index: 2
+      ids: [g0, g1]
+```
+Notes: `adapter_config` assumes your model code will read
+`task.adapters` and the global `adapters` registry (with
+`layer_stack_index`) to wire things.
+
 
 ## Command line overrides
 

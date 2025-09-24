@@ -197,13 +197,61 @@ input of the next step.  This allows more control:
 - Overriding what a particular step does by specifying its output
   manually.
 
-The meta-stage `config_all` runs all of the stages in order.
-     
+The meta-stage `config_all` runs all of the stages in order:
+```
+# 05-train-ready.yaml
+tasks:
+  en_es:
+    src_tgt: "en-es"
+    transforms: [sentencepiece]
+    path_src: data/en-es/train.en
+    path_tgt: data/en-es/train.es
+    path_valid_src: data/en-es/valid.en
+    path_valid_tgt: data/en-es/valid.es
+
+  de_es:
+    src_tgt: "de-es"
+    transforms: [sentencepiece]
+    path_src: data/de-es/train.de
+    path_tgt: data/de-es/train.es
+    path_valid_src: data/de-es/valid.de
+    path_valid_tgt: data/de-es/valid.es
+
+# Vocab / SPM (shared model example)
+src_subword_type: sentencepiece
+tgt_subword_type: sentencepiece
+src_subword_model: ./vocab/joint_spm.model
+tgt_subword_model: ./vocab/joint_spm.model
+
+# Reasonable caps
+batch_type: tokens
+src_seq_length: 256
+tgt_seq_length: 256
+```
+Command:
+```
+python -m mammoth.bin.config_config config_all \
+  --in_config 05-train-ready.yaml \
+  --use_weight --temperature 0.3 \
+  --n_nodes 1 --n_gpus_per_node 4 --n_slots_per_gpu 1 \
+  --out_config 05-ready-augmented.yaml
+```
+
 ## `complete_language_pairs` - Determine which language pairs have data.
 
 The languages to consider as candidates are determined from the
-vocabulary keys.  Generate all tasks (and optional autoencoders) from
-templates:
+vocabulary keys.  An example input:
+```
+# 02-pairs-from-templates.yaml
+language_pairs:
+  - en-es
+  - de-es
+
+# You can also predeclare transforms to be applied later:
+default_transforms: [sentencepiece]
+```
+
+Generate all tasks (and optional autoencoders) from templates:
 
 ```
 python -m mammoth.bin.config_config \
@@ -216,28 +264,29 @@ python -m mammoth.bin.config_config \
   --valid_tgt_path "/dev/{sorted_pair}.{tgt_lang}" \
   --autoencoder --autoencoder_validation
 ```
-Then add transforms:                 
-```                    
-python -m mammoth.bin.config_config \
-  set_transforms \
-  --in_config train.step4.yaml \
-  --out_config train.step5.yaml \
-  --transforms sentencepiece --ae_transforms sentencepiece
-```
-
-## `corpora_schedule`: Determine weighting and curriculum for the tasks.
-
-Run once to build weights and cache counts:
-
-python -m mammoth.bin.config_config \
-  corpora_schedule \
-  --in_config train.human.yaml \
-  --out_config train.step1.yaml \
-  --use_weight --use_introduce_at_training_step --temperature 1.0
-  
+Then add transforms.
 
 ## `cluster_languages`: Determine language groups by clustering.
+
+An example of the input:
 ```
+# 03-cluster-seed.yaml
+languages: [en, es, de, fr]
+
+# You may also pre-list pairs (paths can be added later)
+tasks:
+  en_es: { src_tgt: "en-es" }
+  de_fr: { src_tgt: "de-fr" }
+```
+
+```
+# cluster_languages needs a CSV distance matrix (langs x langs with header)
+python -m mammoth.bin.config_config cluster_languages \
+  --in_config 03-cluster-seed.yaml \
+  --distance_matrix lang_distance.csv \
+  --n_groups 2 \
+  --out_config 03-clustered.yaml
+
 python -m mammoth.bin.config_config \
   cluster_languages \
   --in_config train.step1.yaml \
@@ -249,28 +298,48 @@ If the step is skipped, you should define the `config_config.groups` dict in the
 ```
 ???
 ```
-    
+Combine this with the following task.
+
 ## `sharing_groups`: Apply the parameter sharing groups to tasks.
 
 ```    
+# then derive sharing groups from those clusters
+python -m mammoth.bin.config_config sharing_groups \
+  --in_config 03-clustered.yaml \
+  --out_config 03-sharing.yaml
+
 python -m mammoth.bin.config_config \
   sharing_groups \
   --in_config train.step2.yaml \
   --out_config train.step3.yaml
 ```
 
-#### `set_transforms`
-
-Apply the transforms to tasks.
-
 ## `allocate_devices`: Allocate tasks to nodes and gpus.
 
 A local search procedure is used, taking into account parameter
 sharing groups and tasks delayed by curriculum weighting.
-    
+The input:
+```
+# 04-allocate-seed.yaml
+tasks:
+  en_es:
+    src_tgt: "en-es"
+    path_src: data/en-es/train.en
+    path_tgt: data/en-es/train.es
+  de_es:
+    src_tgt: "de-es"
+    path_src: data/de-es/train.de
+    path_tgt: data/de-es/train.es
+```
 If you want the tool to propose a packing for your cluster:
     
 ```
+python -m mammoth.bin.config_config allocate_devices \
+  --in_config 04-allocate-seed.yaml \
+  --n_nodes 1 --n_gpus_per_node 4 --n_slots_per_gpu 1 \
+  --time_budget_s 5 \
+  --out_config 04-assigned.yaml
+
 python -m mammoth.bin.config_config \
   allocate_devices \
   --in_config train.step5.yaml \
@@ -279,13 +348,53 @@ python -m mammoth.bin.config_config \
   --time_budget_s 30
 ```
 
-#### `adapter_config`
+## Minimal Manual Tasks
 
-Determine the adapter configuration.
+```
+# 01-minimal-tasks.yaml
+tasks:
+  en_es:
+    src_tgt: "en-es"
+    path_src: data/en-es/train.en
+    path_tgt: data/en-es/train.es
+    path_valid_src: data/en-es/valid.en
+    path_valid_tgt: data/en-es/valid.es
 
-#### `translation_configs`
+  de_es:
+    src_tgt: "de-es"
+    path_src: data/de-es/train.de
+    path_tgt: data/de-es/train.es
+    path_valid_src: data/de-es/valid.de
+    path_valid_tgt: data/de-es/valid.es
 
-Generate the translation yaml configs.
+# (Optional) initial global defaults the tool won’t mind carrying along
+batch_type: tokens
+src_seq_length: 256
+tgt_seq_length: 256
+```
+
+### `corpora_schedule`: Determine weighting and curriculum for the tasks.
+
+Run once to build weights and cache counts:
+```
+python -m mammoth.bin.config_config \
+  corpora_schedule \
+  --in_config train.human.yaml \
+  --out_config train.step1.yaml \
+  --use_weight --use_introduce_at_training_step --temperature 1.0
+``  
+
+### `set_transforms`
+
+Apply the transforms to tasks.
+
+```                    
+python -m mammoth.bin.config_config \
+  set_transforms \
+  --in_config train.step4.yaml \
+  --out_config train.step5.yaml \
+  --transforms sentencepiece --ae_transforms sentencepiece
+```
 
 #### `remove_temporary_keys`
 
@@ -298,7 +407,15 @@ python -m mammoth.bin.config_config \
   --out_config train.final.yaml
 ```
 
-### Command line overrides
+### `translation_configs`
+
+Generate the translation yaml configs.
+
+### `adapter_config`
+
+Determine the adapter configuration.
+
+## Command line overrides
 
 Some parameters can also be given on the command line.  If a value is
 given both in the input yaml and on the command line, the command line

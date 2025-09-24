@@ -382,7 +382,7 @@ python -m mammoth.bin.config_config \
   --in_config train.human.yaml \
   --out_config train.step1.yaml \
   --use_weight --use_introduce_at_training_step --temperature 1.0
-``  
+```
 
 ### `set_transforms`
 

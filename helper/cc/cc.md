@@ -508,6 +508,267 @@ python -m mammoth.bin.config_config \
   --n_nodes 4 --n_gpus_per_node 8 --n_slots_per_gpu 1 \
   --time_budget_s 30
 ```
+A more elaborate example:
+```
+# --- before allocate_devices runs ---
+config_version: v1
+
+config_config:
+  n_nodes: 2
+  n_gpus_per_node: 4
+  n_slots_per_gpu: 3
+
+  # Language clusters used by homogeneity/communication terms
+  groups:
+    en: pivot
+    fi: uralic
+    et: uralic
+    lv: baltic
+    lt: baltic
+    ru: slavic
+    uk: slavic
+    kk: turkic
+
+  # Costs in the optimizer’s objective (illustrative)
+  device_assignment:
+    INTER_NODE_COST: 10
+    INTRA_NODE_COST: 3
+    HOMOGENEITY_PENALTY: 1
+    VERY_BAD: 10_000   # (forbidden patterns like co-locating same split)
+    # “ready-coverage” is enforced via the objective/spread
+
+# 12 direction pairs × 2 splits = 24 concrete tasks
+tasks:
+  # --- English ↔ Uralic (4 tasks × 2 splits) ---
+  en-fi-0:
+    src_lang: en
+    tgt_lang: fi
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  en-fi-1:
+    src_lang: en
+    tgt_lang: fi
+    offset: 1
+    introduce_at_training_step: 2000
+  fi-en-0:
+    src_lang: fi
+    tgt_lang: en
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  fi-en-1:
+    src_lang: fi
+    tgt_lang: en
+    offset: 1
+    introduce_at_training_step: 4000
+
+  en-et-0:
+    src_lang: en
+    tgt_lang: et
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  en-et-1:
+    src_lang: en
+    tgt_lang: et
+    offset: 1
+    introduce_at_training_step: 2000
+  et-en-0:
+    src_lang: et
+    tgt_lang: en
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  et-en-1:
+    src_lang: et
+    tgt_lang: en
+    offset: 1
+    introduce_at_training_step: 4000
+
+  # --- English ↔ Baltic (4 tasks × 2 splits) ---
+  en-lv-0:
+    src_lang: en
+    tgt_lang: lv
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  en-lv-1:
+    src_lang: en
+    tgt_lang: lv
+    offset: 1
+    introduce_at_training_step: 3000
+  en-lt-0:
+    src_lang: en
+    tgt_lang: lt
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  en-lt-1:
+    src_lang: en
+    tgt_lang: lt
+    offset: 1
+    introduce_at_training_step: 3000
+
+  # --- English ↔ Slavic (6 tasks × 2 splits) ---
+  en-ru-0:
+    src_lang: en
+    tgt_lang: ru
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  en-ru-1:
+    src_lang: en
+    tgt_lang: ru
+    offset: 1
+    introduce_at_training_step: 5000
+  ru-en-0:
+    src_lang: ru
+    tgt_lang: en
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  ru-en-1:
+    src_lang: ru
+    tgt_lang: en
+    offset: 1
+    introduce_at_training_step: 5000
+  en-uk-0:
+    src_lang: en
+    tgt_lang: uk
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  en-uk-1:
+    src_lang: en
+    tgt_lang: uk
+    offset: 1
+    introduce_at_training_step: 5000
+
+  # --- English ↔ Turkic (2 tasks × 2 splits) ---
+  en-kk-0:
+    src_lang: en
+    tgt_lang: kk
+    offset: 0
+    introduce_at_training_step: 0     # ready
+  en-kk-1:
+    src_lang: en
+    tgt_lang: kk
+    offset: 1
+    introduce_at_training_step: 6000
+
+# (No node_gpu fields yet; allocate_devices will fill those + top-level device metadata)
+```
+
+####  Why this instance is computationally difficult?
+
+1. Conflicting objectives:
+
+   - Minimize inter-node spread of components (pivot en touches
+     everything, so naïvely it explodes across nodes).
+   - Keep each GPU homogeneous (few distinct groups per GPU).
+   - Ensure every GPU has at least one ready task at step 0.
+   - Obey “split” rules (e.g., don’t put en-fi-0 and en-fi-1 on the
+     same GPU if you forbid co-locating splits).
+
+2. Combinatorics: 24 tasks into 24 ordered slots across 8 GPUs on 2
+nodes → massive number of assignments; many are near-ties, so the
+search must inspect lots of swaps to gain small objective
+improvements.
+
+3. Coupling across the whole cluster: moving one en-ru-0 task can
+change the communication cost for components en, ru, slavic, pivot
+across multiple GPUs/nodes.
+
+Below is a plausible result (one of many optimal/near-optimal
+layouts). The important part is how the result is encoded: each task
+now has a node_gpu: "node_id:gpu_id" (the slot index is implicit by
+row order in trainer launch or is irrelevant if all tasks on a GPU are
+multiplexed by the dataloader), and the top-level has n_nodes,
+world_size, and gpu_ranks.
+
+```
+# --- after allocate_devices runs ---
+n_nodes: 2
+world_size: 8
+gpu_ranks: [0,1,2,3,4,5,6,7]
+
+tasks:
+  # Node 0
+  en-fi-0: { node_gpu: "0:0" }   # ready
+  et-en-0: { node_gpu: "0:0" }   # ready
+  en-lv-0: { node_gpu: "0:1" }   # ready
+  en-lt-0: { node_gpu: "0:1" }   # ready
+  en-ru-0: { node_gpu: "0:2" }   # ready
+  ru-en-0: { node_gpu: "0:2" }   # ready
+  en-uk-0: { node_gpu: "0:3" }   # ready
+  en-kk-0: { node_gpu: "0:3" }   # ready
+  en-fi-1: { node_gpu: "0:0" }   # late (offset 1)
+  en-et-1: { node_gpu: "0:0" }   # late
+  en-lv-1: { node_gpu: "0:1" }   # late
+  en-lt-1: { node_gpu: "0:1" }   # late
+
+  # Node 1
+  fi-en-0: { node_gpu: "1:0" }   # ready
+  en-et-0: { node_gpu: "1:0" }   # ready
+  ru-en-1: { node_gpu: "1:1" }   # late
+  en-ru-1: { node_gpu: "1:1" }   # late
+  en-uk-1: { node_gpu: "1:2" }   # late
+  en-kk-1: { node_gpu: "1:2" }   # late
+  fi-en-1: { node_gpu: "1:3" }   # late
+  et-en-1: { node_gpu: "1:3" }   # late
+  # (two more “late” tasks to fill Node1’s remaining slots if you model exactly 3 slots/GPU)
+
+# Optional: allocate_devices often also normalizes per-device curriculum
+# so each GPU has at least one task starting at step 0:
+# introduce_at_training_step values are shifted per GPU so min starts at 0.
+```
+
+#### What makes this placement “good” (qualitatively)
+
+- Each GPU has at least one ready task (*-0) at step 0 → the trainer
+  can fully utilize all 8 GPUs immediately.
+
+- Heavy components (like en/pivot) are concentrated to reduce
+  inter-node spread:
+
+- Node 0 hosts most of the “pivot + Baltic/Uralic/Slavic” ready
+  directions; Node 1 carries the complementary reverse directions and
+  late splits.
+
+- Within a GPU, we co-locate related groups (e.g., en-fi-0 with
+  et-en-0 on 0:0 → “pivot+Uralic flavor” is shared; en-ru-0 with
+  ru-en-0 on 0:2 → “pivot+Slavic flavor”). This reduces the
+  homogeneity penalty.
+
+If your policy forbids placing both splits of the same pair on the
+same GPU, you’d move, say, en-fi-1 from 0:0 to 1:0 (or another GPU) to
+avoid the VERY_BAD penalty. The optimizer’s job is exactly to search
+these trade-offs.
+
+#### Why this example is hard for the optimizer (in numbers)
+
+- 24 tasks tied together by shared components (en, fi, uralic, slavic,
+  baltic, turkic).
+
+- Moving one en-ru-0 from 0:2 → 1:1 changes:
+
+  - Inter-node cost for component en (more nodes now touch en),
+  - Inter/intra-node cost for ru and group slavic,
+  - Homogeneity on both GPUs,
+  - Possibly the “ready” coverage if you displace the only ready task on a GPU,
+  - Any split constraint if it collides with en-ru-1 already on 1:1.
+
+- The objective delta depends on all those counts at once → lots of
+  global coupling. That’s why naïve local moves + full recomputation
+  get expensive fast.
+
+#### Summary
+
+- The input is compact, but the global constraints (communication
+  across nodes, homogeneity per GPU, curriculum readiness, split
+  rules) make the search combinatorial even at modest scales.
+
+- The output encoding is simple (node_gpu per task + a few top-level
+  launch fields), but obtaining that mapping is what costs time.
+
+- With the optimizations (delta-scored swaps/in-place updates,
+  symmetry breaking, hierarchical solve, or a CP-SAT backend with a
+  warm start), the same-sized instance that could take minutes can be
+  brought down to single-digit seconds, and larger “hundreds of
+  languages” cases become practical.
+
 
 ## Minimal Manual Tasks
 
@@ -790,5 +1051,150 @@ Some parameters can also be given on the command line.  If a value is
 given both in the input yaml and on the command line, the command line
 takes precedence.
 
+## Review and Analysis of the Program
+
+If your corpus-size cache is cold, `corpora_schedule` can be slow once
+(it line-counts big files), but after the cache warms,
+`allocate_devices` dominates.  In steady-state runs the slowest
+command is `allocate_devices` because it calls an external optimizer
+(`optimize_gpu_assignment`) that solves a combinatorial packing
+problem under constraints.
+
+Clingo-style ASP-sketch:
+```
+% Facts
+task(i1). ...
+ready(i1).
+group(i1,gA).
+slot(gpu1,1..K).
+gpu(gpu1). ...
+
+% Choice: assign exactly one slot to each task
+1 { assign(I,G,K) : slot(G,K) } 1 :- task(I).
+
+% Slot capacity
+:- assign(I1,G,K), assign(I2,G,K), I1 != I2.
+
+% Ready coverage (hard)
+covered(G) :- assign(I,G,_), ready(I).
+:- gpu(G), not covered(G).
+
+% Group usage
+use(G,H) :- assign(I,G,_), group(I,H).
+
+% Optimization (minimize group sprawl; you can add penalties for c(I,G))
+#minimize { 1@1, use(G,H) }.
+```
+
+This reproduces the main constraints (capacity, single assignment,
+ready-coverage) and lets you steer solutions with minimize
+statements. It’s a good fit if you like declarative encodings and
+iterating on “soft” preferences.
+
+#### When ASP might be competitive
+
+Many qualitative, lexicographic preferences (tiered #minimize with
+dozens of soft rules) where you want guaranteed optimal stable models
+under complex priorities. ASP can express this very naturally and
+sometimes finds good solutions fast for highly logical preference
+stacks.
+
+Heavy model churn (you frequently toggle rules/constraints during
+design). ASP can be quicker to iterate declaratively, but not
+necessarily faster at runtime once the instance size grows.
+
+Keep an ASP encoding as a reference/prototyping tool for exploring new
+soft constraints; once you like the behavior, translate the final set
+into MIP terms.  A MIP/PB model solved by a modern integer optimizer
+(e.g., OR-Tools CP-SAT or a commercial MILP) will almost always run
+faster than ASP on real-sized instances.
+
+####
+
+Short answer: in steady-state runs the slowest command is **`allocate_devices`** because it calls an external optimizer (`optimize_gpu_assignment`) that solves a combinatorial packing problem under constraints; if your corpus-size cache is cold, **`corpora_schedule`** can be slow once (it line-counts big files), but after the cache warms, `allocate_devices` dominates.  &#x20;
+
+---
+
+### `allocate_devices`: line-by-line walkthrough + where time goes
+
+1. **Read config & overrides.** Pull `n_nodes`, `n_gpus_per_node`, `n_slots_per_gpu` from CLI or YAML. Cheap.&#x20;
+2. **Collect instances to place.** For every task, parse `src_tgt`, read any `offset` (from corpus “splits”), detect whether it’s “ready to start” (`introduce_at_training_step == 0`). Build:
+   • `lang_pairs` = list of `(src, tgt, offset)` to place,
+   • `lps_ready_to_start` = subset ready at step 0,
+   • `lp_to_key` = map from `(src,tgt,offset)` → the concrete task keys (because multiple tasks can share the same tuple after splitting). O(#tasks).&#x20;
+3. **Derive missing counts.** If only `n_slots_per_gpu` or `n_nodes` is given, compute the other so total slots ≥ #tasks; compute `n_gpus_tot = n_nodes * n_gpus_per_node`. O(1).&#x20;
+4. **Curriculum fix-up.** If fewer *ready* tasks than GPUs, lower some `introduce_at_training_step` values so that at least `n_gpus_tot` tasks can start immediately; rebuild `lps_ready_to_start`. O(#tasks) and trivial.&#x20;
+5. **Optimization (the slow part).**
+   • If single GPU, assign everything to `0:0`.
+   • Else call **`optimize_gpu_assignment`** with the grid shape, the list of items (`lang_pairs`), the language→group mapping, the “ready” subset, and an optional **`time_budget_s`**. This function returns a mapping {gpu\_slot → lang\_pair}. This is where the heavy combinatorial search happens; runtime is explicitly time-budgeted.&#x20;
+6. **Write back the solution.** For every assigned `lang_pair`, pop one concrete task key from `lp_to_key` and set `node_gpu`. Assert everything got placed. Then set `n_nodes`, `world_size`, `gpu_ranks`. Linear in #tasks.&#x20;
+7. **Per-device “starts at 0” safety pass.** For each device, find the minimum `introduce_at_training_step` among its tasks, subtract it from that device’s tasks so every GPU has some task starting at 0. Linear in #tasks.&#x20;
+
+**Why it’s slow.** Steps 1–4 and 6–7 are linear book-keeping. Step 5 is a **constrained assignment/packing** with coupling terms (grouping, “must have a ready task per GPU”, multiple slots per GPU, and duplicated `(src,tgt,offset)` tuples). The search space grows superlinearly with #tasks and #slots; the code even exposes `--time_budget_s`, confirming the optimizer runs until a time cap. That dominates wall-clock time.&#x20;
+
+> Note on the other “sometimes slow” command: `corpora_schedule` counts lines using `wc`/`zcat` for every source file that’s not cached—IO-bound and costly the first time; after `./corpora_length_cache` fills, it’s fast.&#x20;
+
+### Can we formulate `allocate_devices` as MILP?
+
+Yes. A compact MILP (works with OR-Tools/Gurobi/CP-SAT) for **one-shot static assignment**:
+
+**Sets & data**
+
+* Tasks $i \in \mathcal{I}$ (each with group $g(i)$ and readiness $r_i\in\{0,1\}$).
+* GPUs $u \in \mathcal{U}$ with $K$ slots each (total slots $|\mathcal{U}|K \ge |\mathcal{I}|$).
+* Optional **affinity cost** $c_{i,u}$ (e.g., prefer placing same groups together or keep certain groups apart).
+
+**Vars**
+
+* $x_{i,u,k} \in \{0,1\}$: task $i$ uses slot $k$ on GPU $u$.
+* $R_u \in \{0,1\}$: GPU $u$ has at least one ready task.
+* $y_{u,h} \in \{0,1\}$: GPU $u$ uses group $h$ (helps cluster groups).
+
+**Constraints**
+
+1. **Assign each task once**:
+
+   $$
+   \sum_{u\in\mathcal{U}}\sum_{k=1}^K x_{i,u,k} = 1 \quad \forall i.
+   $$
+2. **Slot capacity**:
+
+   $$
+   \sum_{i\in\mathcal{I}} x_{i,u,k} \le 1 \quad \forall u, k.
+   $$
+3. **Ready-coverage per GPU (soft or hard)**:
+
+   $$
+   R_u \le \sum_{i,k} r_i\,x_{i,u,k} \quad \forall u;\quad R_u \in \{0,1\}.
+   $$
+
+   Use as a hard requirement ($R_u=1$) or reward it in the objective.
+4. **Group-usage indicator**:
+
+   $$
+   x_{i,u,k} \le y_{u,g(i)} \quad \forall i,u,k.
+   $$
+
+**Objective (example, tunable)**
+
+Maximize coverage of ready tasks and “tight” grouping, while
+minimizing placement cost:
+
+$$
+\max\; \lambda_1\sum_u R_u\;-\;\lambda_2\sum_{u,h} y_{u,h}\;-\;\sum_{i,u,k} c_{i,u}\,x_{i,u,k}.
+$$
+
+* The $y$ term penalizes “group sprawl” (fewer distinct groups per
+  GPU).
+
+* $c_{i,u}$ can encode other heuristics (e.g., keep related languages
+  on the same node).
+
+This MILP returns an assignment in seconds to minutes for hundreds of
+tasks (depends on $K,|\mathcal{U}|$ and whether you include pairwise
+terms). For even richer “pairwise same-GPU bonuses” you can introduce
+$z_{i,j,u}$ (1 if $i$ and $j$ co-reside on $u$) with standard
+linearization, but that’s $O(|\mathcal{I}|^2|\mathcal{U}|)$ and can
+blow up—use sparingly.
 
 

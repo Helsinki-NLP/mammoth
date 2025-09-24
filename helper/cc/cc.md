@@ -268,7 +268,7 @@ Then add transforms.
 
 ## `cluster_languages`: Determine language groups by clustering.
 
-An example of the input:
+An example of the input config:
 ```
 # 03-cluster-seed.yaml
 languages: [en, es, de, fr]
@@ -278,7 +278,45 @@ tasks:
   en_es: { src_tgt: "en-es" }
   de_fr: { src_tgt: "de-fr" }
 ```
+turn a similarity CSV into a distance CSV
 
+If you have a symmetric similarity matrix (1.0 = identical), convert it to distance matrix with:
+```
+import csv
+inp = "similarity.csv"   # header: lang,en,es,de,fr ; cells in [0,1]
+out = "langs.csv"
+with open(inp) as f, open(out, "w", newline="") as g:
+    r = list(csv.reader(f))
+    header = r[0]
+    W = r[1:]
+    writer = csv.writer(g)
+    writer.writerow(header)
+    for i,row in enumerate(W):
+        lang = row[0]
+        vals = [lang]
+        for j,x in enumerate(row[1:]):
+            if i==j:
+                vals.append("0.0")            # diagonal
+            else:
+                s = float(x)
+                d = max(0.0, min(1.0, 1.0-s)) # clamp into [0,1]
+                vals.append(f"{d:.4f}")
+        writer.writerow(vals)
+```
+Distance matrix:
+```
+lang,en,es,de,fr
+en,0.0,0.20,0.70,0.50
+es,0.20,0.0,0.80,0.40
+de,0.70,0.80,0.0,0.60
+fr,0.50,0.40,0.60,0.0
+```
+Checks:
+- The CSV must include all languages you want clustered; any missing ones can’t be grouped.
+- Extra languages in the matrix are okay; the tool will subset to those present in your YAML.
+- Values don’t have to be in [0,1], but non-negative with 0 on diagonal is standard.
+
+Command:
 ```
 # cluster_languages needs a CSV distance matrix (langs x langs with header)
 python -m mammoth.bin.config_config cluster_languages \
@@ -292,11 +330,26 @@ python -m mammoth.bin.config_config \
   --in_config train.step1.yaml \
   --out_config train.step2.yaml \
   --distance_matrix langs_dist.csv --n_groups 8
+
+python -m mammoth.bin.config_config cluster_languages \
+  --in_config 03-cluster-seed.yaml \
+  --distance_matrix langs.csv \
+  --n_groups 2 \
+  --out_config 03-clustered.yaml
+```
+A possible result is:
+```
+groups:
+  en: group0
+  es: group0
+  fr: group0
+  de: group1
 ```
 This step can be easily skipped by leaving the `distance_matrix` unset.
+
 If the step is skipped, you should define the `config_config.groups` dict in the input yaml.
 ```
-???
+
 ```
 Combine this with the following task.
 

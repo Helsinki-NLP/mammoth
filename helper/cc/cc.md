@@ -1154,26 +1154,28 @@ Yes. A compact MILP (works with OR-Tools/Gurobi/CP-SAT) for **one-shot static as
 
 1. **Assign each task once**:
 
-   $$
+$$
    \sum_{u\in\mathcal{U}}\sum_{k=1}^K x_{i,u,k} = 1 \quad \forall i.
-   $$
+$$
+
 2. **Slot capacity**:
 
-   $$
+$$
    \sum_{i\in\mathcal{I}} x_{i,u,k} \le 1 \quad \forall u, k.
-   $$
+$$
+
 3. **Ready-coverage per GPU (soft or hard)**:
 
-   $$
-   R_u \le \sum_{i,k} r_i\,x_{i,u,k} \quad \forall u;\quad R_u \in \{0,1\}.
-   $$
+$$
+  R_u \le \sum_{i,k} r_i\,x_{i,u,k} \quad \forall u;\quad R_u \in \{0,1\}.
+$$
 
    Use as a hard requirement ($R_u=1$) or reward it in the objective.
 4. **Group-usage indicator**:
 
-   $$
+$$
    x_{i,u,k} \le y_{u,g(i)} \quad \forall i,u,k.
-   $$
+$$
 
 **Objective (example, tunable)**
 
@@ -1181,7 +1183,7 @@ Maximize coverage of ready tasks and “tight” grouping, while
 minimizing placement cost:
 
 $$
-\max\; \lambda_1\sum_u R_u\;-\;\lambda_2\sum_{u,h} y_{u,h}\;-\;\sum_{i,u,k} c_{i,u}\,x_{i,u,k}.
+\max \lambda_1\sum_u R_u- \lambda_2\sum_{u,h} y_{u,h} - \sum_{i,u,k} c_{i,u} x_{i,u,k}.
 $$
 
 * The $y$ term penalizes “group sprawl” (fewer distinct groups per

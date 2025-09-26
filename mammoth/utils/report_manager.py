@@ -160,10 +160,11 @@ class ReportMgr(ReportMgrBase):
         n_correct = None if report_stats.n_correct is None else 0
         report_stats = mammoth.utils.Statistics(n_correct=n_correct)
 
-        total = sum(sampled_task_counts.values())
-        logger.info(f'Task sampling distribution: (total {total})')
-        for task, count in sampled_task_counts.most_common():
-            logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+        if sampled_task_counts is not None:
+            total = sum(sampled_task_counts.values())
+            logger.info(f'Task sampling distribution: (total {total})')
+            for task, count in sampled_task_counts.most_common():
+                logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
 
         return report_stats
 

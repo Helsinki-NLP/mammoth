@@ -185,6 +185,12 @@ def main(
     # train_iter = iter_on_device(train_iter, device_context)
     valid_iter = _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager)
 
+    # Perform validation before training starts if requested
+    if opts.valid_at_start and valid_iter is not None and device_context.is_master():
+        logger.info("{} - Performing validation before training starts".format(device_context.id))
+        valid_stats = trainer.validate(valid_iter)
+        logger.info("{} - Pre-training validation stats: {}".format(device_context.id, valid_stats))
+
     if len(opts.gpu_ranks):
         if device_context.is_master():
             logger.info('Starting training on GPU: %s' % opts.gpu_ranks)

@@ -382,6 +382,7 @@ def _add_train_general_opts(parser):
     group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
     group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
+    group.add('--valid_at_start', '-valid_at_start', action='store_true', help='Perform validation before training starts')
     group.add('--valid_metrics', '-valid_metrics', nargs='*', default=[], help='List of names of additional validation metrics')
     group.add(
         '--early_stopping', '-early_stopping', type=int, default=0, help='Number of validation steps without improving.'

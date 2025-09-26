@@ -78,6 +78,24 @@ class TokenizerTransform(Transform):
             "sampling, and dropout probability for BPE-dropout. "
             "(target side)",
         )
+        group.add(
+            "-src_subword_type",
+            "--src_subword_type",
+            type=str,
+            default="sentencepiece",
+            choices=["sentencepiece", "bpe", "none"],
+            help="Type of subword tokenization for source side. "
+            "Used by denoising transforms to determine word boundaries.",
+        )
+        group.add(
+            "-tgt_subword_type",
+            "--tgt_subword_type",
+            type=str,
+            default="sentencepiece",
+            choices=["sentencepiece", "bpe", "none"],
+            help="Type of subword tokenization for target side. "
+            "Used by denoising transforms to determine word boundaries.",
+        )
 
         # subword vocabulary restriction options:
         group.add(

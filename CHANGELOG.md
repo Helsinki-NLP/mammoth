@@ -6,6 +6,14 @@ This update introduces HuggingFace model integration capabilities to Mammoth, en
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (26-Sep-2025)
+
+**Training Improvements**
+
+- **New Option**: Added `--valid_at_start` flag to perform validation before training begins (the validation runs only on master node by far).
+- Added `--src_subword_type` and `--tgt_subword_type` parameters for autotokenizer denoising transforms. The current denoising transforms support `sentencepiece`, `bpe`, `none` options for both source and target sides.
+- Fixed the bug that the training will crash when no task sampling has occurred
+
 ## What Was Updated (15-Sep-2025)
 
 **LUMI Supercomputer Support**

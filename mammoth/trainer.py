@@ -333,30 +333,28 @@ class Trainer(object):
             )
 
             if step % valid_steps == 0 and valid_iter is not None:
-                if self.gpu_verbose_level > 0:
-                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
-                valid_stats = self.validate(
-                    iter_on_device(valid_iter, device_context),
-                    moving_average=self.moving_average,
-                )
-                if self.gpu_verbose_level > 0:
-                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} gather valid stat step {step}')
-                valid_stats = self._maybe_gather_stats(valid_stats)
-                if self.gpu_verbose_level > 0:
-                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} report stat step {step}')
+                # Only run validation on master rank to avoid NCCL timeout issues
                 if device_context.is_master():
+                    if self.gpu_verbose_level > 0:
+                        logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
+                    valid_stats = self.validate(
+                        iter_on_device(valid_iter, device_context),
+                        moving_average=self.moving_average,
+                    )
+                    if self.gpu_verbose_level > 0:
+                        logger.info(f'{device_context.node_rank}:{device_context.local_rank} report valid stat step {step}')
                     self._report_step(
                         None,
                         step,
                         valid_stats=valid_stats,
                     )
 
-                # Run patience mechanism
-                if self.earlystopper is not None:
-                    self.earlystopper(valid_stats, step)
-                    # If the patience has reached the limit, stop training
-                    if self.earlystopper.has_stopped():
-                        break
+                    # Run patience mechanism only on master rank
+                    if self.earlystopper is not None:
+                        self.earlystopper(valid_stats, step)
+                        # If the patience has reached the limit, stop training
+                        if self.earlystopper.has_stopped():
+                            break
 
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
                 self.model_saver.save(step, self._data_state, moving_average=self.moving_average)

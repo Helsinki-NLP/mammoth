@@ -6,7 +6,7 @@ import time
 from mammoth.model_builder import build_model, validate_optimizer_coverage
 from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.misc import set_random_seed
-from mammoth.trainer import build_trainer
+from mammoth.trainer import build_trainer, iter_on_device
 from mammoth.utils.model_saver import build_model_saver, load_parameters_from_checkpoint
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
@@ -188,8 +188,23 @@ def main(
     # Perform validation before training starts if requested
     if opts.valid_at_start and valid_iter is not None and device_context.is_master():
         logger.info("{} - Performing validation before training starts".format(device_context.id))
+        valid_iter = iter_on_device(valid_iter, device_context)
         valid_stats = trainer.validate(valid_iter)
-        logger.info("{} - Pre-training validation stats: {}".format(device_context.id, valid_stats))
+
+        # Display BLEU validation results
+        if valid_stats is not None:
+            # Check for BLEU score in validation metrics
+            if hasattr(valid_stats, 'validation_metrics') and valid_stats.validation_metrics:
+                if 'bleu' in valid_stats.validation_metrics:
+                    bleu_score = valid_stats.validation_metrics['bleu']
+                    logger.info("{} - Pre-training validation BLEU: {:.2f}".format(
+                        device_context.id, bleu_score))
+                else:
+                    logger.info("{} - Pre-training validation completed, but no BLEU score computed (check if sacrebleu is available)".format(device_context.id))
+            else:
+                logger.info("{} - Pre-training validation completed, but no BLEU metrics available".format(device_context.id))
+        else:
+            logger.info("{} - Pre-training validation returned no statistics".format(device_context.id))
 
     if len(opts.gpu_ranks):
         if device_context.is_master():

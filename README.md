@@ -18,7 +18,7 @@ We thank the NVIDIA AI Technology Center Finland for their help with the multi-g
 
 For the update history in this branch, see CHANGELOG.md.
 
-**If you are working in LUMI environment, please see the [quickstart guide here](lumi/LUMI_QUICKSTART.md).**
+**For CSC supercomputer environments (LUMI/Puhti), see the [CSC quickstart guide](csc_env/README.md).**
 
 ## Quick Start: HuggingFace Integration
 

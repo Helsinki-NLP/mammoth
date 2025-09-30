@@ -22,6 +22,6 @@ singularity exec \
     -B $your_path_in_lumi:$your_path_in_lumi:rw \
     /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
     $your_path_in_lumi/.venv/bin/python $path_to_mammoth/train.py \
-    -config $path_to_mammoth/training_ft.yaml
+    -config $path_to_mammoth/single_node.yaml
 
 echo "Finishing at `date`"

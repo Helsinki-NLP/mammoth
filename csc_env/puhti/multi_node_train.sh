@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -A project_2001970
+#SBATCH -A project_
 #SBATCH -J mammoth_multinode
 #SBATCH -o ./log/training.%j.out
 #SBATCH -e ./log/training.%j.err

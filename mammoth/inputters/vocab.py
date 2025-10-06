@@ -6,6 +6,12 @@ import os
 from mammoth.utils.logging import logger
 from mammoth.constants import DefaultTokens
 
+try:
+    from tokenizers import Tokenizer
+    HF_TOKENIZERS_AVAILABLE = True
+except ImportError:
+    HF_TOKENIZERS_AVAILABLE = False
+
 
 DEFAULT_SPECIALS = (
     DefaultTokens.BOS,
@@ -15,8 +21,25 @@ DEFAULT_SPECIALS = (
 )
 
 
-def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS):
-    new_vocab = Vocab(path, items=None, tag=lang, size=size, specials=list(specials))
+def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS, use_hf_tokenizer=False):
+    """
+    Factory function to load either traditional MAMMOTH vocab or HuggingFace tokenizer.
+
+    Args:
+        path: Path to vocab file (.txt) or tokenizer file (.json)
+        lang: Language tag for logging
+        size: Vocabulary size (ignored for HF tokenizers)
+        specials: Special tokens (ignored for HF tokenizers)
+        use_hf_tokenizer: If True, load as HuggingFace tokenizer
+
+    Returns:
+        Vocab or HFTokenizerVocab instance
+    """
+    if use_hf_tokenizer or path.endswith('.json'):
+        new_vocab = HFTokenizerVocab(tokenizer_path=path, tag=lang)
+    else:
+        new_vocab = Vocab(path, items=None, tag=lang, size=size, specials=list(specials))
+
     logger.debug(new_vocab)
     return new_vocab
 
@@ -82,6 +105,89 @@ class Vocab:
 
     def __repr__(self):
         return f"{self.__class__.__name__} @ {self.path} ({len(self)} items, specials=[{sorted(self.specials.keys())}])"
+
+
+class HFTokenizerVocab:
+    """Wrapper for HuggingFace tokenizers that provides MAMMOTH Vocab interface."""
+
+    def __init__(self, tokenizer_path, tag=""):
+        if not HF_TOKENIZERS_AVAILABLE:
+            raise RuntimeError(
+                "HuggingFace tokenizers library not available. "
+                "Install with: pip install tokenizers"
+            )
+
+        logger.info(f"Loading {tag} HuggingFace tokenizer from {tokenizer_path}")
+
+        if not os.path.exists(tokenizer_path):
+            raise RuntimeError(f"{tag} tokenizer not found at {tokenizer_path}")
+
+        # Load the tokenizer
+        self.tokenizer = Tokenizer.from_file(tokenizer_path)
+        self.path = tokenizer_path
+
+        # Build stoi (string to index) and itos (index to string) mappings
+        vocab_dict = self.tokenizer.get_vocab()
+        self.stoi = vocab_dict
+        self.itos = {idx: token for token, idx in vocab_dict.items()}
+
+        # Map MAMMOTH special tokens to HuggingFace tokens
+        self.specials = {DefaultTokens.EOS: self.tokenizer.token_to_id("</s>"),
+                         DefaultTokens.UNK: self.tokenizer.token_to_id("<unk>"),
+                         DefaultTokens.BOS: self.tokenizer.token_to_id("<s>"),
+                         DefaultTokens.PAD: self.tokenizer.token_to_id("<pad>"),
+                         DefaultTokens.MASK: self.tokenizer.token_to_id("<mask>")}
+
+    def __getitem__(self, key_str):
+        """Get token ID by token string (mimics Vocab behavior)."""
+        token_id = self.tokenizer.token_to_id(key_str)
+        if token_id is None:
+            # Return UNK token ID if token not found
+            unk_id = self.specials.get(DefaultTokens.UNK)
+            if unk_id is None:
+                raise KeyError(f"Token '{key_str}' not found and no UNK token defined")
+            return unk_id
+        return token_id
+
+    def __len__(self):
+        """Return vocabulary size."""
+        return self.tokenizer.get_vocab_size()
+
+    def decode_token(self, token_id):
+        """
+        Decode a single token ID to its string representation.
+
+        For BPE tokenizers, this returns the raw token string (e.g., 'Ġhello').
+        For proper text decoding, use tokenizer.decode([ids]) instead.
+
+        Args:
+            token_id: Integer token ID
+
+        Returns:
+            Token string or '<unk>' if ID not in vocabulary
+        """
+        return self.itos.get(token_id, '<unk>')
+
+    def decode_tokens(self, token_ids, skip_special_tokens=True):
+        """
+        Decode a sequence of token IDs to text using the tokenizer's decoder.
+
+        This properly handles BPE merging and special token removal.
+
+        Args:
+            token_ids: List of integer token IDs
+            skip_special_tokens: Whether to remove special tokens from output
+
+        Returns:
+            Decoded text string
+        """
+        return self.tokenizer.decode(token_ids, skip_special_tokens=skip_special_tokens)
+
+    def __repr__(self):
+        return (
+            f"{self.__class__.__name__} @ {self.path} "
+            f"({len(self)} items, specials={sorted(self.specials.keys())})"
+        )
 
 
 def _read_vocab_file(vocab_path, tag):

@@ -31,13 +31,34 @@ class TranslationBuilder(object):
         vocab = self.vocabs['tgt']
         tokens = []
 
-        for tok in pred:
-            if tok < len(vocab):
-                tokens.append(vocab.itos[tok.item()])
-            else:
-                tokens.append(src_vocab.itos[tok.item() - len(vocab)])
-            if tokens[-1] == DefaultTokens.EOS:
-                break
+        # Check if using HuggingFace tokenizer
+        from mammoth.inputters.vocab import HFTokenizerVocab
+        is_hf_tokenizer = isinstance(vocab, HFTokenizerVocab)
+
+        if is_hf_tokenizer:
+            # For HF tokenizers, collect all token IDs first, then decode as a sequence
+            token_ids = []
+            for tok in pred:
+                tok_id = tok.item()
+                # Stop at EOS token (don't include it in the token_ids list)
+                if tok_id == vocab.specials.get(DefaultTokens.EOS):
+                    break
+                token_ids.append(tok_id)
+
+            # Use tokenizer's decode method to properly handle BPE merging
+            decoded_text = vocab.decode_tokens(token_ids, skip_special_tokens=True)
+            # Return as list of words (split by spaces) to match expected format
+            tokens = decoded_text.split()
+        else:
+            # Original logic for traditional vocab
+            for tok in pred:
+                if tok < len(vocab):
+                    tokens.append(vocab.itos[tok.item()])
+                else:
+                    tokens.append(src_vocab.itos[tok.item() - len(vocab)])
+                if tokens[-1] == DefaultTokens.EOS:
+                    break
+
         return tokens
 
     def from_batch(self, translation_batch):

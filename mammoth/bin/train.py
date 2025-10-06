@@ -95,11 +95,15 @@ def train(opts):
         vocabs_dict = frame_checkpoint.get('vocab')
     else:
         vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
+        use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False)
         for side in ('src', 'tgt'):
             for lang in global_task_queue_manager.get_langs(side):
                 vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
                 # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
-                vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
+                vocabs_dict[(side, lang)] = get_vocab(
+                    vocab_path, lang, vocab_size[side],
+                    specials=all_specials, use_hf_tokenizer=use_hf_tokenizer
+                )
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
@@ -211,9 +215,26 @@ def train(opts):
     for p in procs:
         logger.info("DD logger")
         p.join()
-    # Once training is done, we can terminate the producers
+
+    # Gracefully shutdown producers by sending termination signal
+    logger.info("Training complete, shutting down producers...")
     for p in producers:
         p.terminate()
+
+    # Wait for producers to finish cleanup (with timeout)
+    for i, p in enumerate(producers):
+        p.join(timeout=5)
+        if p.is_alive():
+            logger.warning(f"Producer {i} did not terminate gracefully, force killing...")
+            p.kill()
+
+    # Clean up queues and semaphores to prevent resource leaks
+    logger.info("Cleaning up queues and semaphores...")
+    for q in queues:
+        q.close()
+        q.join_thread()
+
+    logger.info("Shutdown complete")
 
 
 def _get_parser():

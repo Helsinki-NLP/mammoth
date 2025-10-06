@@ -6,6 +6,42 @@ This update introduces HuggingFace model integration capabilities to Mammoth, en
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (06-Oct-2025)
+
+**HuggingFace Tokenizers Library Integration**
+
+- **New Feature**: Added support for HuggingFace `tokenizers` library for training from scratch
+- **Tokenizer Support**:
+  - New `HFTokenizerVocab` class wraps HuggingFace tokenizers with MAMMOTH's vocab interface
+  - Automatic detection of `.json` tokenizer files
+  - Support for BPE, WordPiece, Unigram, and other modern tokenization algorithms
+- **Configuration**:
+  - Added `--use_hf_tokenizer` flag to enable HF tokenizer mode
+  - Backward compatible with traditional vocabulary files
+- **Dataset Integration**:
+  - Modified `DynamicDatasetIter` to handle both traditional vocabs and HF tokenizers
+  - Transparent tokenization during data loading
+- **Translation Pipeline**:
+  - Updated translation decoding to use tokenizer's built-in decoder
+  - Proper handling of BPE merging and special token removal
+- **Example Script**:
+  - Added `examples/hf_tokenizers/train.py` demonstrating MARIAN-style BPE tokenizer training
+  - Configurable vocabulary size, special tokens, and pre-tokenization strategies
+- **Documentation**:
+  - Comprehensive guide at `docs/HF_TOKENIZERS.md`
+  - Covers installation, usage, advanced configuration, and troubleshooting
+
+**Files Modified:**
+- `mammoth/inputters/vocab.py`: Added `HFTokenizerVocab` class and updated `get_vocab()` factory
+- `mammoth/inputters/dataset.py`: Enhanced dataset loading to support HF tokenizers
+- `mammoth/translate/translation.py`: Updated translation decoding for HF tokenizers
+- `mammoth/opts.py`: Added `--use_hf_tokenizer` configuration option
+- `mammoth/bin/train.py`: Modified to pass tokenizer configuration to vocab loading
+
+**Files Added:**
+- `examples/hf_tokenizers/train.py`: Example tokenizer training script
+- `docs/HF_TOKENIZERS.md`: Complete documentation for HF tokenizers integration
+
 ## What Was Updated (26-Sep-2025)
 
 **Training Improvements**

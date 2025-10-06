@@ -20,6 +20,8 @@ For the update history in this branch, see CHANGELOG.md.
 
 **For CSC supercomputer environments (LUMI/Puhti), see the [CSC quickstart guide](csc_env/README.md).**
 
+**For HuggingFace tokenizers integration (training from scratch), see the [HF Tokenizers guide](docs/HF_TOKENIZERS.md).**
+
 ## Quick Start: HuggingFace Integration
 
 This guide shows:

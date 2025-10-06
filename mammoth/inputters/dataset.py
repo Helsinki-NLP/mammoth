@@ -139,11 +139,33 @@ class ParallelCorpus(IterableDataset):
         bos = vocab[DefaultTokens.BOS]
         eos = vocab[DefaultTokens.EOS]
         unk = vocab[DefaultTokens.UNK]
-        indices = torch.tensor([
-            eos, bos,
-            *(vocab.stoi.get(token, unk) for token in tokens),
-            eos,
-        ], device='cpu')
+
+        # Check if using HuggingFace tokenizer
+        from mammoth.inputters.vocab import HFTokenizerVocab
+        if isinstance(vocab, HFTokenizerVocab):
+            # For HF tokenizers, we need to encode the full text, not lookup individual tokens
+            # tokens is already a list of words - join them back and encode properly
+            text = ' '.join(tokens)
+            encoded = vocab.tokenizer.encode(text, add_special_tokens=False)
+            token_ids = encoded.ids
+
+            # Log a few examples for debugging
+            import random
+            if random.random() < 0.001:  # Log ~0.1% of examples
+                logger.info(f'HF Tokenizer {side} encoding example:')
+                logger.info(f'  Input text: {text[:100]}...')
+                logger.info(f'  Token IDs: {token_ids[:20]}...')
+                # logger.info(f'  Max ID: {max(token_ids) if token_ids else 0}, Vocab size: {len(vocab)}')
+                # logger.info(f'  UNK count: {token_ids.count(unk)}')
+
+            indices = torch.tensor([eos, bos, *token_ids, eos], device='cpu')
+        else:
+            # Traditional vocab: lookup tokens individually
+            indices = torch.tensor([
+                eos, bos,
+                *(vocab.stoi.get(token, unk) for token in tokens),
+                eos,
+            ], device='cpu')
         return indices
 
     def _pad_sequence(self, tensors: list, padding_value: int = 0):

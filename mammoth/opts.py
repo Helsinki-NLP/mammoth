@@ -164,6 +164,13 @@ def _add_dynamic_vocabs_opts(parser):
         default=None,
         help="Maximum size of the target vocabulary; will silently truncate your vocab file if longer."
     )
+    group.add(
+        "-use_hf_tokenizer",
+        "--use_hf_tokenizer",
+        action="store_true",
+        help="Use HuggingFace tokenizers instead of traditional vocab files. "
+        "Vocab paths should point to .json tokenizer files."
+    )
 
 
 def _add_dynamic_transform_opts(parser):

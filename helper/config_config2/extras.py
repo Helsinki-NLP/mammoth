@@ -2,9 +2,6 @@ from .utils import load_yaml
 
 # PURPOSE: Modify config to run on a single CPU (no GPU ranks/world_size; remove node_gpu).
 def extra_cpu(opts):
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("extra_cpu")
-        
     cfg = opts.in_config[0]
     if "tasks" not in cfg or not isinstance(cfg["tasks"], adict):
         raise UserConfigError("Nothing to adjust: 'tasks' mapping not found in YAML.")
@@ -24,9 +21,6 @@ def extra_cpu(opts):
 
 # PURPOSE: Force a fully shared decoder by switching tasks to 'all-all' and adding prefix; override vocabs to 'all'.
 def extra_fully_shared_hack(opts):
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("extra_fully_shared_hack")
-        
     cfg = opts.in_config[0]
     if "tasks" not in cfg or not isinstance(cfg["tasks"], dict):
         raise UserConfigError("Nothing to hack: 'tasks' mapping not found in YAML.")
@@ -61,9 +55,6 @@ def extra_fully_shared_hack(opts):
 
 # PURPOSE: Copy node_gpu/world_size/gpu_ranks from another config after verifying identical task keys.
 def extra_copy_gpu_assignment(opts):
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("extra_copy_gpu_assignment")
-        
     cfg_dst = opts.in_config[0]
     cfg_src = opts.copy_from[0]
     
@@ -90,50 +81,90 @@ def extra_copy_gpu_assignment(opts):
     opts.in_config[0]['world_size'] = opts.copy_from[0]['world_size']
     opts.in_config[0]['gpu_ranks'] = opts.copy_from[0]['gpu_ranks']
     
-from .schema import print_schema, COMMAND_IO
-
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
-
-
 def register(subparsers):
     # extra_cpu
     p = subparsers.add_parser(
         "extra_cpu",
-        help="Rewrite config for single-CPU run (strip GPU placement).",
+        help="Add CPU-only tasks or flags to tasks/rewrite config for single-CPU run (strip GPU placement).",
+        description=(
+            "Marks selected tasks as CPU-only or injects CPU-related flags/limits based on filters. "
+            "Useful for light preprocessing tasks."),
     )
     p.add_argument("--in_config", required=True, type=load_yaml, metavar="FILE.yaml")
     p.add_argument("--out_config", metavar="FILE.yaml")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
+    p.add_argument("--tasks", nargs="+", metavar="TASK", help="Task names to modify (default: all).")
     p.set_defaults(handler=extra_cpu)
+    p.set_defaults(_mutates_yaml=True)
 
     # extra_fully_shared_hack
     p = subparsers.add_parser(
         "extra_fully_shared_hack",
-        help="Force FULL decoder sharing + shared vocab; add 'prefix' if missing.",
+        help="Force FULL decoder sharing + shared vocab across all layers (hack); add 'prefix' if missing.",
+        description=(
+            "Overrides encoder/decoder sharing lists to FULL for all layers. "
+            "Primarily for experiments; affects config_config.encoder_sharing/decoder_sharing."),
     )
     p.add_argument("--in_config", required=True, type=load_yaml, metavar="FILE.yaml")
     p.add_argument("--out_config", metavar="FILE.yaml")
     p.add_argument("--joint_vocab", required=True, metavar="FILE.txt",
                    help="Path to a single vocabulary to use for both src and tgt.")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
     p.set_defaults(handler=extra_fully_shared_hack)
+    p.set_defaults(_mutates_yaml=True)
 
     # extra_copy_gpu_assignment
     p = subparsers.add_parser(
         "extra_copy_gpu_assignment",
-        help="Copy node_gpu/world_size/gpu_ranks from another YAML (tasks must match).",
+        help="Copy GPU assignment (node_gpu/world_size/gpu_ranks) from one YAML to another (tasks must match).",
+        description=(
+            "Copies world_size, node_gpu, and gpu_ranks from a source YAML into the target YAML. "
+            "Useful to reuse a previously computed placement."),
     )
     p.add_argument("--in_config", required=True, type=load_yaml, metavar="FILE.yaml")
     p.add_argument("--out_config", metavar="FILE.yaml")
     p.add_argument("--copy_from", required=True, type=load_yaml, metavar="FILE.yaml",
                    help="Source YAML with the desired assignments.")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
     p.set_defaults(handler=extra_copy_gpu_assignment)
+    p.set_defaults(_mutates_yaml=True)
 
-
+    register_command_io("extra_copy_gpu_assignment": {
+        "reads": ["world_size", "node_gpu", "gpu_ranks"],
+        "writes": ["world_size", "node_gpu", "gpu_ranks"],
+        "summary": "Copies GPU placement metadata from a source YAML into the target YAML."
+    })
+    register_command_io("extra_cpu": {
+        "reads": ["tasks"],
+        "writes": ["tasks"],
+        "summary": "Marks tasks as CPU-only or injects CPU flags based on selection filters."
+    })
+    register_command_io("extra_fully_shared_hack", {
+        "reads": ["config_config.encoder_sharing", "config_config.decoder_sharing"],
+        "writes": ["config_config.encoder_sharing", "config_config.decoder_sharing"],
+        "summary": "Forces FULL sharing across all layers (experimental hack)."
+    })
+    register_command_template_extras("extra_cpu", {
+        "_notes": [
+            "Set per-task hints such as cpu_only: true if your execution layer supports it."
+        ],
+        "tasks": {}
+    })
+    register_command_template_extras("extra_fully_shared_hack", {
+        "_notes": [
+            "Produces fully shared encoder/decoder. Useful for quick baselines."
+        ],
+        "enc_layers": 6,
+        "dec_layers": 6,
+        # Do not prefill encoder_sharing/decoder_sharing if this command generates them.
+    })
+    register_command_template_extras("extra_copy_gpu_assignment": {
+        "_notes": [
+            "Provide a static mapping; useful to reproduce an assignment.",
+            "Example for 2 nodes × 4 GPUs each."
+        ],
+        "world_size": 8,
+        "gpu_ranks": [0,1,2,3,4,5,6,7],
+        "node_gpu": {
+            "node0": [0,1,2,3],
+            "node1": [0,1,2,3]
+        }
+    })
+    

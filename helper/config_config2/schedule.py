@@ -1,6 +1,5 @@
 import time
-from .utils import logger, coalesce, UserConfigError
-from .utils import load_yaml
+from .utils import logger, coalesce, UserConfigError, load_yaml, register_command_io, register_command_template_extras
 
 # SUMMARY: external_linecount
 # PURPOSE: Count lines in a file quickly using system utilities; supports .gz via zcat.
@@ -51,9 +50,6 @@ def read_cached_linecounts(fname):
 
 # PURPOSE: Compute corpus lengths, weights (temperature), and introduce_at_training_step; optionally split large ones.
 def corpora_schedule(opts):
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("corpora_schedule")
-        
     # Start timing for logging.
     start = time.time()
     
@@ -188,13 +184,6 @@ def _split_large_language_pairs(opts, corpora_weights, split_treshold):
     # Return updated weights mapping.
     return corpora_weights_out
 
-from .schema import print_schema, COMMAND_IO
-
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
-
 def register(subparsers):
     p = subparsers.add_parser(
         "corpora_schedule",
@@ -219,8 +208,28 @@ def register(subparsers):
                    help="Compute curriculum start steps (overrides YAML).")
     p.add_argument("--temperature", type=float, metavar="FLOAT", default=None,
                    help="Temperature (1/T): 1.0 empirical, 0.0 uniform (overrides YAML).")
-
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
     p.set_defaults(handler=corpora_schedule)
+    p.set_defaults(_mutates_yaml=True)
 
+    register_command_io("corpora_schedule", {
+        "reads": ["tasks", "config_config.temperature", "config_config.use_weight",
+                  "config_config.ae_weight", "config_config.use_introduce_at_training_step",
+                  "config_config.split_large_language_pairs"],
+        "writes": ["tasks"],  # updates weights, stride/offset, introduce_at_training_step
+        "summary": "Computes weights and optional curriculum; may split large corpora.",
+    })
+    register_command_template_extras("corpora_schedule", {
+        "_notes": [
+            "Computes weights per task: w = (size/total)^temperature",
+            "temperature controls weighting: 0.0 → uniform by corpus count; 1.0 → proportional to size",
+            "If validation files exist, they can be attached already by discovery."
+        ],
+        "tasks": {},   # empty stub to show expected location/shape
+        "config_config": {
+            "temperature": 1.0,
+            "use_weight": True,
+            "ae_weight": 0.5,
+            "use_introduce_at_training_step": False,
+            "split_large_language_pairs": False
+        }
+    })

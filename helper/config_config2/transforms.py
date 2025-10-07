@@ -4,9 +4,6 @@ def set_transforms(opts):
     """Assign transform lists to each task; optionally set 
     prefix tokens and validate settings."""
     
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("transforms")
-        
     # Start timing.
     start = time.time()
 
@@ -67,16 +64,24 @@ def register(subparsers):
                    help="Transform(s) to use for translation tasks (use multiple times).")
     p.add_argument("--ae_transforms", action="append", metavar="NAME",
                    help="Transform(s) to use for autoencoder tasks (use multiple times).")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
     p.set_defaults(handler=set_transforms)
+    p.set_defaults(_mutates_yaml=True)
 
-
-from .schema import print_schema, COMMAND_IO
-
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
-
-
+    register_command_io("set_transforms", {
+        "reads": ["tasks", "config_config.transforms", "config_config.ae_transforms",
+                  "config_config.use_src_lang_token"],
+        "writes": ["tasks"],
+        "summary": "Attaches transforms to tasks; enforces 'prefix' when use_src_lang_token is true.",
+    })
+    register_command_template_extras("set_transforms", {
+        "_notes": [
+            "Will set/override transforms per task.",
+            "ae_transforms are used for autoencoder tasks only."
+        ],
+        "tasks": {},
+        "config_config": {
+            "transforms": [],
+            "ae_transforms": [],
+            "use_src_lang_token": False
+        }
+    })

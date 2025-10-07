@@ -2,15 +2,13 @@ import time
 from itertools import compress
 #from sklearn.cluster import AgglomerativeClustering
 
-from .utils import logger, coalesce, UserConfigError, load_yaml
+from .utils import logger, coalesce, UserConfigError, load_yaml, register_command_io, register_command_template_extras
 
 # ---------- distance matrix ---------------------
 
 import csv
 
-# SUMMARY: load_distmat_csv
 # PURPOSE: Load a language distance matrix from CSV, validate shape, return headers and numpy array.
-# PUT THIS IN: io_helpers.py
 def load_distmat_csv(fname):
      # Open CSV file containing a square distance matrix with a 'lang' first column.
      with open(fname, 'r') as istr:
@@ -59,21 +57,16 @@ def add_cluster_languages_args(parser):
      parser.add_argument('--n_groups', type=int)
 
 
-
-
-# SUMMARY: cluster_languages
-# PURPOSE: Cluster languages using a precomputed distance matrix and store lang->group mapping.
-# PUT THIS IN: clustering.py
 def cluster_languages(opts):
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("cluster_languages")
-        
     start = time.time()
+    
+    cc_opts = opts.in_config[0]['config_config']
+    cc = cc_opts
     
     # If user does not pass --distance_matrix, we try YAML's config_config.distance_matrix.
     # If both missing AND YAML does not already contain 'groups', we raise a friendly error.
     dm = getattr(opts, "distance_matrix", None)
-    if dQm is None:
+    if dm is None:
         path = cc.get("distance_matrix")
         if not path and "groups" not in cc:
             raise UserConfigError("Missing distance matrix. "
@@ -88,7 +81,6 @@ def cluster_languages(opts):
         return
      
     # Resolve key hyperparameters and inputs.
-    cc_opts = opts.in_config[0]['config_config']
     n_groups = coalesce(opts, cc, "n_groups", required=("groups" not in cc), type_desc="integer")
     cutoff_threshold = opts.cutoff_threshold if opts.cutoff_threshold else cc_opts.get('cutoff_threshold', None)
 
@@ -150,13 +142,6 @@ def cluster_languages(opts):
     duration = time.time() - start
     logger.info(f'step took {duration} s')
 
-from .schema import print_schema, COMMAND_IO
-
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
-
 def register(subparsers):
     p = subparsers.add_parser(
         "cluster_languages",
@@ -176,8 +161,22 @@ def register(subparsers):
                    help="Optional average-linkage distance threshold.")
     p.add_argument("--n_groups", type=int, metavar="INT",
                    help="Number of clusters (required unless YAML already has 'groups').")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
 
     p.set_defaults(handler=cluster_languages)
+    p.set_defaults(_mutates_yaml=True)
 
+    register_command_io("cluster_languages", {
+        "reads": ["config_config.distance_matrix", "config_config.n_groups", "config_config.groups"],
+        "writes": ["config_config.groups"],
+        "summary": "Builds language→group mapping, unless already provided.",
+    })
+    register_command_template_extras("cluster_languages", {
+        "_notes": [
+            "Provide n_groups to request clustering, or define 'groups' explicitly.",
+            "If you also provide a CSV distance matrix, the command can use it."
+        ],
+        "config_config": {
+            "n_groups": 2,
+            "groups": {"en": 0, "fi": 1}   # if you want to override clustering
+        }
+    })

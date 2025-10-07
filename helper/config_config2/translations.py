@@ -16,9 +16,6 @@ def remove_temporary_keys(opts):
 # PURPOSE: Placeholder for generating zero-shot translation configs; currently does nothing unless zero_shot is set.
 # PUT THIS IN: translations.py
 def translation_configs(opts):
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("translation_configs")
-        
     start = time.time()
 
     cc_opts = opts.in_config[0]['config_config']
@@ -97,35 +94,56 @@ def register(subparsers):
     # translation_configs (placeholder)
     p = subparsers.add_parser(
         "translation_configs",
-        help="Generate zero-shot translation configs (placeholder).",
+        help="Generate model configs for translation tasks (optionally zero-shot).",
+        description=(
+            "Emits per-task training/eval configs from 'tasks'. Optionally include zero-shot "
+            "pairs via config_config.zero_shot."),
     )
     p.add_argument("--in_config", required=True, type=load_yaml, metavar="FILE.yaml")
     p.add_argument("--out_config", metavar="FILE.yaml")
+    p.add_argument("--emit-dir", metavar="DIR", help="Where to write emitted configs (if applicable).")
     p.add_argument("--zero_shot", action="store_true", help="Enable zero-shot config generation.")
-    p.set_defaults(handler=translation_configs)
+    p.set_defaults(handler=translation_configs, _parser=p)
 
     # remove_temporary_keys
     p = subparsers.add_parser(
         "remove_temporary_keys",
-        help="Remove transient keys (e.g., config_config) before saving.",
+        help="Remove transient keys (e.g., config_config block) before saving.",
+        description=(
+            "Deletes the temporary 'config_config' section and any ephemeral keys so that the output "
+            "YAML contains only durable configuration (tasks, adapters, etc.)."),
     )
     p.add_argument("--in_config", required=True, type=load_yaml, metavar="FILE.yaml")
     p.add_argument("--out_config", metavar="FILE.yaml")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
     p.set_defaults(handler=remove_temporary_keys)
+    p.set_defaults(_mutates_yaml=True)
 
-
-from .schema import print_schema, COMMAND_IO
-
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
+    register_command_io("translation_configs": {
+        "reads": ["tasks", "config_config.zero_shot"],
+        "writes": ["tasks", "configs"],  # or whatever you create
+        "summary": "Generates per-task train/eval configs; can include zero-shot pairs."
+    })
+    register_command_io("remove_temporary_keys", {
+        "reads": ["config_config"],
+        "writes": ["(removes config_config)"],
+        "summary": "Removes transient 'config_config' before final save.",
+    })
+    register_command_template_extras("translation_configs", {
+        "_notes": [
+                "Optional: zero_shot pairs are added as eval-only tasks.",
+            "If 'zero_shot' is non-empty, those pairs are added as eval-only."
+        ],
+        "tasks": {},
+        "config_config": {
+            "zero_shot": []
+        }
+    })
+    register_command_template_extras("remove_temporary_keys", {
+        "_notes": [
+            "Removes temporary or helper keys added by earlier steps.",
+            "No input required; runs on the current YAML."
+        ],
+        "config_config": {}  # anchor so users see where cleanup applies
+    })
 
     
-
-
-
-
-        

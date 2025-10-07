@@ -1,11 +1,8 @@
-# SUMMARY: config_all
+from .utils import load_yaml
+from .clustering import load_distmat_csv
+
 # PURPOSE: Run the full pipeline of steps in order, then log total time.
-# PUT THIS IN: translations.py (or keep as orchestration in cli.py calling into modules)
 def config_all(opts):
-    if getattr(opts, "yaml_help", False):
-        print_command_yaml_help("config_all")
-        
-    return
     # Start timer.
     start = time.time()
 
@@ -75,17 +72,112 @@ def register(subparsers):
 
     p.add_argument("--zero_shot", action="store_true")
 
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
-    
     p.set_defaults(handler=config_all)
+    p.set_defaults(_mutates_yaml=True)
 
-from .schema import print_schema, COMMAND_IO
+    register_command_io("config_all": {
+        "reads": [
+            # task discovery
+            "src_vocab", "tgt_vocab",
+            "config_config.src_path", "config_config.tgt_path",
+            "config_config.ae_path", "config_config.valid_src_path", "config_config.valid_tgt_path",
 
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
+            # scheduling knobs
+            "config_config.temperature", "config_config.use_weight", "config_config.ae_weight",
+            "config_config.use_introduce_at_training_step", "config_config.split_large_language_pairs",
 
+            # clustering / groups
+            "config_config.n_groups", "config_config.groups",
 
-        
+            # sharing
+            "config_config.enc_layers", "config_config.dec_layers",
+            "config_config.enc_sharing_groups", "config_config.dec_sharing_groups",
+
+            # transforms
+            "config_config.transforms", "config_config.ae_transforms", "config_config.use_src_lang_token",
+
+            # devices
+            "config_config.n_gpus_per_node", "config_config.n_nodes", "config_config.n_slots_per_gpu",
+
+            # optional extras
+            "config_config.zero_shot",
+        ],
+        "writes": [
+            "tasks", "world_size", "node_gpu", "gpu_ranks",
+            "config_config.encoder_sharing", "config_config.decoder_sharing",
+            "adapters", "configs"
+        ],
+        "summary": ("End-to-end pipeline: build tasks, schedule, cluster, sharing, "
+                    "transforms, device placement, (optional) adapters, and emit configs.")
+    })
+    register_command_template_extras("config_all", {
+        "_notes": [
+            "This is a compact starter for running the full pipeline.",
+            "Edit paths/templates first; then adjust scheduling/transforms/devices.",
+            "Keys shown here are typical inputs other commands will read."
+        ],
+        "src_vocab": "/data/vocabs/{lang}.txt",
+        "tgt_vocab": "/data/vocabs/{lang}.txt",
+        "config_config": {
+            "_notes": [
+                "Path templates can use {src} and {tgt}.",
+                "If you also want monolingual autoencoders, set ae_path.",
+                "Validation paths are optional; used only if files exist."
+            ],
+            "src_path": "/data/corpora/{src}-{tgt}.src",
+            "tgt_path": "/data/corpora/{src}-{tgt}.tgt",
+            "ae_path":  "/data/mono/{lang}.txt",
+            "valid_src_path": "/data/valid/{src}-{tgt}.src",
+            "valid_tgt_path": "/data/valid/{src}-{tgt}.tgt",
+
+            "_schedule_notes": [
+                "Weights: w = (size/total)^temperature.",
+                "use_weight=True uses corpus sizes; set False for uniform-by-count.",
+                "ae_weight applies a multiplier to AE tasks if present."
+            ],
+            "temperature": 1.0,
+            "use_weight": True,
+            "ae_weight": 0.5,
+            "use_introduce_at_training_step": False,
+            "split_large_language_pairs": False,
+
+            "_groups_notes": [
+                "Either set n_groups to let clustering create groups,",
+                "OR provide explicit 'groups' mapping {lang: group}."
+            ],
+            "n_groups": 2,
+            "groups": {"en": 0, "fi": 1},
+
+            "_sharing_notes": [
+                "If your model config does not define layer counts, set them here.",
+                "enc_sharing_groups/dec_sharing_groups: per-layer group IDs. Often filled by 'sharing_groups'."
+            ],
+            "enc_layers": 6,
+            "dec_layers": 6,
+            "enc_sharing_groups": [],   # will be filled by 'sharing_groups' usually
+            "dec_sharing_groups": [],
+
+            "_transforms_notes": [
+                "Global transform knobs; 'set_transforms' will apply to tasks.",
+                "ae_transforms apply to autoencoder tasks only.",
+                "use_src_lang_token adds a source-language token in inputs."
+            ],
+            "transforms": [],
+            "ae_transforms": [],
+            "use_src_lang_token": False,
+
+            "_devices_notes": [
+                "Multi-node config: set n_gpus_per_node, and either n_nodes or n_slots_per_gpu.",
+                "The other value will be inferred by 'allocate_devices'."
+            ],
+            "n_gpus_per_node": 4,
+            "n_nodes": 1,
+            "n_slots_per_gpu": 1,
+
+            "_zero_shot_notes": [
+                "Zero-shot pairs (no training data); used by 'translation_configs' as eval-only."
+            ],
+            "zero_shot": []
+        }
+    })
+ 

@@ -1,11 +1,8 @@
 from .utils import load_yaml
+from .schema import (register_schema, register_command_io, register_command_template_extras)
 
 # PURPOSE: Expand adapter ID spaces (LANGUAGE/GROUP/FULL) into concrete IDs and attach per-task adapter selections.
 def adapter_config(opts):
-     if getattr(opts, "yaml_help", False):
-          print_command_yaml_help("adapter_config")
-          return
-
      start = time.time()
 
      cc_opts = opts.in_config[0]['config_config']
@@ -103,22 +100,39 @@ def _adapters_to_stacks(task_adapters, opts, side):
      # Return the per-layer adapter arrangement.
      return adapters
 
-from .schema import print_schema, COMMAND_IO
-
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
+from .schema import register_schema, register_command_io
 
 def register(subparsers):
     p = subparsers.add_parser(
         "adapter_config",
         help="Expand adapter ID spaces (LANGUAGE/GROUP/FULL) and attach per-task selections.",
+        description=(
+             "Expands adapter id-spaces (LANGUAGE/GROUP/FULL) using config_config.groups and "
+             "generates adapter mappings for tasks. Writes adapter sections back to YAML."),
     )
     p.add_argument("--in_config", required=True, type=load_yaml, metavar="FILE.yaml")
     p.add_argument("--out_config", metavar="FILE.yaml")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
+    p.add_argument("--dry-run", action="store_true", help="Compute but do not write changes.")         
     p.set_defaults(handler=adapter_config)
+    p.set_defaults(_mutates_yaml=True)
 
-
+    register_command_io("adapter_config", {
+        "reads": ["tasks", "adapters", "config_config.groups"],
+        "writes": ["adapters", "tasks"],
+        "summary": "Expands adapter id-spaces (LANGUAGE/GROUP/FULL) and maps tasks to adapters."
+    })
+    register_command_template_extras("adapter_config", {
+         "_notes": [
+              "Define adapters under 'adapters'. You can refer to them in tasks by name.",
+              "Example shows a shared adapter and a language-specific one."
+         ],
+         "tasks": {},
+         "adapters": {
+              "shared": {"type": "bottleneck", "dim": 256},
+              "lang_en": {"type": "bottleneck", "dim": 256}
+         },
+         "config_config": {
+              "groups": {"en": 0, "fi": 1}
+         }
+    })
+    

@@ -1,159 +1,226 @@
-from .utils import load_yaml
-from .schema import print_command_yaml_help
+from __future__ import annotations
+from collections import defaultdict
+from typing import Any, Dict, List, Tuple
+from .utils import UserConfigError, logger, load_yaml, register_command_io, register_command_template_extras, resolve_command_inputs
+
+# If not already in utils.py, consider adding these tiny helpers there and import them:
+def _ensure_tasks_map(doc: dict) -> dict:
+    """Require doc['tasks'] to be a non-empty mapping."""
+    tasks = doc.get("tasks")
+    if not isinstance(tasks, dict) or not tasks:
+        raise UserConfigError("No 'tasks' mapping found; run complete_language_pairs first or provide tasks.")
+    return tasks
+
+def _ensure_groups_map(x: Any, *, where: str) -> dict:
+    """Require a mapping for language→group; fail with context."""
+    if not isinstance(x, dict) or not x:
+        raise UserConfigError(f"Missing or empty '{where}' mapping (language→group). "
+                              "Run cluster_languages or provide groups in YAML.")
+    return x
+
+def _int_or_none(x: Any) -> int | None:
+    """Return int(x) if it’s a finite integer-like, else None."""
+    if x is None:
+        return None
+    if isinstance(x, bool):
+        return None
+    if isinstance(x, int):
+        return x
+    try:
+        v = int(x)
+        return v
+    except Exception:
+        return None
+
+# Your optimizer must already exist somewhere you import from:
+# from .gpu_assign import optimize_gpu_assignment
+# Here we import lazily inside the function so running --help etc. won’t fail if it’s missing.
+
 
 # PURPOSE: Compute node:gpu assignments for tasks; ensure curriculum allows all devices to start; set world_size/ranks.
 def allocate_devices(opts):
+    """
+    Inputs (via resolve_command_inputs / COMMAND_IO):
+      - tasks (top-level)
+      - config_config.allocate_devices.n_gpus_per_node (required)
+      - config_config.allocate_devices.n_nodes | n_slots_per_gpu (at least one required)
+      - config_config.allocate_devices.time_budget_s (optional)
+      - config_config.allocate_devices.log_name (optional)
+      - config_config.groups (required map lang→group)
      
-     if getattr(opts, "yaml_help", False):
-          print_command_yaml_help("allocate_devices")
-          return
+     Writes:
+      - tasks.*.node_gpu = "node:gpu"
+      - world_size, n_nodes, gpu_ranks
+      - Possibly adjusts tasks.*.introduce_at_training_step
+    """
+    # 1) Normalize/resolve inputs (moves per-command keys under config_config.allocate_devices.*; applies CLI overrides)
+    inputs = resolve_command_inputs("allocate_devices", opts)
+    doc = opts.in_config[0]  # normalized in place
+    tasks = _ensure_tasks_map(doc)
      
-     start = time.time()
+    # 2) Required “groups” mapping (NOT per-command; lives under config_config.* shared space)
+    #    The resolver retains legacy top-level path OR normalized path; we read via inputs.get or doc for clarity.
+    groups = inputs.get("groups")
+    if groups is None:
+        # also accept legacy/global location if user has not normalized yet
+        groups = (doc.get("config_config") or {}).get("groups")
+    groups = _ensure_groups_map(groups, where="config_config.groups")
 
-     cc_opts = opts.in_config[0]['config_config']
-     cc = cc_opts
-
-     # Require groups mapping
-     if "groups" not in cc or not isinstance(cc["groups"], dict):
-          raise UserConfigError("Missing 'config_config.groups' mapping. Run cluster_languages or define it in YAML.")
-
-     # Require n_gpus_per_node (CLI overrides YAML)
-     ngpn = coalesce(opts, cc, "n_gpus_per_node", required=True, type_desc="integer")
-
-     # Must give either n_nodes or n_slots_per_gpu
-     n_nodes = getattr(opts, "n_nodes", None) or cc.get("n_nodes")
-     n_slots = getattr(opts, "n_slots_per_gpu", None) or cc.get("n_slots_per_gpu")
-     if n_nodes is None and n_slots is None:
-          raise UserConfigError("Provide --n_nodes or --n_slots_per_gpu (or set config_config.n_nodes / .n_slots_per_gpu).")
-
-     # Optional time budget/log name
-     coalesce(opts, cc, "time_budget_s", required=False, default=None, type_desc="integer (seconds)")
-     coalesce(opts, cc, "log_name", required=False, default=None, type_desc="string")
-
-
-     # Resolve node/gpu/slot parameters.
-     n_nodes = opts.n_nodes if opts.n_nodes else cc_opts.get('n_nodes', None)
-     n_gpus_per_node = opts.n_gpus_per_node if opts.n_gpus_per_node else cc_opts['n_gpus_per_node']
-     n_slots_per_gpu = opts.n_slots_per_gpu if opts.n_slots_per_gpu else cc_opts.get('n_slots_per_gpu', None)
-
-     # Build the list of (src, tgt, offset) triples and mark which are ready at step 0.
-     lang_pairs = []
-     lps_ready_to_start = []
-     lp_to_key = defaultdict(list)
-     for key, tasks_config in opts.in_config[0]['tasks'].items():
-         src_lang, tgt_lang = tasks_config['src_tgt'].split('-')
-         offset = tasks_config.get('offset', 0)
-         ready_to_start = tasks_config.get('introduce_at_training_step', 0) == 0
-
-         lang_pairs.append((src_lang, tgt_lang, offset))
-         if ready_to_start:
-             lps_ready_to_start.append((src_lang, tgt_lang, offset))
-         lp_to_key[(src_lang, tgt_lang, offset)].append(key)
-
-     # Either n_nodes or n_slots_per_gpu must be provided (to compute the other).
-     if n_nodes is None and n_slots_per_gpu is None:
-         raise Exception('You must specify either n_nodes or n_slots_per_gpu')
+    # 3) Pull device knobs (CLI already applied by resolver)
+    n_gpus_per_node = _int_or_none(inputs.get("n_gpus_per_node"))
+    n_nodes         = _int_or_none(inputs.get("n_nodes"))
+    n_slots_per_gpu = _int_or_none(inputs.get("n_slots_per_gpu"))
      
-     if n_nodes is None:
-         n_slots_per_node = n_gpus_per_node * n_slots_per_gpu
-         n_nodes = int(np.ceil(len(lang_pairs) / n_slots_per_node))
-     n_gpus_tot = n_nodes * n_gpus_per_node
-     
-     if n_slots_per_gpu is None:
-         n_slots_per_gpu = int(np.ceil(len(lang_pairs) / n_gpus_tot))
-     logger.info(f'n_nodes:          {n_nodes}')
-     logger.info(f'n_gpus_per_node:  {n_gpus_per_node}')
-     logger.info(f'n_slots_per_gpu:  {n_slots_per_gpu}')
-     logger.info(f'total slots:      {n_nodes * n_gpus_per_node * n_slots_per_gpu}')
-     logger.info(f'lang_pairs:       {len(lang_pairs)}')
+    if n_gpus_per_node is None or n_gpus_per_node <= 0:
+        raise UserConfigError("config_config.n_gpus_per_node is required and must be a positive integer.")
 
-     # If too few "ready" tasks to occupy all GPUs, shift curricula so enough start at 0.
-     if len(lps_ready_to_start) < (n_nodes * n_gpus_per_node):
-         iats = [corpus.get('introduce_at_training_step', 0) for _, corpus in opts.in_config[0]['tasks'].items()]
-         iats = sorted(iats)
-         iats_at_last_gpu = iats[n_nodes * n_gpus_per_node]
-         lps_ready_to_start = []
-         for cname, corpus in opts.in_config[0]['tasks'].items():
-             src_lang, tgt_lang = corpus['src_tgt'].split('-')
-             offset = corpus.get('offset', 0)
-             if 'introduce_at_training_step' not in corpus:
-                 lps_ready_to_start.append((src_lang, tgt_lang, offset))
-                 continue
-             adjusted = max(0, corpus.get('introduce_at_training_step', 0) - iats_at_last_gpu)
-             corpus['introduce_at_training_step'] = adjusted
-             if adjusted == 0:
-                 lps_ready_to_start.append((src_lang, tgt_lang, offset))
+    if (n_nodes is None) and (n_slots_per_gpu is None):
+        raise UserConfigError("Provide --n_nodes or --n_slots_per_gpu (or set config_config.n_nodes / .n_slots_per_gpu).")
 
-     # Trivial assignment when only one GPU total.
-     if n_gpus_tot < 2:
-         print('Assigning all tasks to 0:0')
-         for key in opts.in_config[0]['tasks']:
-             opts.in_config[0]['tasks'][key]['node_gpu'] = '0:0'
-     else:
-         # Run assignment optimizer to place tasks on node:gpu slots.
-         assignment = optimize_gpu_assignment(
-             n_nodes=n_nodes,
-             n_gpus_per_node=n_gpus_per_node,
-             n_slots_per_gpu=n_slots_per_gpu,
-             lang_pairs=lang_pairs,
-             lang_to_group_mapping=cc_opts['groups'],
-             lps_ready_to_start=lps_ready_to_start,
-             log_name=opts.log_name,
-             time_budget_s=opts.time_budget_s,
-         )
+    time_budget_s = _int_or_none(inputs.get("time_budget_s"))
+    log_name      = inputs.get("log_name")
 
-         # Write assignments back into the tasks.
-         for gpu_slot, lp in assignment.items():
-             if lp is None:
-                 continue
-             key = lp_to_key[lp].pop()
-             opts.in_config[0]['tasks'][key]['node_gpu'] = f'{gpu_slot.node}:{gpu_slot.gpu}'
-             
-         # Sanity-check that we consumed all tasks.
-         total_remaining = 0
-         for lp, keys in lp_to_key.items():
-             if len(keys) > 0:
-                 print(f'{lp} remaining keys: {keys}')
-             total_remaining += len(keys)
-         assert total_remaining == 0
+    # 4) Build (src,tgt,offset) tuples, mark which are ready at step 0
+    lang_pairs: List[Tuple[str, str, int]] = []
+    lps_ready: List[Tuple[str, str, int]] = []
+    lp_to_task_keys: Dict[Tuple[str, str, int], List[str]] = defaultdict(list)
 
-     # Ensure every task has a node_gpu assigned.
-     for cname, corpus in opts.in_config[0]['tasks'].items():
-         assert 'node_gpu' in corpus, f'{cname} not assigned to node_gpu: {corpus}'
+    for tkey, task in tasks.items():
+        if not isinstance(task, dict):
+            logger.warning(f"Task {tkey!r} is not a mapping; skipping.")
+            continue
+        lab = task.get("src_tgt")
+        if not isinstance(lab, str) or "-" not in lab:
+            logger.warning(f"Task {tkey!r} has no 'src_tgt' like 'en-fi'; skipping.")
+            continue
+        src, tgt = lab.split("-", 1)
+        offset = int(task.get("offset", 0) or 0)
+        ready0 = int(task.get("introduce_at_training_step", 0) or 0) == 0
 
-     # Store global distributed training settings.
-     opts.in_config[0]['n_nodes'] = n_nodes
-     opts.in_config[0]['world_size'] = n_gpus_tot
-     opts.in_config[0]['gpu_ranks'] = list(range(n_gpus_per_node))
+        triple = (src, tgt, offset)
+        lang_pairs.append(triple)
+        if ready0:
+            lps_ready.append(triple)
+        lp_to_task_keys[triple].append(tkey)
 
-     # Normalize introduce_at_training_step so each device has at least one task ready at 0.
-     train_steps = opts.in_config[0].get('train_steps', 100_000)
-     min_introduce_at_training_step = defaultdict(lambda: train_steps)
-     for cname, corpus in opts.in_config[0]['tasks'].items():
-         if 'introduce_at_training_step' not in corpus:
-             continue
-         min_introduce_at_training_step[corpus['node_gpu']] = min(
-             corpus['introduce_at_training_step'],
-             min_introduce_at_training_step[corpus['node_gpu']]
-         )
-     for cname, corpus in opts.in_config[0]['tasks'].items():
-         if 'introduce_at_training_step' not in corpus:
-             continue
-         adjust = min_introduce_at_training_step[corpus['node_gpu']]
-         if adjust > 0:
-             logger.warning(f'Reducing introduce_at_training_step of {cname} by {adjust}')
-             corpus['introduce_at_training_step'] -= adjust
+    if not lang_pairs:
+        raise UserConfigError("No usable tasks discovered (need tasks.* with a 'src_tgt').")
 
-     duration = time.time() - start
-     logger.info(f'step took {duration} s')
+    # 5) Infer missing n_nodes / n_slots_per_gpu
+    if n_nodes is None and n_slots_per_gpu is None:
+        raise UserConfigError("Internal error: both n_nodes and n_slots_per_gpu are None after resolve.")
+   
+    import math
+    if n_nodes is None:
+        slots_per_node = n_gpus_per_node * n_slots_per_gpu
+        n_nodes = math.ceil(len(lang_pairs) / max(1, slots_per_node))
+         
+    n_gpus_total = n_nodes * n_gpus_per_node
 
-from .schema import print_schema, COMMAND_IO
+    if n_slots_per_gpu is None:
+        # enough slots so all pairs can be placed
+        n_slots_per_gpu = math.ceil(len(lang_pairs) / max(1, n_gpus_total))
 
-def _yaml_help_for_command(cmd):
-    keys = ( COMMAND_IO.get(cmd, {}).get("reads", []) +
-             COMMAND_IO.get(cmd, {}).get("writes", []) )
-    print_schema(sorted(set(keys)))
+    logger.info(f"n_nodes:          {n_nodes}")
+    logger.info(f"n_gpus_per_node:  {n_gpus_per_node}")
+    logger.info(f"n_slots_per_gpu:  {n_slots_per_gpu}")
+    logger.info(f"total slots:      {n_nodes * n_gpus_per_node * n_slots_per_gpu}")
+    logger.info(f"lang_pairs:       {len(lang_pairs)}")
 
+    # 6) Ensure every GPU has something at step 0: shift curricula if needed
+    if len(lps_ready) < n_gpus_total:
+        # gather all iats and find the threshold at the k-th smallest, k = n_gpus_total
+        iats = sorted(int((t.get("introduce_at_training_step", 0) or 0)) for t in tasks.values())
+        if len(iats) > n_gpus_total:
+            kth = iats[n_gpus_total]  # 0-based index gives (n_gpus_total+1)-th smallest
+        else:
+            kth = 0
+        lps_ready = []
+        for tkey, task in tasks.items():
+            lab = task.get("src_tgt", "")
+            if "-" not in lab:
+                continue
+            src, tgt = lab.split("-", 1)
+            offset = int(task.get("offset", 0) or 0)
+            # shift down so at least n_gpus_total tasks become 0
+            if "introduce_at_training_step" not in task:
+                lps_ready.append((src, tgt, offset))
+                continue
+            adjusted = max(0, int(task.get("introduce_at_training_step", 0) or 0) - kth)
+            task["introduce_at_training_step"] = adjusted
+            if adjusted == 0:
+                lps_ready.append((src, tgt, offset))
+
+    # 7) Trivial assignment if a single GPU only
+    if n_gpus_total < 2:
+        logger.info("Assigning all tasks to 0:0 (single GPU total).")
+        for tkey in tasks:
+            tasks[tkey]["node_gpu"] = "0:0"
+    else:
+        # Lazily import your optimizer only when needed
+        try:
+            from .gpu_assignment import optimize_gpu_assignment
+        except Exception as e:
+            raise UserConfigError(f"Internal error: optimizer not available: {e}")
+
+        assignment = optimize_gpu_assignment(
+            n_nodes=n_nodes,
+            n_gpus_per_node=n_gpus_per_node,
+            n_slots_per_gpu=n_slots_per_gpu,
+            lang_pairs=lang_pairs,
+            lang_to_group_mapping=groups,
+            lps_ready_to_start=lps_ready,
+            log_name=log_name,
+            time_budget_s=time_budget_s,
+        )
+
+        # Write assignments back
+        for gpu_slot, triple in assignment.items():
+            if triple is None:
+                continue
+            tkey = lp_to_task_keys[triple].pop()
+            tasks[tkey]["node_gpu"] = f"{gpu_slot.node}:{gpu_slot.gpu}"
+
+        # Sanity: all consumed
+        leftovers = sum(len(v) for v in lp_to_task_keys.values())
+        if leftovers:
+            for lp, pending in lp_to_task_keys.items():
+                if pending:
+                    logger.warning(f"Unassigned for {lp}: {pending}")
+            raise UserConfigError("Not all tasks were assigned to a device slot.")
+
+    # 8) Post conditions: every task has node_gpu
+    for tkey, task in tasks.items():
+        if "node_gpu" not in task:
+            raise UserConfigError(f"Task {tkey!r} missing 'node_gpu' after assignment.")
+
+    # 9) Global distributed settings
+    doc["n_nodes"] = n_nodes
+    doc["world_size"] = n_gpus_total
+    # NOTE: prev code had gpu_ranks = range(n_gpus_per_node); that’s per-node ranks.
+    # For global ranks, emit 0..world_size-1:
+    doc["gpu_ranks"] = list(range(n_gpus_total))
+
+    # 10) Normalize introduce_at_training_step so each device has at least one task ready at 0
+    train_steps = int(doc.get("train_steps", 100_000) or 100_000)
+    min_iat_by_slot: Dict[str, int] = defaultdict(lambda: train_steps)
+    for tkey, task in tasks.items():
+        if "introduce_at_training_step" in task:
+            slot = task["node_gpu"]
+            iat  = int(task.get("introduce_at_training_step", 0) or 0)
+            if iat < min_iat_by_slot[slot]:
+                min_iat_by_slot[slot] = iat
+
+    for tkey, task in tasks.items():
+        if "introduce_at_training_step" not in task:
+            continue
+        slot = task["node_gpu"]
+        adjust = min_iat_by_slot[slot]
+        if adjust > 0:
+            logger.warning(f"Reducing introduce_at_training_step of {tkey} by {adjust}")
+            task["introduce_at_training_step"] = int(task["introduce_at_training_step"]) - adjust
+
+    return "completed allocate devices step"
 
 def register(subparsers):
     p = subparsers.add_parser(
@@ -175,7 +242,24 @@ def register(subparsers):
     p.add_argument("--log_name", metavar="STR", help="Assignment optimizer run name.")
     p.add_argument("--time_budget_s", type=int, metavar="SECONDS",
                    help="Time budget for GPU assignment, in seconds.")
-    p.add_argument("--yaml-help", action="store_true",
-                   help="Show YAML keys this command reads/writes and exit.")
     p.set_defaults(handler=allocate_devices)
-
+    p.set_defaults(_mutates_yaml=True)
+    
+    register_command_io("allocate_devices", {
+         "reads": ["tasks", "config_config.sharing_groups.groups", "config_config.n_gpus_per_node",
+                   "config_config.n_nodes", "config_config.n_slots_per_gpu",
+                   "config_config.time_budget_s", "config_config.log_name"],
+         "writes": ["tasks", "world_size", "node_gpu", "n_nodes", "gpu_ranks"],
+         "summary": ("Place tasks on node:gpu slots, set world_size/gpu_ranks, "
+                     "and shift curricula so each device can start."),
+    })
+    register_command_template_extras("allocate_devices", {
+         "config_config": {
+              "_notes": [
+                   "Either set n_nodes or n_slots_per_gpu (the other is inferred).",
+                   "One task slot per GPU by default. Provide either n_nodes OR n_slots_per_gpu.",
+                   "n_gpus_per_node is required to compute the full multi-node layout."
+              ],
+         }
+    })
+    

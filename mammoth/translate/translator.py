@@ -550,6 +550,14 @@ class Inference(object):
 
         for batch in batches:
             batch.to(corpus.device)
+
+            # DEBUG: Print source token IDs
+            src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1)  # Convert from [T, B, 1] to [B, T]
+            for i, src_seq in enumerate(src_ids):
+                # Remove padding (assuming 0 is pad token)
+                src_seq_no_pad = src_seq[src_seq != 0].tolist()
+                self._log(f"Source sentence {next(counter)} token IDs: {src_seq_no_pad}")
+
             batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
 
@@ -876,7 +884,7 @@ class Translator(Inference):
             # new_cache is a list of LayerIntermediates objects, one for each layer_stack
 
             if active_decoder.can_cache_kv:
-                decode_strategy.set_cache([new_cache])
+                decode_strategy.set_cache(new_cache)
 
             # we only need the logits of the new prediction
             logits = logits_for_whole_sequence[:, -1]

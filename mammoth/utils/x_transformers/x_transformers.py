@@ -20,9 +20,8 @@ from torch.nn import Module, ModuleList, ModuleDict
 
 from loguru import logger
 
-from .attend import Attend, Intermediates
-from .autoregressive_wrapper import AutoregressiveWrapper
-from .bert_padding import unpad_input, pad_input
+from x_transformers.attend import Attend, Intermediates
+from x_transformers.autoregressive_wrapper import AutoregressiveWrapper
 
 import einx
 from einops.layers.torch import Rearrange
@@ -1216,12 +1215,11 @@ class GLU(Module):
         dim_in,
         dim_out,
         activation: Callable,
-        mult_bias = False,
-        no_bias = False
+        mult_bias = False
     ):
         super().__init__()
         self.act = activation
-        self.proj = nn.Linear(dim_in, dim_out * 2, bias = not no_bias)
+        self.proj = nn.Linear(dim_in, dim_out * 2)
         self.mult_bias = nn.Parameter(torch.ones(dim_out)) if mult_bias else 1.
 
     def forward(self, x):
@@ -1259,7 +1257,7 @@ class FeedForward(Module):
             activation = nn.GELU()
 
         if glu:
-            proj_in = GLU(dim, inner_dim, activation, mult_bias = glu_mult_bias, no_bias = no_bias)
+            proj_in = GLU(dim, inner_dim, activation, mult_bias = glu_mult_bias)
         else:
             proj_in = nn.Sequential(
                 nn.Linear(dim, inner_dim, bias = not no_bias),
@@ -1315,9 +1313,6 @@ class Attention(Module):
         heads = 8,
         causal = False,
         flash = False,
-        sliding_window: int = -1,
-        layer_id: int | None = None,
-        global_attn_every_n_layers: int = -1,
         pre_talking_heads = False,
         post_talking_heads = False,
         pre_scale_post_talking_heads = False,
@@ -1377,13 +1372,6 @@ class Attention(Module):
         dim_latent_kv = None,
         latent_rope_subheads = None,
         onnxable = False,
-        use_unpadding = False,           # ModernBERT-style unpadding for efficiency with variable-length sequences
-        rope_theta: float | None = None,  # Per-layer RoPE theta (for ModernBERT global/local attention)
-        rotary_emb_dim: int | None = None,  # RoPE embedding dimension
-        rotary_xpos: bool = False,       # Use xpos for RoPE
-        rotary_xpos_scale_base: int = 512,
-        rotary_interpolation_factor: float = 1.0,
-        rotary_base_rescale_factor: float = 1.0,
         attend_sdp_kwargs: dict = dict(
             enable_flash = True,
             enable_math = True,
@@ -1393,28 +1381,11 @@ class Attention(Module):
         super().__init__()
         dim_kv = default(dim_context, dim)
 
-        # Unpadding support from ModernBERT
-        # Removes padding tokens before attention for faster computation
-        # If flash attention is not available, automatically disable unpadding and fall back to standard padding
-        if use_unpadding and not flash:
-            logger.warning(
-                "Unpadding requested but flash attention is disabled. "
-                "Falling back to standard padding. For optimal performance with unpadding, enable flash attention."
-            )
-            self.use_unpadding = False
-        else:
-            self.use_unpadding = use_unpadding
-
         self.scale = dim_head ** -0.5
 
         self.heads = heads
         self.causal = causal
         self.max_attend_past = max_attend_past
-
-        # Sliding window support
-        self.sliding_window = sliding_window
-        self.layer_id = layer_id
-        self.global_attn_every_n_layers = global_attn_every_n_layers
 
         assert not (exists(kv_heads) and one_kv_head), 'either attn_one_kv_head is set to True (in which case kv_heads is set to 1), or attn_kv_heads is set, but not both'
 
@@ -1557,34 +1528,7 @@ class Attention(Module):
 
             self.data_dependent_alibi = dda_klass(**dda_kwargs, **data_dependent_alibi_kwargs)
 
-        # Per-layer rotary positional embeddings
-        # Allows different RoPE theta values for global vs local attention layers (ModernBERT)
-
-        self.rotary_pos_emb = None
-        self.rotate_num_heads = rotate_num_heads
-
-        if exists(rope_theta):
-            # Use provided rotary embedding dimension or default to half of head dimension
-            rotary_emb_dim = default(rotary_emb_dim, dim_head // 2)
-
-            assert rotary_emb_dim <= dim_head, f'rotary emb dim {rotary_emb_dim} must be less than or equal to attention head dimension {dim_head}'
-
-            assert not (rotary_xpos and not causal), 'rotary xpos is not compatible with bidirectional attention'
-
-            # Create per-layer RoPE instance with layer-specific theta
-            self.rotary_pos_emb = RotaryEmbedding(
-                rotary_emb_dim,
-                use_xpos = rotary_xpos,
-                scale_base = rotary_xpos_scale_base,
-                interpolation_factor = rotary_interpolation_factor,
-                base = rope_theta,  # Layer-specific theta value
-                base_rescale_factor = rotary_base_rescale_factor
-            )
-
         # attend class - includes core attention algorithm + talking heads
-
-        # Compute window size for this layer based on sliding window configuration
-        window_size = self._compute_window_size()
 
         self.attend = Attend(
             heads = heads,
@@ -1608,7 +1552,6 @@ class Attention(Module):
             add_zero_kv = add_zero_kv,
             head_learned_sink = head_learned_sink,
             flash = flash,
-            window_size = window_size,
             softclamp_logits = softclamp_logits,
             logit_softclamp_value = logit_softclamp_value,
             cope = cope,
@@ -1693,35 +1636,6 @@ class Attention(Module):
         if zero_init_output:
             init_zero_(self.to_out)
 
-    def _compute_window_size(self) -> tuple[int, int] | None:
-        """
-        Compute window size for this layer based on configuration.
-
-        Returns:
-            tuple: (left_context, right_context) for local attention
-                   (-1, -1) for global attention
-                   None for full attention (no sliding window config)
-        """
-        # If no sliding window configured, use full attention
-        if self.sliding_window <= 0:
-            return None
-
-        # If no layer_id provided, cannot determine if global/local
-        if self.layer_id is None:
-            # Default to sliding window for all layers
-            half_window = self.sliding_window // 2
-            return (half_window, half_window)
-
-        # Check if this is a global attention layer
-        if self.global_attn_every_n_layers > 0:
-            if self.layer_id % self.global_attn_every_n_layers == 0:
-                # This is a global layer - use full attention
-                return (-1, -1)
-
-        # Local attention layer - use sliding window
-        half_window = self.sliding_window // 2
-        return (half_window, half_window)
-
     @torch.no_grad()
     def qk_clip_(
         self,
@@ -1772,25 +1686,6 @@ class Attention(Module):
         additional_key_value_mask = None,
     ):
         b, n, h, kv_h, head_scale, num_mem_kv, device, has_context, qkv_receive_diff_residuals, is_multi_latent_attn = x.shape[0], x.shape[1], self.heads, self.kv_heads, self.head_scale, self.num_mem_kv, x.device, exists(context), self.qkv_receive_diff_residuals, self.use_latent_kv
-
-        # ModernBERT-style unpadding for efficient computation with variable-length sequences
-        # This technique removes padding tokens before processing, providing significant speedup
-        unpadding_metadata = None
-        if self.use_unpadding and exists(mask) and not has_context:
-            # Only apply unpadding for self-attention with masks
-            assert not has_context, 'unpadding only supported for self-attention'
-            assert not exists(cache), 'unpadding not compatible with kv caching yet'
-            assert not qkv_receive_diff_residuals, 'unpadding not compatible with diff residuals'
-            assert not exists(mem), 'unpadding not compatible with memory tokens yet'
-
-            # Store metadata needed to repad output
-            orig_batch, orig_seqlen = b, n
-            x, indices, cu_seqlens, max_seqlen = unpad_input(x, mask)
-            unpadding_metadata = (orig_batch, orig_seqlen, indices, cu_seqlens, max_seqlen)
-
-            # After unpadding, x.shape = (total_valid_tokens, dim)
-            # Flash attention will use cu_seqlens to understand sequence boundaries
-            # Standard attention will process as a single batch (less efficient but functional)
 
         # an interesting possibility with hyper connections
         # having queries, keys, values be routed from different layers
@@ -1898,18 +1793,6 @@ class Attention(Module):
             if return_intermediates:
                 mem_len = mem.shape[-2] if exists(mem) else 0
                 cached_kv = (k[..., mem_len:, :], v[..., mem_len:, :])
-
-        # Generate per-layer RoPE if this layer has its own RoPE instance
-        if exists(self.rotary_pos_emb) and not exists(rotary_pos_emb):
-            # Generate positions for RoPE
-            seq_len = n
-            if exists(mem):
-                seq_len += mem.shape[-2]
-
-            if not exists(pos):
-                pos = arange(seq_len, device = device)
-
-            rotary_pos_emb = self.rotary_pos_emb(pos)
 
         if exists(rotary_pos_emb):
             rotate_num_heads = self.rotate_num_heads
@@ -2147,11 +2030,6 @@ class Attention(Module):
 
         out = maybe(self.sublayer_dropout)(out)
 
-        # Repad output if we used unpadding
-        if exists(unpadding_metadata):
-            orig_batch, orig_seqlen, indices, cu_seqlens, max_seqlen = unpadding_metadata
-            out = pad_input(out, indices, orig_batch, orig_seqlen)
-
         if exists(mask) and not exists(cache):
             out = einx.where('b n, b n d, -> b n d', mask, out, 0.)
 
@@ -2198,11 +2076,7 @@ class AttentionLayers(Module):
         rotary_interpolation_factor = 1.,
         rotary_xpos_scale_base = 512,
         rotary_base_rescale_factor = 1.,
-        global_rope_theta: float = 160000.0,  # RoPE theta for global attention layers (ModernBERT)
-        local_rope_theta: float = 10000.0,    # RoPE theta for local attention layers (ModernBERT)
         rotate_num_heads = None,
-        sliding_window: int = -1,
-        global_attn_every_n_layers: int = -1,
         weight_tie_layers = False,
         custom_layers: tuple[str, ...] | None = None,
         layers_execute_order: tuple[int, ...] | None = None,
@@ -2296,18 +2170,7 @@ class AttentionLayers(Module):
             logger.warning('when training language model, rotary embedding dimension should be at least 32')
 
         assert not (rotary_xpos and not causal), 'rotary xpos is not compatible with bidirectional attention'
-
-        # Store RoPE configuration for per-layer instantiation
-        # Each attention layer will create its own RoPE instance with layer-specific theta
-        self.rotary_pos_emb = None  # No longer using shared RoPE
-        self.rotary_pos_emb_enabled = rotary_pos_emb
-        self.rotary_emb_dim = rotary_emb_dim
-        self.rotary_xpos = rotary_xpos
-        self.rotary_xpos_scale_base = rotary_xpos_scale_base
-        self.rotary_interpolation_factor = rotary_interpolation_factor
-        self.rotary_base_rescale_factor = rotary_base_rescale_factor
-        self.global_rope_theta = global_rope_theta
-        self.local_rope_theta = local_rope_theta
+        self.rotary_pos_emb = RotaryEmbedding(rotary_emb_dim, use_xpos = rotary_xpos, scale_base = rotary_xpos_scale_base, interpolation_factor = rotary_interpolation_factor, base_rescale_factor = rotary_base_rescale_factor) if rotary_pos_emb else None
 
         assert at_most_one_of(alibi_pos_bias, rel_pos_bias, data_dependent_alibi), 'you can only choose one of Alibi positional bias, data dependent Alibi (forgetting transformers), dynamic tanh, or T5 relative positional bias'
         assert rel_pos_num_buckets <= rel_pos_max_distance, 'number of relative position buckets must be less than the relative position max distance'
@@ -2523,9 +2386,6 @@ class AttentionLayers(Module):
         is_first_cross_attn = True
         learned_value_residual_mix &= add_value_residual
 
-        # track self-attention layer index for sliding window
-        self_attn_layer_index = 0
-
         # iterate and construct layers
 
         for ind, (layer_type, layer_shift_tokens) in enumerate(zip(self.layer_types, shift_tokens)):
@@ -2545,37 +2405,8 @@ class AttentionLayers(Module):
             if layer_type == 'a':
                 self_attn_learned_value_residual = learned_value_residual_mix and not is_first_self_attn
 
-                # Compute layer-specific RoPE theta based on global/local attention pattern
-                rope_theta = None
-                if self.rotary_pos_emb_enabled:
-                    # Determine if this is a global or local attention layer
-                    is_global_layer = (
-                        global_attn_every_n_layers > 0 and
-                        self_attn_layer_index % global_attn_every_n_layers == 0
-                    )
-                    rope_theta = self.global_rope_theta if is_global_layer else self.local_rope_theta
-
-                layer = Attention(
-                    dim,
-                    heads = heads,
-                    causal = causal,
-                    qkv_receive_diff_residuals = layer_qkv_receives_diff_view,
-                    learned_value_residual_mix = self_attn_learned_value_residual,
-                    rotate_num_heads = rotate_num_heads,
-                    sliding_window = sliding_window,
-                    layer_id = self_attn_layer_index,
-                    global_attn_every_n_layers = global_attn_every_n_layers,
-                    # Pass per-layer RoPE configuration
-                    rope_theta = rope_theta,
-                    rotary_emb_dim = self.rotary_emb_dim if self.rotary_pos_emb_enabled else None,
-                    rotary_xpos = self.rotary_xpos,
-                    rotary_xpos_scale_base = self.rotary_xpos_scale_base,
-                    rotary_interpolation_factor = self.rotary_interpolation_factor,
-                    rotary_base_rescale_factor = self.rotary_base_rescale_factor,
-                    **attn_kwargs
-                )
+                layer = Attention(dim, heads = heads, causal = causal, qkv_receive_diff_residuals = layer_qkv_receives_diff_view, learned_value_residual_mix = self_attn_learned_value_residual, rotate_num_heads = rotate_num_heads, **attn_kwargs)
                 is_first_self_attn = False
-                self_attn_layer_index += 1
 
             elif layer_type == 'c':
                 layer = Attention(dim, heads = heads, **{**attn_kwargs, **cross_attn_kwargs})
@@ -2765,16 +2596,29 @@ class AttentionLayers(Module):
                 self_attn_kv_mask = left_pad_mask
 
         # rotary positions
-        # NOTE: Per-layer RoPE is now handled inside each Attention module
-        # Each layer generates its own RoPE embeddings with layer-specific theta values
-        # This allows global attention layers (theta=160000) and local attention layers (theta=10000)
-        # to have different positional encodings, as required by ModernBERT
 
         cross_attn_rotary_pos_emb = dict()
 
-        # Legacy support: if rotary_pos_emb is passed externally, we still support it
-        # But for ModernBERT-style per-layer RoPE, this section is skipped
-        # (self.rotary_pos_emb is None when using per-layer RoPE)
+        if exists(self.rotary_pos_emb):
+            if not exists(rotary_pos_emb):
+                maybe_mem = first(mems, None) # todo - handle edge case where different layers get different memory lengths. don't think this will ever come up but who knows
+                mem_len = maybe_mem.shape[1] if exists(maybe_mem) else 0
+
+                if not exists(pos):
+                    pos = arange(x.shape[1] + mem_len + seq_pos_offset, device = x.device) - mem_len
+
+                rotary_pos_emb = self.rotary_pos_emb(pos)
+
+            # allow for rotary positions for context if provided
+
+            if exists(context_pos):
+                assert self.cross_attend
+                context_rotary_pos_emb = self.rotary_pos_emb(context_pos)
+
+                cross_attn_rotary_pos_emb.update(
+                    rotary_pos_emb = rotary_pos_emb,
+                    context_rotary_pos_emb = context_rotary_pos_emb
+                )
 
         # assume cached key / values
 
@@ -2948,10 +2792,8 @@ class AttentionLayers(Module):
             # forward depending on layer type
 
             if layer_type == 'a':
-                # Note: rotary_pos_emb removed - each layer generates its own with layer-specific theta
-                out, inter = block(x, mask = mask, context_mask = self_attn_kv_mask, attn_mask = attn_mask, rel_pos = self.rel_pos, pos = pos, additional_key_values = next(iter_self_attn_kv, None), additional_key_value_mask = additional_kv_mask, prev_attn = prev_attn, cache = next(iter_attn_cache, None), mem = layer_mem, mem_mask = layer_mem_mask, attn_bias = attn_bias, value_residual = maybe_self_attn_value_residual, return_intermediates = True)
+                out, inter = block(x, mask = mask, context_mask = self_attn_kv_mask, attn_mask = attn_mask, rel_pos = self.rel_pos, pos = pos, rotary_pos_emb = rotary_pos_emb, additional_key_values = next(iter_self_attn_kv, None), additional_key_value_mask = additional_kv_mask, prev_attn = prev_attn, cache = next(iter_attn_cache, None), mem = layer_mem, mem_mask = layer_mem_mask, attn_bias = attn_bias, value_residual = maybe_self_attn_value_residual, return_intermediates = True)
             elif layer_type == 'c':
-                # Cross-attention still uses shared cross_attn_rotary_pos_emb if provided
                 out, inter = block(x, context = context, mask = mask, context_mask = context_mask, prev_attn = prev_cross_attn, cache = next(iter_attn_cache, None), value_residual = maybe_cross_attn_value_residual, **cross_attn_rotary_pos_emb, return_intermediates = True)
             elif layer_type == 'f':
                 out = block(x, deep_embed = next(deep_embeds_iter, None))
@@ -3692,13 +3534,6 @@ class TransformerWrapper(Module):
 
         # different returns
 
-        # [DEBUG] Log encoder output for ModernBERT alignment verification
-        if return_embeddings or return_embeddings_and_intermediates:
-            print(f"[MAMMOTH ENCODER OUTPUT] shape: {x.shape}")
-            print(f"[MAMMOTH ENCODER OUTPUT] mean: {x.mean().item():.6f}, std: {x.std().item():.6f}")
-            print(f"[MAMMOTH ENCODER OUTPUT] min: {x.min().item():.6f}, max: {x.max().item():.6f}")
-            print(f"[MAMMOTH ENCODER OUTPUT] first 5 values of first token: {x[0, 0, :5]}")
-
         if return_logits_and_embeddings:
             out = (logits, x)
         elif return_embeddings_and_intermediates:
@@ -3772,13 +3607,11 @@ class XTransformer(Module):
         enc_transformer_kwargs['num_memory_tokens'] = enc_kwargs.pop('num_memory_tokens', None)
         enc_transformer_kwargs['scaled_sinu_pos_emb'] = enc_kwargs.pop('scaled_sinu_pos_emb', False)
         enc_transformer_kwargs['use_abs_pos_emb'] = enc_kwargs.pop('use_abs_pos_emb', True)
-        enc_transformer_kwargs['post_emb_norm'] = enc_kwargs.pop('post_emb_norm', False)
 
         dec_transformer_kwargs = pick_and_pop(['num_tokens', 'max_seq_len'], dec_kwargs)
         dec_transformer_kwargs['emb_dropout'] = dec_kwargs.pop('emb_dropout', 0)
         dec_transformer_kwargs['scaled_sinu_pos_emb'] = dec_kwargs.pop('scaled_sinu_pos_emb', False)
         dec_transformer_kwargs['use_abs_pos_emb'] = dec_kwargs.pop('use_abs_pos_emb', True)
-        dec_transformer_kwargs['post_emb_norm'] = dec_kwargs.pop('post_emb_norm', False)
 
         self.cross_attn_tokens_dropout = cross_attn_tokens_dropout  # how many tokens from the encoder to dropout when cross attending from decoder - seen in a couple papers, including Perceiver AR - this will also be very effective regularization when cross attending to very long memories
 

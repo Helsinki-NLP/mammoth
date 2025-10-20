@@ -1,0 +1,41 @@
+# Inference configuration: Load one language pair - test one language pair
+# This config loads only the en-ar task and tests en-ar translation
+
+# Task Configuration - Single language pair
+tasks:
+  task_en_is:
+    src_tgt: "en-is"
+    node_gpu: 0:0
+    enc_sharing_group: ["shared"]
+    dec_sharing_group: ["is"]
+    transforms: [sentencepiece, prefix]
+    src_prefix: "<to_is>"
+    tgt_prefix: "<is>"
+
+
+src_subword_model: /scratch/project_2005099/members/chaowang/training/two_nodes/vocab/joint_spm_en_multi.model
+tgt_subword_model: /scratch/project_2005099/members/chaowang/training/two_nodes/vocab/joint_spm_en_multi.model
+src_vocab:
+  en: /scratch/project_2005099/members/chaowang/training/two_nodes/vocab/joint_spm_en_multi.vocab
+tgt_vocab:
+  he: /scratch/project_2005099/members/chaowang/training/two_nodes/vocab/joint_spm_en_multi.vocab
+
+
+model: /scratch/project_2005099/members/chaowang/training/two_nodes/models/62500/  # Path to trained model
+task_id: task_en_is
+seed: 42
+src: /scratch/project_2005099/data/hplt_bilingual/is-en.tmx/val_en.txt
+output: eval_en_is.txt
+
+
+batch_size: 16
+batch_type: sents
+beam_size: 1
+max_length: 256
+min_length: 1
+transforms: [sentencepiece]
+
+
+
+
+

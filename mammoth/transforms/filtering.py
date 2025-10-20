@@ -1,5 +1,6 @@
 from mammoth.transforms import register_transform
 from .transform import Transform, ObservableStats
+from mammoth.utils.logging import logger
 import re
 import math
 import itertools
@@ -36,6 +37,46 @@ class FilterTooLongTransform(Transform):
     def _parse_opts(self):
         self.src_seq_length = self.opts.src_seq_length
         self.tgt_seq_length = self.opts.tgt_seq_length
+        self._hf_overhead_adjusted = False
+
+    def warm_up(self, vocabs):
+        """
+        Adjust thresholds when using HFTokenizerVocab to account for special token overhead.
+
+        When using HF tokenizers, numericalization adds [BOS, *tokens, EOS] = 2 extra tokens.
+        We reduce thresholds by 2 to ensure final tensors fit within max_length.
+        """
+        from mammoth.inputters.vocab import HFTokenizerVocab
+
+        logger.info(f"FilterTooLongTransform.warm_up() called with vocabs: {list(vocabs.keys())}")
+        logger.info(f"  src vocab type: {type(vocabs.get('src', None))}")
+        logger.info(f"  tgt vocab type: {type(vocabs.get('tgt', None))}")
+
+        # Check if any vocab is an HF tokenizer
+        uses_hf_tokenizer = any(isinstance(v, HFTokenizerVocab) for v in vocabs.values())
+        logger.info(f"  uses_hf_tokenizer: {uses_hf_tokenizer}")
+
+        if uses_hf_tokenizer and not self._hf_overhead_adjusted:
+            # Overhead: 2 special tokens (BOS, EOS)
+            # After fix to use direct token-to-ID lookup, no re-encoding variance
+            overhead = 2
+
+            original_src = self.src_seq_length
+            original_tgt = self.tgt_seq_length
+
+            self.src_seq_length = max(1, self.src_seq_length - overhead)
+            self.tgt_seq_length = max(1, self.tgt_seq_length - overhead)
+
+            self._hf_overhead_adjusted = True
+
+            logger.info(
+                f"✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. "
+                f"src: {original_src} → {self.src_seq_length}, "
+                f"tgt: {original_tgt} → {self.tgt_seq_length} "
+                f"(reserves {overhead} tokens for special tokens + re-encoding)"
+            )
+        else:
+            logger.info(f"FilterTooLongTransform: No adjustment needed. HF={uses_hf_tokenizer}, Already adjusted={self._hf_overhead_adjusted}")
 
     def apply(self, example, is_train=False, stats=None, **kwargs):
         """Return None if too long else return as is."""
@@ -49,6 +90,18 @@ class FilterTooLongTransform(Transform):
                 stats.update(FilterTooLongStats())
             return None
         else:
+            # Debug: Log sequences near the threshold that pass through
+            threshold_margin = 5
+            if src_len > self.src_seq_length - threshold_margin or tgt_len > self.tgt_seq_length - threshold_margin:
+                logger.warning(
+                    f"FilterTooLong: Sequence near threshold PASSED. "
+                    f"src_len={src_len} (threshold={self.src_seq_length}), "
+                    f"tgt_len={tgt_len} (threshold={self.tgt_seq_length}), "
+                    f"ratio={tgt_len/src_len:.2f}. "
+                    f"After numericalization will add ~3 special tokens."
+                )
+                logger.warning(f"  SRC tokens: {example['src'][:20]} ...")
+                logger.warning(f"  TGT tokens: {example['tgt'][:20]} ...")
             return example
 
     def _repr_args(self):

@@ -26,6 +26,7 @@ from mammoth.modules.adapters import (
 )
 from mammoth.inputters.vocab import Vocab
 from mammoth.models import NMTModel
+from mammoth.models.architecture_config import get_model_architecture_config
 from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
@@ -76,6 +77,39 @@ def get_attention_layers_kwargs(
         'cross_attend': cross_attend,
         'pre_norm_has_final_norm': pre_norm_has_final_norm,
     })
+
+    # Apply model architecture-specific configurations
+    model_type = getattr(model_opts, 'model_type', 'bart')
+    try:
+        arch_config = get_model_architecture_config(model_type)
+
+        # Inject attention-specific parameters
+        attn_kwargs = arch_config.to_attention_kwargs()
+        kwargs.update(attn_kwargs)
+
+        # Inject feedforward-specific parameters
+        ff_kwargs = arch_config.to_feedforward_kwargs()
+        kwargs.update(ff_kwargs)
+
+        # Inject layer norm-specific parameters
+        ln_kwargs = arch_config.to_layer_norm_kwargs()
+        kwargs.update(ln_kwargs)
+
+    except ValueError as e:
+        logger.warning(f"Unknown model_type '{model_type}', using defaults: {e}")
+
+    # Add sliding window attention configuration (ModernBERT-style local/global pattern)
+    sliding_window = getattr(model_opts, 'sliding_window', -1)
+    global_attn_every_n_layers = getattr(model_opts, 'global_attn_every_n_layers', -1)
+
+    if sliding_window > 0:
+        kwargs['sliding_window'] = sliding_window
+        kwargs['global_attn_every_n_layers'] = global_attn_every_n_layers
+        logger.info(
+            f"Sliding window attention enabled: window_size={sliding_window}, "
+            f"global_every_n={global_attn_every_n_layers}"
+        )
+
     return kwargs
 
 
@@ -394,7 +428,8 @@ def build_model(
     )
 
     model.to(device)
-    if opts.log_model_structure:
+    if opts.log_model_structure and task_queue_manager.global_rank == 0:
+        # Only log model structure on master GPU to avoid redundant output
         logger.info(model)
         for component in task_queue_manager.get_my_distributed_components():
             logger.info(component)

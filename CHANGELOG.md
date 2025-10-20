@@ -6,6 +6,46 @@ This update introduces HuggingFace model integration capabilities to Mammoth, en
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (20-Oct-2025)
+
+**HuggingFace Integration Module Structure**
+
+- **Module Organization**: Established formal `mammoth/hf_integration/` module structure
+  - `from_hf/`: HuggingFace → MAMMOTH model conversion (BART, ModernBERT, etc.)
+  - `to_hf/`: MAMMOTH → HuggingFace custom model export
+  - Auto-registration with HuggingFace AutoModel classes
+- **Moved Legacy Scripts**: Relocated conversion scripts from root to proper module locations
+
+**CSC Environment Configuration Reorganization**
+
+- **Structured Configuration**: Reorganized Puhti and LUMI configs by deployment scale
+  - `one_node/`: A testing single-node training configuration
+  - `two_nodes/`: A testing two-node training configuration
+  - `four_nodes/`: A testing four-node (16 GPU) training configuration
+
+**x-transformers Library Updates**
+- Update the x-transformers library to 2.9.2 (https://github.com/lucidrains/x-transformers/releases/tag/2.9.2)
+- Add global/local sliding window attention support to x-transformers `attend.py`. 
+- Add global/local RoPE theta value support for global/local attention layers.
+
+**Core Framework Improvements**
+
+- **Vocabulary System**: Refined `mammoth/inputters/vocab.py` and added `language_tokens.py` for better HF tokenizer support
+- **Transform Pipeline**: Updated denoising, filtering, and tokenization transforms for HF tokenizer compatibility
+
+**Files Added:**
+- `mammoth/hf_integration/__init__.py`: Module initialization with AutoModel registration
+- `mammoth/hf_integration/from_hf/{__init__.py,hf2mammoth2hf.py}`: HF→MAMMOTH conversion
+- `mammoth/hf_integration/from_hf/modernBERT/hfModernBERT2mammoth.py`: ModernBERT converter
+- `mammoth/hf_integration/to_hf/README.md`: Export documentation
+- `mammoth/models/architecture_config.py`: Architecture configuration utilities
+- `mammoth/inputters/language_tokens.py`: Language token management
+- `mammoth/utils/x_transformers/*.py`: x-transformers utilities (12 new modules)
+- `mammoth/x_transformers/{bert_padding.py,gpt_vae.py}`: New transformer components
+- `csc_env/{puhti,lumi}/four_nodes/{train.yaml,inference.yaml}`: 4-node configs
+- `csc_env/puhti/four_nodes/{train.sh,multinode_train_script.sh}`: Multi-node training scripts
+- `csc_env/puhti/eval.yaml`: Evaluation configuration
+
 ## What Was Updated (06-Oct-2025)
 
 **HuggingFace Tokenizers Library Integration**

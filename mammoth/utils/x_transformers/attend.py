@@ -185,7 +185,6 @@ class Attend(Module):
         gumbel_softmax_hard = True,
         custom_attn_fn: Callable | None = None,
         flash = False,
-        window_size= None,
         softclamp_logits = False,
         logit_softclamp_value = 50.,
         add_zero_kv = False,
@@ -207,11 +206,6 @@ class Attend(Module):
 
         self.causal = causal
         self.create_causal_mask = onnx_create_causal_mask if onnxable else create_causal_mask
-
-        # Sliding window support
-        self.window_size = window_size
-        self._cached_window_mask = None
-        self._cached_seq_len = None
 
         # attention type
 
@@ -321,43 +315,6 @@ class Attend(Module):
             else:
                 self.sdp_context_manager = partial(torch.backends.cuda.sdp_kernel, **sdp_kwargs)
 
-    def _create_window_mask(self, seq_len, device):
-        """
-        Create attention mask for sliding window.
-        Used as fallback when Flash Attention is not available.
-
-        Args:
-            seq_len: Sequence length
-            device: torch device
-
-        Returns:
-            mask: [seq_len, seq_len] boolean mask (True = can attend)
-        """
-        # Check cache
-        if self._cached_window_mask is not None and self._cached_seq_len == seq_len:
-            return self._cached_window_mask
-
-        if self.window_size is None or self.window_size == (-1, -1):
-            # No window restriction (full attention)
-            mask = torch.ones(seq_len, seq_len, device=device, dtype=torch.bool)
-        else:
-            left_window, right_window = self.window_size
-
-            # Create position indices
-            positions = torch.arange(seq_len, device=device)
-            row_positions = positions.unsqueeze(1)  # [seq_len, 1]
-            col_positions = positions.unsqueeze(0)  # [1, seq_len]
-
-            # Create window mask: token at position i can attend to [i-left, i+right]
-            mask = (col_positions >= row_positions - left_window) & \
-                   (col_positions <= row_positions + right_window)
-
-        # Cache for reuse
-        self._cached_window_mask = mask
-        self._cached_seq_len = seq_len
-
-        return mask
-
     def flash_attn(
         self,
         q, k, v,
@@ -456,64 +413,13 @@ class Attend(Module):
 
             mask = attn_bias
 
-        # Check if we should use flash_attn library directly (for window_size)
-        use_flash_attn_lib = self.window_size is not None and self.window_size != (-1, -1)
-
-        if use_flash_attn_lib:
-            try:
-                from flash_attn import flash_attn_func
-
-                # flash_attn expects (batch, seq_len, heads, dim_head)
-                q = rearrange(q, 'b h n d -> b n h d')
-                k = rearrange(k, 'b h n d -> b n h d')
-                v = rearrange(v, 'b h n d -> b n h d')
-
-                # Handle scale
-                softmax_scale = None
-                if exists(self.scale):
-                    softmax_scale = self.scale
-
-                # Call flash_attn with window_size
-                out = flash_attn_func(
-                    q, k, v,
-                    dropout_p = self.dropout if self.training else 0.,
-                    softmax_scale = softmax_scale,
-                    causal = causal,
-                    window_size = self.window_size  # KEY: Native window support
-                )
-
-                # Transpose back to (batch, heads, seq_len, dim_head)
-                out = rearrange(out, 'b n h d -> b h n d')
-
-                # Handle entirely masked rows
-                if exists(row_is_entirely_masked) and row_is_entirely_masked.any():
-                    out = out.masked_fill(row_is_entirely_masked[..., None], 0.)
-
-                return out, Intermediates()
-
-            except ImportError:
-                print_once("flash_attn library not available, falling back to SDPA with manual mask")
-                use_flash_attn_lib = False
-
-        # Fallback: PyTorch SDPA (with manual window mask if needed)
-        if not use_flash_attn_lib and self.window_size is not None and self.window_size != (-1, -1):
-            # Create sliding window mask
-            window_mask = self._create_window_mask(q_len, device)
-            window_mask = window_mask.unsqueeze(0).unsqueeze(0).expand(batch, heads, -1, -1)
-
-            # Combine with existing mask
-            if exists(mask):
-                mask = mask & window_mask
-            else:
-                mask = window_mask
-
         # pytorch 2.0 flash attn: q, k, v, mask, dropout, causal, softmax_scale
 
         with self.sdp_context_manager():
             out = F.scaled_dot_product_attention(
                 q, k, v,
                 attn_mask = mask,
-                dropout_p = self.dropout if self.training else 0.,
+                dropout_p = self.dropout if self.training else 0., 
                 is_causal = causal
             )
 

@@ -125,6 +125,7 @@ class HFTokenizerVocab:
         # Load the tokenizer
         self.tokenizer = Tokenizer.from_file(tokenizer_path)
         self.path = tokenizer_path
+        self.tag = tag
 
         # Build stoi (string to index) and itos (index to string) mappings
         vocab_dict = self.tokenizer.get_vocab()
@@ -137,6 +138,10 @@ class HFTokenizerVocab:
                          DefaultTokens.BOS: self.tokenizer.token_to_id("<s>"),
                          DefaultTokens.PAD: self.tokenizer.token_to_id("<pad>"),
                          DefaultTokens.MASK: self.tokenizer.token_to_id("<mask>")}
+
+        # Detect subword marker type by inspecting vocabulary
+        # Most HF tokenizers use spacer (▁) for SentencePiece-style tokenization
+        self.subword_type = self._detect_subword_type()
 
     def __getitem__(self, key_str):
         """Get token ID by token string (mimics Vocab behavior)."""
@@ -183,10 +188,73 @@ class HFTokenizerVocab:
         """
         return self.tokenizer.decode(token_ids, skip_special_tokens=skip_special_tokens)
 
+    def _detect_subword_type(self):
+        """
+        Detect the subword marker type by inspecting the vocabulary.
+
+        Returns:
+            'sentencepiece' if spacer (▁) markers found
+            'bpe' if joiner (￭) markers or Ġ prefix found
+            'none' otherwise
+        """
+        from mammoth.constants import SubwordMarker
+
+        # Sample tokens from vocabulary to check for markers
+        sample_tokens = list(self.stoi.keys())[:1000]
+
+        has_spacer = any(SubwordMarker.SPACER in token for token in sample_tokens)
+        has_joiner = any(SubwordMarker.JOINER in token for token in sample_tokens)
+        has_gpt_marker = any(token.startswith('Ġ') for token in sample_tokens)
+
+        if has_spacer:
+            return 'sentencepiece'
+        elif has_joiner or has_gpt_marker:
+            return 'bpe'
+        else:
+            return 'none'
+
+    def tokenize(self, text, is_train=False):
+        """
+        Tokenize text using the HuggingFace tokenizer.
+
+        Args:
+            text: Input text string or list of words
+            is_train: Training mode flag (for future regularization support)
+
+        Returns:
+            List of token strings
+        """
+        if isinstance(text, list):
+            # Join word list into text
+            text = " ".join(text)
+
+        encoding = self.tokenizer.encode(text)
+        return encoding.tokens
+
+    def tokenize_example(self, example, is_train=False):
+        """
+        Tokenize both src and tgt in an example dict.
+
+        Args:
+            example: Dict with 'src' and 'tgt' keys containing text
+            is_train: Training mode flag
+
+        Returns:
+            Modified example dict with tokenized src and tgt
+        """
+        if 'src' in example and example['src'] is not None:
+            example['src'] = self.tokenize(example['src'], is_train)
+
+        if 'tgt' in example and example['tgt'] is not None:
+            example['tgt'] = self.tokenize(example['tgt'], is_train)
+
+        return example
+
     def __repr__(self):
         return (
             f"{self.__class__.__name__} @ {self.path} "
-            f"({len(self)} items, specials={sorted(self.specials.keys())})"
+            f"({len(self)} items, subword_type={self.subword_type}, "
+            f"specials={sorted(self.specials.keys())})"
         )
 
 

@@ -244,7 +244,7 @@ class DynamicDatasetIter(object):
         if opts.batch_size_multiple is not None:
             batch_size_multiple = opts.batch_size_multiple
         else:
-            batch_size_multiple = 8 if opts.model_dtype == "fp16" else 1
+            batch_size_multiple = 8 if opts.model_dtype in ["fp16", "bf16"] else 1
         return cls(
             task_queue_manager,
             opts,

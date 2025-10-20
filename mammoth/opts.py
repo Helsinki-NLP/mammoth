@@ -171,6 +171,15 @@ def _add_dynamic_vocabs_opts(parser):
         help="Use HuggingFace tokenizers instead of traditional vocab files. "
         "Vocab paths should point to .json tokenizer files."
     )
+    group.add(
+        "-add_language_tokens",
+        "--add_language_tokens",
+        action="store_true",
+        default=True,
+        help="Automatically add language prefix tokens (src_prefix/tgt_prefix from tasks) "
+        "to HuggingFace tokenizers. Only applies when use_hf_tokenizer is True. "
+        "Default: True"
+    )
 
 
 def _add_dynamic_transform_opts(parser):
@@ -220,7 +229,7 @@ def model_opts(parser):
         choices=['text'],
         help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
     )
-    group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
+    group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Data type of the model.')
 
     # group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
     group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder module')
@@ -278,6 +287,30 @@ def model_opts(parser):
         " and the kwargs of `Attention` with the prefix `attn_`."
         " For tips, examples, and citations see"
         " https://github.com/lucidrains/x-transformers/blob/main/README.md ."
+    )
+
+    # Sliding Window Attention (ModernBERT-style local/global pattern)
+    group.add(
+        '--sliding_window',
+        '-sliding_window',
+        type=int,
+        default=-1,
+        help="Sliding window size for local attention layers. "
+        "-1 disables sliding window (full attention everywhere). "
+        "Window is symmetric: each token attends to ±(sliding_window/2) neighbors. "
+        "Must be an even number if set. "
+        "Example: sliding_window=128 means ±64 tokens."
+    )
+    group.add(
+        '--global_attn_every_n_layers',
+        '-global_attn_every_n_layers',
+        type=int,
+        default=-1,
+        help="Use global (full) attention every N layers. "
+        "-1 disables alternating pattern (all layers use same attention type). "
+        "Layer indices divisible by N will have global attention. "
+        "Requires --sliding_window to be set. "
+        "Example: global_attn_every_n_layers=3 means layers 0,3,6,9... are global."
     )
 
     # Generator and loss options.

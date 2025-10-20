@@ -125,10 +125,22 @@ class ParallelCorpus(IterableDataset):
         self.max_length = max_length
         self._line_idx_restore = line_idx_restore
 
-    # FIXME: most likely redundant with mammoth.transforms.tokenize
     def _tokenize(self, string, side='src'):
-        """Split string, accompanied by a drumroll"""
-        return string.split()
+        """
+        Split string into tokens.
+
+        If using HFTokenizerVocab, applies subword tokenization directly.
+        Otherwise, performs simple whitespace splitting for word-level tokens.
+        """
+        vocab = self.vocabs[side]
+        from mammoth.inputters.vocab import HFTokenizerVocab
+
+        if isinstance(vocab, HFTokenizerVocab):
+            # Use HF tokenizer to get subword tokens
+            return vocab.tokenize(string, is_train=self.is_train)
+        else:
+            # Traditional word-level tokenization (whitespace split)
+            return string.split()
 
     def _maybe_numericalize(self, key, value):
         """Convert list of strings into list of indices"""
@@ -143,26 +155,48 @@ class ParallelCorpus(IterableDataset):
         # Check if using HuggingFace tokenizer
         from mammoth.inputters.vocab import HFTokenizerVocab
         if isinstance(vocab, HFTokenizerVocab):
-            # For HF tokenizers, we need to encode the full text, not lookup individual tokens
-            # tokens is already a list of words - join them back and encode properly
-            text = ' '.join(tokens)
-            encoded = vocab.tokenizer.encode(text, add_special_tokens=False)
-            token_ids = encoded.ids
+            # For HF tokenizers, tokens are already tokenized subwords (e.g., ['▁Hello', '▁world'])
+            # Look up each token's ID directly instead of re-encoding
+            # (Re-encoding would treat '▁' as literal text and produce wrong tokenization)
+            token_ids = []
+            for token in tokens:
+                token_id = vocab.tokenizer.token_to_id(token)
+                if token_id is None:
+                    # Token not in vocabulary, use UNK
+                    token_ids.append(unk)
+                else:
+                    token_ids.append(token_id)
 
             # Log a few examples for debugging
             import random
-            if random.random() < 0.001:  # Log ~0.1% of examples
-                logger.info(f'HF Tokenizer {side} encoding example:')
-                logger.info(f'  Input text: {text[:100]}...')
+            if random.random() < 0.0001:  # Log ~0.1% of examples
+                logger.info(f'HF Tokenizer {side} direct lookup example:')
+                logger.info(f'  Input tokens: {tokens[:20]}...')
                 logger.info(f'  Token IDs: {token_ids[:20]}...')
-                # logger.info(f'  Max ID: {max(token_ids) if token_ids else 0}, Vocab size: {len(vocab)}')
-                # logger.info(f'  UNK count: {token_ids.count(unk)}')
 
-            indices = torch.tensor([eos, bos, *token_ids, eos], device='cpu')
+            indices = torch.tensor([bos, *token_ids, eos], device='cpu')
+
+            # Debug: Catch sequences that will exceed positional embedding limit
+            final_length = len(indices)
+            if final_length > 256:
+                logger.error(
+                    f"❌ SEQUENCE TOO LONG AFTER NUMERICALIZATION! {side.upper()}\n"
+                    f"   Token count: {len(tokens)}\n"
+                    f"   Token IDs: {len(token_ids)}\n"
+                    f"   Final tensor length (with special tokens): {final_length}\n"
+                    f"   Exceeds limit by: {final_length - 256} tokens\n"
+                    f"   First 30 tokens: {tokens[:30]}\n"
+                    f"   Last 30 tokens: {tokens[-30:]}\n"
+                )
+            elif final_length > 250:
+                logger.warning(
+                    f"⚠️  Sequence near limit after numericalization. {side}: "
+                    f"tokens={len(tokens)} → token_ids={len(token_ids)} → final={final_length}"
+                )
         else:
             # Traditional vocab: lookup tokens individually
             indices = torch.tensor([
-                eos, bos,
+                bos,
                 *(vocab.stoi.get(token, unk) for token in tokens),
                 eos,
             ], device='cpu')

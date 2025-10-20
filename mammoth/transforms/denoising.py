@@ -6,6 +6,7 @@ import torch
 from typing import Sequence, Callable
 from mammoth.constants import DefaultTokens, SubwordMarker
 from mammoth.transforms import register_transform
+from mammoth.utils.logging import logger
 from .transform import Transform
 
 
@@ -413,7 +414,16 @@ class NoiseTransform(Transform):
     def warm_up(self, vocabs):
         super().warm_up(vocabs)
 
-        subword_type = self.opts.src_subword_type
+        # Detect if using HFTokenizerVocab and infer subword type from vocab
+        from mammoth.inputters.vocab import HFTokenizerVocab
+        if isinstance(self.vocabs['src'], HFTokenizerVocab):
+            # HFTokenizerVocab auto-detects subword type from vocabulary
+            subword_type = self.vocabs['src'].subword_type
+            logger.info(f"Detected HFTokenizerVocab with subword_type={subword_type}")
+        else:
+            # Use config-specified subword type for traditional vocabs
+            subword_type = self.opts.src_subword_type
+
         if self.opts.mask_length == 'subword':
             if subword_type == 'none':
                 raise ValueError(

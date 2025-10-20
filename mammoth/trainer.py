@@ -429,7 +429,9 @@ class Trainer(object):
                 # else:
                 #     normalization = batch.batch_size
 
-                with torch.cuda.amp.autocast(enabled=self.optim.amp):
+                # Determine dtype for mixed precision training
+                dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
+                with torch.cuda.amp.autocast(enabled=self.optim.amp, dtype=dtype):
                     # F-prop through the model.
                     logits, decoder_output = valid_model(
                         rearrange(src, 't b 1 -> b t'),
@@ -554,7 +556,9 @@ class Trainer(object):
 
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
-            with torch.cuda.amp.autocast(enabled=self.optim.amp):
+            # Determine dtype for mixed precision training
+            dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
+            with torch.cuda.amp.autocast(enabled=self.optim.amp, dtype=dtype):
                 logits, decoder_output = self.model(
                     src=rearrange(src, 't b 1 -> b t'),
                     decoder_input=rearrange(decoder_input, 't b 1 -> b t'),

@@ -9,7 +9,7 @@ import torch
 from torch import nn, cat, tensor, randperm
 from torch.nn import LSTM, GRU, Module
 
-from .x_transformers import (
+from x_transformers.x_transformers import (
     TransformerWrapper,
     AutoregressiveWrapper
 )

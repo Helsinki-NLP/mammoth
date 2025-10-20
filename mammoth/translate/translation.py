@@ -47,8 +47,12 @@ class TranslationBuilder(object):
 
             # Use tokenizer's decode method to properly handle BPE merging
             decoded_text = vocab.decode_tokens(token_ids, skip_special_tokens=True)
-            # Return as list of words (split by spaces) to match expected format
-            tokens = decoded_text.split()
+            # Replace embedded newlines with spaces (model may generate newlines from training data)
+            # and normalize multiple spaces to single space
+            decoded_text = ' '.join(decoded_text.split())
+            # Return as single-element list containing the fully decoded text
+            # This prevents re-splitting subword tokens
+            tokens = [decoded_text] if decoded_text else []
         else:
             # Original logic for traditional vocab
             for tok in pred:

@@ -24,6 +24,10 @@ from mammoth.inputters import DynamicDatasetIter
 from mammoth.utils.parse import ArgumentParser
 from mammoth.opts import train_opts
 from mammoth.inputters import get_vocab, DEFAULT_SPECIALS
+from mammoth.inputters.language_tokens import (
+    extract_language_tokens_from_config,
+    add_language_tokens_to_tokenizer,
+)
 from mammoth.transforms import get_transforms_cls
 from collections import OrderedDict
 from mammoth.constants import ModelTask
@@ -96,6 +100,38 @@ def train(opts):
     else:
         vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
         use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False)
+
+        # Extract and add language tokens to HF tokenizers if enabled
+        if use_hf_tokenizer and getattr(opts, 'add_language_tokens', True):
+            # Reuse the language tokens already collected by transforms (if any)
+            # These are the same tokens from src_prefix/tgt_prefix in task configs
+            language_tokens = set()
+            if transforms_cls and 'prefix' in transforms_cls:
+                from mammoth.transforms.misc import PrefixTransform
+                src_prefix_tokens, tgt_prefix_tokens = PrefixTransform.get_specials(opts)
+                language_tokens = src_prefix_tokens | tgt_prefix_tokens
+                logger.info(f"Extracted {len(language_tokens)} language tokens from PrefixTransform")
+            else:
+                # Fallback: extract directly from config if prefix transform not used
+                language_tokens = extract_language_tokens_from_config(opts)
+                logger.info(f"Extracted {len(language_tokens)} language tokens directly from config")
+
+            if language_tokens:
+                # Track which tokenizer files we've already modified to avoid duplicate work
+                processed_tokenizer_paths = set()
+
+                for side in ('src', 'tgt'):
+                    for lang in global_task_queue_manager.get_langs(side):
+                        vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
+
+                        # Only process each unique tokenizer file once
+                        if vocab_path not in processed_tokenizer_paths and vocab_path.endswith('.json'):
+                            try:
+                                add_language_tokens_to_tokenizer(vocab_path, language_tokens, inplace=True)
+                                processed_tokenizer_paths.add(vocab_path)
+                            except Exception as e:
+                                logger.warning(f"Failed to add language tokens to {vocab_path}: {e}")
+
         for side in ('src', 'tgt'):
             for lang in global_task_queue_manager.get_langs(side):
                 vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]

@@ -1,0 +1,389 @@
+# Training configuration for 4-node setup with 16 GPUs total (4 GPUs per node)
+# Hierarchical Architecture: Shared base encoder + Language family-specific upper encoder
+# Node 0: GPUs 0-3 (Indo-Aryan) | Node 1: GPUs 4-7 (Slavic) | Node 2: GPUs 8-11 (Semitic+Iranian) | Node 3: GPUs 12-15 (Mixed)
+
+# Task Configuration - 16 tasks distributed across 4 nodes (16 GPUs total)
+tasks:
+  # ============================================================================
+  # NODE 0 - Indo-Aryan Languages (GPUs 0-3)
+  # ============================================================================
+  task_en_hi:
+    src_tgt: "en-hi"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "0:0"  # Node 0, GPU 0 (Global GPU 0)
+    enc_sharing_group: ["shared", "indo_aryan"]  # Stack 0: shared, Stack 1: indo-aryan
+    dec_sharing_group: ["shared_low", "hi"]      # Stack 0: shared, Stack 1: language-specific
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_hi.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_hi.txt
+    src_prefix: "<to_hi>"
+    tgt_prefix: "<hi>"
+
+  task_en_bn:
+    src_tgt: "en-bn"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "0:1"  # Node 0, GPU 1 (Global GPU 1)
+    enc_sharing_group: ["shared", "indo_aryan"]
+    dec_sharing_group: ["shared_low", "bn"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/bn-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/bn-en.tmx/train_bn.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/bn-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/bn-en.tmx/val_bn.txt
+    src_prefix: "<to_bn>"
+    tgt_prefix: "<bn>"
+
+  task_en_gu:
+    src_tgt: "en-gu"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "0:2"  # Node 0, GPU 2 (Global GPU 2)
+    enc_sharing_group: ["shared", "indo_aryan"]
+    dec_sharing_group: ["shared_low", "gu"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/gu-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/gu-en.tmx/train_gu.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/gu-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/gu-en.tmx/val_gu.txt
+    src_prefix: "<to_gu>"
+    tgt_prefix: "<gu>"
+
+  task_en_kn:
+    src_tgt: "en-kn"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "0:3"  # Node 0, GPU 3 (Global GPU 3)
+    enc_sharing_group: ["shared", "indo_aryan"]
+    dec_sharing_group: ["shared_low", "kn"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/kn-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/kn-en.tmx/train_kn.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/kn-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/kn-en.tmx/val_kn.txt
+    src_prefix: "<to_kn>"
+    tgt_prefix: "<kn>"
+
+  # ============================================================================
+  # NODE 1 - Slavic Languages + Esperanto (GPUs 4-7)
+  # ============================================================================
+  task_en_be:
+    src_tgt: "en-be"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:0"  # Node 1, GPU 0 (Global GPU 4)
+    enc_sharing_group: ["shared", "slavic"]
+    dec_sharing_group: ["shared_low", "be"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/be-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/be-en.tmx/train_be.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/be-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/be-en.tmx/val_be.txt
+    src_prefix: "<to_be>"
+    tgt_prefix: "<be>"
+
+  task_en_bs:
+    src_tgt: "en-bs"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:1"  # Node 1, GPU 1 (Global GPU 5)
+    enc_sharing_group: ["shared", "slavic"]
+    dec_sharing_group: ["shared_low", "bs"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/bs-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/bs-en.tmx/train_bs.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/bs-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/bs-en.tmx/val_bs.txt
+    src_prefix: "<to_bs>"
+    tgt_prefix: "<bs>"
+
+  task_en_hr:
+    src_tgt: "en-hr"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:2"  # Node 1, GPU 2 (Global GPU 6)
+    enc_sharing_group: ["shared", "slavic"]
+    dec_sharing_group: ["shared_low", "hr"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_hr.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_hr.txt
+    src_prefix: "<to_hr>"
+    tgt_prefix: "<hr>"
+
+  task_en_eo:
+    src_tgt: "en-eo"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:3"  # Node 1, GPU 3 (Global GPU 7)
+    enc_sharing_group: ["shared", "slavic"]
+    dec_sharing_group: ["shared_low", "eo"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/eo-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/eo-en.tmx/train_eo.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/eo-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/eo-en.tmx/val_eo.txt
+    src_prefix: "<to_eo>"
+    tgt_prefix: "<eo>"
+
+  # ============================================================================
+  # NODE 2 - Semitic + Iranian + Bantu (GPUs 8-11)
+  # ============================================================================
+  task_en_ar:
+    src_tgt: "en-ar"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "2:0"  # Node 2, GPU 0 (Global GPU 8)
+    enc_sharing_group: ["shared", "semitic_iranian"]
+    dec_sharing_group: ["shared_low", "ar"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar.txt
+    src_prefix: "<to_ar>"
+    tgt_prefix: "<ar>"
+
+  task_en_he:
+    src_tgt: "en-he"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "2:1"  # Node 2, GPU 1 (Global GPU 9)
+    enc_sharing_group: ["shared", "semitic_iranian"]
+    dec_sharing_group: ["shared_low", "he"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_he.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_he.txt
+    src_prefix: "<to_he>"
+    tgt_prefix: "<he>"
+
+  task_en_fa:
+    src_tgt: "en-fa"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "2:2"  # Node 2, GPU 2 (Global GPU 10)
+    enc_sharing_group: ["shared", "semitic_iranian"]
+    dec_sharing_group: ["shared_low", "fa"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/fa-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fa-en.tmx/train_fa.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fa-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fa-en.tmx/val_fa.txt
+    src_prefix: "<to_fa>"
+    tgt_prefix: "<fa>"
+
+  task_en_sw:
+    src_tgt: "en-sw"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "2:3"  # Node 2, GPU 3 (Global GPU 11)
+    enc_sharing_group: ["shared", "semitic_iranian"]
+    dec_sharing_group: ["shared_low", "sw"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_sw.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_sw.txt
+    src_prefix: "<to_sw>"
+    tgt_prefix: "<sw>"
+
+  # ============================================================================
+  # NODE 3 - Isolates + Uralic + Romance + Germanic (GPUs 12-15)
+  # ============================================================================
+  task_en_eu:
+    src_tgt: "en-eu"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "3:0"  # Node 3, GPU 0 (Global GPU 12)
+    enc_sharing_group: ["shared", "mixed"]
+    dec_sharing_group: ["shared_low", "eu"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_eu.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_eu.txt
+    src_prefix: "<to_eu>"
+    tgt_prefix: "<eu>"
+
+  task_en_fi:
+    src_tgt: "en-fi"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "3:1"  # Node 3, GPU 1 (Global GPU 13)
+    enc_sharing_group: ["shared", "mixed"]
+    dec_sharing_group: ["shared_low", "fi"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt
+    src_prefix: "<to_fi>"
+    tgt_prefix: "<fi>"
+
+  task_en_gl:
+    src_tgt: "en-gl"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "3:2"  # Node 3, GPU 2 (Global GPU 14)
+    enc_sharing_group: ["shared", "mixed"]
+    dec_sharing_group: ["shared_low", "gl"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/gl-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/gl-en.tmx/train_gl.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/gl-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/gl-en.tmx/val_gl.txt
+    src_prefix: "<to_gl>"
+    tgt_prefix: "<gl>"
+
+  task_en_is:
+    src_tgt: "en-is"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "3:3"  # Node 3, GPU 3 (Global GPU 15)
+    enc_sharing_group: ["shared", "mixed"]
+    dec_sharing_group: ["shared_low", "is"]
+    transforms: [prefix, filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_is.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_is.txt
+    src_prefix: "<to_is>"
+    tgt_prefix: "<is>"
+
+# ============================================================================
+# Vocabulary Configuration
+# ============================================================================
+use_hf_tokenizer: true
+
+src_vocab:
+  en: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+
+tgt_vocab:
+  # Indo-Aryan
+  hi: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  bn: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  gu: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  kn: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  # Slavic + Esperanto
+  be: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  bs: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  hr: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  eo: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  # Semitic + Iranian + Bantu
+  ar: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  he: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  fa: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  sw: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  # Mixed (Isolates + Uralic + Romance + Germanic)
+  eu: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  fi: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  gl: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+  is: /scratch/project_462000964/members/wangchao/training/four_nodes/tokenizer.json
+
+
+src_seq_length: 254
+tgt_seq_length: 254
+max_length: 256
+
+# ============================================================================
+# Denoising Transform Parameters
+# ============================================================================
+# denoising_objective: bart
+# mask_ratio: 0.2              # Fraction of tokens to mask
+# mask_length: span-poisson    # Options: 'subword', 'word', 'span-poisson'
+# poisson_lambda: 3.0          # Lambda for span length distribution
+# replace_length: 1            # -1: keep N tokens, 0: remove all, 1: single mask per span
+
+# ============================================================================
+# Model Architecture - Hierarchical Multi-Stack
+# ============================================================================
+# Encoder: 2 stacks [6, 3] = 9 layers total
+#   Stack 0 (6 layers): Shared universal features across all 16 GPUs
+#   Stack 1 (3 layers): Language family-specific features (4 families)
+enc_layers: [6, 3]
+
+# Decoder: 2 stacks [2, 4] = 6 layers total
+#   Stack 0 (2 layers): Shared low-level decoding across all 16 GPUs
+#   Stack 1 (4 layers): Language-specific decoding (16 separate decoders)
+dec_layers: [2, 4]
+
+model_dim: 768               # Transformer model dimension
+dropout: 0.1                 # Dropout rate
+
+# ============================================================================
+# x-transformers Specific Options
+# ============================================================================
+x_transformers_opts:
+  # attn_flash: true           # Flash attention (not supported on V100)
+  rotary_pos_emb: false         # Use rotary positional embeddings
+  tie_embedding: false         # Tie input/output embeddings
+  heads: 12                    # Number of attention heads
+  pre_norm: false              # Use post-norm (standard transformer)
+  post_emb_norm: true          # Normalize after embeddings
+  post_emb_norm_bias: true     # Add bias to post-embedding norm
+  attn_dropout: 0.1            # Attention dropout
+  ff_dropout: 0.1              # Feed-forward dropout
+  layernorm_bias: true         # Use bias in layer normalization
+  use_abs_pos_emb: true        # Use absolute positional embeddings
+
+# ============================================================================
+# Training Configuration
+# ============================================================================
+train_steps: 62500
+accum_count: [1]                  # Gradient accumulation steps
+batch_size: 16                     # Per-GPU batch size (in sentences)
+batch_type: sents                 # Batch by sentences
+normalization: tokens             # Normalize gradients by token count
+valid_batch_size: 16               # Validation batch size
+valid_steps: 10000                # Validation frequency
+valid_metrics: [bleu]             # Validation metrics
+# valid_at_start: true              # Run validation before training
+save_checkpoint_steps: 5000       # Checkpoint saving frequency
+keep_checkpoint: 5                # Number of checkpoints to keep
+
+# ============================================================================
+# Optimizer Settings
+# ============================================================================
+optim: adamw
+learning_rate: 0.0001
+adam_beta1: 0.9
+adam_beta2: 0.999
+weight_decay: 0.0
+max_grad_norm: 1.0                # Gradient clipping per component
+
+# Learning rate scheduling
+warmup_steps: 5000
+decay_method: linear_warmup
+learning_rate_decay: 0
+start_decay_steps: 0
+
+# ============================================================================
+# Distributed Training Configuration (4-node, 16 GPU setup)
+# ============================================================================
+world_size: 16                    # Total number of GPUs across all nodes
+gpu_ranks: [0, 1, 2, 3]           # GPUs per node
+n_nodes: 4                        # Number of nodes
+task_distribution_strategy: weighted_sampling
+
+# ============================================================================
+# Logging and Monitoring
+# ============================================================================
+log_model_structure: false       # Log model structure at startup
+report_every: 100                 # Report training stats every N steps
+report_training_accuracy: true    # Report training accuracy
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+seed: 42                          # Random seed for reproducibility
+reset_optim: all                  # Reset optimizer state when loading checkpoint
+label_smoothing: 0.1              # Label smoothing for better generalization
+
+# Model checkpoint path
+save_model: /scratch/project_462000964/members/wangchao/training/four_nodes/models/16gpu

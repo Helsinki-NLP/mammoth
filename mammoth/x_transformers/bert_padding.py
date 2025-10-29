@@ -119,7 +119,15 @@ def unpad_input(
     # times larger than it needs to be, wasting memory. It's faster and more memory-efficient to
     # index with integer indices. Moreover, torch's index is a bit slower than it needs to be,
     # so we write custom forward and backward to make it a bit faster.
-    hidden_states = cast(torch.Tensor, index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices))
+
+    # Handle both 2D (token indices) and 3D+ (embeddings) inputs, matching ModernBERT's approach
+    if hidden_states.dim() == 2:
+        # For 2D input (batch, seqlen) - token indices before embedding
+        hidden_states = hidden_states.flatten()[indices]
+    else:
+        # For 3D+ input (batch, seqlen, ...) - embeddings or higher-dimensional tensors
+        hidden_states = cast(torch.Tensor, index_first_axis(rearrange(hidden_states, "b s ... -> (b s) ..."), indices))
+
     return hidden_states, indices, cu_seqlens, max_seqlen_in_batch
 
 
@@ -166,3 +174,42 @@ def pad_input(hidden_states: torch.Tensor, indices: torch.Tensor, batch: int, se
     """
     output = index_put_first_axis(hidden_states, indices, batch * seqlen)
     return rearrange(output, "(b s) ... -> b s ...", b=batch)  # type: ignore
+
+
+def pad_output(
+    hidden_states: torch.Tensor,
+    indices: torch.Tensor,
+    batch: int,
+    seqlen: int
+) -> torch.Tensor:
+    """Add padding back to unpadded sequences (ModernBERT-style).
+
+    This function matches ModernBERT's _pad_modernbert_output() behavior.
+    It reconstructs the original padded tensor shape from the unpadded
+    representation returned by unpad_input().
+
+    Arguments:
+        hidden_states: (total_nnz, ...) - Unpadded tokens from unpad_input()
+        indices: (total_nnz,) - Token position indices from unpad_input()
+        batch: int - Original batch size
+        seqlen: int - Maximum sequence length (with padding)
+
+    Returns:
+        hidden_states: (batch, seqlen, ...) - Reconstructed padded tensor
+
+    Example:
+        If we unpadded sequences of lengths [5, 3, 4] from shape (3, 6, d):
+        pad_output(unpadded_tokens, indices, batch=3, seqlen=6) -> (3, 6, d)
+        where positions corresponding to padding contain zeros
+    """
+    if hidden_states.dim() == 1:
+        # For 1D tensors
+        output = torch.zeros(batch * seqlen, dtype=hidden_states.dtype, device=hidden_states.device)
+        output[indices] = hidden_states
+        return output.view(batch, seqlen)
+    else:
+        # For 2D+ tensors
+        _, *rest = hidden_states.shape
+        output = torch.zeros(batch * seqlen, *rest, dtype=hidden_states.dtype, device=hidden_states.device)
+        output[indices] = hidden_states
+        return output.view(batch, seqlen, *rest)

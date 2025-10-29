@@ -69,6 +69,7 @@ class NMTModel(BaseModel):
             adapter_ids=metadata.decoder_adapter_ids,
         )
 
+        # Pass padded input to encoder - unpadding happens internally (ModernBERT-style)
         encoder_output = active_encoder(
             x=src,
             mask=src_mask,
@@ -89,6 +90,12 @@ class NMTModel(BaseModel):
         # not that if return_attn were to be used, the return signature would be:
         # (logits, decoder_output), attentions = retval
         logits, decoder_output = retval
+
+        # Repad encoder output if we used unpadding
+        # Note: decoder output doesn't need repadding as it processes target sequence
+        # But encoder output might be used elsewhere, so we keep the unpadded version
+        # The attention bridge and decoder can handle unpadded encoder output
+
         return logits, decoder_output
 
     def update_dropout(self, dropout):

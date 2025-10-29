@@ -315,6 +315,10 @@ class ModelSaver(ModelSaverBase):
         if device_context.is_master():
             module_state_dicts["frame"]["data_state"] = data_state
 
+        # Ensure the directory for checkpoint files exists
+        checkpoint_dir = os.path.dirname(self.base_path)
+        os.makedirs(checkpoint_dir, exist_ok=True)
+
         for key, state_dict in module_state_dicts.items():
             # The exploded state_dicts across different devices only contain one copy of each module:
             # on the lowest ranked device having that module.

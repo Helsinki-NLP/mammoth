@@ -164,13 +164,13 @@ LLAMA_CONFIG = ModelArchitectureConfig(
 )
 
 MODERNBERT_CONFIG = ModelArchitectureConfig(
-    positional_embedding_scale=None,  # ModernBERT uses standard scaling
-    qkv_bias=False,  # ModernBERT uses bias-free projections (configurable)
+    positional_embedding_scale=None,  # ModernBERT uses RoPE (rotary position embeddings)
+    qkv_bias=False,  # ModernBERT uses bias-free projections
     attention_out_bias=False,  # No bias in output projection
-    layer_norm_bias=False,  # ModernBERT supports LayerNorm bias (configurable)
+    layer_norm_bias=False,  # ModernBERT uses bias-free LayerNorm
     layer_norm_eps=1e-5,
     activation_function="gelu",  # GELU activation
-    feedforward_glu=True,  # ModernBERT uses GLU in MLP
+    feedforward_glu=True,  # ModernBERT uses GLU in MLP (GeGLU specifically)
 )
 
 # Registry mapping model type strings to configurations

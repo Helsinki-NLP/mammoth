@@ -225,9 +225,9 @@ def model_opts(parser):
     group.add(
         '--model_type',
         '-model_type',
-        default='text',
-        choices=['text'],
-        help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
+        default='bart',
+        choices=['text', 'bart', 'modernbert', 'gpt2', 't5', 'llama'],
+        help="Type of model architecture to use. Options are [bart, modernbert, gpt2, t5, llama, text]. Default is bart for compatibility.",
     )
     group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Data type of the model.')
 

@@ -388,6 +388,21 @@ def build_model(
         device = torch.device("cpu")
     logger.info(device)
 
+    # Determine dtype for model initialization
+    dtype = torch.float32
+    if hasattr(model_opts, 'model_dtype'):
+        if model_opts.model_dtype == 'fp16':
+            dtype = torch.float16
+            logger.info('Initializing model in fp16 precision')
+        elif model_opts.model_dtype == 'bf16':
+            dtype = torch.bfloat16
+            logger.info('Initializing model in bf16 precision')
+        else:
+            logger.info('Initializing model in fp32 precision')
+
+    # Set default dtype for model initialization
+    torch.set_default_dtype(dtype)
+
     enc_adapters_by_name: Optional[Dict[str, Adapter]] = build_adapters(
         side=Side.encoder,
         model_opts=model_opts,
@@ -427,7 +442,12 @@ def build_model(
         attention_bridge=attention_bridge
     )
 
+    # Reset default dtype to fp32
+    # torch.set_default_dtype(torch.float32)
+
+    # Move model to device
     model.to(device)
+
     if opts.log_model_structure and task_queue_manager.global_rank == 0:
         # Only log model structure on master GPU to avoid redundant output
         logger.info(model)

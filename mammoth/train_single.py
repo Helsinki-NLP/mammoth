@@ -11,7 +11,7 @@ from mammoth.utils.model_saver import build_model_saver, load_parameters_from_ch
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
-from mammoth.distributed import broadcast_tensors
+from mammoth.distributed import broadcast_tensors, _reattach_batch_tensors
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
@@ -177,6 +177,9 @@ def main(
     def _train_iter():
         while True:
             batch, metadata, communication_batch_id = batch_queue.get()
+            # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
+            batch = _reattach_batch_tensors(batch)
+            metadata = _reattach_batch_tensors(metadata)
             semaphore.release()
             # TODO: confirm that batch-providing corpus has already been to'd to the correct place
             yield batch, metadata, communication_batch_id
@@ -224,3 +227,9 @@ def main(
 
     if trainer.report_manager.tensorboard_writer is not None:
         trainer.report_manager.tensorboard_writer.close()
+
+    # Properly cleanup PyTorch distributed resources before exit
+    if device_context.is_distributed():
+        logger.info("{} - Cleaning up distributed process group".format(device_context.id))
+        torch.distributed.destroy_process_group()
+        logger.info("{} - Distributed cleanup complete".format(device_context.id))

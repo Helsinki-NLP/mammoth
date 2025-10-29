@@ -68,6 +68,10 @@ class AdaptedAttentionLayersStack(nn.Module):
     def disable_abs_pos_emb(self):
         return self.attention_layers_stack[0].disable_abs_pos_emb
 
+    @property
+    def causal(self):
+        return self.attention_layers_stack[0].causal
+
 
 class StackXcoder(nn.ModuleDict):
     """

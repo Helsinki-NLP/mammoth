@@ -1,10 +1,62 @@
-# HuggingFace Model Integration Update
+#  Mammoth Changelog
 
 ## Overview
 
-This update introduces HuggingFace model integration capabilities to Mammoth, enabling seamless conversion and use of pre-trained HuggingFace BART models within the Mammoth translation framework.
+This branch mainly works on two fronts:
+- Introduces HuggingFace model integration capabilities to Mammoth, enabling seamless conversion and use of pre-trained HuggingFace models within the Mammoth translation framework.  
+- Improves Mammoth's core training and model architecture features.
 
 For usage instructions, please refer to README.md.
+
+## What Was Updated (29-Oct-2025)
+
+**Advanced Attention Mechanisms**
+
+- **Sliding Window Attention**: Added support for local sliding window attention with configurable window sizes
+  - Native integration with Flash Attention library for optimal performance
+  - Fallback to PyTorch SDPA with manual window masking when Flash Attention is unavailable
+  - Per-layer window size configuration via `sliding_window` and `global_attn_every_n_layers` parameters
+  - Efficient caching mechanism for window masks to reduce overhead
+
+- **Flexible RoPE Theta for Global/Local Attention**: Per-layer RoPE (Rotary Position Embedding) theta configuration
+  - Support for different theta values for global attention layers (`global_rope_theta`) and local attention layers (`local_rope_theta`)
+  - Enables ModernBERT-style architecture with alternating global/local attention patterns
+  - Layer-specific RoPE instances with customizable interpolation and scaling factors
+
+**Training Precision and Performance**
+
+- **BFloat16 (bf16) Support**: Added native support for BF16 mixed precision training
+  - New `--model_dtype` option now accepts `'bf16'` in addition to `'fp32'` and `'fp16'`
+  - Automatic dtype selection in autocast context for both training and validation
+  - Better numerical stability than FP16 for large-scale training
+
+- **Unpadding for Variable-Length Sequences**: ModernBERT-style unpadding implementation for efficiency
+  - Removes padding tokens before attention computation to reduce wasted computation
+  - Implements `IndexFirstAxis` and `IndexPutFirstAxis` custom autograd functions for efficient indexing
+  - `unpad_input()` and `pad_input()` utilities for removing and restoring padding
+  - Significant speedup for batches with variable-length sequences
+
+
+**Distributed Training Improvements**
+
+- **Detach and Reattach Method for Data Preparation**: New serialization approach for multi-node training
+  - `_detach_batch_tensors()`: Recursively converts all batch tensors to CPU NumPy arrays before serialization
+  - `_reattach_batch_tensors()`: Converts NumPy arrays back to PyTorch tensors after deserialization
+  - Prevents `/dev/shm` race conditions in containerized multi-node environments
+  - Bypasses PyTorch's automatic shared memory pickling which can cause issues on CSC supercomputers
+  - Preserves tensor dtypes through serialization via string representation
+  - Handles nested structures (dicts, lists, tuples, namedtuples, custom objects)
+**NOTE:** 
+1. This method is currently experimental and may have performance overhead due to CPU-GPU transfers.
+2. The training will crash at very end after the model is fully saved.
+
+**Model Architecture Configuration**
+
+- **Architecture-Specific Configuration Registry**: New system for architecture-specific parameters
+  - Centralized configuration for BART, ModernBERT, and potentially other transformer architectures
+  - Automatic parameter routing for attention layers, feed-forward networks, and normalization
+  - Configurable activation functions, bias terms, and initialization schemes
+  - Files added: `mammoth/models/architecture_config.py`
 
 ## What Was Updated (20-Oct-2025)
 

@@ -195,6 +195,7 @@ class Inference(object):
         logger=None,
         seed=-1,
         task=None,
+        model_dtype="fp32",
     ):
         assert task is not None
         self.task = task
@@ -203,6 +204,14 @@ class Inference(object):
 
         self.model = model
         self.vocabs = vocabs
+        self.model_dtype = model_dtype
+        # Convert model_dtype string to torch dtype for beam search
+        if model_dtype == 'fp16':
+            self._torch_dtype = torch.float16
+        elif model_dtype == 'bf16':
+            self._torch_dtype = torch.bfloat16
+        else:
+            self._torch_dtype = torch.float32
         tgt_vocab = dict(self.vocabs)[("tgt", task.tgt_lang)]
         self._tgt_vocab = tgt_vocab
         self._tgt_eos_idx = self._tgt_vocab.stoi[DefaultTokens.EOS]
@@ -334,6 +343,7 @@ class Inference(object):
             logger=logger,
             seed=opts.seed,
             task=task,
+            model_dtype=getattr(model_opts, 'model_dtype', 'fp32'),
         )
 
     def _log(self, msg):
@@ -795,6 +805,7 @@ class Translator(Inference):
                     ratio=self.ratio,
                     ban_unk_token=self.ban_unk_token,
                     device=self._device,
+                    dtype=self._torch_dtype,
                 )
             return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
 

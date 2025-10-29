@@ -141,17 +141,19 @@ class Translation(object):
         pred_scores (List[List[float]]): Log-probs of n-best translations.
         gold_sent (List[str]): Words from gold translation.
         gold_score (List[float]): Log-prob of gold translation.
+        word_aligns (List[List]): Word alignment info.
     """
 
-    __slots__ = ["src", "src_raw", "pred_sents", "pred_scores", "gold_sent", "gold_score"]
+    __slots__ = ["src", "src_raw", "pred_sents", "pred_scores", "gold_sent", "gold_score", "word_aligns"]
 
-    def __init__(self, src, src_raw, pred_sents, pred_scores, tgt_sent, gold_score):
+    def __init__(self, src, src_raw, pred_sents, pred_scores, tgt_sent, gold_score, word_aligns=None):
         self.src = src
         self.src_raw = src_raw
         self.pred_sents = pred_sents
         self.pred_scores = pred_scores
         self.gold_sent = tgt_sent
         self.gold_score = gold_score
+        self.word_aligns = word_aligns
 
     def log(self, sent_number):
         """

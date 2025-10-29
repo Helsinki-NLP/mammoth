@@ -13,6 +13,72 @@ from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
 
 
+def _detach_batch_tensors(obj):
+    """
+    Recursively convert all tensors in a batch to CPU NumPy arrays to prevent shared memory usage.
+    This avoids /dev/shm race conditions in multi-node containerized environments.
+
+    PyTorch's custom pickle implementation automatically uses shared memory (/dev/shm) for tensors,
+    even after .detach().clone(). Converting to NumPy forces standard Python serialization.
+
+    The consumer will convert NumPy arrays back to tensors and move to the appropriate device.
+    """
+    if isinstance(obj, torch.Tensor):
+        # Convert to CPU NumPy array to bypass PyTorch's shared memory pickling
+        # Store dtype as string to preserve it through serialization
+        return {'__tensor__': True, 'data': obj.detach().cpu().numpy(), 'dtype': str(obj.dtype)}
+    elif isinstance(obj, dict):
+        return {k: _detach_batch_tensors(v) for k, v in obj.items()}
+    elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
+        # Handle namedtuples (which have _fields attribute)
+        # Reconstruct by passing detached values to constructor
+        return type(obj)(*(_detach_batch_tensors(item) for item in obj))
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(_detach_batch_tensors(item) for item in obj)
+    elif hasattr(obj, '__dict__'):
+        # Handle custom objects with attributes
+        new_obj = type(obj).__new__(type(obj))
+        for key, value in obj.__dict__.items():
+            setattr(new_obj, key, _detach_batch_tensors(value))
+        return new_obj
+    else:
+        return obj
+
+
+def _reattach_batch_tensors(obj):
+    """
+    Recursively convert NumPy arrays back to PyTorch tensors.
+    This is the inverse operation of _detach_batch_tensors.
+
+    Tensors are reconstructed on CPU; the consumer will move them to the appropriate device.
+    """
+    if isinstance(obj, dict):
+        # Check if this is a serialized tensor
+        if obj.get('__tensor__') is True:
+            # Convert NumPy array back to tensor
+            numpy_array = obj['data']
+            dtype_str = obj['dtype']
+            # Parse dtype string (e.g., "torch.float32" -> torch.float32)
+            dtype = getattr(torch, dtype_str.replace('torch.', ''))
+            return torch.from_numpy(numpy_array).to(dtype)
+        else:
+            # Regular dict, recurse
+            return {k: _reattach_batch_tensors(v) for k, v in obj.items()}
+    elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
+        # Handle namedtuples
+        return type(obj)(*(_reattach_batch_tensors(item) for item in obj))
+    elif isinstance(obj, (list, tuple)):
+        return type(obj)(_reattach_batch_tensors(item) for item in obj)
+    elif hasattr(obj, '__dict__'):
+        # Handle custom objects with attributes
+        new_obj = type(obj).__new__(type(obj))
+        for key, value in obj.__dict__.items():
+            setattr(new_obj, key, _reattach_batch_tensors(value))
+        return new_obj
+    else:
+        return obj
+
+
 def multi_init(opts, global_rank):
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
         master_ip=opts.master_ip, master_port=opts.master_port
@@ -218,18 +284,39 @@ class ErrorHandler(object):
 
 def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     """Produce batches to `queues` from `generator_to_serve`."""
+    # Set sharing strategy in spawned subprocess (not inherited from parent)
+    torch.multiprocessing.set_sharing_strategy('file_system')
+
     log_level = "INFO" if opts.verbose or device_id == 0 else "WARNING"
     init_logger(opts.log_file, log_level=log_level)
     set_random_seed(opts.seed, False)
     logger.info("BATCH PRODUCER")
     logger.info(generator_to_serve)
 
-    for batch, metadata, communication_batch_id in generator_to_serve:
-        semaphore.acquire()
-        # Move batch to correspond device_id when consumer iterate
-        # hack to dodge unpicklable `dict_keys`
-        # batch.fields = list(batch.fields)
-        queue.put((batch, metadata, communication_batch_id))
+    try:
+        for batch, metadata, communication_batch_id in generator_to_serve:
+            semaphore.acquire()
+            # Move batch to correspond device_id when consumer iterate
+            # hack to dodge unpicklable `dict_keys`
+            # batch.fields = list(batch.fields)
+
+            # Detach tensors to prevent shared memory race conditions in multi-node training
+            batch_detached = _detach_batch_tensors(batch)
+            metadata_detached = _detach_batch_tensors(metadata)
+
+            queue.put((batch_detached, metadata_detached, communication_batch_id))
+    except KeyboardInterrupt:
+        # Graceful shutdown on termination signal
+        logger.info(f"BATCH PRODUCER {device_id} - Received shutdown signal, cleaning up...")
+    finally:
+        # Send sentinel value to signal end of data stream
+        try:
+            semaphore.acquire()
+            queue.put(None)
+            logger.info(f"BATCH PRODUCER {device_id} - Shutdown complete")
+        except Exception:
+            # Ignore errors during shutdown cleanup
+            pass
 
 
 def consumer(
@@ -244,6 +331,9 @@ def consumer(
     frame_checkpoint_path,
 ):
     """Run `process_fn` on `device_id` with data from `batch_queue`."""
+    # Set sharing strategy in spawned subprocess (not inherited from parent)
+    torch.multiprocessing.set_sharing_strategy('file_system')
+
     try:
         logger.info(
             f"global_rank {device_context.global_rank} "

@@ -7,6 +7,7 @@ from .communication import (
     broadcast_tensors,
     externally_managed_reduce_and_rescale_grads,
     ErrorHandler,
+    _reattach_batch_tensors,
 )
 from .contexts import (
     DeviceContext,
@@ -27,6 +28,7 @@ __all__ = [
     "consumer",
     "externally_managed_reduce_and_rescale_grads",
     "ErrorHandler",
+    "_reattach_batch_tensors",
     "DeviceContext",
     "WorldContext",
     "DeviceContextEnum",

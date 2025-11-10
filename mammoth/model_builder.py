@@ -11,6 +11,7 @@ from typing import Optional, List, Dict, Tuple
 from mammoth.x_transformers import TransformerWrapper
 from mammoth.x_transformers.x_transformers import TokenEmbedding, AbsolutePositionalEmbedding
 
+
 from mammoth.distributed.components import (
     DistributedAdapter,
     DistributedComponent,
@@ -26,7 +27,6 @@ from mammoth.modules.adapters import (
 )
 from mammoth.inputters.vocab import Vocab
 from mammoth.models import NMTModel
-from mammoth.models.architecture_config import get_model_architecture_config
 from mammoth.modules.attention_bridge import AttentionBridge
 from mammoth.modules.layer_stack import AdaptedAttentionLayersStack, StackXcoder
 from mammoth.utils.logging import logger
@@ -78,25 +78,6 @@ def get_attention_layers_kwargs(
         'pre_norm_has_final_norm': pre_norm_has_final_norm,
     })
 
-    # Apply model architecture-specific configurations
-    model_type = getattr(model_opts, 'model_type', 'bart')
-    try:
-        arch_config = get_model_architecture_config(model_type)
-
-        # Inject attention-specific parameters
-        attn_kwargs = arch_config.to_attention_kwargs()
-        kwargs.update(attn_kwargs)
-
-        # Inject feedforward-specific parameters
-        ff_kwargs = arch_config.to_feedforward_kwargs()
-        kwargs.update(ff_kwargs)
-
-        # Inject layer norm-specific parameters
-        ln_kwargs = arch_config.to_layer_norm_kwargs()
-        kwargs.update(ln_kwargs)
-
-    except ValueError as e:
-        logger.warning(f"Unknown model_type '{model_type}', using defaults: {e}")
 
     # Add sliding window attention configuration (ModernBERT-style local/global pattern)
     sliding_window = getattr(model_opts, 'sliding_window', -1)
@@ -254,7 +235,7 @@ def build_xcoder(
         component for component in components_to_create
         if isinstance(component, distributed_xcoder_class)
     ]
-
+    
     attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]] = defaultdict(dict)
     for component in attention_layers_components:
         layer_stack_index = component.layer_stack_index

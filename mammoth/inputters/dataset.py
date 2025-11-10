@@ -109,6 +109,7 @@ class ParallelCorpus(IterableDataset):
         task=None,
         max_length=None,
         line_idx_restore=None,
+        model_max_seq_len=None,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -122,7 +123,8 @@ class ParallelCorpus(IterableDataset):
         self.offset = offset
         self.is_train = is_train
         self.corpus_id = task.corpus_id
-        self.max_length = max_length
+        self.max_length = max_length # for padding
+        self.model_max_seq_len = model_max_seq_len
         self._line_idx_restore = line_idx_restore
 
     def _tokenize(self, string, side='src'):
@@ -167,28 +169,50 @@ class ParallelCorpus(IterableDataset):
                 else:
                     token_ids.append(token_id)
 
+            # Strip HF-added special tokens that conflict with MAMMOTH's BOS/EOS
+            # Different HF models use different special tokens:
+            # - BERT/ModernBERT: [CLS], [SEP]
+            # We strip common ones to avoid double-wrapping
+            special_tokens_to_strip = set()
+
+            # Collect special token IDs (if they exist in tokenizer)
+            for token_str in ['[CLS]', '[SEP]', '<s>', '</s>', '<bos>', '<eos>']:
+                token_id = vocab.tokenizer.token_to_id(token_str)
+                if token_id is not None:
+                    special_tokens_to_strip.add(token_id)
+
+            # Strip from beginning
+            while token_ids and token_ids[0] in special_tokens_to_strip:
+                token_ids = token_ids[1:]
+
+            # Strip from end
+            while token_ids and token_ids[-1] in special_tokens_to_strip:
+                token_ids = token_ids[:-1]
+
             # Log a few examples for debugging
             import random
             if random.random() < 0.0001:  # Log ~0.1% of examples
                 logger.info(f'HF Tokenizer {side} direct lookup example:')
-                logger.info(f'  Input tokens: {tokens[:20]}...')
-                logger.info(f'  Token IDs: {token_ids[:20]}...')
+                logger.info(f'  Input tokens: {tokens[:10]}...')
+                logger.info(f'  Token IDs: {token_ids[:10]}...')
+                if special_tokens_to_strip:
+                    logger.info(f'  Stripped special tokens: {special_tokens_to_strip}')
 
             indices = torch.tensor([bos, *token_ids, eos], device='cpu')
 
             # Debug: Catch sequences that will exceed positional embedding limit
             final_length = len(indices)
-            if final_length > 256:
+            if final_length > self.model_max_seq_len:
                 logger.error(
                     f"❌ SEQUENCE TOO LONG AFTER NUMERICALIZATION! {side.upper()}\n"
                     f"   Token count: {len(tokens)}\n"
                     f"   Token IDs: {len(token_ids)}\n"
                     f"   Final tensor length (with special tokens): {final_length}\n"
-                    f"   Exceeds limit by: {final_length - 256} tokens\n"
+                    f"   Exceeds limit by: {final_length - self.model_max_seq_len} tokens\n"
                     f"   First 30 tokens: {tokens[:30]}\n"
                     f"   Last 30 tokens: {tokens[-30:]}\n"
                 )
-            elif final_length > 250:
+            elif final_length > self.model_max_seq_len - 5:
                 logger.warning(
                     f"⚠️  Sequence near limit after numericalization. {side}: "
                     f"tokens={len(tokens)} → token_ids={len(token_ids)} → final={final_length}"
@@ -305,6 +329,7 @@ def get_corpus(
     transforms_to_apply = [transforms_cls[trf_name] for trf_name in transforms_to_apply]
 
     max_length = None
+    model_max_seq_len = opts.max_length
     if opts.pad_to_max_length:
         assert opts.max_length is not None and opts.max_length > 0, 'Please provide a --max_length'
         max_length = opts.max_length

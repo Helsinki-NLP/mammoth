@@ -200,7 +200,7 @@ class HFTokenizerVocab:
         from mammoth.constants import SubwordMarker
 
         # Sample tokens from vocabulary to check for markers
-        sample_tokens = list(self.stoi.keys())[:1000]
+        sample_tokens = list(self.stoi.keys())[:100]
 
         has_spacer = any(SubwordMarker.SPACER in token for token in sample_tokens)
         has_joiner = any(SubwordMarker.JOINER in token for token in sample_tokens)
@@ -256,6 +256,79 @@ class HFTokenizerVocab:
             f"({len(self)} items, subword_type={self.subword_type}, "
             f"specials={sorted(self.specials.keys())})"
         )
+
+
+def create_vocabs_dict_from_hf_tokenizer(src_tokenizer_path, tgt_tokenizer_paths=None, src_lang="en", tgt_langs=None):
+    """
+    Create vocabs_dict from HuggingFace tokenizer(s) - supports both shared and separate vocabs
+
+    Args:
+        src_tokenizer_path: Path to source tokenizer.json file
+        tgt_tokenizer_paths: Dict mapping language codes to tokenizer paths (e.g., {"ar": "path/to/ar_tokenizer.json"})
+                            If None, uses src_tokenizer_path for all languages (multilingual setup)
+        src_lang: Source language (default: "en")
+        tgt_langs: List of target languages (default: ["ar"])
+
+    Returns:
+        Dict mapping (side, lang) tuples to HFTokenizerVocab objects
+    """
+    if tgt_langs is None:
+        tgt_langs = ["ar"]
+
+    if not os.path.exists(src_tokenizer_path):
+        raise FileNotFoundError(
+            f"Source tokenizer not found at {src_tokenizer_path}"
+        )
+
+    if not HF_TOKENIZERS_AVAILABLE:
+        raise ImportError(
+            "HuggingFace tokenizers library is not available. "
+            "Please install it with: pip install tokenizers"
+        )
+
+    # Create source vocabulary
+    src_tokenizer = Tokenizer.from_file(src_tokenizer_path)
+    src_vocab = HFTokenizerVocab(
+        tokenizer_path=src_tokenizer_path,
+        tag=f"src_{src_lang}",
+    )
+    vocabs_dict = {("src", src_lang): src_vocab}
+
+    logger.info(f"Created source vocab: {len(src_vocab)} tokens from {src_tokenizer_path}")
+
+    # Create target vocabularies
+    if tgt_tokenizer_paths is None:
+        # Multilingual setup: all languages share the same tokenizer
+        logger.info(f"Using shared tokenizer for all languages (multilingual mode)")
+        for tgt_lang in tgt_langs:
+            tgt_vocab = HFTokenizerVocab(
+                tokenizer_path=src_tokenizer_path,
+                tag=f"tgt_{tgt_lang}",
+            )
+            vocabs_dict[("tgt", tgt_lang)] = tgt_vocab
+    else:
+        # Separate vocabs: each target language has its own tokenizer
+        logger.info(f"Using separate tokenizers for target languages:")
+        for tgt_lang in tgt_langs:
+            if tgt_lang not in tgt_tokenizer_paths:
+                raise ValueError(
+                    f"Target language '{tgt_lang}' not found in tgt_tokenizer_paths. "
+                    f"Available: {list(tgt_tokenizer_paths.keys())}"
+                )
+
+            tgt_path = tgt_tokenizer_paths[tgt_lang]
+            if not os.path.exists(tgt_path):
+                raise FileNotFoundError(f"Target tokenizer not found at {tgt_path}")
+
+            tgt_tokenizer = Tokenizer.from_file(tgt_path)
+            tgt_vocab = HFTokenizerVocab(
+                tokenizer_path=tgt_path,
+                tag=f"tgt_{tgt_lang}",
+            )
+            vocabs_dict[("tgt", tgt_lang)] = tgt_vocab
+            logger.info(f"  - {tgt_lang}: {len(tgt_vocab)} tokens ({tgt_path})")
+
+    return vocabs_dict
 
 
 def _read_vocab_file(vocab_path, tag):

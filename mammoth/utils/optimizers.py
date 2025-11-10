@@ -28,7 +28,6 @@ def get_base_optimizer(opts):
     Returns:
       A callable that returns ``torch.optim.Optimizer`` instances.
     """
-    betas = [opts.adam_beta1, opts.adam_beta2]
     if opts.optim == 'sgd':
         base_optimizer = functools.partial(optim.SGD, lr=opts.learning_rate)
     elif opts.optim == 'adagrad':
@@ -48,6 +47,7 @@ def get_base_optimizer(opts):
             weight_decay=opts.weight_decay,
         )
     elif opts.optim == 'adam':
+        betas = [opts.adam_beta1, opts.adam_beta2]
         base_optimizer = functools.partial(
             optim.Adam,
             lr=opts.learning_rate,
@@ -56,6 +56,7 @@ def get_base_optimizer(opts):
             weight_decay=opts.weight_decay,
         )
     elif opts.optim == 'adamw':
+        betas = [opts.adam_beta1, opts.adam_beta2]
         base_optimizer = functools.partial(
             optim.AdamW,
             lr=opts.learning_rate,

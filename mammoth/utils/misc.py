@@ -90,7 +90,9 @@ def use_gpu(opts):
     """
     Creates a boolean if gpu used
     """
-    return (hasattr(opts, 'gpu_ranks') and len(opts.gpu_ranks) > 0) or (hasattr(opts, 'gpu') and opts.gpu > -1)
+    return (hasattr(opts, 'gpu_ranks') and len(opts.gpu_ranks) > 0) or \
+           (hasattr(opts, 'gpu') and opts.gpu > -1) or \
+           (hasattr(opts, 'gpu_rank') and opts.gpu_rank > -1)
 
 
 def set_random_seed(seed, is_cuda):

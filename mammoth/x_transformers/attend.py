@@ -362,10 +362,7 @@ class Attend(Module):
         self,
         q, k, v,
         mask = None,
-        attn_bias = None,
-        cu_seqlens: Tensor | None = None,
-        max_seqlen: int | None = None,
-        is_unpadded: bool = False
+        attn_bias = None
     ):
         batch, heads, q_len, _, k_len, is_cuda, device = *q.shape, k.shape[-2], q.is_cuda, q.device
 
@@ -394,60 +391,6 @@ class Attend(Module):
         if exists(self.scale):
             default_scale = q.shape[-1] ** -0.5
             q = q * (self.scale / default_scale)
-
-        # Try FlashAttention varlen path when inputs are unpadded
-        use_varlen = (
-            is_unpadded
-            and exists(cu_seqlens)
-            and exists(max_seqlen)
-            and not exists(mask)
-            and not exists(attn_bias)
-            and not self.l2_distance
-        )
-
-        if use_varlen:
-            try:
-                from flash_attn import flash_attn_varlen_qkvpacked_func
-
-                batch = q.shape[0]
-                seq_len = q.shape[-2]
-
-                q_reshaped = rearrange(q, 'b h n d -> (b n) h d')
-                k_reshaped = rearrange(k, 'b h n d -> (b n) h d')
-                v_reshaped = rearrange(v, 'b h n d -> (b n) h d')
-
-                qkv = torch.stack((q_reshaped, k_reshaped, v_reshaped), dim = 1)
-
-                convert_dtype = qkv.dtype not in (torch.float16, torch.bfloat16)
-                if convert_dtype:
-                    orig_dtype = qkv.dtype
-                    qkv = qkv.to(torch.bfloat16)
-
-                window_size = None
-                if self.window_size not in (None, (-1, -1)):
-                    window_size = self.window_size
-
-                softmax_scale = self.scale if exists(self.scale) else None
-
-                out = flash_attn_varlen_qkvpacked_func(
-                    qkv,
-                    cu_seqlens = cu_seqlens,
-                    max_seqlen = max_seqlen,
-                    dropout_p = self.dropout if self.training else 0.,
-                    softmax_scale = softmax_scale,
-                    causal = self.causal,
-                    window_size = window_size
-                )
-
-                if convert_dtype:
-                    out = out.to(orig_dtype)
-
-                out = rearrange(out, '(b n) h d -> b h n d', b = batch, n = seq_len)
-
-                return out, Intermediates()
-
-            except ImportError:
-                print_once("flash_attn varlen path not available, falling back to padded flash attention")
 
         # Check if mask exists and expand to compatible shape
         # The mask is B L, so it would have to be expanded to B H N L
@@ -586,10 +529,7 @@ class Attend(Module):
         q, k, v,
         mask = None,
         attn_bias = None,
-        prev_attn = None,
-        is_unpadded: bool = False,
-        cu_seqlens: Tensor | None = None,
-        max_seqlen: int | None = None
+        prev_attn = None
     ):
         """
         einstein notation
@@ -635,14 +575,7 @@ class Attend(Module):
 
         if self.flash:
             assert not exists(prev_attn), 'residual attention not compatible with flash attention'
-            return self.flash_attn(
-                q, k, v,
-                mask = mask,
-                attn_bias = attn_bias,
-                cu_seqlens = cu_seqlens,
-                max_seqlen = max_seqlen,
-                is_unpadded = is_unpadded
-            )
+            return self.flash_attn(q, k, v, mask = mask, attn_bias = attn_bias)
 
         kv_einsum_eq = 'b j d' if k.ndim == 3 else 'b h j d'
 

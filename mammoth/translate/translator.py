@@ -685,7 +685,14 @@ class Inference(object):
             msg = "%s No words predicted" % (name,)
         else:
             avg_score = score_total / words_total
-            ppl = np.exp(-score_total.item() / words_total)
+            # Numerical stability: clamp extreme values to prevent overflow
+            neg_avg_score = -score_total.item() / words_total
+            if neg_avg_score > 700:  # exp(700) is close to float64 overflow limit
+                ppl = float('inf')
+            elif neg_avg_score < -700:  # exp(-700) underflows to 0
+                ppl = 0.0
+            else:
+                ppl = np.exp(neg_avg_score)
             msg = "%s AVG SCORE: %.4f, %s PPL: %.4f" % (
                 name,
                 avg_score,

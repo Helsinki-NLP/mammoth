@@ -146,7 +146,22 @@ def main(
             task_queue_manager=task_queue_manager,
             reset_optim=opts.reset_optim in {'all', 'states'},
         )
-        optim.global_training_step = frame_checkpoint['global_training_step']
+
+        # Only load training step if NOT resetting optimizer
+        # When resetting optimizer, start from step 1 for correct LR scheduling
+        if opts.reset_optim in {'none', 'keep_states'}:
+            optim.global_training_step = frame_checkpoint['global_training_step']
+            logger.info(
+                f"Loaded global_training_step={optim.global_training_step} from checkpoint "
+                f"(reset_optim={opts.reset_optim})"
+            )
+        else:
+            # Reset to step 1 when resetting optimizer (reset_optim in {'all', 'states'})
+            optim.global_training_step = 1
+            logger.info(
+                f"Reset global_training_step to 1 (reset_optim={opts.reset_optim}, "
+                f"checkpoint was at step {frame_checkpoint['global_training_step']})"
+            )
 
     # Build model saver
     model_saver = build_model_saver(

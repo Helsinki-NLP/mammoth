@@ -225,11 +225,11 @@ def model_opts(parser):
     group.add(
         '--model_type',
         '-model_type',
-        default='bart',
-        choices=['text', 'bart', 'modernbert', 'gpt2', 't5', 'llama'],
-        help="Type of model architecture to use. Options are [bart, modernbert, gpt2, t5, llama, text]. Default is bart for compatibility.",
+        default='text',
+        choices=['text'],
+        help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
     )
-    group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Data type of the model.')
+    group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Data type of the model. For LUMI (MI250X based), bf16 is recommended. For Puhti (V100 based), fp32 is recommended.') 
 
     # group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
     group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder module')
@@ -241,7 +241,7 @@ def model_opts(parser):
         default=-1,
         help="Size of Transformer representations.",
     )
-
+    
     group.add(
         '--pos_ffn_activation_fn',
         '-pos_ffn_activation_fn',
@@ -495,11 +495,23 @@ def _add_train_general_opts(parser):
         help="If training from a checkpoint then this is the path to the pretrained model's state_dict.",
     )
     group.add(
+        '--override_checkpoint_vocab',
+        '-override_checkpoint_vocab',
+        action='store_true',
+        help="When training from checkpoint, override the checkpoint's vocabulary with the one specified in config. "
+             "This allows using different tokenizers than the ones baked into the checkpoint. "
+             "Default: False (use checkpoint vocabulary).",
+    )
+    group.add(
         '--reset_optim',
         '-reset_optim',
         default='none',
         choices=['none', 'all', 'states', 'keep_states'],
-        help="Optimization resetter when train_from.",
+        help="Optimization resetter when train_from. "
+             "'none': load everything from checkpoint (model, optimizer, training step). "
+             "'all': load only model weights, reset optimizer and training step to 1. "
+             "'states': load model and optimizer config, reset optimizer state and training step to 1. "
+             "'keep_states': load model and optimizer state, use new optimizer config, keep training step.",
     )
     group.add(
         '--yes_i_messed_with_the_checkpoint',

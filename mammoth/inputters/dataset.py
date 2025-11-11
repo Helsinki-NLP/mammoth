@@ -202,21 +202,22 @@ class ParallelCorpus(IterableDataset):
 
             # Debug: Catch sequences that will exceed positional embedding limit
             final_length = len(indices)
-            if final_length > self.model_max_seq_len:
-                logger.error(
-                    f"❌ SEQUENCE TOO LONG AFTER NUMERICALIZATION! {side.upper()}\n"
-                    f"   Token count: {len(tokens)}\n"
-                    f"   Token IDs: {len(token_ids)}\n"
-                    f"   Final tensor length (with special tokens): {final_length}\n"
-                    f"   Exceeds limit by: {final_length - self.model_max_seq_len} tokens\n"
-                    f"   First 30 tokens: {tokens[:30]}\n"
-                    f"   Last 30 tokens: {tokens[-30:]}\n"
-                )
-            elif final_length > self.model_max_seq_len - 5:
-                logger.warning(
-                    f"⚠️  Sequence near limit after numericalization. {side}: "
-                    f"tokens={len(tokens)} → token_ids={len(token_ids)} → final={final_length}"
-                )
+            if self.model_max_seq_len is not None:
+                if final_length > self.model_max_seq_len:
+                    logger.error(
+                        f"❌ SEQUENCE TOO LONG AFTER NUMERICALIZATION! {side.upper()}\n"
+                        f"   Token count: {len(tokens)}\n"
+                        f"   Token IDs: {len(token_ids)}\n"
+                        f"   Final tensor length (with special tokens): {final_length}\n"
+                        f"   Exceeds limit by: {final_length - self.model_max_seq_len} tokens\n"
+                        f"   First 30 tokens: {tokens[:30]}\n"
+                        f"   Last 30 tokens: {tokens[-30:]}\n"
+                    )
+                elif final_length > self.model_max_seq_len - 5:
+                    logger.warning(
+                        f"⚠️  Sequence near limit after numericalization. {side}: "
+                        f"tokens={len(tokens)} → token_ids={len(token_ids)} → final={final_length}"
+                    )
         else:
             # Traditional vocab: lookup tokens individually
             indices = torch.tensor([
@@ -346,6 +347,7 @@ def get_corpus(
         task=task,
         max_length=max_length,
         line_idx_restore=line_idx_restore,
+        model_max_seq_len=model_max_seq_len,
     )
     return dataset
 

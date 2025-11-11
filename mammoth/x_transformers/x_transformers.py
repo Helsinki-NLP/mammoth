@@ -3418,12 +3418,24 @@ class TransformerWrapper(Module):
 
         # attention layers
 
+        # Variable to store multi-stack intermediates list for proper caching
+        multi_stack_intermediates_list = None
+
         if not self.recycling:
             assert not exists(recycle_steps) or recycle_steps == 1, 'you did not train with recycling'
 
             # regular
 
             attended, intermediates = self.attn_layers(x, mask = mask, mems = mems, mem_masks = mem_masks, cache = cache, deep_embeds_and_ids = deep_embed_and_ids, return_hiddens = True, **kwargs)
+
+            # For AdaptedAttentionLayersStack (multi-stack models):
+            # intermediates is a list of LayerIntermediates, one per stack
+            # Store the full list for caching, but use last stack for attribute setting
+            if hasattr(self.attn_layers, "attention_layers_stack"):
+                # Multi-stack model - intermediates is a list
+                if isinstance(intermediates, list) and len(intermediates) > 0:
+                    multi_stack_intermediates_list = intermediates  # Keep for decoder caching
+                    intermediates = intermediates[-1]  # Use last stack's output for attributes
 
         else:
             # recycling
@@ -3579,6 +3591,9 @@ class TransformerWrapper(Module):
             intermediates.mems = new_mems
 
         if return_intermediates:
+            # For multi-stack decoders, return the full list for proper caching
+            if exists(multi_stack_intermediates_list):
+                return out, multi_stack_intermediates_list
             return out, intermediates
 
         if return_attn:

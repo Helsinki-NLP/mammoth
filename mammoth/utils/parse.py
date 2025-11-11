@@ -28,7 +28,6 @@ class DataOptsCheckerMixin(object):
     @staticmethod
     def _validate_file(file_path, info):
         """Check `file_path` is valid or raise `IOError`."""
-        print(f"file_path:{file_path}")
         if not os.path.isfile(file_path):
             raise IOError(f"Please check path of your {info} file! {file_path}")
 
@@ -71,8 +70,6 @@ class DataOptsCheckerMixin(object):
         default_transforms = opts.transforms
         if len(default_transforms) != 0:
             logger.info(f"Default transforms: {default_transforms}.")
-        print(f"opts.tasks: {opts.tasks}")
-        print(type(opts.tasks))
         corpora = yaml_or_dict(opts.tasks, name='opts.tasks')
         logger.info("Parsing corpora")
         n_without_node_gpu = 0
@@ -218,8 +215,6 @@ class DataOptsCheckerMixin(object):
                     assert feature in opts.src_feats_vocab, f"No vocab file set for feature {feature}"
 
         # validation when train:
-        print(f"src_vocab: {opts.src_vocab}")
-        print(type(opts.src_vocab))
         for key, vocab in opts.src_vocab.items():
             cls._validate_file(vocab, info=f'src vocab ({key})')
             cls._validate_file(vocab, info=f'tgt vocab ({key})')

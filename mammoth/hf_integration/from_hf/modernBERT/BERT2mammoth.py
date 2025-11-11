@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
+import sys
+import os
+
+# Add repository root to Python path
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+sys.path.insert(0, REPO_ROOT)
+
 """
 HuggingFace ModernBERT to Mammoth Model Converter
 Usage: python hfModernBERT2mammoth.py <hf_model_path> <save_path> [--src-lang en] [--tgt-lang es]
 
-ModernBERT-specific features:
-- Fused Wqkv projection (needs splitting into separate Q, K, V)
+ModernBERT-specific features (fully supported):
+- Fused Wqkv projection (mapped directly with fused_qkv=True for efficiency)
 - Pre-Layer Normalization (Pre-LN)
-- GeGLU MLP (GELU-gated GLU)
+- GeGLU MLP (GELU-gated GLU with fused gate+value projection)
 - Bias-free architecture
-- RoPE positional embeddings; different RoPE bases and dimensions for local and global attention
+- Sliding window attention with configurable global attention pattern
+- RoPE positional embeddings with per-layer theta (different bases for global/local attention)
 - ModernBERT-style unpadding for efficient computation with variable-length sequences
 """
 
@@ -18,13 +26,12 @@ from collections import OrderedDict
 from argparse import Namespace
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 from mammoth.x_transformers import XTransformer
-from mammoth.inputters.vocab import Vocab, DEFAULT_SPECIALS
+from mammoth.inputters.vocab import Vocab, HFTokenizerVocab, DEFAULT_SPECIALS
 from mammoth.distributed.tasks import TaskQueueManager
 from mammoth.distributed.contexts import WorldContext, DeviceContext, DeviceContextEnum
 from mammoth.model_builder import build_model
 from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.model_saver import build_model_saver
-from mammoth.models.architecture_config import get_model_architecture_config
 
 
 # =============================================================================
@@ -34,17 +41,23 @@ from mammoth.models.architecture_config import get_model_architecture_config
 
 def create_xtransformer_model(model_path, model_type='modernbert'):
     """
-    Create XTransformer model from HF ModernBERT config
+    Create XTransformer model from HF ModernBERT config with full feature support
 
     ModernBERT is encoder-only. For MAMMOTH (seq2seq framework):
-    - Encoder: Load ModernBERT weights (bias-free, Pre-LN, GLU, local/global attention)
+    - Encoder: Load ModernBERT weights with fused QKV, per-layer RoPE theta, unpadding
     - Decoder: Standard 6-layer transformer (randomly initialized)
+
+    Features enabled:
+    - fused_qkv: Efficient single-matmul QKV projection (ModernBERT-style)
+    - per-layer RoPE theta: Different theta for global vs local attention layers
+    - unpadding: Remove padding tokens before attention for efficiency
+    - sliding window attention: Configurable local/global attention pattern
 
     Args:
         model_path: Path to HuggingFace model
         model_type: Architecture type (default: 'modernbert')
     """
-    config = AutoConfig.from_pretrained(model_path)
+    config = AutoConfig.from_pretrained(model_path, local_files_only=True, trust_remote_code=False)
 
     # Calculate ff_mult from ModernBERT's intermediate_size
     # ModernBERT uses intermediate_size=1152 (1.5x hidden_size)
@@ -95,6 +108,8 @@ def create_xtransformer_model(model_path, model_type='modernbert'):
         enc_ff_mult=ff_mult,  # Match ModernBERT's intermediate size
         enc_emb_dropout=0.0,
         enc_attn_flash=True,
+        enc_fused_qkv=True,  # NEW: Use fused QKV projection (ModernBERT-style)
+        enc_attn_use_unpadding=True,  # NEW: ModernBERT-style unpadding for efficiency
         enc_ff_glu=True,  # ModernBERT uses GLU
         enc_ff_no_bias=True,  # ModernBERT is bias-free
         enc_sliding_window=sliding_window,  # NEW: Sliding window support
@@ -126,7 +141,7 @@ def create_weight_mapping_modernbert(num_layers):
     Create mapping from HuggingFace ModernBERT to x-transformers
 
     ModernBERT is bias-free, so we only map .weight parameters.
-    Key challenge: Split fused Wqkv into separate to_q, to_k, to_v
+    With fused_qkv enabled, we directly map the fused Wqkv weight without splitting.
     """
     mapping = {}
 
@@ -147,8 +162,10 @@ def create_weight_mapping_modernbert(num_layers):
             f"encoder.attn_layers.layers.{attn_idx}.0.0.gamma"
         )
 
-        # Fused Wqkv - special handling (will split during loading)
-        mapping[f"layers.{i}.attn.Wqkv.weight"] = "FUSED_QKV"
+        # Fused Wqkv - direct mapping (no splitting needed with fused_qkv=True)
+        mapping[f"layers.{i}.attn.Wqkv.weight"] = (
+            f"encoder.attn_layers.layers.{attn_idx}.1.to_qkv.weight"
+        )
 
         # Attention output
         mapping[f"layers.{i}.attn.Wo.weight"] = (
@@ -160,12 +177,12 @@ def create_weight_mapping_modernbert(num_layers):
             f"encoder.attn_layers.layers.{ff_idx}.0.0.gamma"
         )
 
-        # MLP with GLU
+        # MLP with GLU (fused gate+value projection)
         mapping[f"layers.{i}.mlp.Wi.weight"] = (
-            f"encoder.attn_layers.layers.{ff_idx}.1.ff.0.weight"
+            f"encoder.attn_layers.layers.{ff_idx}.1.ff.0.proj.weight"
         )
         mapping[f"layers.{i}.mlp.Wo.weight"] = (
-            f"encoder.attn_layers.layers.{ff_idx}.1.ff.3.weight"
+            f"encoder.attn_layers.layers.{ff_idx}.1.ff.2.weight"
         )
 
     # Final layer normalization
@@ -174,34 +191,28 @@ def create_weight_mapping_modernbert(num_layers):
     return mapping
 
 
-def split_fused_qkv(fused_weight, num_heads, head_dim):
-    """
-    Split ModernBERT's fused Wqkv into separate Q, K, V projections
-
-    Args:
-        fused_weight: Shape [3 * hidden_size, hidden_size]
-        num_heads: Number of attention heads
-        head_dim: Dimension per head
-
-    Returns:
-        q_weight, k_weight, v_weight (no bias - ModernBERT is bias-free)
-    """
-    hidden_size = num_heads * head_dim
-
-    # Fused weight is stacked as [Q; K; V] vertically
-    q_weight = fused_weight[:hidden_size, :]
-    k_weight = fused_weight[hidden_size:2*hidden_size, :]
-    v_weight = fused_weight[2*hidden_size:, :]
-
-    return q_weight, k_weight, v_weight
-
 
 def load_hf_weights_to_xtransformer(hf_model_path, xt_model):
-    """Load weights from HuggingFace ModernBERT to x-transformers model"""
-    print(f"Loading HF ModernBERT model from {hf_model_path}")
-    config = AutoConfig.from_pretrained(hf_model_path)
-    hf_model = AutoModel.from_pretrained(hf_model_path)
+    """
+    Load weights from HuggingFace ModernBERT to x-transformers model
+
+    With fused_qkv enabled, the fused Wqkv weights are mapped directly
+    without splitting, matching ModernBERT's efficient single-matmul design.
+    """
+    print(f"Loading HF ModernBERT model from {hf_model_path}", flush=True)
+    print(f"  [1/3] Loading config...", flush=True)
+    config = AutoConfig.from_pretrained(hf_model_path, local_files_only=True, trust_remote_code=False)
+    print(f"  [2/3] Loading model weights (this may take a while)...", flush=True)
+    hf_model = AutoModel.from_pretrained(
+        hf_model_path,
+        local_files_only=True,
+        trust_remote_code=False,
+        torch_dtype=torch.bfloat16,
+        use_safetensors=True  # Prefer safetensors format (faster loading)
+    )
+    print(f"  [3/3] Extracting state dict...", flush=True)
     hf_state_dict = hf_model.state_dict()
+    print(f"✓ Model loaded successfully", flush=True)
 
     mapping = create_weight_mapping_modernbert(config.num_hidden_layers)
     x_state_dict = OrderedDict()
@@ -223,21 +234,8 @@ def load_hf_weights_to_xtransformer(hf_model_path, xt_model):
                 identity_inits.append((x_key, "layers.0.attn_norm.weight"))
             continue
 
-        if x_key == "FUSED_QKV":
-            # Special handling for fused Wqkv - split into Q, K, V
-            layer_idx = int(hf_key.split('.')[1])
-            attn_idx = layer_idx * 2
-
-            fused_weight = hf_state_dict[hf_key]
-            q_w, k_w, v_w = split_fused_qkv(fused_weight, num_heads, head_dim)
-
-            # Map to x-transformers (bias-free)
-            x_state_dict[f"encoder.attn_layers.layers.{attn_idx}.1.to_q.weight"] = q_w
-            x_state_dict[f"encoder.attn_layers.layers.{attn_idx}.1.to_k.weight"] = k_w
-            x_state_dict[f"encoder.attn_layers.layers.{attn_idx}.1.to_v.weight"] = v_w
-        else:
-            # Direct weight mapping
-            x_state_dict[x_key] = hf_state_dict[hf_key]
+        # Direct weight mapping (no splitting needed - fused_qkv handles it)
+        x_state_dict[x_key] = hf_state_dict[hf_key]
 
     # Initialize missing first-layer pre-norm as identity
     for x_key, hf_key in identity_inits:
@@ -269,84 +267,212 @@ def load_hf_weights_to_xtransformer(hf_model_path, xt_model):
 
 
 # =============================================================================
-# SECTION 2: Reuse MAMMOTH utilities from BART converter
+# SECTION 2:  MAMMOTH utilities
 # =============================================================================
 
-def create_vocabs_dict_from_hf_tokenizer(hf_model_path, src_lang="en", tgt_langs=None, save_dir="."):
+
+def rename_hf_special_tokens_to_mammoth(tokenizer_path, output_path=None):
     """
-    Create vocabs_dict from HuggingFace tokenizer for multilingual setup
+    Rename HuggingFace special tokens to MAMMOTH conventions in-place
+
+    This avoids adding new tokens and wasting embeddings. Instead, we directly
+    rename the existing HF tokens to match MAMMOTH's naming:
+    - [CLS] → <s> (BOS)
+    - [SEP] → </s> (EOS)
+    - [PAD] → <pad>
+    - [MASK] → <mask>
+    - [UNK] → <unk>
 
     Args:
-        hf_model_path: Path to HuggingFace model
+        tokenizer_path: Path to the HuggingFace tokenizer.json file
+        output_path: Optional path to save modified tokenizer (if None, modifies in-place)
+
+    Returns:
+        Path to the modified tokenizer file
+    """
+    import json
+    import shutil
+    from pathlib import Path
+
+    print(f"Renaming HF special tokens to MAMMOTH conventions...")
+    print(f"  Input: {tokenizer_path}")
+
+    # Load tokenizer
+    with open(tokenizer_path, 'r', encoding='utf-8') as f:
+        tokenizer_data = json.load(f)
+
+    # Define renaming mapping
+    token_renames = {
+        '[CLS]': '<s>',      # BOS
+        '[SEP]': '</s>',     # EOS
+        '[PAD]': '<pad>',    # PAD (lowercase)
+        '[MASK]': '<mask>',  # MASK (lowercase)
+        '[UNK]': '<unk>',    # UNK (lowercase)
+    }
+
+    # Track renamed tokens
+    renamed_count = 0
+    rename_log = []
+
+    # 1. Rename in vocabulary
+    vocab = tokenizer_data['model']['vocab']
+    for old_token, new_token in token_renames.items():
+        if old_token in vocab:
+            token_id = vocab[old_token]
+            del vocab[old_token]
+            vocab[new_token] = token_id
+            renamed_count += 1
+            rename_log.append(f"  ✓ {old_token:12s} → {new_token:12s} (ID {token_id})")
+
+    # 2. Rename in added_tokens section
+    if 'added_tokens' in tokenizer_data:
+        for token_entry in tokenizer_data['added_tokens']:
+            if token_entry['content'] in token_renames:
+                old_content = token_entry['content']
+                token_entry['content'] = token_renames[old_content]
+                rename_log.append(f"  ✓ Updated added_tokens: {old_content} → {token_entry['content']}")
+
+    # 3. Rename in post_processor special_tokens
+    if 'post_processor' in tokenizer_data and 'special_tokens' in tokenizer_data['post_processor']:
+        special_tokens = tokenizer_data['post_processor']['special_tokens']
+        new_special_tokens = {}
+
+        for token_name, token_info in special_tokens.items():
+            if token_name in token_renames:
+                new_name = token_renames[token_name]
+                # Update the token info
+                token_info['id'] = new_name
+                token_info['tokens'] = [new_name]
+                new_special_tokens[new_name] = token_info
+                rename_log.append(f"  ✓ Updated post_processor special_tokens: {token_name} → {new_name}")
+            else:
+                new_special_tokens[token_name] = token_info
+
+        tokenizer_data['post_processor']['special_tokens'] = new_special_tokens
+
+    # 4. Update post_processor template (single and pair)
+    if 'post_processor' in tokenizer_data:
+        post_proc = tokenizer_data['post_processor']
+
+        # Update 'single' template
+        if 'single' in post_proc:
+            for item in post_proc['single']:
+                if 'SpecialToken' in item:
+                    old_id = item['SpecialToken']['id']
+                    if old_id in token_renames:
+                        item['SpecialToken']['id'] = token_renames[old_id]
+                        rename_log.append(f"  ✓ Updated single template: {old_id} → {token_renames[old_id]}")
+
+        # Update 'pair' template
+        if 'pair' in post_proc:
+            for item in post_proc['pair']:
+                if 'SpecialToken' in item:
+                    old_id = item['SpecialToken']['id']
+                    if old_id in token_renames:
+                        item['SpecialToken']['id'] = token_renames[old_id]
+                        rename_log.append(f"  ✓ Updated pair template: {old_id} → {token_renames[old_id]}")
+
+    # Save modified tokenizer
+    if output_path is None:
+        output_path = tokenizer_path
+        # Create backup
+        backup_path = str(Path(tokenizer_path).with_suffix('.json.backup'))
+        if not Path(backup_path).exists():
+            shutil.copy2(tokenizer_path, backup_path)
+            print(f"  Created backup: {backup_path}")
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        json.dump(tokenizer_data, f, ensure_ascii=False, indent=2)
+
+    print(f"✓ Renamed {renamed_count} special tokens:")
+    for log_entry in rename_log[:5]:  # Show first 5 renames
+        print(log_entry)
+
+    print(f"✓ Modified tokenizer saved to: {output_path}")
+    return output_path
+
+
+def create_vocabs_dict_from_hf_tokenizer(src_tokenizer_path, tgt_tokenizer_paths=None, src_lang="en", tgt_langs=None):
+    """
+    Create vocabs_dict from HuggingFace tokenizer(s) - supports both shared and separate vocabs
+
+    Args:
+        src_tokenizer_path: Path to source tokenizer.json file
+        tgt_tokenizer_paths: Dict mapping language codes to tokenizer paths (e.g., {"ar": "path/to/ar_tokenizer.json"})
+                            If None, uses src_tokenizer_path for all languages (multilingual setup)
         src_lang: Source language (default: "en")
-        tgt_langs: List of target languages (default: 16 languages for multi-task)
-        save_dir: Directory to save vocabulary files (default: current directory)
+        tgt_langs: List of target languages (default: ["ar"])
     """
     if tgt_langs is None:
-        # Default 16 target languages from train.yaml
-        tgt_langs = [
-            "hi", "bn", "gu", "kn",  # Indo-Aryan
-            "be", "bs", "hr", "eo",  # Slavic + Esperanto
-            "ar", "he", "fa", "sw",  # Semitic + Iranian + Bantu
-            "eu", "fi", "gl", "is",  # Mixed
-        ]
+        tgt_langs = ["ar"]
 
-    tokenizer = AutoTokenizer.from_pretrained(hf_model_path)
-    vocab_items = [
-        tok for tok, _ in sorted(tokenizer.get_vocab().items(), key=lambda kv: kv[1])
-    ]
+    if not os.path.exists(src_tokenizer_path):
+        raise FileNotFoundError(
+            f"Source tokenizer not found at {src_tokenizer_path}"
+        )
 
-    specials = list(DEFAULT_SPECIALS)
+    from tokenizers import Tokenizer
 
     # Create source vocabulary
-    src_vocab = Vocab(
-        path=None,
-        items=vocab_items,
+    src_tokenizer = Tokenizer.from_file(src_tokenizer_path)
+    src_vocab = HFTokenizerVocab(
+        tokenizer_path=src_tokenizer_path,
         tag=f"src_{src_lang}",
-        size=len(tokenizer),
-        specials=specials,
     )
-
-    # Create vocabs_dict with source and all target languages
     vocabs_dict = {("src", src_lang): src_vocab}
 
-    # Add all target language vocabularies (sharing the same multilingual vocab)
-    for tgt_lang in tgt_langs:
-        tgt_vocab = Vocab(
-            path=None,
-            items=vocab_items,
-            tag=f"tgt_{tgt_lang}",
-            size=len(tokenizer),
-            specials=specials,
-        )
-        vocabs_dict[("tgt", tgt_lang)] = tgt_vocab
+    print(f"✓ Created source vocab: {len(src_vocab)} tokens")
+    print(f"  Path: {src_tokenizer_path}")
 
-    # Print vocabularies to txt files in save directory
-    src_vocab_file = os.path.join(save_dir, f"src_vocab_{src_lang}.txt")
-    with open(src_vocab_file, "w", encoding="utf-8") as f:
-        for token in vocab_items:
-            f.write(token + "\n")
+    # Create target vocabularies
+    if tgt_tokenizer_paths is None:
+        # Multilingual setup: all languages share the same tokenizer
+        print(f"✓ Using shared tokenizer for all languages (multilingual mode)")
+        for tgt_lang in tgt_langs:
+            tgt_vocab = HFTokenizerVocab(
+                tokenizer_path=src_tokenizer_path,
+                tag=f"tgt_{tgt_lang}",
+            )
+            vocabs_dict[("tgt", tgt_lang)] = tgt_vocab
+    else:
+        # Separate vocabs: each target language has its own tokenizer
+        print(f"✓ Using separate tokenizers for target languages:")
+        for tgt_lang in tgt_langs:
+            if tgt_lang not in tgt_tokenizer_paths:
+                raise ValueError(
+                    f"Target language '{tgt_lang}' not found in tgt_tokenizer_paths. "
+                    f"Available: {list(tgt_tokenizer_paths.keys())}"
+                )
 
-    print(f"✓ Created vocabularies: {len(src_vocab)} tokens")
-    print(f"✓ Saved src vocab to: {src_vocab_file}")
-    print(f"✓ Target languages: {', '.join(tgt_langs)}")
+            tgt_path = tgt_tokenizer_paths[tgt_lang]
+            if not os.path.exists(tgt_path):
+                raise FileNotFoundError(f"Target tokenizer not found at {tgt_path}")
+
+            tgt_tokenizer = Tokenizer.from_file(tgt_path)
+            tgt_vocab = HFTokenizerVocab(
+                tokenizer_path=tgt_path,
+                tag=f"tgt_{tgt_lang}",
+            )
+            vocabs_dict[("tgt", tgt_lang)] = tgt_vocab
+            print(f"  - {tgt_lang}: {len(tgt_vocab)} tokens ({tgt_path})")
+
     return vocabs_dict
 
 
 def create_model_opts_from_xt_model(xt_model, hf_model_path, model_type='modernbert'):
     """Create model_opts for Mammoth from x-transformer model"""
-    config = AutoConfig.from_pretrained(hf_model_path)
+    config = AutoConfig.from_pretrained(hf_model_path, local_files_only=True, trust_remote_code=False)
     model_opts = Namespace()
 
     # Basic settings
     model_opts.model_type = model_type
-    model_opts.model_dtype = "fp32" # ModernBERT is using fp32
+    model_opts.model_dtype = "bf16" 
     model_opts.pos_ffn_activation_fn = "gelu"
 
     # Architecture
     model_opts.model_dim = config.hidden_size
     model_opts.enc_layers = [config.num_hidden_layers]
-    model_opts.dec_layers = [config.num_hidden_layers]
+    model_opts.dec_layers = [6]  # 6-layer decoder (per train.yaml)
 
     # ModernBERT intermediate size calculation
     # Note: With GLU, x-transformers doubles the ff_mult internally (one for gate, one for value)
@@ -370,11 +496,13 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path, model_type='modernb
         "heads": config.num_attention_heads,
         "attn_dropout": getattr(config, "attention_dropout", 0.0),
         "attn_flash": True,
+        "fused_qkv": True,  # ModernBERT uses fused QKV projection for efficiency
         "attn_use_unpadding": True,  # ModernBERT-style unpadding for efficient computation with variable-length sequences
         "ff_mult": ff_mult,
         "ff_dropout": getattr(config, "mlp_dropout", 0.0),
         "ff_glu": True,  # ModernBERT uses GLU
         "ff_no_bias": True,  # ModernBERT is bias-free
+        # NOTE: pre_norm_has_final_norm is automatically managed by MAMMOTH and cannot be set explicitly
         "pre_norm": True,  # ModernBERT uses Pre-LN (AttentionLayers parameter)
         "post_emb_norm": True,  # TransformerWrapper parameter
         "rotary_pos_emb": True,  # AttentionLayers parameter
@@ -382,6 +510,7 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path, model_type='modernb
         "local_rope_theta": local_rope_theta,    # RoPE theta for local attention layers
         "sliding_window": sliding_window,  # NEW: Sliding window support
         "global_attn_every_n_layers": global_attn_every_n_layers,  # NEW: Global attention pattern
+        "use_modernbert_encoder": True
     }
 
     model_opts.max_length = getattr(config, "max_position_embeddings", 1024)
@@ -395,6 +524,8 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path, model_type='modernb
     model_opts.self_attn_type = "scaled-dot"
     model_opts.dropout = [0.0]
     model_opts.attention_dropout = [getattr(config, "attention_dropout", 0.0)]
+
+    print(f'model max_length: {model_opts.max_length}')
 
     return model_opts
 
@@ -439,27 +570,33 @@ class SimpleDeviceContext(DeviceContext):
         return False
 
 
-def create_task_queue_manager(vocabs_dict=None, num_layers=22):
+def create_task_queue_manager(vocabs_dict=None, num_layers=22, tgt_langs=None):
     """
-    Create TaskQueueManager for 16-language multi-task setup
+    Create TaskQueueManager for multi-language multi-task setup
 
     Matches train.yaml configuration:
     - 1 shared encoder (ModernBERT with {num_layers} layers)
-    - 16 language-specific decoders (6 layers each)
-    - 16 GPUs across 8 nodes (2 GPUs per node)
+    - N language-specific decoders (6 layers each)
+
+    Args:
+        vocabs_dict: Dictionary of vocabularies
+        num_layers: Number of encoder layers
+        tgt_langs: List of target languages (if None, defaults to ["ar"])
     """
-    # 16 target languages from train.yaml
-    target_languages = [
-        "hi", "bn", "gu", "kn",  # Indo-Aryan (Node 0-1, GPUs 0-3)
-        "be", "bs", "hr", "eo",  # Slavic + Esperanto (Node 2-3, GPUs 4-7)
-        "ar", "he", "fa", "sw",  # Semitic + Iranian + Bantu (Node 4-5, GPUs 8-11)
-        "eu", "fi", "gl", "is",  # Mixed (Node 6-7, GPUs 12-15)
-    ]
+    # Extract target languages from vocabs_dict if not provided
+    if tgt_langs is None:
+        # Try to infer from vocabs_dict
+        if vocabs_dict:
+            tgt_langs = [lang for side, lang in vocabs_dict.keys() if side == "tgt"]
+        if not tgt_langs:
+            tgt_langs = ["ar"]  # Fallback default
+
+    target_languages = tgt_langs
 
     opts = Namespace()
     opts.tasks = {}
 
-    # Create 16 tasks - one per language pair
+    # Create 1 task - one per language pair
     for gpu_id, tgt_lang in enumerate(target_languages):
         node_id = gpu_id // 2  # 2 GPUs per node
         local_gpu = gpu_id % 2  # GPU within node (0 or 1)
@@ -488,8 +625,18 @@ def create_task_queue_manager(vocabs_dict=None, num_layers=22):
 
     for task in task_manager.tasks:
         task.src_vocab = src_vocab
-        # All languages share the same multilingual vocabulary
-        task.tgt_vocab = src_vocab  # ModernBERT uses single multilingual vocab
+
+        # Extract target language from task's src_tgt field (e.g., "en-ar" -> "ar")
+        tgt_lang = task.tgt_lang
+
+        # Check if separate target vocab exists, otherwise fallback to source vocab (multilingual mode)
+        tgt_vocab = vocabs_dict.get(("tgt", tgt_lang))
+        if tgt_vocab is None:
+            print(f"  ⚠ Target vocab for '{tgt_lang}' not found, using source vocab (multilingual mode)")
+            task.tgt_vocab = src_vocab
+        else:
+            task.tgt_vocab = tgt_vocab
+            print(f"  ✓ Task {task.corpus_id}: src_vocab={len(src_vocab)} tokens, tgt_vocab={len(tgt_vocab)} tokens")
 
     local_task_manager = task_manager.global_to_local(
         node_rank=0, local_rank=0, opts=opts
@@ -506,11 +653,11 @@ def create_opts():
     opts = Namespace()
     opts.train_from = None
     opts.reset_optim = "all"
-    opts.model_dtype = "fp32"
+    opts.model_dtype = "bf16"
     opts.optim = "adafactor"
     opts.learning_rate = 0.001
-    opts.adam_beta1 = 0.9  # Required even for adafactor (fallback)
-    opts.adam_beta2 = 0.999  # Required even for adafactor (fallback)
+    opts.adam_beta1 = 0.9  # Default value (only used for adam/adamw optimizers)
+    opts.adam_beta2 = 0.999  # Default value (only used for adam/adamw optimizers)
     opts.weight_decay = 0.0
     opts.max_grad_norm = 1.0
     opts.decay_method = "none"
@@ -525,12 +672,9 @@ def create_opts():
 
 
 # =============================================================================
-# SECTION 3: x-transformers to Mammoth conversion (reuse from BART)
+# SECTION 3: x-transformers to Mammoth conversion 
 # =============================================================================
 
-# Note: The x-transformers → MAMMOTH mapping is identical to BART
-# since both use the same x-transformers backend
-# Reusing the functions from hfBART2mammoth.py
 
 
 def create_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, corpus_id="modernbert_translation"):
@@ -565,11 +709,12 @@ def create_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, corpus_
         # Mammoth:        layers.0.0.0.gamma (same!)
         mapping[f"{xt_attn_base}.0.0.gamma"] = f"{mammoth_attn_base}.0.0.gamma"
 
-        # Attention projections (bias-free)
-        mapping[f"{xt_attn_base}.1.to_q.weight"] = f"{mammoth_attn_base}.1.to_q.weight"
-        mapping[f"{xt_attn_base}.1.to_k.weight"] = f"{mammoth_attn_base}.1.to_k.weight"
-        mapping[f"{xt_attn_base}.1.to_v.weight"] = f"{mammoth_attn_base}.1.to_v.weight"
+        # Attention projections (bias-free, fused QKV)
+        mapping[f"{xt_attn_base}.1.to_qkv.weight"] = f"{mammoth_attn_base}.1.to_qkv.weight"
         mapping[f"{xt_attn_base}.1.to_out.weight"] = f"{mammoth_attn_base}.1.to_out.weight"
+
+        # RoPE theta (rotary position embedding inverse frequency)
+        mapping[f"{xt_attn_base}.1.rotary_pos_emb.inv_freq"] = f"{mammoth_attn_base}.1.rotary_pos_emb.inv_freq"
 
         # Feedforward layer
         ff_idx = layer_idx * 2 + 1
@@ -603,7 +748,7 @@ def map_xt_to_mammoth_weights(
     """
     Map ModernBERT encoder weights to all task-specific encoders in Mammoth model
 
-    Since enc_sharing_group: ["shared"] creates 16 separate encoder instances
+    Since enc_sharing_group: ["shared"] creates 1 separate encoder instances
     with shared parameters, we copy the same ModernBERT weights to all of them.
     During training, MAMMOTH's gradient synchronization keeps them aligned.
 
@@ -612,7 +757,7 @@ def map_xt_to_mammoth_weights(
         mammoth_model: Mammoth multi-task model
         num_encoder_layers: Number of encoder layers (22 for ModernBERT-base)
         num_decoder_layers: Number of decoder layers (6)
-        task_names: List of task names (e.g., ["task_en_hi", "task_en_bn", ...])
+        task_names: List of task names (e.g., ["task_en_ar", "task_en_bn", ...])
     """
     xt_sd = xt_model.state_dict()
     mammoth_sd = mammoth_model.state_dict()
@@ -733,7 +878,16 @@ def verify_attention_patterns(mammoth_model, hf_config):
         expected_local_layers = list(range(num_layers))
 
     # Check the first task's encoder (all tasks share the same encoder)
-    first_task_name = f"task_en_hi"  # First task from target languages
+    # We need to dynamically determine the first task name based on available tasks
+    first_task_name = None
+    if hasattr(mammoth_model.encoder, 'keys'):
+        available_tasks = list(mammoth_model.encoder.keys())
+        if available_tasks:
+            first_task_name = available_tasks[0]
+
+    if first_task_name is None:
+        print(f"  ⚠️  Unable to determine first task name for verification")
+        return
 
     try:
         # Navigate to the encoder attention layers using the correct MAMMOTH structure
@@ -800,29 +954,50 @@ def verify_attention_patterns(mammoth_model, hf_config):
             pass
 
 
-def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', save_dir="."):
+def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', src_tokenizer_path=None, tgt_tokenizer_paths=None):
     """
     Create Mammoth multi-task model from x-transformer
 
     Creates:
     - 1 shared encoder (ModernBERT weights loaded)
-    - 16 language-specific decoders (randomly initialized)
-    - 16 task configurations matching train.yaml
+    - N language-specific decoders (randomly initialized)
+    - N task configurations
+
+    Args:
+        xt_model: x-transformers model with loaded HF weights
+        hf_model_path: Path to HuggingFace model
+        model_type: Architecture type (default: 'modernbert')
+        src_tokenizer_path: Path to source tokenizer.json (if None, uses HF model path)
+        tgt_tokenizer_paths: Dict of {lang: tokenizer_path} for separate target vocabs (optional)
     """
+    config = AutoConfig.from_pretrained(hf_model_path, local_files_only=True, trust_remote_code=False)
+
+    # Determine target languages from tokenizer paths
+    if tgt_tokenizer_paths:
+        tgt_langs = list(tgt_tokenizer_paths.keys())
+    else:
+        tgt_langs = ["ar"]  # Default for multilingual/shared tokenizer mode
+
     print("Creating Mammoth multi-task model...")
     print("  - 1 shared encoder (ModernBERT)")
-    print("  - 16 language-specific decoders")
+    print(f"  - {len(tgt_langs)} language-specific decoder(s): {', '.join(tgt_langs)}")
 
-    config = AutoConfig.from_pretrained(hf_model_path)
+    # Create vocabulary (supports both shared and separate vocabs)
+    if src_tokenizer_path is None:
+        raise ValueError("src_tokenizer_path must be provided")
 
-    # Create multilingual vocabulary (shared across all tasks)
-    vocabs_dict = create_vocabs_dict_from_hf_tokenizer(hf_model_path, src_lang="en", save_dir=save_dir)
+    vocabs_dict = create_vocabs_dict_from_hf_tokenizer(
+        src_tokenizer_path=src_tokenizer_path,
+        tgt_tokenizer_paths=tgt_tokenizer_paths,
+        src_lang="en",
+        tgt_langs=tgt_langs
+    )
 
     model_opts = create_model_opts_from_xt_model(xt_model, hf_model_path, model_type)
-    task_queue_manager = create_task_queue_manager(vocabs_dict, config.num_hidden_layers)
+    task_queue_manager = create_task_queue_manager(vocabs_dict, config.num_hidden_layers, tgt_langs=tgt_langs)
     opts = create_opts()
 
-    # Build Mammoth multi-task model (no single_task - all 16 tasks)
+    # Build Mammoth multi-task model
     mammoth_model = build_model(
         model_opts=model_opts,
         opts=opts,
@@ -831,16 +1006,8 @@ def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', save_
         single_task=None,  # Multi-task training
     )
 
-    # Map ModernBERT weights to all 16 task encoders
-    # (They share parameters during training via gradient synchronization)
-    # Decoders remain randomly initialized (one per language)
-    target_languages = [
-        "hi", "bn", "gu", "kn",  # Indo-Aryan
-        "be", "bs", "hr", "eo",  # Slavic + Esperanto
-        "ar", "he", "fa", "sw",  # Semitic + Iranian + Bantu
-        "eu", "fi", "gl", "is",  # Mixed
-    ]
-    task_names = [f"task_en_{lang}" for lang in target_languages]
+    # Map ModernBERT weights to task encoders
+    task_names = [f"task_en_{lang}" for lang in tgt_langs]
 
     print("Mapping ModernBERT weights to all task encoders...")
     map_xt_to_mammoth_weights(
@@ -857,7 +1024,7 @@ def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', save_
 
     print("✓ Mammoth multi-task model created")
     print("  ✓ Encoder: ModernBERT weights loaded")
-    print("  ✓ Decoders: 16 randomly initialized (one per language)")
+    print(f"  ✓ Decoder: {len(tgt_langs)} randomly initialized ({', '.join(tgt_langs)})")
     return mammoth_model, model_opts, vocabs_dict, task_queue_manager, optimizer
 
 
@@ -866,22 +1033,56 @@ def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', save_
 # =============================================================================
 
 
-def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert'):
+def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert', src_tokenizer_path=None, tgt_tokenizer_paths=None):
     """
     Convert HuggingFace ModernBERT to Mammoth multi-task format
 
-    Creates 16-task setup matching train.yaml:
+    Creates multi-task setup:
     - 1 shared encoder (ModernBERT weights)
-    - 16 language-specific decoders (random init)
+    - N language-specific decoders (random init)
+
+    Args:
+        hf_model_path: Path to HuggingFace model directory
+        save_path: Path to save converted Mammoth model
+        model_type: Architecture type (default: 'modernbert')
+        src_tokenizer_path: Path to source tokenizer.json (if None, uses hf_model_path/tokenizer.json)
+        tgt_tokenizer_paths: Dict of {lang: tokenizer_path} for separate target vocabs (optional)
+                            If None, uses shared multilingual tokenizer
     """
+    # Determine target languages
+    if tgt_tokenizer_paths:
+        tgt_langs = list(tgt_tokenizer_paths.keys())
+    else:
+        tgt_langs = ["ar"]  # Default
+
     print(f"Converting HuggingFace ModernBERT: {hf_model_path}")
     print(f"Save path: {save_path}")
-    print(f"Multi-task setup: 1 shared encoder + 16 language-specific decoders")
+    print(f"Multi-task setup: 1 shared encoder + {len(tgt_langs)} language-specific decoder(s) ({', '.join(tgt_langs)})")
     print("=" * 70)
 
     # Determine save directory for debug files
     save_dir = os.path.dirname(save_path) if os.path.dirname(save_path) else "."
     os.makedirs(save_dir, exist_ok=True)
+
+    # Stage 0: Prepare tokenizer
+    print("\n[Stage 0] Preparing tokenizer")
+
+    # If no src_tokenizer_path provided, rename HF tokenizer to MAMMOTH conventions
+    if src_tokenizer_path is None:
+        print("  No src_tokenizer_path provided, using HF model tokenizer")
+        tokenizer_path = os.path.join(hf_model_path, "tokenizer.json")
+        src_tokenizer_path = os.path.join(save_dir, "tokenizer.json")
+        rename_hf_special_tokens_to_mammoth(tokenizer_path, src_tokenizer_path)
+    else:
+        print(f"  Using provided source tokenizer: {src_tokenizer_path}")
+
+    # Check if separate target tokenizers are provided
+    if tgt_tokenizer_paths:
+        print(f"  Using separate target tokenizers for {len(tgt_langs)} language(s):")
+        for lang, path in tgt_tokenizer_paths.items():
+            print(f"    - {lang}: {path}")
+    else:
+        print(f"  Using shared tokenizer for all languages (multilingual mode)")
 
     # Stage 1: HuggingFace → x-transformers
     print("\n[Stage 1] HuggingFace ModernBERT → x-transformers")
@@ -896,9 +1097,15 @@ def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert'):
     print(f"✓ x-transformer keys saved to {xt_keys_path}")
 
     # Stage 2: x-transformers → Mammoth multi-task
-    print("\n[Stage 2] x-transformers → Mammoth (16-task)")
+    print("\n[Stage 2] x-transformers → Mammoth (1-task)")
     mammoth_model, model_opts, vocabs_dict, task_queue_manager, optimizer = (
-        create_mammoth_model(xt_model, hf_model_path, model_type, save_dir)
+        create_mammoth_model(
+            xt_model,
+            hf_model_path,
+            model_type,
+            src_tokenizer_path=src_tokenizer_path,
+            tgt_tokenizer_paths=tgt_tokenizer_paths
+        )
     )
 
     # Save Mammoth model keys
@@ -910,11 +1117,12 @@ def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert'):
 
     # Stage 2.5: Verify attention patterns
     print("\n[Stage 2.5] Verifying attention patterns")
-    config = AutoConfig.from_pretrained(hf_model_path)
+    config = AutoConfig.from_pretrained(hf_model_path, local_files_only=True, trust_remote_code=False)
+    # Use first target language for verification (all tasks share the same encoder)
     verify_attention_patterns(mammoth_model, config)
 
     # Stage 3: Save Mammoth model
-    print("\nStage 3: Saving Mammoth model")
+    print("\n[Stage 3] Saving Mammoth model")
 
     save_opts = Namespace()
     save_opts.save_model = save_path
@@ -950,16 +1158,18 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Convert ModernBERT-base with 16-language multi-task setup
+  # Multilingual setup (shared tokenizer)
   python hfModernBERT2mammoth.py answerdotai/ModernBERT-base ./models/modernbert_base.pt
 
-  # Convert ModernBERT-large
-  python hfModernBERT2mammoth.py answerdotai/ModernBERT-large ./models/modernbert_large.pt
+  # Separate source/target tokenizers (for translation)
+  python hfModernBERT2mammoth.py answerdotai/ModernBERT-base ./models/modernbert_base.pt \\
+    --src-tokenizer /path/to/en_tokenizer.json \\
+    --tgt-tokenizer ar /path/to/ar_tokenizer.json
 
 Output:
   - 1 shared encoder (ModernBERT weights loaded)
-  - 16 language-specific decoders (randomly initialized)
-  - Languages: hi, bn, gu, kn, be, bs, hr, eo, ar, he, fa, sw, eu, fi, gl, is
+  - N language-specific decoders (randomly initialized, one per --tgt-tokenizer)
+  - Languages determined by --tgt-tokenizer arguments (defaults to 'ar' if none provided)
         """,
     )
 
@@ -979,6 +1189,19 @@ Output:
         help="Architecture type (default: modernbert)"
     )
 
+    parser.add_argument(
+        "--src-tokenizer",
+        help="Path to source tokenizer.json (if not provided, uses HF model tokenizer)"
+    )
+
+    parser.add_argument(
+        "--tgt-tokenizer",
+        nargs=2,
+        action="append",
+        metavar=("LANG", "PATH"),
+        help="Target language tokenizer: LANG PATH (e.g., --tgt-tokenizer ar /path/to/ar_tokenizer.json). Can be specified multiple times."
+    )
+
     args = parser.parse_args()
 
     # Validate input
@@ -991,12 +1214,19 @@ Output:
         print(f"Creating directory: {save_dir}")
         os.makedirs(save_dir, exist_ok=True)
 
+    # Parse target tokenizers into dict
+    tgt_tokenizer_paths = None
+    if args.tgt_tokenizer:
+        tgt_tokenizer_paths = {lang: path for lang, path in args.tgt_tokenizer}
+
     try:
         # Run conversion
         convert_hf_to_mammoth(
             hf_model_path=args.hf_model_path,
             save_path=args.save_path,
             model_type=args.model_type,
+            src_tokenizer_path=args.src_tokenizer,
+            tgt_tokenizer_paths=tgt_tokenizer_paths,
         )
 
     except Exception as e:

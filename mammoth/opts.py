@@ -241,7 +241,6 @@ def model_opts(parser):
         default=-1,
         help="Size of Transformer representations.",
     )
-    
     group.add(
         '--pos_ffn_activation_fn',
         '-pos_ffn_activation_fn',
@@ -287,30 +286,6 @@ def model_opts(parser):
         " and the kwargs of `Attention` with the prefix `attn_`."
         " For tips, examples, and citations see"
         " https://github.com/lucidrains/x-transformers/blob/main/README.md ."
-    )
-
-    # Sliding Window Attention (ModernBERT-style local/global pattern)
-    group.add(
-        '--sliding_window',
-        '-sliding_window',
-        type=int,
-        default=-1,
-        help="Sliding window size for local attention layers. "
-        "-1 disables sliding window (full attention everywhere). "
-        "Window is symmetric: each token attends to ±(sliding_window/2) neighbors. "
-        "Must be an even number if set. "
-        "Example: sliding_window=128 means ±64 tokens."
-    )
-    group.add(
-        '--global_attn_every_n_layers',
-        '-global_attn_every_n_layers',
-        type=int,
-        default=-1,
-        help="Use global (full) attention every N layers. "
-        "-1 disables alternating pattern (all layers use same attention type). "
-        "Layer indices divisible by N will have global attention. "
-        "Requires --sliding_window to be set. "
-        "Example: global_attn_every_n_layers=3 means layers 0,3,6,9... are global."
     )
 
     # Generator and loss options.

@@ -429,9 +429,10 @@ class Trainer(object):
                 # else:
                 #     normalization = batch.batch_size
 
-                # Determine dtype for mixed precision training
+                # Determine device and dtype for mixed precision training
+                device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
                 dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
-                with torch.cuda.amp.autocast(enabled=self.optim.amp, dtype=dtype):
+                with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                     # F-prop through the model.
                     logits, decoder_output = valid_model(
                         rearrange(src, 't b 1 -> b t'),
@@ -527,6 +528,11 @@ class Trainer(object):
         normalization = 0
         seen_comm_batches = set()
         expected_metadata = my_task.get_serializable_metadata()
+
+        # Determine device and dtype for mixed precision training (once per accumulation)
+        device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
+        dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
+
         for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
             if metadata != expected_metadata:
                 raise Exception(
@@ -556,9 +562,7 @@ class Trainer(object):
 
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
-            # Determine dtype for mixed precision training
-            dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
-            with torch.cuda.amp.autocast(enabled=self.optim.amp, dtype=dtype):
+            with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                 logits, decoder_output = self.model(
                     src=rearrange(src, 't b 1 -> b t'),
                     decoder_input=rearrange(decoder_input, 't b 1 -> b t'),

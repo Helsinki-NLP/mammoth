@@ -11,7 +11,6 @@ from typing import Optional, List, Dict, Tuple
 from mammoth.x_transformers import TransformerWrapper
 from mammoth.x_transformers.x_transformers import TokenEmbedding, AbsolutePositionalEmbedding
 
-
 from mammoth.distributed.components import (
     DistributedAdapter,
     DistributedComponent,
@@ -77,20 +76,6 @@ def get_attention_layers_kwargs(
         'cross_attend': cross_attend,
         'pre_norm_has_final_norm': pre_norm_has_final_norm,
     })
-
-
-    # Add sliding window attention configuration (ModernBERT-style local/global pattern)
-    sliding_window = getattr(model_opts, 'sliding_window', -1)
-    global_attn_every_n_layers = getattr(model_opts, 'global_attn_every_n_layers', -1)
-
-    if sliding_window > 0:
-        kwargs['sliding_window'] = sliding_window
-        kwargs['global_attn_every_n_layers'] = global_attn_every_n_layers
-        logger.info(
-            f"Sliding window attention enabled: window_size={sliding_window}, "
-            f"global_every_n={global_attn_every_n_layers}"
-        )
-
     return kwargs
 
 
@@ -235,7 +220,7 @@ def build_xcoder(
         component for component in components_to_create
         if isinstance(component, distributed_xcoder_class)
     ]
-    
+
     attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]] = defaultdict(dict)
     for component in attention_layers_components:
         layer_stack_index = component.layer_stack_index
@@ -423,14 +408,10 @@ def build_model(
         attention_bridge=attention_bridge
     )
 
-    # Reset default dtype to fp32
-    # torch.set_default_dtype(torch.float32)
 
-    # Move model to device
     model.to(device)
 
     if opts.log_model_structure and task_queue_manager.global_rank == 0:
-        # Only log model structure on master GPU to avoid redundant output
         logger.info(model)
         for component in task_queue_manager.get_my_distributed_components():
             logger.info(component)

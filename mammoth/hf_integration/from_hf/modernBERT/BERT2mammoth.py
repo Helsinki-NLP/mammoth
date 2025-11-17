@@ -8,9 +8,12 @@ sys.path.insert(0, REPO_ROOT)
 
 """
 HuggingFace ModernBERT to Mammoth Model Converter
-Usage: python hfModernBERT2mammoth.py <hf_model_path> <save_path> [--src-lang en] [--tgt-lang es]
+Usage: python BERT2mammoth.py <hf_model_path> <save_path> [--src-lang en] [--tgt-lang es]
 
-ModernBERT-specific features (fully supported):
+The minimum conversion solution will only map the weights instead of implementing the same techniques that ModernBert use.
+The converted ModernBERT will be fully served by Mammoth (x-transformers).
+
+ModernBERT-specific features (will not be implemented):
 - Fused Wqkv projection (mapped directly with fused_qkv=True for efficiency)
 - Pre-Layer Normalization (Pre-LN)
 - GeGLU MLP (GELU-gated GLU with fused gate+value projection)
@@ -39,23 +42,16 @@ from mammoth.utils.model_saver import build_model_saver
 # =============================================================================
 
 
-def create_xtransformer_model(model_path, model_type='modernbert'):
+def create_xtransformer_model(model_path):
     """
     Create XTransformer model from HF ModernBERT config with full feature support
 
     ModernBERT is encoder-only. For MAMMOTH (seq2seq framework):
-    - Encoder: Load ModernBERT weights with fused QKV, per-layer RoPE theta, unpadding
+    - Encoder: Load ModernBERT weights 
     - Decoder: Standard 6-layer transformer (randomly initialized)
-
-    Features enabled:
-    - fused_qkv: Efficient single-matmul QKV projection (ModernBERT-style)
-    - per-layer RoPE theta: Different theta for global vs local attention layers
-    - unpadding: Remove padding tokens before attention for efficiency
-    - sliding window attention: Configurable local/global attention pattern
 
     Args:
         model_path: Path to HuggingFace model
-        model_type: Architecture type (default: 'modernbert')
     """
     config = AutoConfig.from_pretrained(model_path, local_files_only=True, trust_remote_code=False)
 
@@ -65,33 +61,11 @@ def create_xtransformer_model(model_path, model_type='modernbert'):
     intermediate_size = getattr(config, "intermediate_size", config.hidden_size * 4)
     ff_mult = intermediate_size / config.hidden_size
 
-    # Extract sliding window attention configuration
-    sliding_window = getattr(config, "local_attention", -1)  # -1 means no sliding window
-    global_attn_every_n_layers = getattr(config, "global_attn_every_n_layers", -1)
 
-    # Extract RoPE theta configuration for global/local attention layers
-    global_rope_theta = getattr(config, "global_rope_theta", 160000.0)
-    local_rope_theta = getattr(config, "local_rope_theta", 10000.0)
-
-    print(f"Using architecture: {model_type}")
     print(f"  - Encoder: ModernBERT (bias-free, Pre-LN, GLU, {config.num_hidden_layers} layers)")
     print(f"  - Decoder: Standard transformer (6 layers, randomly initialized)")
     print(f"  - FF multiplier: {ff_mult} (intermediate_size={intermediate_size})")
-    print(f"  - RoPE theta: global={global_rope_theta}, local={local_rope_theta}")
-
-    # Print attention configuration
-    if sliding_window > 0:
-        print(f"  - Sliding window: {sliding_window} (±{sliding_window//2} tokens)")
-        if global_attn_every_n_layers > 0:
-            global_layers = [i for i in range(config.num_hidden_layers) if i % global_attn_every_n_layers == 0]
-            local_layers = [i for i in range(config.num_hidden_layers) if i % global_attn_every_n_layers != 0]
-            print(f"  - Global attention every {global_attn_every_n_layers} layers")
-            print(f"    Global layers: {global_layers}")
-            print(f"    Local layers:  {local_layers}")
-        else:
-            print(f"  - All layers use sliding window attention")
-    else:
-        print(f"  - Full attention (no sliding window)")
+    print(f"  - RoPE theta: use unified global attention")
 
 
     xt_model = XTransformer(
@@ -100,20 +74,13 @@ def create_xtransformer_model(model_path, model_type='modernbert'):
         enc_num_tokens=config.vocab_size,
         enc_max_seq_len=config.max_position_embeddings,
         enc_rotary_pos_emb=True,  # ModernBERT uses RoPE
-        enc_global_rope_theta=global_rope_theta,  # RoPE theta for global attention layers
-        enc_local_rope_theta=local_rope_theta,    # RoPE theta for local attention layers
         enc_post_emb_norm=True,
         enc_depth=config.num_hidden_layers,
         enc_heads=config.num_attention_heads,
         enc_ff_mult=ff_mult,  # Match ModernBERT's intermediate size
         enc_emb_dropout=0.0,
-        enc_attn_flash=True,
-        enc_fused_qkv=True,  # NEW: Use fused QKV projection (ModernBERT-style)
-        enc_attn_use_unpadding=True,  # NEW: ModernBERT-style unpadding for efficiency
         enc_ff_glu=True,  # ModernBERT uses GLU
         enc_ff_no_bias=True,  # ModernBERT is bias-free
-        enc_sliding_window=sliding_window,  # NEW: Sliding window support
-        enc_global_attn_every_n_layers=global_attn_every_n_layers,  # NEW: Global attention pattern
 
 
         # Decoder: Bias-free transformer (randomly initialized)
@@ -123,13 +90,10 @@ def create_xtransformer_model(model_path, model_type='modernbert'):
         dec_rotary_pos_emb=True,  # Match encoder (uses RoPE)
         # Decoder uses standard causal attention (no global/local pattern)
         # Set both thetas to same value - standard RoPE base of 10000
-        dec_global_rope_theta=10000.0,  # Standard RoPE for decoder
-        dec_local_rope_theta=10000.0,   # Same value (no pattern)
         dec_post_emb_norm=True,
         dec_depth=6,  # 6-layer decoder (per train.yaml)
         dec_heads=config.num_attention_heads,
         dec_emb_dropout=0.1,
-        dec_attn_flash=True,
         dec_ff_glu=True,  # Match encoder GLU
         dec_ff_no_bias=True,  # Match encoder (bias-free)
     )
@@ -139,9 +103,6 @@ def create_xtransformer_model(model_path, model_type='modernbert'):
 def create_weight_mapping_modernbert(num_layers):
     """
     Create mapping from HuggingFace ModernBERT to x-transformers
-
-    ModernBERT is bias-free, so we only map .weight parameters.
-    With fused_qkv enabled, we directly map the fused Wqkv weight without splitting.
     """
     mapping = {}
 
@@ -162,9 +123,11 @@ def create_weight_mapping_modernbert(num_layers):
             f"encoder.attn_layers.layers.{attn_idx}.0.0.gamma"
         )
 
-        # Fused Wqkv - direct mapping (no splitting needed with fused_qkv=True)
+        # Fused Wqkv - will be split into separate Q, K, V during loading
         mapping[f"layers.{i}.attn.Wqkv.weight"] = (
-            f"encoder.attn_layers.layers.{attn_idx}.1.to_qkv.weight"
+            f"encoder.attn_layers.layers.{attn_idx}.1.to_q.weight",
+            f"encoder.attn_layers.layers.{attn_idx}.1.to_k.weight",
+            f"encoder.attn_layers.layers.{attn_idx}.1.to_v.weight"
         )
 
         # Attention output
@@ -196,8 +159,6 @@ def load_hf_weights_to_xtransformer(hf_model_path, xt_model):
     """
     Load weights from HuggingFace ModernBERT to x-transformers model
 
-    With fused_qkv enabled, the fused Wqkv weights are mapped directly
-    without splitting, matching ModernBERT's efficient single-matmul design.
     """
     print(f"Loading HF ModernBERT model from {hf_model_path}", flush=True)
     print(f"  [1/3] Loading config...", flush=True)
@@ -205,8 +166,6 @@ def load_hf_weights_to_xtransformer(hf_model_path, xt_model):
     print(f"  [2/3] Loading model weights (this may take a while)...", flush=True)
     hf_model = AutoModel.from_pretrained(
         hf_model_path,
-        local_files_only=True,
-        trust_remote_code=False,
         torch_dtype=torch.bfloat16,
         use_safetensors=True  # Prefer safetensors format (faster loading)
     )
@@ -234,8 +193,23 @@ def load_hf_weights_to_xtransformer(hf_model_path, xt_model):
                 identity_inits.append((x_key, "layers.0.attn_norm.weight"))
             continue
 
-        # Direct weight mapping (no splitting needed - fused_qkv handles it)
-        x_state_dict[x_key] = hf_state_dict[hf_key]
+        # Check if x_key is a tuple (for split QKV mapping)
+        if isinstance(x_key, tuple):
+            # Split fused Wqkv into separate Q, K, V
+            # ModernBERT has fused Wqkv of shape [hidden_size * 3, hidden_size]
+            fused_qkv = hf_state_dict[hf_key]
+            chunk_size = hidden_size
+
+            # Split into Q, K, V chunks
+            q_weight, k_weight, v_weight = torch.chunk(fused_qkv, 3, dim=0)
+
+            # Assign to separate keys
+            x_state_dict[x_key[0]] = q_weight  # to_q.weight
+            x_state_dict[x_key[1]] = k_weight  # to_k.weight
+            x_state_dict[x_key[2]] = v_weight  # to_v.weight
+        else:
+            # Direct weight mapping
+            x_state_dict[x_key] = hf_state_dict[hf_key]
 
     # Initialize missing first-layer pre-norm as identity
     for x_key, hf_key in identity_inits:
@@ -459,13 +433,12 @@ def create_vocabs_dict_from_hf_tokenizer(src_tokenizer_path, tgt_tokenizer_paths
     return vocabs_dict
 
 
-def create_model_opts_from_xt_model(xt_model, hf_model_path, model_type='modernbert'):
+def create_model_opts_from_xt_model(xt_model, hf_model_path):
     """Create model_opts for Mammoth from x-transformer model"""
     config = AutoConfig.from_pretrained(hf_model_path, local_files_only=True, trust_remote_code=False)
     model_opts = Namespace()
 
     # Basic settings
-    model_opts.model_type = model_type
     model_opts.model_dtype = "bf16" 
     model_opts.pos_ffn_activation_fn = "gelu"
 
@@ -480,24 +453,10 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path, model_type='modernb
     intermediate_size = getattr(config, "intermediate_size", config.hidden_size * 4)
     ff_mult = intermediate_size / config.hidden_size
 
-    # Extract sliding window attention configuration
-    sliding_window = getattr(config, "local_attention", -1)  # -1 means no sliding window
-    global_attn_every_n_layers = getattr(config, "global_attn_every_n_layers", -1)
-
-    # Store sliding window configuration for later use
-    model_opts.sliding_window = sliding_window
-    model_opts.global_attn_every_n_layers = global_attn_every_n_layers
-
-    # Extract RoPE theta configuration for global/local attention layers
-    global_rope_theta = getattr(config, "global_rope_theta", 160000.0)
-    local_rope_theta = getattr(config, "local_rope_theta", 10000.0)
-
     model_opts.x_transformers_opts = {
         "heads": config.num_attention_heads,
         "attn_dropout": getattr(config, "attention_dropout", 0.0),
         "attn_flash": True,
-        "fused_qkv": True,  # ModernBERT uses fused QKV projection for efficiency
-        "attn_use_unpadding": True,  # ModernBERT-style unpadding for efficient computation with variable-length sequences
         "ff_mult": ff_mult,
         "ff_dropout": getattr(config, "mlp_dropout", 0.0),
         "ff_glu": True,  # ModernBERT uses GLU
@@ -506,11 +465,6 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path, model_type='modernb
         "pre_norm": True,  # ModernBERT uses Pre-LN (AttentionLayers parameter)
         "post_emb_norm": True,  # TransformerWrapper parameter
         "rotary_pos_emb": True,  # AttentionLayers parameter
-        "global_rope_theta": global_rope_theta,  # RoPE theta for global attention layers
-        "local_rope_theta": local_rope_theta,    # RoPE theta for local attention layers
-        "sliding_window": sliding_window,  # NEW: Sliding window support
-        "global_attn_every_n_layers": global_attn_every_n_layers,  # NEW: Global attention pattern
-        "use_modernbert_encoder": True
     }
 
     model_opts.max_length = getattr(config, "max_position_embeddings", 1024)
@@ -680,11 +634,6 @@ def create_opts():
 def create_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, corpus_id="modernbert_translation"):
     """
     Create mapping from xt_model keys to mammoth_model keys for ModernBERT
-
-    Both x-transformers and Mammoth use bias-free architecture for ModernBERT:
-    - Uses RoPE (no positional embeddings)
-    - Bias-free LayerNorm (uses 'gamma' parameter)
-    - GLU feedforward with fused gate+value projection (ff.0.proj.weight, ff.2.weight)
     """
     mapping = {}
 
@@ -698,6 +647,11 @@ def create_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, corpus_
         f"encoder.{corpus_id}.post_emb_norm.gamma"
     )
 
+    # Shared RoPE (rotary positional embeddings)
+    mapping["encoder.attn_layers.rotary_pos_emb.inv_freq"] = (
+        f"encoder.{corpus_id}.attn_layers.attention_layers_stack.0.rotary_pos_emb.inv_freq"
+    )
+
     # Encoder layers
     for layer_idx in range(num_encoder_layers):
         attn_idx = layer_idx * 2
@@ -709,12 +663,11 @@ def create_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, corpus_
         # Mammoth:        layers.0.0.0.gamma (same!)
         mapping[f"{xt_attn_base}.0.0.gamma"] = f"{mammoth_attn_base}.0.0.gamma"
 
-        # Attention projections (bias-free, fused QKV)
-        mapping[f"{xt_attn_base}.1.to_qkv.weight"] = f"{mammoth_attn_base}.1.to_qkv.weight"
+        # Attention projections (bias-free, separate Q, K, V)
+        mapping[f"{xt_attn_base}.1.to_q.weight"] = f"{mammoth_attn_base}.1.to_q.weight"
+        mapping[f"{xt_attn_base}.1.to_k.weight"] = f"{mammoth_attn_base}.1.to_k.weight"
+        mapping[f"{xt_attn_base}.1.to_v.weight"] = f"{mammoth_attn_base}.1.to_v.weight"
         mapping[f"{xt_attn_base}.1.to_out.weight"] = f"{mammoth_attn_base}.1.to_out.weight"
-
-        # RoPE theta (rotary position embedding inverse frequency)
-        mapping[f"{xt_attn_base}.1.rotary_pos_emb.inv_freq"] = f"{mammoth_attn_base}.1.rotary_pos_emb.inv_freq"
 
         # Feedforward layer
         ff_idx = layer_idx * 2 + 1
@@ -846,115 +799,8 @@ def map_xt_to_mammoth_weights(
     print(f"\n  Note: Decoders remain randomly initialized")
 
 
-def verify_attention_patterns(mammoth_model, hf_config):
-    """
-    Verify that each layer has the correct attention type (global vs local)
 
-    Args:
-        mammoth_model: MAMMOTH multi-task model
-        hf_config: HuggingFace ModernBERT config
-    """
-    print("\nVerifying attention pattern configuration...")
-
-    num_layers = hf_config.num_hidden_layers
-    sliding_window = getattr(hf_config, "local_attention", -1)
-    global_attn_every_n_layers = getattr(hf_config, "global_attn_every_n_layers", -1)
-
-    if sliding_window <= 0:
-        print(f"  ✓ Full attention (no sliding window configured)")
-        return
-
-    print(f"  Expected pattern:")
-    print(f"    - Sliding window: {sliding_window} (±{sliding_window//2} tokens)")
-    if global_attn_every_n_layers > 0:
-        print(f"    - Global attention every {global_attn_every_n_layers} layers")
-        expected_global_layers = [i for i in range(num_layers) if i % global_attn_every_n_layers == 0]
-        expected_local_layers = [i for i in range(num_layers) if i % global_attn_every_n_layers != 0]
-        print(f"    - Global layers: {expected_global_layers}")
-        print(f"    - Local layers:  {expected_local_layers}")
-    else:
-        print(f"    - All layers use sliding window attention")
-        expected_global_layers = []
-        expected_local_layers = list(range(num_layers))
-
-    # Check the first task's encoder (all tasks share the same encoder)
-    # We need to dynamically determine the first task name based on available tasks
-    first_task_name = None
-    if hasattr(mammoth_model.encoder, 'keys'):
-        available_tasks = list(mammoth_model.encoder.keys())
-        if available_tasks:
-            first_task_name = available_tasks[0]
-
-    if first_task_name is None:
-        print(f"  ⚠️  Unable to determine first task name for verification")
-        return
-
-    try:
-        # Navigate to the encoder attention layers using the correct MAMMOTH structure
-        # MAMMOTH uses StackXcoder which is a ModuleDict containing task-specific TransformerWrappers
-        transformer_wrapper = mammoth_model.encoder[first_task_name]
-        attention_layers = transformer_wrapper.attn_layers.attention_layers_stack[0].layers
-
-        print(f"\n  Actual attention configuration:")
-
-        correct_count = 0
-        total_count = 0
-
-        for layer_idx in range(num_layers):
-            # Every other layer is attention (even indices: 0, 2, 4, ...)
-            attn_idx = layer_idx * 2
-
-            if attn_idx >= len(attention_layers):
-                print(f"    Layer {layer_idx:2d}: ⚠️  Index {attn_idx} out of range")
-                continue
-
-            attention_module = attention_layers[attn_idx][1]  # [0] is LayerNorm, [1] is Attention
-
-            # Get the window size from the attention module
-            window_size = getattr(attention_module.attend, 'window_size', None)
-
-            # Determine if this should be global or local
-            expected_global = (global_attn_every_n_layers > 0 and
-                             layer_idx % global_attn_every_n_layers == 0)
-
-            # Check the actual attention type
-            if window_size == (-1, -1) or window_size is None:
-                actual_type = "Global"
-                is_correct = expected_global
-            else:
-                actual_type = f"Local({window_size})"
-                is_correct = not expected_global
-
-            if is_correct:
-                status = "✅"
-                correct_count += 1
-            else:
-                status = "❌"
-
-            total_count += 1
-            expected_type = "Global" if expected_global else f"Local({(sliding_window//2, sliding_window//2)})"
-
-            print(f"    Layer {layer_idx:2d}: {actual_type:<15} {status} Expected: {expected_type}")
-
-        # Summary
-        if correct_count == total_count:
-            print(f"\n  ✓ All {total_count} layers have correct attention configuration!")
-        else:
-            print(f"\n  ⚠️  {correct_count}/{total_count} layers have correct attention configuration")
-
-    except Exception as e:
-        print(f"  ❌ Error verifying attention patterns: {e}")
-        print(f"     This might be due to model structure differences")
-        # Let's print some debug information about the model structure
-        try:
-            print(f"  Encoder type: {type(mammoth_model.encoder)}")
-            if hasattr(mammoth_model.encoder, 'keys'):
-                print(f"  Available tasks: {list(mammoth_model.encoder.keys())}")
-        except:
-            pass
-
-
-def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', src_tokenizer_path=None, tgt_tokenizer_paths=None):
+def create_mammoth_model(xt_model, hf_model_path, src_tokenizer_path=None, tgt_tokenizer_paths=None):
     """
     Create Mammoth multi-task model from x-transformer
 
@@ -966,7 +812,6 @@ def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', src_t
     Args:
         xt_model: x-transformers model with loaded HF weights
         hf_model_path: Path to HuggingFace model
-        model_type: Architecture type (default: 'modernbert')
         src_tokenizer_path: Path to source tokenizer.json (if None, uses HF model path)
         tgt_tokenizer_paths: Dict of {lang: tokenizer_path} for separate target vocabs (optional)
     """
@@ -993,7 +838,7 @@ def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', src_t
         tgt_langs=tgt_langs
     )
 
-    model_opts = create_model_opts_from_xt_model(xt_model, hf_model_path, model_type)
+    model_opts = create_model_opts_from_xt_model(xt_model, hf_model_path)
     task_queue_manager = create_task_queue_manager(vocabs_dict, config.num_hidden_layers, tgt_langs=tgt_langs)
     opts = create_opts()
 
@@ -1033,7 +878,7 @@ def create_mammoth_model(xt_model, hf_model_path, model_type='modernbert', src_t
 # =============================================================================
 
 
-def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert', src_tokenizer_path=None, tgt_tokenizer_paths=None):
+def convert_hf_to_mammoth(hf_model_path, save_path, src_tokenizer_path=None, tgt_tokenizer_paths=None):
     """
     Convert HuggingFace ModernBERT to Mammoth multi-task format
 
@@ -1044,7 +889,6 @@ def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert', src
     Args:
         hf_model_path: Path to HuggingFace model directory
         save_path: Path to save converted Mammoth model
-        model_type: Architecture type (default: 'modernbert')
         src_tokenizer_path: Path to source tokenizer.json (if None, uses hf_model_path/tokenizer.json)
         tgt_tokenizer_paths: Dict of {lang: tokenizer_path} for separate target vocabs (optional)
                             If None, uses shared multilingual tokenizer
@@ -1086,14 +930,15 @@ def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert', src
 
     # Stage 1: HuggingFace → x-transformers
     print("\n[Stage 1] HuggingFace ModernBERT → x-transformers")
-    xt_model = create_xtransformer_model(hf_model_path, model_type)
+    xt_model = create_xtransformer_model(hf_model_path)
     xt_model = load_hf_weights_to_xtransformer(hf_model_path, xt_model)
 
     # Save x-transformer keys for debugging
     xt_keys_path = os.path.join(save_dir, "xt_model_keys_modernbert.txt")
+    xt_state_dict = xt_model.state_dict()
     with open(xt_keys_path, "w") as f:
-        for key in xt_model.state_dict().keys():
-            f.write(key + "\n")
+        for key in xt_state_dict.keys():
+            f.write(key + "\t" + str(xt_state_dict[key].shape) + "\n")
     print(f"✓ x-transformer keys saved to {xt_keys_path}")
 
     # Stage 2: x-transformers → Mammoth multi-task
@@ -1102,7 +947,6 @@ def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert', src
         create_mammoth_model(
             xt_model,
             hf_model_path,
-            model_type,
             src_tokenizer_path=src_tokenizer_path,
             tgt_tokenizer_paths=tgt_tokenizer_paths
         )
@@ -1110,16 +954,12 @@ def convert_hf_to_mammoth(hf_model_path, save_path, model_type='modernbert', src
 
     # Save Mammoth model keys
     mammoth_keys_path = os.path.join(save_dir, "mammoth_model_keys_modernbert.txt")
+    mammoth_state_dict = mammoth_model.state_dict()
     with open(mammoth_keys_path, "w") as f:
-        for key in mammoth_model.state_dict().keys():
-            f.write(key + "\n")
+        for key in mammoth_state_dict.keys():
+            f.write(key + "\t" + str(mammoth_state_dict[key].shape) + "\n")
     print(f"✓ Mammoth model keys saved to {mammoth_keys_path}")
 
-    # Stage 2.5: Verify attention patterns
-    print("\n[Stage 2.5] Verifying attention patterns")
-    config = AutoConfig.from_pretrained(hf_model_path, local_files_only=True, trust_remote_code=False)
-    # Use first target language for verification (all tasks share the same encoder)
-    verify_attention_patterns(mammoth_model, config)
 
     # Stage 3: Save Mammoth model
     print("\n[Stage 3] Saving Mammoth model")
@@ -1184,12 +1024,6 @@ Output:
     )
 
     parser.add_argument(
-        "--model-type",
-        default="modernbert",
-        help="Architecture type (default: modernbert)"
-    )
-
-    parser.add_argument(
         "--src-tokenizer",
         help="Path to source tokenizer.json (if not provided, uses HF model tokenizer)"
     )
@@ -1224,7 +1058,6 @@ Output:
         convert_hf_to_mammoth(
             hf_model_path=args.hf_model_path,
             save_path=args.save_path,
-            model_type=args.model_type,
             src_tokenizer_path=args.src_tokenizer,
             tgt_tokenizer_paths=tgt_tokenizer_paths,
         )

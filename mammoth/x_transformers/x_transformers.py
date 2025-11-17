@@ -2077,6 +2077,7 @@ class AttentionLayers(Module):
         rotary_interpolation_factor = 1.,
         rotary_xpos_scale_base = 512,
         rotary_base_rescale_factor = 1.,
+        rotary_pos_emb_base = None,
         rotate_num_heads = None,
         weight_tie_layers = False,
         custom_layers: tuple[str, ...] | None = None,
@@ -2171,7 +2172,10 @@ class AttentionLayers(Module):
             logger.warning('when training language model, rotary embedding dimension should be at least 32')
 
         assert not (rotary_xpos and not causal), 'rotary xpos is not compatible with bidirectional attention'
-        self.rotary_pos_emb = RotaryEmbedding(rotary_emb_dim, use_xpos = rotary_xpos, scale_base = rotary_xpos_scale_base, interpolation_factor = rotary_interpolation_factor, base_rescale_factor = rotary_base_rescale_factor) if rotary_pos_emb else None
+
+        # use custom base if provided, otherwise default to None which uses RotaryEmbedding's default
+        rotary_base = rotary_pos_emb_base if rotary_pos_emb_base is not None else 10000
+        self.rotary_pos_emb = RotaryEmbedding(rotary_emb_dim, use_xpos = rotary_xpos, scale_base = rotary_xpos_scale_base, interpolation_factor = rotary_interpolation_factor, base = rotary_base, base_rescale_factor = rotary_base_rescale_factor) if rotary_pos_emb else None
 
         assert at_most_one_of(alibi_pos_bias, rel_pos_bias, data_dependent_alibi), 'you can only choose one of Alibi positional bias, data dependent Alibi (forgetting transformers), dynamic tanh, or T5 relative positional bias'
         assert rel_pos_num_buckets <= rel_pos_max_distance, 'number of relative position buckets must be less than the relative position max distance'

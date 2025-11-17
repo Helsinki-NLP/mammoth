@@ -318,7 +318,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             opts_dict['use_simple_rmsnorm'] = False
         if 'attn_flash' not in opts_dict:
             opts_dict['attn_flash'] = True
-        if 'ff_glu' not in opts_dict:
+        if 'ff_glu' not in opts_dict and 'enc_ff_glu' not in opts_dict and 'dec_ff_glu' not in opts_dict:
             opts_dict['ff_glu'] = False
 
         opts.x_transformers_opts = opts_dict

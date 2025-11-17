@@ -38,6 +38,8 @@ TRANSFORMER_WRAPPER_OPTS = {
     'use_abs_pos_emb',
     'scaled_sinu_pos_emb',
     'emb_frac_gradient',
+    'max_seq_len',
+    'emb_dropout',
 }
 
 
@@ -59,7 +61,13 @@ def get_attention_layers_kwargs(
     xcoder_id,
     model_opts,
 ):
-    """Return arguments for x_transformers.AttentionLayers"""
+    """Return arguments for x_transformers.AttentionLayers
+
+    Supports encoder/decoder-specific options via enc_/dec_ prefixes:
+    - Options with 'enc_' prefix apply only to encoder
+    - Options with 'dec_' prefix apply only to decoder
+    - Options without prefix apply to both
+    """
     assert side in {Side.encoder, Side.decoder}, f'Invalid side "{side}"'
     depths = model_opts.enc_layers if side == Side.encoder else model_opts.dec_layers
     depth = depths[layer_stack_index]
@@ -67,10 +75,47 @@ def get_attention_layers_kwargs(
     cross_attend = side == Side.decoder
     is_last = layer_stack_index == len(depths) - 1
     pre_norm_has_final_norm = is_last
-    kwargs = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
-    kwargs = {key: val for key, val in kwargs.items() if key not in TRANSFORMER_WRAPPER_OPTS}
+
+    # Start with base options (excluding TRANSFORMER_WRAPPER_OPTS)
+    all_opts = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
+
+    # Filter side-specific options
+    kwargs = {}
+    prefix = 'enc_' if side == Side.encoder else 'dec_'
+    other_prefix = 'dec_' if side == Side.encoder else 'enc_'
+
+    for key, val in all_opts.items():
+        # Skip options for the other side
+        if key.startswith(other_prefix):
+            continue
+
+        # Determine the unprefixed key name
+        if key.startswith(prefix):
+            unprefixed_key = key[len(prefix):]
+        else:
+            unprefixed_key = key
+
+        # Skip TRANSFORMER_WRAPPER_OPTS (they go to TransformerWrapper instead)
+        if unprefixed_key in TRANSFORMER_WRAPPER_OPTS:
+            continue
+
+        # Include side-specific options (strip prefix) or shared options
+        if key.startswith(prefix):
+            kwargs[unprefixed_key] = val  # Strip 'enc_' or 'dec_' prefix
+        else:
+            kwargs[key] = val
+
+    # Handle model_dim with side-specific support
+    # Priority: enc_model_dim/dec_model_dim > model_dim
+    if side == Side.encoder and hasattr(model_opts, 'enc_model_dim'):
+        dim = model_opts.enc_model_dim
+    elif side == Side.decoder and hasattr(model_opts, 'dec_model_dim'):
+        dim = model_opts.dec_model_dim
+    else:
+        dim = model_opts.model_dim
+
     kwargs.update({
-        'dim': model_opts.model_dim,
+        'dim': dim,
         'depth': depth,
         'causal': causal,
         'cross_attend': cross_attend,
@@ -83,11 +128,48 @@ def get_transformer_wrapper_kwargs(
     side: Side,
     model_opts,
 ):
-    """Return arguments for x_transformers.TransformerWrapper"""
+    """Return arguments for x_transformers.TransformerWrapper
+
+    Supports encoder/decoder-specific options via enc_/dec_ prefixes:
+    - Options with 'enc_' prefix apply only to encoder
+    - Options with 'dec_' prefix apply only to decoder
+    - Options without prefix apply to both
+    """
     assert side in {Side.encoder, Side.decoder}, f'Invalid side "{side}"'
-    kwargs = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
-    kwargs = {key: val for key, val in kwargs.items() if key in TRANSFORMER_WRAPPER_OPTS}
-    max_seq_len = 0 if model_opts.max_length is None else model_opts.max_length
+    all_opts = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
+
+    # Filter side-specific options
+    kwargs = {}
+    prefix = 'enc_' if side == Side.encoder else 'dec_'
+    other_prefix = 'dec_' if side == Side.encoder else 'enc_'
+
+    for key, val in all_opts.items():
+        # Only include TRANSFORMER_WRAPPER_OPTS
+        if key not in TRANSFORMER_WRAPPER_OPTS and not key.startswith(prefix):
+            continue
+        # Skip options for the other side
+        if key.startswith(other_prefix):
+            continue
+        # Include side-specific options (strip prefix) or shared options
+        if key.startswith(prefix):
+            unprefixed_key = key[len(prefix):]
+            if unprefixed_key in TRANSFORMER_WRAPPER_OPTS:
+                kwargs[unprefixed_key] = val
+        elif key in TRANSFORMER_WRAPPER_OPTS:
+            kwargs[key] = val
+
+    # Handle max_seq_len with side-specific support
+    # Priority: enc_max_seq_len/dec_max_seq_len > max_seq_len from x_transformers_opts > model_opts.max_length
+    max_seq_len_key = f'{prefix}max_seq_len'
+    if max_seq_len_key in all_opts:
+        max_seq_len = all_opts[max_seq_len_key]
+    elif 'max_seq_len' in all_opts:
+        max_seq_len = all_opts['max_seq_len']
+    elif model_opts.max_length is not None:
+        max_seq_len = model_opts.max_length
+    else:
+        max_seq_len = 0
+
     kwargs.update({
         'max_seq_len': max_seq_len,
     })
@@ -256,13 +338,22 @@ def build_xcoder(
     else:
         all_langs = sorted(set(task_queue_manager.get_my_tgt_langs()))
     side_alt_str = 'src' if side == Side.encoder else 'tgt'
+
+    # Get side-specific model_dim
+    if side == Side.encoder and hasattr(model_opts, 'enc_model_dim'):
+        emb_dim = model_opts.enc_model_dim
+    elif side == Side.decoder and hasattr(model_opts, 'dec_model_dim'):
+        emb_dim = model_opts.dec_model_dim
+    else:
+        emb_dim = model_opts.model_dim
+
     if token_embs is None:
         token_embs = dict()
     for lang in all_langs:
         if lang not in token_embs:
             vocab = vocabs_dict[(side_alt_str, lang)]
             token_embs[lang] = TokenEmbedding(
-                dim=model_opts.model_dim,
+                dim=emb_dim,
                 num_tokens=len(vocab),
                 l2norm_embed=l2norm_embed
             )
@@ -294,7 +385,7 @@ def build_xcoder(
         transformer_wrapper = TransformerWrapper(
             num_tokens=len(vocab),
             attn_layers=adapted_attention_layers_stack,
-            emb_dim=model_opts.model_dim,
+            emb_dim=emb_dim,  # Use side-specific dimension
             token_emb=token_embs[lang],
             
             **transformer_wrapper_kwargs,
@@ -401,7 +492,18 @@ def build_model(
         single_task=single_task,
         adapters_by_name=dec_adapters_by_name,
     )
-    attention_bridge = build_attention_bridge(model_opts)
+
+    # Check if encoder and decoder have different dimensions
+    # If so, skip attention bridge (it requires matching dimensions)
+    enc_dim = model_opts.enc_model_dim if hasattr(model_opts, 'enc_model_dim') else model_opts.model_dim
+    dec_dim = model_opts.dec_model_dim if hasattr(model_opts, 'dec_model_dim') else model_opts.model_dim
+
+    if enc_dim != dec_dim:
+        logger.info(f'Encoder dim ({enc_dim}) != Decoder dim ({dec_dim}): Skipping attention bridge')
+        attention_bridge = None
+    else:
+        attention_bridge = build_attention_bridge(model_opts)
+
     model = NMTModel(
         encoder=encoder,
         decoder=decoder,

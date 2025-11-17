@@ -8,6 +8,30 @@ This branch mainly works on two fronts:
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (18-Nov-2025)
+
+**Enhanced Encoder-Decoder Architecture Support**
+
+- **Dual Architecture Model Support**: Added support for using different transformer architectures for encoder and decoder in the same model
+  - ModernBERT can now be used as encoder while Gemma3 serves as decoder in a single translation model
+  - Enables optimal architecture selection per component (encoder/decoder) rather than one-size-fits-all approach
+
+- **Encoder/Decoder-Specific Parameter Prefixing**: Implemented `enc_` and `dec_` prefix system for more x_transformers parameters
+
+**HuggingFace Model Converter Expansion**
+
+- **Gemma3 Decoder Support**: Added comprehensive Gemma3 270M to Mammoth decoder converter (`mammoth/hf_integration/from_hf/gemma3/gemma2mammoth.py`)
+
+- **ModernBERT Encoder Enhancements**: Updated ModernBERT to Mammoth encoder converter 
+  - Added `mammoth/hf_integration/from_hf/modernBERT/train.yaml` for single-architecture training
+  - Enhanced weight mapping for encoder-only use case
+  - Better integration with multilingual training pipeline
+
+**Files Added:**
+- `mammoth/hf_integration/from_hf/gemma3/gemma2mammoth.py`: Comprehensive Gemma3 decoder converter
+- `mammoth/hf_integration/from_hf/gemma3/train.yaml`: Gemma3 training configuration
+- `mammoth/hf_integration/from_hf/modernBERT/train.yaml`: ModernBERT training configuration
+
 ## What Was Updated (29-Oct-2025)
 
 **Advanced Attention Mechanisms**

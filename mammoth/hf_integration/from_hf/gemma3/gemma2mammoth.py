@@ -855,7 +855,7 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
 
     model_opts.param_init = 0.0
     model_opts.param_init_glorot = True
-    model_opts.attention_bridge = None # should NOT be used when encoder and decoder are using different model_dim
+    model_opts.attention_bridge = None 
     model_opts.ab_layers = []
     model_opts.adapters = None
     model_opts.enable_embeddingless = False

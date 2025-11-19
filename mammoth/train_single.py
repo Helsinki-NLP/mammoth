@@ -139,24 +139,30 @@ def main(
 
     # Load parameters from checkpoint
     if opts.train_from:
+        # Determine whether to load optimizer state based on reset_optim
+        # 'none' and 'keep_states' → load state
+        # 'all' and 'states' → reset state
+        should_reset_optimizer_state = opts.reset_optim in {'all', 'states'}
+
         load_parameters_from_checkpoint(
             frame_checkpoint_path=frame_checkpoint_path,
             model=model,
             optim=optim,
             task_queue_manager=task_queue_manager,
-            reset_optim=opts.reset_optim in {'all', 'states'},
+            reset_optim=should_reset_optimizer_state,
         )
 
-        # Only load training step if NOT resetting optimizer
-        # When resetting optimizer, start from step 1 for correct LR scheduling
-        if opts.reset_optim in {'none', 'keep_states'}:
+        # Determine whether to load training step based on reset_optim
+        # 'none' and 'states' → keep training step
+        # 'all' and 'keep_states' → reset training step to 1
+        if opts.reset_optim in {'none', 'states'}:
             optim.global_training_step = frame_checkpoint['global_training_step']
             logger.info(
                 f"Loaded global_training_step={optim.global_training_step} from checkpoint "
                 f"(reset_optim={opts.reset_optim})"
             )
         else:
-            # Reset to step 1 when resetting optimizer (reset_optim in {'all', 'states'})
+            # Reset to step 1 (reset_optim in {'all', 'keep_states'})
             optim.global_training_step = 1
             logger.info(
                 f"Reset global_training_step to 1 (reset_optim={opts.reset_optim}, "

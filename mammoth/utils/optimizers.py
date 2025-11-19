@@ -275,14 +275,20 @@ class MultipleOptimizer(object):
             checkpoint_opts = frame_checkpoint['opts']
 
             if opts.reset_optim == 'none':
-                # Load everything from the checkpoint.
-                optim_opts = checkpoint_opts
+                # Load everything from the checkpoint, but merge with current opts
+                # to ensure all fields exist (handles checkpoints missing optimizer fields)
+                from argparse import Namespace
+                optim_opts = Namespace(**opts.__dict__)
+                optim_opts.__dict__.update(checkpoint_opts.__dict__)
             elif opts.reset_optim == 'all':
                 # Build everything from scratch.
                 pass
             elif opts.reset_optim == 'states':
-                # Reset optimizer, keep options.
-                optim_opts = checkpoint_opts
+                # Reset optimizer, keep options from checkpoint
+                # but merge with current opts to handle missing fields
+                from argparse import Namespace
+                optim_opts = Namespace(**opts.__dict__)
+                optim_opts.__dict__.update(checkpoint_opts.__dict__)
             elif opts.reset_optim == 'keep_states':
                 # Reset options, keep optimizer.
                 # Note that options are reset in load_parameters_from_checkpoint, not here

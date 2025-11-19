@@ -37,6 +37,7 @@ TRANSFORMER_WRAPPER_OPTS = {
     'tie_embedding',
     'use_abs_pos_emb',
     'scaled_sinu_pos_emb',
+    'scaled_embeddings',  # Gemma3-style scaled embeddings (scaling in forward pass)
     'emb_frac_gradient',
     'max_seq_len',
     'emb_dropout',

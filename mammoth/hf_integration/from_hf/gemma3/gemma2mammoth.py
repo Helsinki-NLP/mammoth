@@ -21,8 +21,8 @@ Gemma3 Architecture (✅ = Fully Supported):
 - ✅ Gated MLP with GELU activation (gate_proj, up_proj pattern)
 - ⚠️ RoPE with dual theta (global: 1M, local: 10K for sliding window)
   * Using global theta only (x_transformers has single RoPE)
-- ⚠️ Scaled word embeddings (multiply by sqrt(hidden_size))
-  * Needs custom scaling after conversion
+- ✅ Scaled word embeddings (multiply by sqrt(hidden_size))
+  * Supported via dec_scaled_embeddings parameter in x_transformers_opts
 - ✅ Bias-free architecture
 - ⚠️ Alternating attention pattern (sliding window / full attention)
   * All layers use same config (x_transformers limitation)
@@ -818,6 +818,7 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
         # "dec_num_tokens": config.vocab_size,  # Decoder vocab size (Gemma3)
         "dec_post_emb_norm": False,  # Gemma3 has no post-emb norm
         "dec_max_seq_len": config.max_position_embeddings,  # Gemma3's max sequence length
+        "dec_scaled_embeddings": True,  # Gemma3 uses scaled word embeddings (multiply by sqrt(hidden_size))
 
         # Decoder-specific AttentionLayers options (must match Gemma3 exactly)
         "dec_heads": config.num_attention_heads,
@@ -838,11 +839,12 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
         "dec_sandwich_norm": True,  # 4 norms per layer
         # CRITICAL: Tell decoder cross-attention to expect encoder dimension
         "dec_cross_attn_dim_context": model_opts.enc_model_dim,  # Encoder outputs 512-dim, decoder is 256-dim
-        
+
         # Encoder-specific TransformerWrapper options
         # "enc_num_tokens": config.vocab_size,  # Encoder vocab size (can be different from decoder)
         "enc_post_emb_norm": True,  # Standard encoder has post-emb norm
         "enc_max_seq_len": 512,  # Encoder max sequence length (can be different from decoder)
+        "enc_scaled_embeddings": False,  # Standard encoder doesn't use scaled embeddings
 
         # Encoder-specific AttentionLayers options (standard transformer encoder)
         "enc_heads": 8,
@@ -1293,9 +1295,6 @@ def map_xt_to_mammoth_weights(xt_model, mammoth_model, num_decoder_layers, task_
         if len(missed_details) > 10:
             print(f"  ... and {len(missed_details) - 10} more")
 
-    print(f"\n  ⚠ Note: Gemma3 embedding scaling NOT applied in weights")
-    print(f"    Needs custom forward pass modification")
-
     return True
 
 
@@ -1560,7 +1559,7 @@ def convert_hf_gemma3_to_mammoth(hf_model_path, save_path, src_tokenizer_path=No
     print(f"    ✅ MQA (Multi-Query Attention via attn_one_kv_head=True)")
     print(f"    ✅ Gated MLP with GELU (via ff_glu=True)")
     print(f"    ✅ LM head output projection (lm_head.weight → to_logits.weight)")
-    print(f"    ⚠️  Scaled embeddings (needs custom scaling)")
+    print(f"    ✅ Scaled embeddings (via dec_scaled_embeddings=True)")
     print(f"    ⚠️  Dual RoPE (using global theta only)")
     print(f"    ⚠️  Alternating attention patterns (all layers use same config)")
     return mammoth_model
@@ -1579,26 +1578,6 @@ def main():
         description="Convert HuggingFace Gemma3 to Mammoth multi-task format",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  # Multilingual setup (shared tokenizer)
-  python gemma3_2mammoth.py google/gemma-3-4b ./models/gemma3_4b.pt
-
-  # Separate source/target tokenizers (for translation)
-  python gemma3_2mammoth.py google/gemma-3-4b ./models/gemma3_4b.pt \\
-    --src-tokenizer en /path/to/en_tokenizer.json \\
-    --tgt-tokenizer ar /path/to/ar_tokenizer.json
-
-  # Different source language
-  python gemma3_2mammoth.py google/gemma-3-4b ./models/gemma3_4b.pt \\
-    --src-tokenizer fr /path/to/fr_tokenizer.json \\
-    --tgt-tokenizer en /path/to/en_tokenizer.json
-
-  # Multiple target languages
-  python gemma3_2mammoth.py google/gemma-3-4b ./models/gemma3_4b.pt \\
-    --src-tokenizer en /path/to/en_tokenizer.json \\
-    --tgt-tokenizer ar /path/to/ar_tokenizer.json \\
-    --tgt-tokenizer es /path/to/es_tokenizer.json \\
-    --tgt-tokenizer zh /path/to/zh_tokenizer.json
 
 Output:
   - 1 shared decoder (Gemma3 weights loaded)

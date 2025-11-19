@@ -293,6 +293,32 @@ class TokenEmbedding(Module):
             return
         nn.init.kaiming_normal_(self.emb.weight)
 
+class ScaledTokenEmbedding(TokenEmbedding):
+    """
+    Token embedding with scaling applied in forward pass (Gemma3-style).
+
+    Unlike baking scaling into weights, this applies sqrt(dim) scaling during
+    forward pass, matching Gemma3's behavior exactly:
+    - Weights remain unscaled
+    - Output = embedding(x) * sqrt(dim)
+
+    Args:
+        dim: Embedding dimension
+        num_tokens: Vocabulary size
+        l2norm_embed: Whether to L2-normalize embeddings (default: False)
+        scale_factor: Custom scale factor (default: None, uses sqrt(dim))
+    """
+    def __init__(self, dim, num_tokens, l2norm_embed = False, scale_factor = None):
+        super().__init__(dim, num_tokens, l2norm_embed)
+        if scale_factor is None:
+            scale_factor = dim ** 0.5
+        # Register as buffer (non-trainable, non-persistent)
+        self.register_buffer('scale', torch.tensor(scale_factor), persistent=False)
+
+    def forward(self, x):
+        token_emb = super().forward(x)  # Get base embedding (with optional L2 norm)
+        return token_emb * self.scale.to(token_emb.dtype)
+
 # positional embeddings
 
 class AbsolutePositionalEmbedding(Module):
@@ -3056,6 +3082,7 @@ class TransformerWrapper(Module):
         num_output_heads = 1,
         use_abs_pos_emb = True,
         scaled_sinu_pos_emb = False,
+        scaled_embeddings = False,  # Gemma3-style scaled embeddings (scaling in forward pass)
         l2norm_embed = False,
         recycling = False,            # from Jumper et al. - Alphafold2
         train_max_recycle_steps = 4,  # saw a benefit for language modeling up to 3 recycling steps, so let's default this to 4
@@ -3094,7 +3121,11 @@ class TransformerWrapper(Module):
         self.l2norm_embed = l2norm_embed
 
         if not exists(token_emb):
-            token_emb = TokenEmbedding(emb_dim, num_tokens, l2norm_embed = l2norm_embed)
+            # Use ScaledTokenEmbedding if scaled_embeddings=True (Gemma3-style)
+            if scaled_embeddings:
+                token_emb = ScaledTokenEmbedding(emb_dim, num_tokens, l2norm_embed = l2norm_embed)
+            else:
+                token_emb = TokenEmbedding(emb_dim, num_tokens, l2norm_embed = l2norm_embed)
 
         self.token_emb = token_emb
 

@@ -482,11 +482,26 @@ def _add_train_general_opts(parser):
         '-reset_optim',
         default='none',
         choices=['none', 'all', 'states', 'keep_states'],
-        help="Optimization resetter when train_from. "
-             "'none': load everything from checkpoint (model, optimizer, training step). "
-             "'all': load only model weights, reset optimizer and training step to 1. "
-             "'states': load model and optimizer config, reset optimizer state and training step to 1. "
-             "'keep_states': load model and optimizer state, use new optimizer config, keep training step.",
+        help="Controls which parts of optimizer to load from checkpoint when using --train_from. "
+             "This is a 2x2 matrix of [Optimizer State] × [Training Step]: "
+             "\n"
+             "'none': KEEP state + KEEP step → True resumption after interruption. "
+             "Loads optimizer state (momentum, variance buffers) and continues from checkpoint's training step. "
+             "CRITICAL: Your config's 'optim' must match the optimizer used to create the checkpoint. "
+             "\n"
+             "'keep_states': KEEP state + RESET step to 1 → Restart LR schedule with same optimizer. "
+             "Useful when you want to change learning rate schedule but preserve optimizer momentum. "
+             "\n"
+             "'states': RESET state + KEEP step → Switch optimizer mid-training. "
+             "Loads checkpoint's training step but builds fresh optimizer state. "
+             "Use when switching optimizer types (e.g., Adam → Adafactor). "
+             "\n"
+             "'all': RESET state + RESET step to 1 → Fine-tuning from scratch. "
+             "Only loads model weights, starts fresh training with new optimizer and step=1. "
+             "\n"
+             "IMPORTANT: Checkpoints do NOT save optimizer configuration (optim, learning_rate, etc). "
+             "The optimizer type is ALWAYS from your config file, regardless of reset_optim value. "
+             "Checkpoints only save: (1) model architecture, (2) model weights, (3) optimizer state buffers.",
     )
     group.add(
         '--yes_i_messed_with_the_checkpoint',

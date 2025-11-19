@@ -22,7 +22,7 @@ class FilterTooLongStats(ObservableStats):
 
 @register_transform(name='filtertoolong')
 class FilterTooLongTransform(Transform):
-    """Filter out sentence that are too long."""
+    """Filter out sentences that are too long or too short."""
 
     def __init__(self, opts):
         super().__init__(opts)
@@ -31,12 +31,16 @@ class FilterTooLongTransform(Transform):
     def add_options(cls, parser):
         """Available options relating to this Transform."""
         group = parser.add_argument_group("Transform/Length filter")
-        group.add("--src_seq_length", "-src_seq_length", type=int, default=200, help="Maximum source sequence length.")
-        group.add("--tgt_seq_length", "-tgt_seq_length", type=int, default=200, help="Maximum target sequence length.")
+        group.add("--src_seq_length_max", "-src_seq_length_max", type=int, default=200, help="Maximum source sequence length.")
+        group.add("--tgt_seq_length_max", "-tgt_seq_length_max", type=int, default=200, help="Maximum target sequence length.")
+        group.add("--src_seq_length_min", "-src_seq_length_min", type=int, default=1, help="Minimum source sequence length.")
+        group.add("--tgt_seq_length_min", "-tgt_seq_length_min", type=int, default=1, help="Minimum target sequence length.")
 
     def _parse_opts(self):
-        self.src_seq_length = self.opts.src_seq_length
-        self.tgt_seq_length = self.opts.tgt_seq_length
+        self.src_seq_length_max = self.opts.src_seq_length_max
+        self.tgt_seq_length_max = self.opts.tgt_seq_length_max
+        self.src_seq_length_min = self.opts.src_seq_length_min
+        self.tgt_seq_length_min = self.opts.tgt_seq_length_min
         self._hf_overhead_adjusted = False
 
     def warm_up(self, vocabs):
@@ -61,42 +65,47 @@ class FilterTooLongTransform(Transform):
             # After fix to use direct token-to-ID lookup, no re-encoding variance
             overhead = 2
 
-            original_src = self.src_seq_length
-            original_tgt = self.tgt_seq_length
+            original_src = self.src_seq_length_max
+            original_tgt = self.tgt_seq_length_max
 
-            self.src_seq_length = max(1, self.src_seq_length - overhead)
-            self.tgt_seq_length = max(1, self.tgt_seq_length - overhead)
+            self.src_seq_length_max = max(1, self.src_seq_length_max - overhead)
+            self.tgt_seq_length_max = max(1, self.tgt_seq_length_max - overhead)
 
             self._hf_overhead_adjusted = True
 
             logger.info(
                 f"✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. "
-                f"src: {original_src} → {self.src_seq_length}, "
-                f"tgt: {original_tgt} → {self.tgt_seq_length} "
+                f"src: {original_src} → {self.src_seq_length_max}, "
+                f"tgt: {original_tgt} → {self.tgt_seq_length_max} "
                 f"(reserves {overhead} tokens for special tokens + re-encoding)"
             )
         else:
             logger.info(f"FilterTooLongTransform: No adjustment needed. HF={uses_hf_tokenizer}, Already adjusted={self._hf_overhead_adjusted}")
 
     def apply(self, example, is_train=False, stats=None, **kwargs):
-        """Return None if too long else return as is."""
+        """Return None if too long or too short, else return as is."""
         src_len = len(example['src'])
         tgt_len = len(example['tgt'])
-        if src_len == 0 or tgt_len == 0:
-            # also filter empty strings
+
+        # Filter sequences that are too short
+        if src_len < self.src_seq_length_min or tgt_len < self.tgt_seq_length_min:
+            if stats is not None:
+                stats.update(FilterTooLongStats())
             return None
-        if src_len > self.src_seq_length or tgt_len > self.tgt_seq_length:
+
+        # Filter sequences that are too long
+        if src_len > self.src_seq_length_max or tgt_len > self.tgt_seq_length_max:
             if stats is not None:
                 stats.update(FilterTooLongStats())
             return None
         else:
             # Debug: Log sequences near the threshold that pass through
             threshold_margin = 5
-            if src_len > self.src_seq_length - threshold_margin or tgt_len > self.tgt_seq_length - threshold_margin:
+            if src_len > self.src_seq_length_max - threshold_margin or tgt_len > self.tgt_seq_length_max - threshold_margin:
                 logger.warning(
                     f"FilterTooLong: Sequence near threshold PASSED. "
-                    f"src_len={src_len} (threshold={self.src_seq_length}), "
-                    f"tgt_len={tgt_len} (threshold={self.tgt_seq_length}), "
+                    f"src_len={src_len} (threshold={self.src_seq_length_max}), "
+                    f"tgt_len={tgt_len} (threshold={self.tgt_seq_length_max}), "
                     f"ratio={tgt_len/src_len:.2f}. "
                     f"After numericalization will add ~3 special tokens."
                 )
@@ -106,7 +115,12 @@ class FilterTooLongTransform(Transform):
 
     def _repr_args(self):
         """Return str represent key arguments for class."""
-        return '{}={}, {}={}'.format('src_seq_length', self.src_seq_length, 'tgt_seq_length', self.tgt_seq_length)
+        return '{}={}, {}={}, {}={}, {}={}'.format(
+            'src_seq_length_max', self.src_seq_length_max,
+            'tgt_seq_length_max', self.tgt_seq_length_max,
+            'src_seq_length_min', self.src_seq_length_min,
+            'tgt_seq_length_min', self.tgt_seq_length_min
+        )
 
 
 # Filters inspired by OpusFilter

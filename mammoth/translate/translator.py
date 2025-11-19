@@ -825,10 +825,12 @@ class Translator(Inference):
             return_embeddings=True,
         )
 
-        encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
-        if self.model.attention_bridge.is_fixed_length:
-            # turn off masking in the transformer decoder
-            src_mask = None
+        # Apply attention bridge if it exists (matches model.py pattern)
+        if self.model.attention_bridge is not None:
+            encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
+            if self.model.attention_bridge.is_fixed_length:
+                # turn off masking in the transformer decoder
+                src_mask = None
 
         return encoder_output, src_mask
 

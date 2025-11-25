@@ -8,6 +8,36 @@ This branch mainly works on two fronts:
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (19-Nov-2025)
+
+**Hybrid Model Architecture and Training Enhancements**
+
+- **Hybrid ModernBERT-Gemma3 Model**: Added support for combining HuggingFace ModernBERT as encoder with Gemma3 as decoder
+  - New converter: `mammoth/hf_integration/from_hf/hybrid/modernBERT_gemma3_2mammoth.py`
+  - Complete training configuration: `mammoth/hf_integration/from_hf/hybrid/train.yaml`
+
+- **Scaled Embedding Support**: Added `scaled_embedding` parameter to accommodate Gemma3 training requirements
+
+- **Enhanced Optimizer State Management**: Improved `reset_optim` logic with four distinct scenarios
+  - Correct handling of optimizer states, momentum, and steps from previous checkpoints
+
+- **Advanced Sentence Filtering**: Enhanced `filtertoolong` transform with dual-range filtering
+  - Can now filter sentences longer than maximum tokens AND shorter than minimum tokens
+
+**Files Modified:**
+- `mammoth/hf_integration/from_hf/gemma3/gemma2mammoth.py`: Updated for hybrid compatibility
+- `mammoth/hf_integration/from_hf/hf2mammoth2hf.py`: Removed outdated converter
+- `mammoth/model_builder.py`: Added scaled_embedding parameter support
+- `mammoth/opts.py`: Added new training and filtering options
+- `mammoth/train_single.py`: Enhanced optimizer reset logic
+- `mammoth/transforms/filtering.py`: Dual-range sentence length filtering
+- `mammoth/utils/optimizers.py`: Improved optimizer state management
+- `mammoth/x_transformers/x_transformers.py`: Scaled embedding integration
+
+**Files Added:**
+- `mammoth/hf_integration/from_hf/hybrid/modernBERT_gemma3_2mammoth.py`: Hybrid model converter
+- `mammoth/hf_integration/from_hf/hybrid/train.yaml`: Hybrid model training configuration
+
 ## What Was Updated (18-Nov-2025)
 
 **Enhanced Encoder-Decoder Architecture Support**

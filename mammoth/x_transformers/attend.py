@@ -15,6 +15,14 @@ from dataclasses import dataclass
 
 from einops import rearrange, repeat, pack, unpack
 
+# Try to import flash_attn - it's optional but required for sliding window support
+try:
+    from flash_attn import flash_attn_func
+    FLASH_ATTN_AVAILABLE = True
+except ImportError:
+    FLASH_ATTN_AVAILABLE = False
+    flash_attn_func = None
+
 # constants
 
 @dataclass
@@ -185,6 +193,7 @@ class Attend(Module):
         gumbel_softmax_hard = True,
         custom_attn_fn: Callable | None = None,
         flash = False,
+        window_size = (-1, -1),  # Sliding window attention: (left_context, right_context)
         softclamp_logits = False,
         logit_softclamp_value = 50.,
         add_zero_kv = False,
@@ -295,6 +304,29 @@ class Attend(Module):
 
         torch_version = version.parse(torch.__version__)
         assert not (flash and torch_version < version.parse('2.0.0')), 'in order to use flash attention, you must be using pytorch 2.0 or above'
+
+        # sliding window attention
+        self.window_size = window_size
+        has_sliding_window = window_size != (-1, -1)
+
+        # Validate sliding window + flash attention compatibility
+        if has_sliding_window and not flash:
+            print_once('Warning: sliding window attention is most efficient with flash attention enabled')
+
+        # MI250X (AMD ROCm) specific validation for sliding window
+        if has_sliding_window and flash and FLASH_ATTN_AVAILABLE:
+            import os
+            is_rocm = torch.version.hip is not None  # ROCm uses HIP instead of CUDA
+
+            if is_rocm:
+                flash_backend = os.environ.get('FLASH_ATTENTION_BACKEND', '')
+                if flash_backend != 'ck':
+                    print_once(
+                        'Warning: For AMD MI250X with sliding window attention, '
+                        'set FLASH_ATTENTION_BACKEND=ck (Composable Kernel). '
+                        f'Current backend: {flash_backend or "not set"}. '
+                        'Triton backend does not support sliding window.'
+                    )
 
         # torch 2.3 uses new backend and context manager
 
@@ -413,15 +445,49 @@ class Attend(Module):
 
             mask = attn_bias
 
-        # pytorch 2.0 flash attn: q, k, v, mask, dropout, causal, softmax_scale
+        # Determine whether to use flash_attn_func or PyTorch SDPA
+        has_sliding_window = self.window_size != (-1, -1)
+        use_flash_attn_func = FLASH_ATTN_AVAILABLE and has_sliding_window
 
-        with self.sdp_context_manager():
-            out = F.scaled_dot_product_attention(
+        if use_flash_attn_func:
+            # Use flash_attn_func for sliding window support
+            # Convert from (batch, heads, seq, dim) to (batch, seq, heads, dim)
+            q = rearrange(q, 'b h s d -> b s h d')
+            k = rearrange(k, 'b h s d -> b s h d')
+            v = rearrange(v, 'b h s d -> b s h d')
+
+            # Flash attention doesn't support arbitrary masks or attention bias
+            # If these exist, we need to warn and fall back
+            if exists(mask) or exists(attn_bias):
+                print_once('Warning: flash_attn_func does not support arbitrary masks/attention bias. Falling back to PyTorch SDPA.')
+                use_flash_attn_func = False
+                # Convert back to original shape
+                q = rearrange(q, 'b s h d -> b h s d')
+                k = rearrange(k, 'b s h d -> b h s d')
+                v = rearrange(v, 'b s h d -> b h s d')
+
+        if use_flash_attn_func:
+            # Call flash_attn_func with window_size
+            out = flash_attn_func(
                 q, k, v,
-                attn_mask = mask,
-                dropout_p = self.dropout if self.training else 0., 
-                is_causal = causal
+                dropout_p=self.dropout if self.training else 0.,
+                softmax_scale=None,  # Uses default (dim_head ** -0.5)
+                causal=causal,
+                window_size=self.window_size,
+                return_attn_probs=False
             )
+
+            # Convert back from (batch, seq, heads, dim) to (batch, heads, seq, dim)
+            out = rearrange(out, 'b s h d -> b h s d')
+        else:
+            # Fall back to PyTorch SDPA (no sliding window support)
+            with self.sdp_context_manager():
+                out = F.scaled_dot_product_attention(
+                    q, k, v,
+                    attn_mask = mask,
+                    dropout_p = self.dropout if self.training else 0.,
+                    is_causal = causal
+                )
 
         # for a row that is entirely masked out, should zero out the output of that row token
 

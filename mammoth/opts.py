@@ -220,6 +220,17 @@ def model_opts(parser):
         "(Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
     )
 
+    group.add(
+        '--share_encoder_decoder_embeddings',
+        '-share_encoder_decoder_embeddings',
+        action='store_true',
+        help="Share token embeddings between encoder and decoder. "
+        "Only works when encoder and decoder use the same vocabulary "
+        "and have matching model dimensions. This is different from "
+        "'tie_embedding' in x_transformers_opts which ties input and "
+        "output embeddings within the decoder.",
+    )
+
     # Encoder-Decoder Options
     group = parser.add_argument_group('Model- Encoder-Decoder')
     group.add(
@@ -263,6 +274,80 @@ def model_opts(parser):
         type=str,
         default="scaled-dot",
         help='Self attention type in Transformer decoder layer -- currently "scaled-dot" or "average" ',
+    )
+
+    # Sliding window attention options (Flash Attention 2)
+    group.add(
+        '--enc_sliding_window',
+        '-enc_sliding_window',
+        type=int,
+        default=-1,
+        help='Sliding window size for encoder attention (total context, symmetric). '
+             '-1 = disabled (full attention). Requires Flash Attention 2. '
+             'Reduces memory for long sequences. Example: 128 = attend to ±64 tokens.'
+    )
+    group.add(
+        '--dec_sliding_window',
+        '-dec_sliding_window',
+        type=int,
+        default=-1,
+        help='Sliding window size for decoder attention (total context, symmetric). '
+             '-1 = disabled (full attention). Requires Flash Attention 2. '
+             'Causal masking is automatically applied. Example: 128 = attend to ±64 tokens.'
+    )
+    group.add(
+        '--enc_global_attn_every_n_layers',
+        '-enc_global_attn_every_n_layers',
+        type=int,
+        default=3,
+        help='Encoder: every Nth layer uses global attention (full context), others use sliding window. '
+             'Interleaved pattern from ModernBERT. Layer 0, N, 2N, ... get global attention. '
+             'Only applies if enc_sliding_window > 0. Default: 3'
+    )
+    group.add(
+        '--dec_global_attn_every_n_layers',
+        '-dec_global_attn_every_n_layers',
+        type=int,
+        default=3,
+        help='Decoder: every Nth layer uses global attention (full context), others use sliding window. '
+             'Interleaved pattern from ModernBERT. Layer 0, N, 2N, ... get global attention. '
+             'Only applies if dec_sliding_window > 0. Default: 3'
+    )
+    group.add(
+        '--enc_global_rope_theta',
+        '-enc_global_rope_theta',
+        type=float,
+        default=160000.0,
+        help='Encoder: RoPE theta for global attention layers (every Nth layer). '
+             'Higher values allow for longer context modeling. Default: 160000.0 (ModernBERT style). '
+             'Only applies if enc_sliding_window > 0 and rotary_pos_emb is enabled.'
+    )
+    group.add(
+        '--enc_local_rope_theta',
+        '-enc_local_rope_theta',
+        type=float,
+        default=10000.0,
+        help='Encoder: RoPE theta for local sliding window attention layers. '
+             'Standard value for most transformer models. Default: 10000.0. '
+             'Only applies if enc_sliding_window > 0 and rotary_pos_emb is enabled.'
+    )
+    group.add(
+        '--dec_global_rope_theta',
+        '-dec_global_rope_theta',
+        type=float,
+        default=160000.0,
+        help='Decoder: RoPE theta for global attention layers (every Nth layer). '
+             'Higher values allow for longer context modeling. Default: 160000.0 (ModernBERT style). '
+             'Only applies if dec_sliding_window > 0 and rotary_pos_emb is enabled.'
+    )
+    group.add(
+        '--dec_local_rope_theta',
+        '-dec_local_rope_theta',
+        type=float,
+        default=10000.0,
+        help='Decoder: RoPE theta for local sliding window attention layers. '
+             'Standard value for most transformer models. Default: 10000.0. '
+             'Only applies if dec_sliding_window > 0 and rotary_pos_emb is enabled.'
     )
 
     # TODO is this actually in use?
@@ -510,18 +595,62 @@ def _add_train_general_opts(parser):
         help="Only set this if you know what you are doing."
     )
 
-    # Freeze word vectors
+    # Granular parameter freezing
+    group = parser.add_argument_group('Fine-grained Parameter Freezing')
     group.add(
-        '--freeze_word_vecs_enc',
-        '-freeze_word_vecs_enc',
+        '--freeze_encoder',
+        '-freeze_encoder',
         action='store_true',
-        help="Freeze word embeddings on the encoder side.",
+        help="Freeze all encoder parameters (attention and feedforward layers). "
+             "Does not affect embeddings unless --freeze_encoder_embeddings is also set. "
+             "Adapters remain trainable if configured.",
     )
     group.add(
-        '--freeze_word_vecs_dec',
-        '-freeze_word_vecs_dec',
+        '--freeze_decoder',
+        '-freeze_decoder',
         action='store_true',
-        help="Freeze word embeddings on the decoder side.",
+        help="Freeze all decoder parameters (self-attention, cross-attention, and feedforward). "
+             "Does not affect embeddings unless --freeze_decoder_embeddings is also set. "
+             "Adapters remain trainable if configured. "
+             "Can be combined with --freeze_cross_attention=false to keep only cross-attention trainable.",
+    )
+    group.add(
+        '--freeze_encoder_embeddings',
+        '-freeze_encoder_embeddings',
+        action='store_true',
+        help="Freeze encoder token embeddings. Can be used independently or with --freeze_encoder.",
+    )
+    group.add(
+        '--freeze_decoder_embeddings',
+        '-freeze_decoder_embeddings',
+        action='store_true',
+        help="Freeze decoder token embeddings. Can be used independently or with --freeze_decoder.",
+    )
+    group.add(
+        '--freeze_cross_attention',
+        '-freeze_cross_attention',
+        action='store_true',
+        help="Freeze only cross-attention layers in the decoder. "
+             "Useful for adapting decoder to new encoder representations while preserving "
+             "the encoder-decoder alignment learned during pretraining. "
+             "Mutually exclusive with --freeze_decoder (decoder freeze takes precedence).",
+    )
+    group.add(
+        '--freeze_attention_bridge',
+        '-freeze_attention_bridge',
+        action='store_true',
+        help="Freeze the attention bridge between encoder and decoder if present. "
+             "Only applies when attention bridge is configured (ab_layers is not empty) "
+             "and encoder/decoder dimensions match. Has no effect if attention bridge does not exist.",
+    )
+    group.add(
+        '--freeze_decoder_except_cross_attention',
+        '-freeze_decoder_except_cross_attention',
+        action='store_true',
+        help="Freeze decoder self-attention and feedforward layers, but keep cross-attention trainable. "
+             "Useful for adapting how decoder attends to encoder representations while keeping "
+             "decoder's internal processing frozen. Adapters remain trainable if configured. "
+             "Mutually exclusive with --freeze_decoder and --freeze_cross_attention.",
     )
 
     # Optimization options

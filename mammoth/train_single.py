@@ -116,6 +116,11 @@ def main(
     # Build model.
     model = build_model(model_opts, opts, vocabs_dict, task_queue_manager)
 
+    # Apply parameter freezing based on configuration
+    if device_context.is_master():
+        from mammoth.model_builder import freeze_model_components
+        freeze_model_components(model, opts, task_queue_manager)
+
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)

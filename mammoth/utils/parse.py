@@ -280,18 +280,38 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             model_opts.model_dim = model_opts.model_dim
             model_opts.model_dim = model_opts.model_dim
 
-        # Backward compatibility with "fix_word_vecs_*" opts
-        if hasattr(model_opts, 'fix_word_vecs_enc'):
-            model_opts.freeze_word_vecs_enc = model_opts.fix_word_vecs_enc
-        if hasattr(model_opts, 'fix_word_vecs_dec'):
-            model_opts.freeze_word_vecs_dec = model_opts.fix_word_vecs_dec
-
     @classmethod
     def validate_x_transformers_opts(cls, opts):
         if not opts.x_transformers_opts:
             opts.x_transformers_opts = dict()
-            return
-        opts_dict = yaml_or_dict(opts.x_transformers_opts, name="opts.x_transformers_opts")
+        else:
+            opts.x_transformers_opts = yaml_or_dict(opts.x_transformers_opts, name="opts.x_transformers_opts")
+
+        opts_dict = opts.x_transformers_opts
+
+        # Transfer sliding window CLI options to x_transformers_opts
+        # These options support enc_/dec_ prefixes for side-specific configuration
+        if hasattr(opts, 'enc_sliding_window') and opts.enc_sliding_window is not None:
+            opts_dict['enc_sliding_window'] = opts.enc_sliding_window
+        if hasattr(opts, 'dec_sliding_window') and opts.dec_sliding_window is not None:
+            opts_dict['dec_sliding_window'] = opts.dec_sliding_window
+        if hasattr(opts, 'enc_global_attn_every_n_layers') and opts.enc_global_attn_every_n_layers is not None:
+            opts_dict['enc_global_attn_every_n_layers'] = opts.enc_global_attn_every_n_layers
+        if hasattr(opts, 'dec_global_attn_every_n_layers') and opts.dec_global_attn_every_n_layers is not None:
+            opts_dict['dec_global_attn_every_n_layers'] = opts.dec_global_attn_every_n_layers
+
+        # Transfer RoPE theta options for layer-specific sliding window attention
+        # These options support enc_/dec_ prefixes for side-specific configuration
+        if hasattr(opts, 'enc_global_rope_theta') and opts.enc_global_rope_theta is not None:
+            opts_dict['enc_global_rope_theta'] = opts.enc_global_rope_theta
+        if hasattr(opts, 'enc_local_rope_theta') and opts.enc_local_rope_theta is not None:
+            opts_dict['enc_local_rope_theta'] = opts.enc_local_rope_theta
+        if hasattr(opts, 'dec_global_rope_theta') and opts.dec_global_rope_theta is not None:
+            opts_dict['dec_global_rope_theta'] = opts.dec_global_rope_theta
+        if hasattr(opts, 'dec_local_rope_theta') and opts.dec_local_rope_theta is not None:
+            opts_dict['dec_local_rope_theta'] = opts.dec_local_rope_theta
+
+        opts.x_transformers_opts = opts_dict
         for overwritten_key in (
             'dim',
             'depth',

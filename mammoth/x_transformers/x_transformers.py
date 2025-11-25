@@ -799,22 +799,29 @@ class LayerNorm(Module):
     def __init__(
         self,
         dim,
-        unit_offset = False
+        unit_offset = False,
+        layernorm_bias = False  # Enable LayerNorm bias (beta) for BART compatibility
     ):
         """
         bias-less layernorm has been shown to be more stable. most newer models have moved towards rmsnorm, also bias-less
         """
         super().__init__()
         self.unit_offset = unit_offset
+        self.layernorm_bias = layernorm_bias
 
         self.ln = nn.LayerNorm(dim, elementwise_affine = False)
         self.gamma = nn.Parameter(torch.ones(dim))
         nn.init.constant_(self.gamma, 1. - float(unit_offset))
 
+        self.beta = nn.Parameter(torch.zeros(dim)) if layernorm_bias else None
+
     def forward(self, x):
         normed = self.ln(x)
         gamma = self.gamma + float(self.unit_offset)
-        return normed * gamma
+        out = normed * gamma
+        if self.beta is not None:
+            out = out + self.beta
+        return out
 
 class AdaptiveLayerNorm(Module):
     def __init__(
@@ -1340,6 +1347,9 @@ class Attention(Module):
         heads = 8,
         causal = False,
         flash = False,
+        sliding_window = -1,  # Sliding window size (total), -1 = disabled
+        layer_id = None,      # Layer index for interleaved pattern
+        global_attn_every_n_layers = 3,  # Every Nth layer uses global attention
         pre_talking_heads = False,
         post_talking_heads = False,
         pre_scale_post_talking_heads = False,
@@ -1399,6 +1409,7 @@ class Attention(Module):
         dim_latent_kv = None,
         latent_rope_subheads = None,
         onnxable = False,
+        qkv_bias = False,  # Enable bias for Q, K, V projections (needed for BART compatibility)
         attend_sdp_kwargs: dict = dict(
             enable_flash = True,
             enable_math = True,
@@ -1463,9 +1474,9 @@ class Attention(Module):
 
         # query key projection
 
-        self.to_q = LinearNoBias(dim_q_input, q_dim)
-        self.to_k = LinearNoBias(dim_kv_input, k_dim)
-        self.to_v = LinearNoBias(dim_kv_input, v_dim)
+        self.to_q = nn.Linear(dim_q_input, q_dim, bias=qkv_bias)
+        self.to_k = nn.Linear(dim_kv_input, k_dim, bias=qkv_bias)
+        self.to_v = nn.Linear(dim_kv_input, v_dim, bias=qkv_bias)
 
         # split and merge of attention heads
 
@@ -1523,6 +1534,14 @@ class Attention(Module):
 
         self.value_rmsnorm = MultiheadRMSNorm(dim_head, heads = heads) if value_rmsnorm else None
 
+        # sliding window attention - store parameters and compute window size
+        self.sliding_window = sliding_window
+        self.layer_id = layer_id
+        self.global_attn_every_n_layers = global_attn_every_n_layers
+
+        # Compute window size based on layer pattern (ModernBERT-style interleaving)
+        window_size = self._compute_window_size()
+
         # contextual positional encoding
         # https://arxiv.org/html/2405.18719v2
 
@@ -1579,6 +1598,7 @@ class Attention(Module):
             add_zero_kv = add_zero_kv,
             head_learned_sink = head_learned_sink,
             flash = flash,
+            window_size = window_size,
             softclamp_logits = softclamp_logits,
             logit_softclamp_value = logit_softclamp_value,
             cope = cope,
@@ -1638,7 +1658,7 @@ class Attention(Module):
         # output dimension by default same as input, but can be overridden
 
         dim_out = default(dim_out, dim)
-        self.to_out = nn.Sequential(LinearNoBias(out_dim, dim_out * 2), nn.GLU()) if on_attn else LinearNoBias(out_dim, dim_out)
+        self.to_out = nn.Sequential(nn.Linear(out_dim, dim_out * 2, bias=qkv_bias), nn.GLU()) if on_attn else nn.Linear(out_dim, dim_out, bias=qkv_bias)
 
         # sublayer dropout
 
@@ -1662,6 +1682,35 @@ class Attention(Module):
 
         if zero_init_output:
             init_zero_(self.to_out)
+
+    def _compute_window_size(self):
+        """
+        Compute window_size tuple based on layer_id and sliding_window settings.
+
+        Returns:
+            tuple: (left_context, right_context) for sliding window attention.
+                   (-1, -1) means full attention (no window).
+
+        Interleaved pattern:
+            - Every Nth layer (layer_id % global_attn_every_n_layers == 0) gets global attention
+            - Other layers get local sliding window attention
+        """
+        # If sliding window is disabled or not set, return full attention
+        if self.sliding_window <= 0:
+            return (-1, -1)
+
+        # If no layer_id provided, assume local attention (for backward compatibility)
+        if self.layer_id is None:
+            half_window = self.sliding_window // 2
+            return (half_window, half_window)
+
+        # Check if this is a global attention layer (every Nth layer)
+        if self.layer_id % self.global_attn_every_n_layers == 0:
+            return (-1, -1)  # Global: full attention
+
+        # Local layer: use sliding window
+        half_window = self.sliding_window // 2
+        return (half_window, half_window)
 
     @torch.no_grad()
     def qk_clip_(
@@ -2104,7 +2153,11 @@ class AttentionLayers(Module):
         rotary_xpos_scale_base = 512,
         rotary_base_rescale_factor = 1.,
         rotary_pos_emb_base = None,
+        global_rope_theta = None,             # RoPE theta for global attention layers
+        local_rope_theta = None,              # RoPE theta for local sliding window layers
         rotate_num_heads = None,
+        sliding_window = -1,                  # Sliding window size (total), -1 = disabled
+        global_attn_every_n_layers = 3,      # Every Nth layer uses global attention (interleaved pattern)
         weight_tie_layers = False,
         custom_layers: tuple[str, ...] | None = None,
         layers_execute_order: tuple[int, ...] | None = None,
@@ -2137,6 +2190,7 @@ class AttentionLayers(Module):
         learned_reinject_input_gate = False,
         add_value_residual = False,          # resformer from Zhou et al - https://arxiv.org/abs/2410.17897v1 - further corroboration by https://arxiv.org/abs/2412.15113 (faster emergence of ICL) - looks like this setting may becoming a necessity for every transformer soon
         learned_value_residual_mix = True,   # seeing big improvements when the value residual mix value is learned per token - credit goes to @faresobeid for taking the first step with learned scalar mix, then @Blinkdl for taking it a step further with data dependent. here we will use per token learned
+        layernorm_bias = False,              # Enable LayerNorm bias (beta parameter) for BART compatibility
         rel_pos_kwargs: dict = dict(),
         residual_fn_kwargs: dict = dict(),
         verbose = True,
@@ -2160,6 +2214,10 @@ class AttentionLayers(Module):
 
         self.attn_heads = heads
         self.attn_dim_head = dim_head
+
+        # sliding window attention parameters
+        self.sliding_window = sliding_window
+        self.global_attn_every_n_layers = global_attn_every_n_layers
 
         # routing related
         # 1. greater than one residual stream, proposed in Hyper-Connections paper https://arxiv.org/abs/2409.19606
@@ -2199,9 +2257,41 @@ class AttentionLayers(Module):
 
         assert not (rotary_xpos and not causal), 'rotary xpos is not compatible with bidirectional attention'
 
-        # use custom base if provided, otherwise default to None which uses RotaryEmbedding's default
-        rotary_base = rotary_pos_emb_base if rotary_pos_emb_base is not None else 10000
-        self.rotary_pos_emb = RotaryEmbedding(rotary_emb_dim, use_xpos = rotary_xpos, scale_base = rotary_xpos_scale_base, interpolation_factor = rotary_interpolation_factor, base = rotary_base, base_rescale_factor = rotary_base_rescale_factor) if rotary_pos_emb else None
+        # Create rotary embeddings for sliding window attention with layer-specific theta values
+        if rotary_pos_emb:
+            # Default values for global/local RoPE theta
+            default_rotary_base = rotary_pos_emb_base if rotary_pos_emb_base is not None else 10000
+            default_global_theta = global_rope_theta if global_rope_theta is not None else default_rotary_base
+            default_local_theta = local_rope_theta if local_rope_theta is not None else default_rotary_base
+
+            # Create separate RotaryEmbedding objects for global and local layers
+            self.global_rotary_pos_emb = RotaryEmbedding(
+                rotary_emb_dim,
+                use_xpos = rotary_xpos,
+                scale_base = rotary_xpos_scale_base,
+                interpolation_factor = rotary_interpolation_factor,
+                base = default_global_theta,
+                base_rescale_factor = rotary_base_rescale_factor
+            )
+
+            self.local_rotary_pos_emb = RotaryEmbedding(
+                rotary_emb_dim,
+                use_xpos = rotary_xpos,
+                scale_base = rotary_xpos_scale_base,
+                interpolation_factor = rotary_interpolation_factor,
+                base = default_local_theta,
+                base_rescale_factor = rotary_base_rescale_factor
+            )
+
+            # For backward compatibility, if sliding window is disabled, only use global
+            if sliding_window <= 0:
+                self.rotary_pos_emb = self.global_rotary_pos_emb
+            else:
+                self.rotary_pos_emb = None  # Will be determined per layer
+        else:
+            self.global_rotary_pos_emb = None
+            self.local_rotary_pos_emb = None
+            self.rotary_pos_emb = None
 
         assert at_most_one_of(alibi_pos_bias, rel_pos_bias, data_dependent_alibi), 'you can only choose one of Alibi positional bias, data dependent Alibi (forgetting transformers), dynamic tanh, or T5 relative positional bias'
         assert rel_pos_num_buckets <= rel_pos_max_distance, 'number of relative position buckets must be less than the relative position max distance'
@@ -2269,6 +2359,10 @@ class AttentionLayers(Module):
         if not norm_need_condition and norm_add_unit_offset:
             # researcher Ohad Rubin shares in a blog post by adding an offset to gammas, they can be subjected to weight decay safely
             norm_fn = partial(norm_fn, unit_offset = True)
+
+        # Add LayerNorm bias support for BART compatibility
+        if norm_class == LayerNorm and layernorm_bias:
+            norm_fn = partial(norm_fn, layernorm_bias = True)
 
         self.norm_need_condition = norm_need_condition
         self.dim_condition = dim_condition
@@ -2417,6 +2511,9 @@ class AttentionLayers(Module):
         is_first_cross_attn = True
         learned_value_residual_mix &= add_value_residual
 
+        # track self-attention layer counter for sliding window
+        self_attn_layer_counter = 0
+
         # iterate and construct layers
 
         for ind, (layer_type, layer_shift_tokens) in enumerate(zip(self.layer_types, shift_tokens)):
@@ -2436,8 +2533,9 @@ class AttentionLayers(Module):
             if layer_type == 'a':
                 self_attn_learned_value_residual = learned_value_residual_mix and not is_first_self_attn
 
-                layer = Attention(dim, heads = heads, causal = causal, qkv_receive_diff_residuals = layer_qkv_receives_diff_view, learned_value_residual_mix = self_attn_learned_value_residual, rotate_num_heads = rotate_num_heads, **attn_kwargs)
+                layer = Attention(dim, heads = heads, causal = causal, qkv_receive_diff_residuals = layer_qkv_receives_diff_view, learned_value_residual_mix = self_attn_learned_value_residual, rotate_num_heads = rotate_num_heads, sliding_window = self.sliding_window, layer_id = self_attn_layer_counter, global_attn_every_n_layers = self.global_attn_every_n_layers, **attn_kwargs)
                 is_first_self_attn = False
+                self_attn_layer_counter += 1
 
             elif layer_type == 'c':
                 layer = Attention(dim, heads = heads, **{**attn_kwargs, **cross_attn_kwargs})
@@ -2630,9 +2728,34 @@ class AttentionLayers(Module):
 
         cross_attn_rotary_pos_emb = dict()
 
-        if exists(self.rotary_pos_emb):
+        # Layer-specific rotary embedding for sliding window attention
+        if exists(self.global_rotary_pos_emb) and exists(self.local_rotary_pos_emb):
+            # Set the first rotary embedding for backward compatibility
+            # We'll use local embedding as default and override per layer in the loop
             if not exists(rotary_pos_emb):
-                maybe_mem = first(mems, None) # todo - handle edge case where different layers get different memory lengths. don't think this will ever come up but who knows
+                maybe_mem = first(mems, None)
+                mem_len = maybe_mem.shape[1] if exists(maybe_mem) else 0
+
+                if not exists(pos):
+                    pos = arange(x.shape[1] + mem_len + seq_pos_offset, device = x.device) - mem_len
+
+                # Use local rotary embedding as default
+                rotary_pos_emb = self.local_rotary_pos_emb(pos)
+
+            # allow for rotary positions for context if provided
+            if exists(context_pos):
+                assert self.cross_attend
+                context_rotary_pos_emb = self.global_rotary_pos_emb(context_pos) if exists(context_pos) else None
+
+                if exists(context_rotary_pos_emb):
+                    cross_attn_rotary_pos_emb.update(
+                        rotary_pos_emb = rotary_pos_emb,
+                        context_rotary_pos_emb = context_rotary_pos_emb
+                    )
+        elif exists(self.rotary_pos_emb):
+            # Fallback for non-sliding-window case (backward compatibility)
+            if not exists(rotary_pos_emb):
+                maybe_mem = first(mems, None)
                 mem_len = maybe_mem.shape[1] if exists(maybe_mem) else 0
 
                 if not exists(pos):
@@ -2823,7 +2946,36 @@ class AttentionLayers(Module):
             # forward depending on layer type
 
             if layer_type == 'a':
-                out, inter = block(x, mask = mask, context_mask = self_attn_kv_mask, attn_mask = attn_mask, rel_pos = self.rel_pos, pos = pos, rotary_pos_emb = rotary_pos_emb, additional_key_values = next(iter_self_attn_kv, None), additional_key_value_mask = additional_kv_mask, prev_attn = prev_attn, cache = next(iter_attn_cache, None), mem = layer_mem, mem_mask = layer_mem_mask, attn_bias = attn_bias, value_residual = maybe_self_attn_value_residual, return_intermediates = True)
+                # Determine layer-specific rotary embedding for sliding window attention
+                layer_rotary_pos_emb = rotary_pos_emb
+                if exists(self.global_rotary_pos_emb) and exists(self.local_rotary_pos_emb):
+                    # Get the self-attention layer counter for this layer
+                    # Count how many 'a' layers we've seen so far
+                    self_attn_layers_before = sum(1 for lt in self.layer_types[:ind] if lt == 'a')
+
+                    # Check if this is a global attention layer (every Nth layer)
+                    if self.sliding_window > 0 and self_attn_layers_before % self.global_attn_every_n_layers == 0:
+                        # Global attention layer - use global RoPE theta
+                        if exists(pos):
+                            layer_rotary_pos_emb = self.global_rotary_pos_emb(pos)
+                        elif exists(rotary_pos_emb):
+                            # Recompute using global rotary embedding
+                            maybe_mem = first(mems, None)
+                            mem_len = maybe_mem.shape[1] if exists(maybe_mem) else 0
+                            layer_pos = arange(x.shape[1] + mem_len + seq_pos_offset, device = x.device) - mem_len
+                            layer_rotary_pos_emb = self.global_rotary_pos_emb(layer_pos)
+                    else:
+                        # Local attention layer - use local RoPE theta
+                        if exists(pos):
+                            layer_rotary_pos_emb = self.local_rotary_pos_emb(pos)
+                        elif exists(rotary_pos_emb):
+                            # Recompute using local rotary embedding
+                            maybe_mem = first(mems, None)
+                            mem_len = maybe_mem.shape[1] if exists(maybe_mem) else 0
+                            layer_pos = arange(x.shape[1] + mem_len + seq_pos_offset, device = x.device) - mem_len
+                            layer_rotary_pos_emb = self.local_rotary_pos_emb(layer_pos)
+
+                out, inter = block(x, mask = mask, context_mask = self_attn_kv_mask, attn_mask = attn_mask, rel_pos = self.rel_pos, pos = pos, rotary_pos_emb = layer_rotary_pos_emb, additional_key_values = next(iter_self_attn_kv, None), additional_key_value_mask = additional_kv_mask, prev_attn = prev_attn, cache = next(iter_attn_cache, None), mem = layer_mem, mem_mask = layer_mem_mask, attn_bias = attn_bias, value_residual = maybe_self_attn_value_residual, return_intermediates = True)
             elif layer_type == 'c':
                 out, inter = block(x, context = context, mask = mask, context_mask = context_mask, prev_attn = prev_cross_attn, cache = next(iter_attn_cache, None), value_residual = maybe_cross_attn_value_residual, **cross_attn_rotary_pos_emb, return_intermediates = True)
             elif layer_type == 'f':
@@ -2990,6 +3142,7 @@ class ViTransformerWrapper(Module):
         channels = 3,
         num_classes = None,
         post_emb_norm = False,
+        post_emb_norm_bias = False,
         num_register_tokens = 0,
         emb_dropout = 0.
     ):
@@ -3015,7 +3168,7 @@ class ViTransformerWrapper(Module):
             LayerNorm(dim)
         )
 
-        self.post_emb_norm = LayerNorm(dim) if post_emb_norm else nn.Identity()
+        self.post_emb_norm = LayerNorm(dim, layernorm_bias=post_emb_norm_bias) if post_emb_norm else nn.Identity()
         self.dropout = nn.Dropout(emb_dropout)
 
         self.attn_layers = attn_layers
@@ -3074,9 +3227,11 @@ class TransformerWrapper(Module):
         shift_mem_down = 0,
         emb_dropout = 0.,
         post_emb_norm = False,
+        post_emb_norm_bias = False,  # Enable bias for post embedding LayerNorm (BART compatibility)
         num_memory_tokens = None,
         memory_tokens_interspersed_every = None,
         tie_embedding = False,
+        final_logits_bias = None,  # BART-style final logits bias (shape: [1, vocab_size] or [vocab_size])
         logits_dim = None,
         return_only_embed = False,
         num_output_heads = 1,
@@ -3159,7 +3314,7 @@ class TransformerWrapper(Module):
 
         self.emb_frac_gradient = emb_frac_gradient
 
-        self.post_emb_norm = LayerNorm(emb_dim) if post_emb_norm else nn.Identity()
+        self.post_emb_norm = LayerNorm(emb_dim, layernorm_bias=post_emb_norm_bias) if post_emb_norm else nn.Identity()
         self.emb_dropout = nn.Dropout(emb_dropout)
 
         self.project_emb = nn.Linear(emb_dim, dim) if emb_dim != dim else nn.Identity()
@@ -3228,11 +3383,27 @@ class TransformerWrapper(Module):
 
         self.has_multiple_heads = num_output_heads > 1
 
+        # Store final_logits_bias if provided (for BART compatibility)
+        self.final_logits_bias = None
+        if exists(final_logits_bias):
+            # Ensure bias is [vocab_size] shape (squeeze out extra dimensions if needed)
+            if final_logits_bias.dim() > 1:
+                final_logits_bias = final_logits_bias.squeeze(0)
+            assert final_logits_bias.shape[0] == logits_dim, f'final_logits_bias shape {final_logits_bias.shape} does not match logits_dim {logits_dim}'
+            self.final_logits_bias = nn.Parameter(final_logits_bias)
+            print(f"[DEBUG TransformerWrapper] Created final_logits_bias parameter: shape={self.final_logits_bias.shape}")
+        else:
+            print(f"[DEBUG TransformerWrapper] No final_logits_bias provided (final_logits_bias={'None' if final_logits_bias is None else 'exists but empty'})")
+
         if return_only_embed:
             self.to_logits = None
         elif tie_embedding:
             assert isinstance(token_emb, TokenEmbedding), 'can only tie embedding if using `TokenEmbedding`'
-            self.to_logits = lambda t: t @ self.token_emb.emb.weight.t()
+            # Create a function that applies tied embeddings and optionally adds final_logits_bias
+            if exists(self.final_logits_bias):
+                self.to_logits = lambda t: t @ self.token_emb.emb.weight.t() + self.final_logits_bias
+            else:
+                self.to_logits = lambda t: t @ self.token_emb.emb.weight.t()
         elif num_output_heads > 1:
             self.to_logits = ModuleList([LinearNoBias(dim, logits_dim) for _ in range(num_output_heads)])
         else:

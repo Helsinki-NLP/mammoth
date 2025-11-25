@@ -8,6 +8,50 @@ This branch mainly works on two fronts:
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (25-Nov-2025)
+
+**HuggingFace BART Model Integration**
+
+- **Full BART Architecture Support**: Added comprehensive features to accommodate HuggingFace BART models
+  - **QKV Bias Support**: Query, Key, Value projection layers now support bias terms
+  - **LayerNorm Bias**: Added bias parameter support for normalization layers
+  - **Final Logits Bias**: Support for bias term in final output projection
+  - **Tied Embeddings**: Implemented weight sharing between encoder and decoder embeddings
+  - New converter: `mammoth/hf_integration/from_hf/BART/BART2mammoth.py` (+1302 lines)
+
+- **Advanced Freezing Mechanism**: Complete reimplementation of parameter freezing with fine-grained control
+  - Freeze encoder embedding independently
+  - Freeze encoder layers (excluding embeddings)
+  - Freeze cross-attention layers only
+  - Freeze decoder layers (including or excluding cross-attention)
+  - Freeze decoder embeddings independently
+  - Removed legacy freezing implementation
+  - Note: Output projection layer remains trainable in all configurations
+
+- **Sliding Window Attention Reinstatement**: Restored sliding window attention functionality
+  - Local/global attention pattern support
+  - Configurable window sizes per layer
+
+- **RoPE Theta Configuration**: Reinstated dual theta value support for RoPE
+  - Separate theta values for local attention layers (`local_rope_theta`)
+  - Separate theta values for global attention layers (`global_rope_theta`)
+
+**Files Modified:**
+- `mammoth/distributed/components.py`: Component freezing support (+5 lines)
+- `mammoth/model_builder.py`: BART features, freezing logic, tied embeddings (+282 lines)
+- `mammoth/opts.py`: New command-line options for freezing and BART features (+143 lines)
+- `mammoth/train_single.py`: Training loop freezing integration (+5 lines)
+- `mammoth/utils/parse.py`: Configuration parsing for new features (+36 lines)
+- `mammoth/x_transformers/attend.py`: Sliding window attention restoration (+80 lines)
+- `mammoth/x_transformers/x_transformers.py`: BART architecture support, tied embeddings (+203 lines)
+
+**Files Added:**
+- `mammoth/hf_integration/from_hf/BART/BART2mammoth.py`: Comprehensive BART to Mammoth converter
+
+**Files Removed:**
+- `mammoth/hf_integration/from_hf/__init__.py`: Outdated converter code (-12 lines)
+- `mammoth/hf_integration/from_hf/modernBERT/ROPE_QUICK_REFERENCE.md`: Documentation consolidation (-243 lines)
+
 ## What Was Updated (19-Nov-2025)
 
 **Hybrid Model Architecture and Training Enhancements**

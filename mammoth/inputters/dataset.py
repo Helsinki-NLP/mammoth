@@ -56,11 +56,22 @@ def read_examples_from_files(
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
         src_str, tgt_str = packed
+        line_idx = next(line_idx_generator)
+
+        # Log first 5 lines of this training session for dataset continuation testing
+        start_line = offset if offset is not None else 0
+        if line_idx < start_line + 5:
+            logger.info(
+                f"[DataLoader] Line {line_idx + 1}: "
+                f"SRC={src_str.strip()[:100]} "
+                f"TGT={tgt_str.strip()[:100] if tgt_str else 'None'}"
+            )
+
         return {
             'src': tokenize_fn(src_str, side='src'),
             'tgt': tokenize_fn(tgt_str, side='tgt') if tgt_str is not None else None,
             # 'align': None,
-            'line_idx': next(line_idx_generator)
+            'line_idx': line_idx,
         }
 
     if isinstance(src_path, IOBase):
@@ -82,6 +93,9 @@ def read_examples_from_files(
     if stride is not None and offset is not None:
         # Start by skipping offset examples. After that return every stride:th example.
         examples = itertools.islice(examples, offset, None, stride)
+    elif offset is not None:
+        # No stride, but we need to skip to the offset position for dataset continuation
+        examples = itertools.islice(examples, offset, None)
     examples = map(_make_example_dict, examples)
     examples = map(transforms_fn, examples)
     examples = filter(None, examples)  # filtertoolong replaces invalid examples with None

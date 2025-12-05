@@ -324,6 +324,7 @@ class DynamicDatasetIter(object):
                 ordered_iter, metadata = self.dataset_iterators[my_task.corpus_id]
                 for _ in range(self.task_queue_manager.accum_count):
                     batch = next(ordered_iter)
+
                     if batch_task_sample.training_step == 0 and self.opts.verbose:
                         # De-numericalize a few sentences for debugging
                         # FIXME should be debug, not warn

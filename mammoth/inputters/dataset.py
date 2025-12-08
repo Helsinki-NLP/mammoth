@@ -195,12 +195,17 @@ class ParallelCorpus(IterableDataset):
                 if token_id is not None:
                     special_tokens_to_strip.add(token_id)
 
+            # Track which tokens were actually stripped
+            actually_stripped = []
+
             # Strip from beginning
             while token_ids and token_ids[0] in special_tokens_to_strip:
+                actually_stripped.append(token_ids[0])
                 token_ids = token_ids[1:]
 
             # Strip from end
             while token_ids and token_ids[-1] in special_tokens_to_strip:
+                actually_stripped.append(token_ids[-1])
                 token_ids = token_ids[:-1]
 
             # Log a few examples for debugging
@@ -209,8 +214,8 @@ class ParallelCorpus(IterableDataset):
                 logger.info(f'HF Tokenizer {side} direct lookup example:')
                 logger.info(f'  Input tokens: {tokens[:10]}...')
                 logger.info(f'  Token IDs: {token_ids[:10]}...')
-                if special_tokens_to_strip:
-                    logger.info(f'  Stripped special tokens: {special_tokens_to_strip}')
+                if actually_stripped:
+                    logger.info(f'  Stripped special tokens: {actually_stripped}')
 
             indices = torch.tensor([bos, *token_ids, eos], device='cpu')
 

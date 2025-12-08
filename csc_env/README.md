@@ -5,7 +5,6 @@ This directory contains configuration files, scripts, and documentation for runn
 ## Available Environments
 
 - **[LUMI](lumi/LUMI_QUICKSTART.md)** - Pre-exascale supercomputer with AMD GPUs (ROCm)
-- **[Puhti](puhti/PUHTI_QUICKSTART.md)** - Pre-exascale supercomputer with Nvidia GPUs (CUDA)
 
 Each environment includes:
 - Environment setup scripts

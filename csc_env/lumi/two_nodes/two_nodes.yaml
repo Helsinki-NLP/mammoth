@@ -1,6 +1,8 @@
 # Training configuration for 2-node setup with 8 GPUs total (4 GPUs per node)
 # Node 0: GPUs 0,1,2,3 | Node 1: GPUs 4,5,6,7
 # Shared encoder across all tasks, language-specific decoders distributed across nodes
+# Disclaimer: Model training settings, parameters and values are only for testing purpose. 
+
 
 # Task Configuration - 4 tasks distributed across 2 nodes (8 GPUs total)
 tasks:
@@ -11,13 +13,12 @@ tasks:
     node_gpu: 0:0  # Node 0, GPU 0
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["ar"]      # Arabic-specific decoder
-    transforms: [sentencepiece,prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar.txt
-    src_prefix: "<to_ar>"
-    tgt_prefix: "<ar>"
+
 
   task_en_eu:
     src_tgt: "en-eu"
@@ -26,13 +27,12 @@ tasks:
     node_gpu: 0:1  # Node 0, GPU 1
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["eu"]      # Basque-specific decoder
-    transforms: [sentencepiece, prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_eu.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_eu.txt
-    src_prefix: "<to_eu>"
-    tgt_prefix: "<eu>"
+
 
   task_en_fi:
     src_tgt: "en-fi"
@@ -41,13 +41,12 @@ tasks:
     node_gpu: 0:2  # Node 0, GPU 2
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["fi"]      # Finnish-specific decoder
-    transforms: [sentencepiece, prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt
-    src_prefix: "<to_fi>"
-    tgt_prefix: "<fi>"
+
 
   task_en_he:
     src_tgt: "en-he"
@@ -56,13 +55,12 @@ tasks:
     node_gpu: 0:3  # Node 0, GPU 3
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["he"]      # Hebrew-specific decoder
-    transforms: [sentencepiece, prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_he.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_he.txt
-    src_prefix: "<to_he>"
-    tgt_prefix: "<he>"
+
 
   task_en_hi:
     src_tgt: "en-hi"
@@ -71,13 +69,12 @@ tasks:
     node_gpu: "1:0"  # Node 1, GPU 0 (global GPU 4)
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["hi"]      
-    transforms: [sentencepiece, prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_hi.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_hi.txt
-    src_prefix: "<to_hi>"
-    tgt_prefix: "<hi>"
+
 
   task_en_hr:
     src_tgt: "en-hr"
@@ -86,13 +83,11 @@ tasks:
     node_gpu: "1:1"  # Node 1, GPU 1 (global GPU 5)
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["hr"]      
-    transforms: [sentencepiece, prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_hr.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_hr.txt
-    src_prefix: "<to_hr>"
-    tgt_prefix: "<hr>"
 
   task_en_is:
     src_tgt: "en-is"
@@ -101,13 +96,12 @@ tasks:
     node_gpu: "1:2"  # Node 1, GPU 2 (global GPU 6)
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["is"]      # Spanish-specific decoder
-    transforms: [sentencepiece, prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_is.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_is.txt
-    src_prefix: "<to_is>"
-    tgt_prefix: "<is>"
+
 
   task_en_sw:
     src_tgt: "en-sw"
@@ -116,37 +110,33 @@ tasks:
     node_gpu: "1:3"  # Node 1, GPU 3 (global GPU 7)
     enc_sharing_group: ["shared"]  # Shared encoder across all tasks
     dec_sharing_group: ["sw"]      # Italian-specific decoder
-    transforms: [sentencepiece, prefix,denoising,filtertoolong]
+    transforms: [denoising,filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_en.txt
     path_tgt: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_sw.txt
     path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_en.txt
     path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_sw.txt
-    src_prefix: "<to_sw>"
-    tgt_prefix: "<sw>"
 
-# Vocabulary files for all languages
+# Vocabulary and Tokenizers
+use_hf_tokenizer: true
+
 src_vocab:
-  en: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
+  en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+
 tgt_vocab:
-  ar: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-  eu: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-  fi: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-  he: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-  hi: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-  hr: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-  is: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-  sw: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.vocab
-src_vocab_size: 128000
-tgt_vocab_size: 128000
+  hi: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/tgt_tokenizer/tokenizer.json
+  hr: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/tgt_tokenizer/tokenizer.json
+  ar: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/tgt_tokenizer/tokenizer.json
+  sw: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/tgt_tokenizer/tokenizer.json
+  eu: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/tgt_tokenizer/tokenizer.json
+  fi: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
+  is: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/tgt_tokenizer/tokenizer.json
+  he: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/tgt_tokenizer/tokenizer.json
 
-# Subword configuration for sentencepiece
-src_subword_type: sentencepiece
-tgt_subword_type: sentencepiece
-src_subword_model: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.model
-tgt_subword_model: /scratch/project_462000964/members/wangchao/training/two_nodes/vocab/joint_spm_en_multi.model
 
-src_seq_length: 256
-tgt_seq_length: 256
+src_seq_length_max: 256
+tgt_seq_length_max: 256
+src_seq_length_min: 10
+tgt_seq_length_min: 10
 max_length: 256
 
 # Denoising transform parameters
@@ -161,10 +151,11 @@ enc_layers: [9]                   # Shared encoder layers
 dec_layers: [3]                   # Decoder layers for each language-specific decoder
 model_dim: 768                    # Transformer model dimension
 dropout: 0.1                      # Dropout rate
+model_dtype: bf16
 
 # x-transformers specific options
 x_transformers_opts:
-  # attn_flash: true            # Flash attention (not supported on V100)
+  attn_flash: true            
   rotary_pos_emb: true          # Use rotary positional embeddings
   tie_embedding: false           # Tie input/output embeddings
   heads: 12
@@ -174,26 +165,25 @@ x_transformers_opts:
   attn_dropout: 0.1
   ff_dropout: 0.1
   layernorm_bias: true
-  use_abs_pos_emb: true
+  use_abs_pos_emb: false
 
 # Training Configuration
 
 # Training specifics - adjusted for 2-node setup
 train_steps: 62500
 accum_count: [1]                  # gradient accumulation
-batch_size: 16                    # per-GPU batch size
-batch_type: sents   
-valid_batch_size: 16             
-valid_steps: 10000
+batch_size: 8196                    # per-GPU batch size
+batch_type: tokens   
+valid_batch_size: 4096 
+normalization: tokens            
+valid_steps: 5000
 valid_metrics: [bleu]
-valid_at_start: true             # validation frequency
 save_checkpoint_steps: 5000      # checkpoint saving frequency
-keep_checkpoint: 5
-                # number of checkpoints to keep
+keep_checkpoint: 5 # number of checkpoints to keep
 
 # Optimizer settings
 optim: adamw
-learning_rate: 0.0001
+learning_rate: 0.0003
 adam_beta1: 0.9
 adam_beta2: 0.999
 weight_decay: 0.0
@@ -214,14 +204,15 @@ task_distribution_strategy: weighted_sampling
 
 # Logging and Monitoring
 log_model_structure: false         # log model structure
-# tensorboard: true                 # enable tensorboard logging
-# tensorboard_log_dir: ./logs     # tensorboard log directory
+tensorboard: true                 # enable tensorboard logging
+tensorboard_log_dir: ./logs     # tensorboard log directory
 report_every: 100
 report_training_accuracy: true     # reporting accuracy
 
 # Miscellaneous
 seed: 42                            # random seed
 reset_optim: all                    # reset optimizer state
-# Model saving
-save_model: /scratch/project_462000964/members/wangchao/training/two_nodes/models/en_multi_2node  # model save path
 label_smoothing: 0.1              # Label smoothing for better generalization
+
+# Model saving
+save_model: /scratch/project_462000964/members/wangchao/training/081225/two_nodes_models/  # model save path

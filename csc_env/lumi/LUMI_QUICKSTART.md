@@ -12,7 +12,7 @@ Use the provided setup script to create a virtual environment with PyTorch:
 cd /scratch/project_YOUR_PROJECT_ID/
 
 # Clone MAMMOTH repository
-git clone -b feat/hf_integration https://github.com/Helsinki-NLP/mammoth.git
+git clone -b feat/hf_integration_lumi https://github.com/Helsinki-NLP/mammoth.git
 cd mammoth
 
 # Copy and customize the environment setup script
@@ -30,113 +30,41 @@ source setup_env.sh
 The setup script will:
 - Load the LUMI PyTorch container (ROCm 6.2.4, Python 3.12, PyTorch 2.7.1)
 - Create a Python virtual environment
-- Install MAMMOTH and required dependencies
+- Install Mammoth required dependencies (but not Mammoth itself as current run does not require installing Mammoth to lib path)
 
 ## Training on LUMI
 
 ### Single-Node Training
 
-For single-node training with up to 8 GPUs.
+For single-node training with up to 8 GPUs:
 
-#### 1. Prepare Configuration
-
-```bash
-# Copy and customize the single-node configuration
-cp csc_env/lumi/single_node_train.yaml ./my_train.yaml
-nano my_train.yaml
-```
-
-Update in `my_train.yaml`:
-- Data paths (`path_src`, `path_tgt`, `path_valid_src`, `path_valid_tgt`)
-- Vocabulary paths (`src_vocab`, `tgt_vocab`, `src_subword_model`, `tgt_subword_model`)
-- Model save path (`save_model`)
-- Task configuration as needed
-
-#### 2. Prepare SLURM Script
-
-```bash
-# Copy and customize the single-node training script
-cp csc_env/lumi/single_node_train.sh ./my_train.sh
-nano my_train.sh
-```
-
-Update in `my_train.sh`:
-- `#SBATCH -A project_XXXXXX` - Your project number
-- Mount paths (line 22) - Replace `$your_path_in_lumi` with your actual path
-- Python and config paths (lines 24-25) - Replace `$your_path_in_lumi` and `$path_to_mammoth`
-
-#### 3. Submit Job
-
-```bash
-mkdir -p log
-sbatch my_train.sh
-```
+- Check `csc_env/lumi/single_node/single_node_train.yaml` for training configuration template.
+- Check `csc_env/lumi/single_node/single_node_train.sh` for slurm job script template.
+- Use `sbatch single_node_train.sh` to submit the job to LUMI system.
 
 ### Multi-Node Distributed Training
 
 For distributed training across multiple nodes. Example: 2 nodes × 4 GPUs = 8 GPUs total.
 
-#### 1. Prepare Configuration
-
-```bash
-# Copy and customize the multi-node configuration
-cp csc_env/lumi/multi_node_train.yaml ./my_multinode_train.yaml
-nano my_multinode_train.yaml
-```
-
+- Check `csc_env/lumi/two_nodes/two_nodes.yaml` for training configuration template.
 Key configuration points:
 - `world_size: 8` - Total GPUs across all nodes
 - `n_nodes: 2` - Number of nodes
 - `node_gpu: "0:0"` - Task assignment (format: `"node:gpu"`)
-- Update all data paths and vocabulary paths
-- Adjust `save_model` path
 
-#### 2. Prepare SLURM Script
+- Check `csc_env/lumi/two_nodes/two_nodes.sh` for slurm job script template.
+- Use `sbatch multi_node_train.sh` to submit the job to LUMI system.
 
-```bash
-# Copy and customize the multi-node training script
-cp csc_env/lumi/multi_node_train.sh ./my_multinode_train.sh
-nano my_multinode_train.sh
-```
 
-Update in `my_multinode_train.sh`:
-- `#SBATCH -A project_XXXXXX` - Your project number
-- `#SBATCH --nodes=2` - Adjust if using different node count
-- `#SBATCH --mail-user` - Your email address
-- Script creation path (line 32)
-- Mount paths (lines 55-57)
-- Virtual environment and config paths (line 59, line 42)
-
-#### 3. Submit Job
-
-```bash
-mkdir -p log
-sbatch my_multinode_train.sh
-```
-
-#### 4. Monitor Training
-
-```bash
-# Check job status
-squeue -u $USER
-
-# View live output
-tail -f log/training.<job_id>.out
-
-# Check for errors
-tail -f log/training.<job_id>.err
-```
+### And template recipes for 4-node and 8-node training are in:
+`csc_env/lumi/four_nodes` and `csc_env/lumi/eight_nodes`
 
 ## Translation/Inference on LUMI
 
-```bash
-# Copy and customize the translation script
-cp csc_env/lumi/translate.sh ./my_translate.sh
-nano my_translate.sh
-
-# Update paths and submit
-sbatch my_translate.sh
-```
+- Check `csc_env/lumi/inference.yaml` for inferencing configuration template
+Note: 
+Please align the model settings as possible as you can. Copying the model training settings (model architectures, x-transformer opts etc) to the inference config file is preferred, because Mammoth is building a new such model before loading the trained weights for the inferencing. 
+- Check `csc_env/lumi/inference.yaml` for slurm script template.
 
 ## Container Information
 
@@ -147,11 +75,5 @@ MAMMOTH on LUMI uses the official PyTorch container (latest as of Sept 2025):
 - **GPU**: AMD MI250X GPUs
 - **Additional dependencies**: Installed via `requirements_lumi.txt`
 
-## Hardware Specifications
-
-- **GPU**: AMD MI250X (each GCD has 64GB HBM2e memory)
-- **Nodes**: Pre-exascale system with thousands of GPU nodes
-- **GPUs per node**: 8× MI250X GCDs (4× MI250X packages, 2 GCDs per package)
-- **Interconnect**: HPE Slingshot for high-speed inter-node communication
 
 For more information, refer to the [main README](../../README.md) and [LUMI documentation](https://docs.lumi-supercomputer.eu/).

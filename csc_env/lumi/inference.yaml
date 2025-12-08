@@ -1,0 +1,93 @@
+# Inference configuration template
+# Disclaimer: Model training settings, parameters and values are only for testing purpose. 
+
+# Task Configuration
+task_id: task_en_hi # A standalone task_id is required for inferencing
+
+tasks:
+  task_en_hi:
+    src_tgt: "en-hi"
+    node_gpu: 0:0
+    enc_sharing_group: ["en"]
+    dec_sharing_group: ["hi"]
+
+# ============================================================================
+# Vocabulary Configuration - HuggingFace Tokenizer
+# ============================================================================
+use_hf_tokenizer: true
+
+src_vocab:
+  en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+
+tgt_vocab:
+  hi: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/tgt_tokenizer/tokenizer.json
+
+src_seq_length_max: 256
+src_seq_length_min: 10
+tgt_seq_length_max: 256
+tgt_seq_length_min: 10
+max_length: 256
+
+# ============================================================================
+# Model Architecture  (must match training)
+# ============================================================================
+enc_layers: [22]
+dec_layers: [6]
+
+model_dim: 768
+model_dtype: bf16
+dropout: [0.0]
+
+# ============================================================================
+# x-transformers Options - ModernBERT Configuration (from training)
+# ============================================================================
+x_transformers_opts:
+  # Attention configuration
+  heads: 12
+  attn_flash: true
+  attn_dropout: 0.0
+
+  # RoPE (Rotary Position Embeddings)
+  rotary_pos_emb: true
+
+  # Feed-forward network (GLU with bias-free architecture)
+  ff_mult: 1.5
+  ff_glu: true
+  ff_dropout: 0.0
+  ff_no_bias: true
+
+  # Normalization
+  pre_norm: true
+  post_emb_norm: true
+
+  # Position embeddings
+  use_abs_pos_emb: false
+  tie_embedding: false
+  
+
+# ============================================================================
+# Inference Configuration
+# ============================================================================
+# Model checkpoint to load
+model: 
+
+# Input/output files
+src: /scratch/project_462000964/members/wangchao/training/eight_nodes/val_3200.en
+output: /scratch/project_462000964/members/wangchao/training/eight_nodes/output_3200.txt
+
+# Decoding parameters
+beam_size: 5
+batch_size: 32
+batch_type: sents
+
+# GPU settings
+gpu: 0
+world_size: 1
+gpu_ranks: [0]
+
+# Report settings
+report_time: true
+# verbose: true # currently not supported in inference, need to modify code to enable it
+
+# Random seed
+seed: 42

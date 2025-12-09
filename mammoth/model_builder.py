@@ -116,6 +116,24 @@ def get_attention_layers_kwargs(
     else:
         dim = model_opts.model_dim
 
+    # Handle sliding window attention parameters (top-level model_opts attributes)
+    # These are not in x_transformers_opts but are needed for AttentionLayers
+    sliding_window_attrs = [
+        'sliding_window',
+        'global_attn_every_n_layers',
+        'global_rope_theta',
+        'local_rope_theta',
+    ]
+
+    for attr in sliding_window_attrs:
+        # Check for side-specific attribute first (e.g., enc_sliding_window)
+        side_specific_attr = f"{prefix}{attr}"
+        if hasattr(model_opts, side_specific_attr):
+            kwargs[attr] = getattr(model_opts, side_specific_attr)
+        # Fall back to generic attribute if it exists
+        elif hasattr(model_opts, attr):
+            kwargs[attr] = getattr(model_opts, attr)
+
     kwargs.update({
         'dim': dim,
         'depth': depth,

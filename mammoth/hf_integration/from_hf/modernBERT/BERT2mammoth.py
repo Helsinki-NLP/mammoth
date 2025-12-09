@@ -13,14 +13,14 @@ Usage: python BERT2mammoth.py <hf_model_path> <save_path> [--src-lang en] [--tgt
 The minimum conversion solution will only map the weights instead of implementing the same techniques that ModernBert use.
 The converted ModernBERT will be fully served by Mammoth (x-transformers).
 
-ModernBERT-specific features (will not be implemented):
-- Fused Wqkv projection (mapped directly with fused_qkv=True for efficiency)
+ModernBERT-specific features:
 - Pre-Layer Normalization (Pre-LN)
 - GeGLU MLP (GELU-gated GLU with fused gate+value projection)
 - Bias-free architecture
 - Sliding window attention with configurable global attention pattern
 - RoPE positional embeddings with per-layer theta (different bases for global/local attention)
-- ModernBERT-style unpadding for efficient computation with variable-length sequences
+- Fused Wqkv projection (mapped directly with fused_qkv=True for efficiency) (Not implemented yet)
+- ModernBERT-style unpadding for efficient computation with variable-length sequences (Not implemented yet)
 """
 
 import os
@@ -47,7 +47,7 @@ def create_xtransformer_model(model_path):
     Create XTransformer model from HF ModernBERT config with full feature support
 
     ModernBERT is encoder-only. For MAMMOTH (seq2seq framework):
-    - Encoder: Load ModernBERT weights 
+    - Encoder: Load ModernBERT weights
     - Decoder: Standard 6-layer transformer (randomly initialized)
 
     Args:
@@ -61,12 +61,24 @@ def create_xtransformer_model(model_path):
     intermediate_size = getattr(config, "intermediate_size", config.hidden_size * 4)
     ff_mult = intermediate_size / config.hidden_size
 
+    # Extract sliding window attention parameters from HF config
+    # If not present, default to -1 (disabled)
+    enc_sliding_window = getattr(config, "local_attention", -1)
+    enc_global_attn_every_n_layers = getattr(config, "global_attn_every_n_layers", 3)
+    enc_global_rope_theta = getattr(config, "global_rope_theta", 160000.0)
+    enc_local_rope_theta = getattr(config, "local_rope_theta", 10000.0)
 
+    # Log configuration
+    sliding_window_status = "enabled" if enc_sliding_window > 0 else "disabled"
     print(f"  - Encoder: ModernBERT (bias-free, Pre-LN, GLU, {config.num_hidden_layers} layers)")
-    print(f"  - Decoder: Standard transformer (6 layers, randomly initialized)")
+    print(f"    • Sliding window: {sliding_window_status}")
+    if enc_sliding_window > 0:
+        print(f"      - Window size: {enc_sliding_window} tokens")
+        print(f"      - Global attention every N layers: {enc_global_attn_every_n_layers}")
+        print(f"      - Global RoPE theta: {enc_global_rope_theta}")
+        print(f"      - Local RoPE theta: {enc_local_rope_theta}")
+    print(f"  - Decoder: Standard transformer (6 layers, full causal attention, randomly initialized)")
     print(f"  - FF multiplier: {ff_mult} (intermediate_size={intermediate_size})")
-    print(f"  - RoPE theta: use unified global attention")
-
 
     xt_model = XTransformer(
         dim=config.hidden_size,
@@ -81,15 +93,17 @@ def create_xtransformer_model(model_path):
         enc_emb_dropout=0.0,
         enc_ff_glu=True,  # ModernBERT uses GLU
         enc_ff_no_bias=True,  # ModernBERT is bias-free
-
+        # Sliding window attention configuration
+        enc_sliding_window=enc_sliding_window,
+        enc_global_attn_every_n_layers=enc_global_attn_every_n_layers,
+        enc_global_rope_theta=enc_global_rope_theta,
+        enc_local_rope_theta=enc_local_rope_theta,
 
         # Decoder: Bias-free transformer (randomly initialized)
-        # Will be replicated 16x for multi-task training
+        # Uses standard full causal attention (no sliding window)
         dec_num_tokens=config.vocab_size,
         dec_max_seq_len=config.max_position_embeddings,
         dec_rotary_pos_emb=True,  # Match encoder (uses RoPE)
-        # Decoder uses standard causal attention (no global/local pattern)
-        # Set both thetas to same value - standard RoPE base of 10000
         dec_post_emb_norm=True,
         dec_depth=6,  # 6-layer decoder (per train.yaml)
         dec_heads=config.num_attention_heads,
@@ -439,7 +453,7 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
     model_opts = Namespace()
 
     # Basic settings
-    model_opts.model_dtype = "bf16" 
+    model_opts.model_dtype = "bf16"
     model_opts.pos_ffn_activation_fn = "gelu"
 
     # Architecture
@@ -452,6 +466,19 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
     # So if ModernBERT has intermediate_size=1152, we need ff_mult=1.5, not 3.0
     intermediate_size = getattr(config, "intermediate_size", config.hidden_size * 4)
     ff_mult = intermediate_size / config.hidden_size
+
+    # Sliding window attention configuration (from HF config)
+    # These are top-level model_opts attributes (defined in opts.py)
+    model_opts.enc_sliding_window = getattr(config, "local_attention", -1)
+    model_opts.enc_global_attn_every_n_layers = getattr(config, "global_attn_every_n_layers", 3)
+    model_opts.enc_global_rope_theta = getattr(config, "global_rope_theta", 160000.0)
+    model_opts.enc_local_rope_theta = getattr(config, "local_rope_theta", 10000.0)
+
+    # Decoder uses standard full causal attention (no sliding window)
+    model_opts.dec_sliding_window = -1  # Disabled
+    model_opts.dec_global_attn_every_n_layers = 3  # Not used (sliding window disabled)
+    model_opts.dec_global_rope_theta = 10000.0  # Standard RoPE base
+    model_opts.dec_local_rope_theta = 10000.0  # Standard RoPE base
 
     model_opts.x_transformers_opts = {
         "heads": config.num_attention_heads,
@@ -480,6 +507,16 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
     model_opts.attention_dropout = [getattr(config, "attention_dropout", 0.0)]
 
     print(f'model max_length: {model_opts.max_length}')
+
+    # Log sliding window configuration
+    if model_opts.enc_sliding_window > 0:
+        print(f'encoder sliding window: {model_opts.enc_sliding_window} tokens (enabled)')
+        print(f'  - global attention every {model_opts.enc_global_attn_every_n_layers} layers')
+        print(f'  - global RoPE theta: {model_opts.enc_global_rope_theta}')
+        print(f'  - local RoPE theta: {model_opts.enc_local_rope_theta}')
+    else:
+        print('encoder sliding window: disabled (full attention)')
+    print('decoder sliding window: disabled (standard full causal attention)')
 
     return model_opts
 
@@ -561,7 +598,7 @@ def create_task_queue_manager(vocabs_dict=None, num_layers=22, tgt_langs=None):
             "weight": 1.0,
             "introduce_at_training_step": 0,
             "node_gpu": f"{node_id}:{local_gpu}",
-            "enc_sharing_group": ["shared"],  # All tasks share ModernBERT encoder
+            "enc_sharing_group": ["en"],  # All tasks share ModernBERT encoder
             "dec_sharing_group": [tgt_lang],  # Each task has language-specific decoder
         }
 
@@ -647,10 +684,6 @@ def create_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, corpus_
         f"encoder.{corpus_id}.post_emb_norm.gamma"
     )
 
-    # Shared RoPE (rotary positional embeddings)
-    mapping["encoder.attn_layers.rotary_pos_emb.inv_freq"] = (
-        f"encoder.{corpus_id}.attn_layers.attention_layers_stack.0.rotary_pos_emb.inv_freq"
-    )
 
     # Encoder layers
     for layer_idx in range(num_encoder_layers):

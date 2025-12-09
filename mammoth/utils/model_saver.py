@@ -94,6 +94,9 @@ def load_parameters_from_checkpoint(
 
     my_components = task_queue_manager.get_my_distributed_components()
     all_ok = True
+    missing_keys_summary = []
+    unexpected_keys_summary = []
+
     for component in my_components:
         name = component.get_name()
         checkpoint_path = f"{checkpoint_prefix}_{name}.pt"
@@ -108,11 +111,16 @@ def load_parameters_from_checkpoint(
             )
             if incompatible_keys.missing_keys or incompatible_keys.unexpected_keys:
                 logger.info(f"Module {name} incompatible keys: {incompatible_keys}")
+                if incompatible_keys.missing_keys:
+                    missing_keys_summary.extend([f"{name}.{key}" for key in incompatible_keys.missing_keys])
+                if incompatible_keys.unexpected_keys:
+                    unexpected_keys_summary.extend([f"{name}.{key}" for key in incompatible_keys.unexpected_keys])
                 all_ok = False
         else:
             logger.warning(
                 f"Could not find model checkpoint file {checkpoint_path}. Affected parameters are reinitialized."
             )
+            missing_keys_summary.append(f"{checkpoint_path} (entire file missing)")
             all_ok = False
 
         if not reset_optim:
@@ -131,11 +139,16 @@ def load_parameters_from_checkpoint(
                     incompatible_keys.missing_keys or incompatible_keys.unexpected_keys
                 ):
                     logger.info(f"Optim {name} incompatible keys: {incompatible_keys}")
+                    if incompatible_keys.missing_keys:
+                        missing_keys_summary.extend([f"optim_{name}.{key}" for key in incompatible_keys.missing_keys])
+                    if incompatible_keys.unexpected_keys:
+                        unexpected_keys_summary.extend([f"optim_{name}.{key}" for key in incompatible_keys.unexpected_keys])
                     all_ok = False
             else:
                 logger.warning(
                     f"Could not find optim checkpoint file {optimizer_path}. Affected parameters are reinitialized."
                 )
+                missing_keys_summary.append(f"{optimizer_path} (entire file missing)")
                 all_ok = False
     if all_ok:
         if reset_optim:
@@ -152,7 +165,20 @@ def load_parameters_from_checkpoint(
                 "Proceeding with a partial checkpoint due to --yes_i_messed_with_the_checkpoint"
             )
         else:
-            raise Exception("Some parameters are missing from the checkpoint.")
+            error_msg = "Some parameters are missing from the checkpoint."
+            if missing_keys_summary:
+                error_msg += f"\n\nMissing parameters ({len(missing_keys_summary)}):"
+                for key in missing_keys_summary[:10]:  # Show first 10 to avoid overwhelming
+                    error_msg += f"\n  - {key}"
+                if len(missing_keys_summary) > 10:
+                    error_msg += f"\n  ... and {len(missing_keys_summary) - 10} more"
+            if unexpected_keys_summary:
+                error_msg += f"\n\nUnexpected parameters ({len(unexpected_keys_summary)}):"
+                for key in unexpected_keys_summary[:10]:  # Show first 10 to avoid overwhelming
+                    error_msg += f"\n  - {key}"
+                if len(unexpected_keys_summary) > 10:
+                    error_msg += f"\n  ... and {len(unexpected_keys_summary) - 10} more"
+            raise Exception(error_msg)
 
 
 def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):

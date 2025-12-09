@@ -2264,29 +2264,38 @@ class AttentionLayers(Module):
             default_global_theta = global_rope_theta if global_rope_theta is not None else default_rotary_base
             default_local_theta = local_rope_theta if local_rope_theta is not None else default_rotary_base
 
-            # Create separate RotaryEmbedding objects for global and local layers
-            self.global_rotary_pos_emb = RotaryEmbedding(
-                rotary_emb_dim,
-                use_xpos = rotary_xpos,
-                scale_base = rotary_xpos_scale_base,
-                interpolation_factor = rotary_interpolation_factor,
-                base = default_global_theta,
-                base_rescale_factor = rotary_base_rescale_factor
-            )
-
-            self.local_rotary_pos_emb = RotaryEmbedding(
-                rotary_emb_dim,
-                use_xpos = rotary_xpos,
-                scale_base = rotary_xpos_scale_base,
-                interpolation_factor = rotary_interpolation_factor,
-                base = default_local_theta,
-                base_rescale_factor = rotary_base_rescale_factor
-            )
-
-            # For backward compatibility, if sliding window is disabled, only use global
             if sliding_window <= 0:
-                self.rotary_pos_emb = self.global_rotary_pos_emb
+                # No sliding window: only create standard rotary_pos_emb
+                self.global_rotary_pos_emb = None
+                self.local_rotary_pos_emb = None
+                self.rotary_pos_emb = RotaryEmbedding(
+                    rotary_emb_dim,
+                    use_xpos = rotary_xpos,
+                    scale_base = rotary_xpos_scale_base,
+                    interpolation_factor = rotary_interpolation_factor,
+                    base = default_global_theta,
+                    base_rescale_factor = rotary_base_rescale_factor
+                )
             else:
+                # Sliding window enabled: create separate global and local RoPE
+                self.global_rotary_pos_emb = RotaryEmbedding(
+                    rotary_emb_dim,
+                    use_xpos = rotary_xpos,
+                    scale_base = rotary_xpos_scale_base,
+                    interpolation_factor = rotary_interpolation_factor,
+                    base = default_global_theta,
+                    base_rescale_factor = rotary_base_rescale_factor
+                )
+
+                self.local_rotary_pos_emb = RotaryEmbedding(
+                    rotary_emb_dim,
+                    use_xpos = rotary_xpos,
+                    scale_base = rotary_xpos_scale_base,
+                    interpolation_factor = rotary_interpolation_factor,
+                    base = default_local_theta,
+                    base_rescale_factor = rotary_base_rescale_factor
+                )
+
                 self.rotary_pos_emb = None  # Will be determined per layer
         else:
             self.global_rotary_pos_emb = None

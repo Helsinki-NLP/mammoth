@@ -5,7 +5,9 @@ tasks:
     weight: 1.0
     introduce_at_training_step: 0
     node_gpu: 0:0
-    enc_sharing_group: ["shared"]
+    # The below two sharing group names are hard coded in the conversion script. 
+    # Unless you change the names there, please keep them as they are.
+    enc_sharing_group: ["en"] 
     dec_sharing_group: ["fi"]
     transforms: [filtertoolong]
     path_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt
@@ -25,8 +27,10 @@ src_vocab:
 tgt_vocab:
   fi: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
 
-src_seq_length: 256
-tgt_seq_length: 256
+src_seq_length_max: 256
+tgt_seq_length_max: 256
+src_seq_length_min: 10
+tgt_seq_length_min: 10
 max_length: 256  # Mammoth adds bos and eos token to training data.
 
 # ============================================================================
@@ -49,6 +53,12 @@ model_dtype: bf16            # BFloat16 for better training stability
 model_type: text
 dropout: [0.0]                # ModernBERT uses no dropout during training
 
+# Sliding window attention (ModernBERT feature)
+enc_sliding_window: 64
+enc_global_attn_every_n_layers: 3
+enc_global_rope_theta: 160000.0
+enc_local_rope_theta: 10000.0
+
 # ============================================================================
 # x-transformers Options - ModernBERT Configuration
 # ============================================================================
@@ -57,17 +67,7 @@ x_transformers_opts:
   heads: 12                          # Number of attention heads
   attn_flash: true                   # Flash attention 2.0
   attn_dropout: 0.0                  # No attention dropout
-  # attn_use_unpadding: true           # ModernBERT-style unpadding for efficiency
-  # attn_fused_qkv: true
-
-  # # Sliding window attention (ModernBERT feature)
-  # sliding_window: 128                # Local attention window (±64 tokens) (Encoder only)
-  # global_attn_every_n_layers: 3      # Global attention every 3 layers (Encoder only)
-
-  # RoPE (Rotary Position Embeddings)
   rotary_pos_emb: true               # Use RoPE instead of absolute positions
-  # global_rope_theta: 160000.0      # RoPE base for global attention layers (Encoder only)
-  # local_rope_theta: 10000.0        # RoPE base for local attention layers (Encoder only)
 
   # Feed-forward network (GLU with bias-free architecture)
   ff_mult: 1.5                       # FFN dimension = 1.5 * model_dim = 1152
@@ -90,11 +90,10 @@ x_transformers_opts:
 # ============================================================================
 train_steps: 15000
 accum_count: [1]                     # Gradient accumulation (effective batch = 4 * 32 = 128)
-batch_size: 128                      # Per-GPU batch size
-batch_type: sents                    # Batch by sentences
-queue_size: 120
-# normalization: tokens                # Normalize gradients by token count
-valid_batch_size: 16                 # Validation batch size
+batch_size: 8196                      # Per-GPU batch size
+batch_type: tokens                    # Batch by sentences
+normalization: tokens                # Normalize gradients by token count
+valid_batch_size: 4096                 # Validation batch size
 valid_steps: 1500                    # Validation frequency
 valid_metrics: [bleu]                # Validation metrics
 save_checkpoint_steps: 3000          # Checkpoint frequency
@@ -142,5 +141,5 @@ label_smoothing: 0.1                 # Label smoothing
 
 
 # Model saving
-train_from: /scratch/project_462000964/members/wangchao/training/converted_models/modernbert/
-save_model: /scratch/project_462000964/members/wangchao/training/121125/model/
+train_from: /scratch/project_462000964/members/wangchao/training/091225/converted_modernbert/
+save_model: /scratch/project_462000964/members/wangchao/training/091225/model/

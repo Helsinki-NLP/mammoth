@@ -22,4 +22,4 @@ For working on LUMI supercomputer environments, see the [LUMI quickstart guide](
 
 We recommend to use the Hugging Face Tokenizer for training and inferencing in Mammoth, see the [HF Tokenizers guide](docs/HF_TOKENIZERS.md).
 
-For loading pretrained model weights from Hugging Face Model Hub, see the [Loading HF Models guide](docs/LOADING_HF_MODELS.md).
+<!-- For loading pretrained model weights from Hugging Face Model Hub, see the [Loading HF Models guide](docs/LOADING_HF_MODELS.md). -->

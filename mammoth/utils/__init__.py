@@ -1,4 +1,5 @@
 """Module defining various utilities."""
+
 from mammoth.utils.misc import split_corpus, aeq, use_gpu, set_random_seed
 from mammoth.utils.alignment import make_batch_align_matrix
 from mammoth.utils.report_manager import ReportMgr, build_report_manager

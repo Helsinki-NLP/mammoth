@@ -140,7 +140,7 @@ class ParallelCorpus(IterableDataset):
         eos = vocab[DefaultTokens.EOS]
         unk = vocab[DefaultTokens.UNK]
         indices = torch.tensor([
-            bos,
+            eos, bos,
             *(vocab.stoi.get(token, unk) for token in tokens),
             eos,
         ], device='cpu')

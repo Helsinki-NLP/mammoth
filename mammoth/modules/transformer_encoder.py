@@ -50,8 +50,8 @@ class TransformerEncoderLayer(nn.Module):
             pos_ffn_activation_fn,
             is_normformer=is_normformer,
         )
-        self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-6)
-        self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
+        self.layer_norm_1 = nn.LayerNorm(d_model, eps=1e-5)
+        self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-5)
         if is_normformer:
             self.layer_norm_2 = nn.LayerNorm(d_model, eps=1e-6)
         self.dropout = nn.Dropout(dropout)
@@ -67,9 +67,11 @@ class TransformerEncoderLayer(nn.Module):
 
             * outputs ``(batch_size, src_len, model_dim)``
         """
-        input_norm = self.layer_norm_1(inputs)
-        context, _ = self.self_attn(input_norm, input_norm, input_norm, mask=mask, attn_type="self")
-        out = self.dropout(self.layer_norm_2(context)) + inputs
+        # input_norm = self.layer_norm_1(inputs)
+        context, _ = self.self_attn(inputs, inputs, inputs, mask=mask, attn_type="self")
+        out = self.dropout(context) + inputs
+        out = self.layer_norm_1(out)
+        
         return self.feed_forward(out)
 
     def update_dropout(self, dropout, attention_dropout):
@@ -161,7 +163,7 @@ class TransformerEncoder(EncoderBase):
             opts.max_relative_positions,
             pos_ffn_activation_fn=opts.pos_ffn_activation_fn,
             layer_norm_module=(
-                nn.LayerNorm(opts.model_dim, eps=1e-6) if is_on_top
+                nn.LayerNorm(opts.model_dim, eps=1e-5) if is_on_top
                 else nn.Identity()
             ),
             is_normformer=opts.normformer,

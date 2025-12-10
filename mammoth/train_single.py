@@ -29,11 +29,11 @@ def _get_model_opts(opts, frame_checkpoint=None):
         model_opts = ArgumentParser.checkpoint_model_opts(frame_checkpoint["opts"])
         ArgumentParser.update_model_opts(model_opts)
         ArgumentParser.validate_model_opts(model_opts)
-        if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
-                hasattr(model_opts, 'tensorboard_log_dir_dated'):
+        # if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
+                # hasattr(model_opts, 'tensorboard_log_dir_dated'):
             # ensure tensorboard output is written in the directory
             # of previous checkpoints
-            opts.tensorboard_log_dir_dated = model_opts.tensorboard_log_dir_dated
+            # opts.tensorboard_log_dir_dated = model_opts.tensorboard_log_dir_dated
         # Override checkpoint's update_embeddings as it defaults to false
         # model_opts.update_vocab = opts.update_vocab
     else:

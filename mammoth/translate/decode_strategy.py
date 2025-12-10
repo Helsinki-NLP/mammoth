@@ -1,8 +1,8 @@
 import torch
 from copy import deepcopy
 from typing import Optional, List
-from x_transformers.attend import Intermediates
-from x_transformers.x_transformers import LayerIntermediates
+from mammoth.x_transformers.attend import Intermediates
+from mammoth.x_transformers.x_transformers import LayerIntermediates
 
 from mammoth.utils.misc import tile
 
@@ -85,7 +85,6 @@ class DecodeStrategy(object):
         self.bos = bos
         self.eos = eos
         self.unk = unk
-
         self.batch_size = batch_size
         self.parallel_paths = parallel_paths
         self.global_scorer = global_scorer
@@ -126,7 +125,7 @@ class DecodeStrategy(object):
         assert encoder_output is not None
         assert src_mask is not None
         self.alive_seq = torch.full(
-            [self.batch_size * self.parallel_paths, 1], self.bos, dtype=torch.long, device=self.device
+            [self.batch_size * self.parallel_paths, 1], self.bos, dtype=torch.long, device=self.device,
         )
         self.encoder_output_tiled = tile(encoder_output, self.parallel_paths, dim=0)
         self.src_mask_tiled = tile(src_mask, self.parallel_paths, dim=0)

@@ -37,7 +37,6 @@ class TranslationBuilder(object):
             else:
                 tokens.append(src_vocab.itos[tok.item() - len(vocab)])
             if tokens[-1] == DefaultTokens.EOS:
-                tokens = tokens[:-1]
                 break
         return tokens
 

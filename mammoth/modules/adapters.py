@@ -10,7 +10,7 @@ from collections import defaultdict
 from typing import Union, Set, Dict, Tuple, Optional
 from functools import partial
 
-from x_transformers.x_transformers import (
+from mammoth.x_transformers.x_transformers import (
     AttentionLayers,
     FeedForward,
     Residual,

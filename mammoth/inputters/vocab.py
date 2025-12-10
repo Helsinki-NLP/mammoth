@@ -7,7 +7,12 @@ from mammoth.utils.logging import logger
 from mammoth.constants import DefaultTokens
 
 
-DEFAULT_SPECIALS = (DefaultTokens.BOS, DefaultTokens.EOS, DefaultTokens.UNK, DefaultTokens.PAD)
+DEFAULT_SPECIALS = (
+    DefaultTokens.BOS,
+    DefaultTokens.PAD,
+    DefaultTokens.EOS,
+    DefaultTokens.UNK,
+)
 
 
 def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS):
@@ -16,8 +21,8 @@ def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS):
     return new_vocab
 
 
-class Vocab():
-    def __init__(self, path, items=None, tag='', size=None, specials=[]):
+class Vocab:
+    def __init__(self, path, items=None, tag="", size=None, specials=[]):
         if items is None:
             items, has_count = _read_vocab_file(path, tag)
             if has_count:
@@ -28,10 +33,7 @@ class Vocab():
         self.path = path
         size = None if size is None else size + len(specials)
         self.stoi = collections.defaultdict(itertools.count().__next__)
-        self.itos = {
-            self.stoi[elem]: elem
-            for elem in (specials + items)[: size]
-        }
+        self.itos = {self.stoi[elem]: elem for elem in (specials + items)[:size]}
         self.stoi = dict(self.stoi)
         self.specials = {elem: self.stoi[elem] for elem in specials}
 
@@ -76,7 +78,7 @@ class Vocab():
                     nexts = itertools.cycle(itertools.islice(nexts, num_active))
 
         items = list(roundrobin(*[vocab.stoi.keys() for vocab in vocabs]))
-        return cls(None, items=items, tag='', size=size, specials=specials)
+        return cls(None, items=items, tag="", size=size, specials=specials)
 
     def __repr__(self):
         return f"{self.__class__.__name__} @ {self.path} ({len(self)} items, specials=[{sorted(self.specials.keys())}])"
@@ -94,19 +96,18 @@ def _read_vocab_file(vocab_path, tag):
     logger.info("Loading {} vocabulary from {}".format(tag, vocab_path))
 
     if not os.path.exists(vocab_path):
-        raise RuntimeError(
-            "{} vocabulary not found at {}".format(tag, vocab_path))
+        raise RuntimeError("{} vocabulary not found at {}".format(tag, vocab_path))
     else:
-        with codecs.open(vocab_path, 'r', 'utf-8') as f:
+        with codecs.open(vocab_path, "r", "utf-8") as f:
             lines = [line.strip() for line in f if line.strip()]
             first_line = lines[0].split(None, 1)
-            has_count = (len(first_line) == 2 and first_line[-1].isdigit())
+            has_count = len(first_line) == 2 and first_line[-1].isdigit()
             if has_count:
                 vocab = [line.split(None, 1) for line in lines]
                 orig_len = len(vocab)
                 vocab = [tpl for tpl in vocab if len(tpl) == 2]
                 if len(vocab) != orig_len:
-                    logger.warning(f'Dropped invalid entries from {vocab_path}')
+                    logger.warning(f"Dropped invalid entries from {vocab_path}")
             else:
                 vocab = [line.strip().split()[0] for line in lines]
             return vocab, has_count

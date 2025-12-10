@@ -8,6 +8,83 @@ This branch mainly works on two fronts:
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (11-Dec-2025)
+
+**Training Enhancements and Bug Fixes**
+
+- **Best Metrics Saving Strategy**: Added `save_strategy` feature to save checkpoints based on validation metrics
+  - Supports saving best models according to perplexity, BLEU, or other validation metrics
+
+- **Validation Timing Fixes**: Fixed `valid_at_start` option to work properly during training initialization
+
+- **Improved Training Continuation Logging**: Enhanced line checker to only log dataset position at training start rather during validation
+
+
+**Files Modified:**
+- `mammoth/inputters/dataset.py`: Dataset continuation logic improvements (+15 lines)
+- `mammoth/opts.py`: Added save_strategy and validation options (+28 lines)
+- `mammoth/train_single.py`: Training loop integration for new features (+12 lines)
+- `mammoth/trainer.py`: Validation timing fixes (+8 lines)
+- `mammoth/utils/model_saver.py`: Best metrics saving implementation (+45 lines)
+- `mammoth/utils/report_manager.py`: Enhanced logging controls (+6 lines)
+
+## What Was Updated (09-Dec-2025)
+
+**Documentation Updates and Model Validation**
+
+- **HuggingFace Tokenizer Instructions**: Updated documentation with clearer usage instructions
+  - Enhanced examples and configuration guidelines
+  - Improved getting started guide for HF tokenizers
+
+- **Landing Page Refresh**: Updated main README.md with current project information
+  - Added latest features and capabilities
+  - Improved project description and setup instructions
+  - Hid unfinished README sections for cleaner presentation
+
+- **ModernBERT Validation**: Validated and tested all ModernBERT conversion scripts
+  - Ensured compatibility with latest model versions
+  - Verified weight mapping correctness
+
+**Files Modified:**
+- `docs/LOADING_HF_MODELS.md`: Updated tokenizer instructions (+50 lines)
+- `README.md`: Landing page updates (+120 lines)
+- `mammoth/hf_integration/from_hf/modernBERT/`: Validation updates (+15 lines)
+
+## What Was Updated (08-Dec-2025)
+
+**Logging Improvements and LUMI Configuration**
+
+- **Refined Special Token Logging**: Fixed "Stripped special tokens" message to appear only when tokens are actually stripped
+
+- **LUMI Onboarding Enhancements**: Updated example configuration files for LUMI supercomputer
+  - Now all the training examples are validated for quick starting
+  - Improved documentation for new users
+  - Streamlined configuration process
+
+**Files Modified:**
+- `mammoth/inputters/dataset.py`: Selective logging for special tokens (+8 lines)
+- `csc_env/lumi/`: Updated configuration examples (+35 lines)
+
+## What Was Updated (05-Dec-2025)
+
+**Dataset Continuation and Codebase Cleanup**
+
+- **Fixed Dataset Continuation**: Resumed training now correctly starts from the last stopping point
+  - Proper state restoration for interrupted training
+  - Debug logging shows first 5 lines of source text for verification
+  - Maintains training data integrity across sessions
+
+- **Puhti Configuration Removal**: Cleaned up branch by removing Puhti-related configurations
+  - Removed outdated Puhti-specific documentation
+  - Streamlined codebase focus on LUMI platform
+
+**Files Modified:**
+- `mammoth/inputters/dataloader.py`: Dataset continuation fixes (+25 lines)
+- `mammoth/inputters/dataset.py`: State restoration improvements (+18 lines)
+
+**Files Removed:**
+- `csc_env/puhti/`: Entire Puhti configuration directory (-200+ lines)
+
 ## What Was Updated (25-Nov-2025)
 
 **HuggingFace BART Model Integration**
@@ -51,6 +128,7 @@ For usage instructions, please refer to README.md.
 **Files Removed:**
 - `mammoth/hf_integration/from_hf/__init__.py`: Outdated converter code (-12 lines)
 - `mammoth/hf_integration/from_hf/modernBERT/ROPE_QUICK_REFERENCE.md`: Documentation consolidation (-243 lines)
+
 
 ## What Was Updated (19-Nov-2025)
 

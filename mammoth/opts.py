@@ -474,10 +474,48 @@ def _add_train_general_opts(parser):
         '-save_checkpoint_steps',
         type=int,
         default=5000,
-        help="""Save a checkpoint every X steps""",
+        help="Save a checkpoint every X steps. "
+        "Only used when save_strategy='steps'. "
+        "For metric-based strategies (best_*), checkpoints are saved at validation time (--valid_steps).",
     )
     group.add(
-        '--keep_checkpoint', '-keep_checkpoint', type=int, default=-1, help="Keep X checkpoints (negative: keep all)"
+        '--keep_checkpoint',
+        '-keep_checkpoint',
+        type=int,
+        default=-1,
+        help="Keep X checkpoints (negative: keep all). "
+        "Works with --save_strategy to determine rotation behavior: "
+        "FIFO for 'steps', metric-based for 'best_only'/'best_and_last'/'best_n'.",
+    )
+    group.add(
+        '--save_strategy',
+        '-save_strategy',
+        type=str,
+        default='steps',
+        choices=['steps', 'best_only', 'best_and_last', 'best_n'],
+        help="Checkpoint saving strategy:\n"
+        "  'steps': Save every save_checkpoint_steps (FIFO rotation)\n"
+        "  'best_only': Keep only the best checkpoint by metric (saves at validation time)\n"
+        "  'best_and_last': Keep best + keep_checkpoint most recent (saves at validation time)\n"
+        "  'best_n': Keep top keep_checkpoint checkpoints by metric (saves at validation time)\n"
+        "Note: Metric-based strategies (best_*) save at validation frequency (--valid_steps), "
+        "not --save_checkpoint_steps. Use --keep_checkpoint to control how many to keep.",
+    )
+    group.add(
+        '--metric_for_best_model',
+        '-metric_for_best_model',
+        type=str,
+        default='ppl',
+        help="Metric to use for determining best checkpoint. "
+        "Options: 'ppl' (perplexity), 'accuracy', 'bleu', or custom metric name",
+    )
+    group.add(
+        '--greater_is_better',
+        '-greater_is_better',
+        type=lambda x: x.lower() == 'true',
+        default=None,
+        help="Whether higher metric values are better. "
+        "If None, auto-inferred: False for ppl, True for accuracy/bleu",
     )
     group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
     group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')

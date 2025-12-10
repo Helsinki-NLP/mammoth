@@ -43,6 +43,7 @@ def read_examples_from_files(
     transforms_fn=lambda x: x,
     stride=None,
     offset=None,
+    is_train=False,
 ):
     """Helper function to read examples"""
 
@@ -59,8 +60,9 @@ def read_examples_from_files(
         line_idx = next(line_idx_generator)
 
         # Log first 5 lines of this training session for dataset continuation testing
+        # Only log during training, not validation (validation always resets to line 1)
         start_line = offset if offset is not None else 0
-        if line_idx < start_line + 5:
+        if is_train and line_idx < start_line + 5:
             logger.info(
                 f"[DataLoader] Line {line_idx + 1}: "
                 f"SRC={src_str.strip()[:100]} "
@@ -299,6 +301,7 @@ class ParallelCorpus(IterableDataset):
             ),
             stride=self.stride,
             offset=offset,
+            is_train=self.is_train,
         )
         examples = map(_cast, examples)
         yield from examples

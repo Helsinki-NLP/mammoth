@@ -250,6 +250,20 @@ class Trainer(object):
         else:
             logger.info('Start training loop and validate every %d steps...', valid_steps)
 
+        # Validate configuration for metric-based checkpoint strategies
+        if self.model_saver is not None:
+            save_strategy = getattr(self.model_saver, 'save_strategy', 'steps')
+            if save_strategy in ['best_only', 'best_and_last', 'best_n']:
+                if valid_iter is None:
+                    raise ValueError(
+                        f"save_strategy='{save_strategy}' requires validation, but no validation data provided. "
+                        f"Either provide validation data or use save_strategy='steps'."
+                    )
+                if valid_steps <= 0:
+                    raise ValueError(
+                        f"save_strategy='{save_strategy}' requires valid_steps > 0, but got {valid_steps}"
+                    )
+
         n_correct = 0 if self.report_training_accuracy else None
         total_stats = mammoth.utils.Statistics(n_correct=n_correct)
         report_stats = mammoth.utils.Statistics(n_correct=n_correct)
@@ -341,6 +355,9 @@ class Trainer(object):
                         iter_on_device(valid_iter, device_context),
                         moving_average=self.moving_average,
                     )
+                    # Store last validation stats for use at end of training
+                    self._last_valid_stats = valid_stats
+
                     if self.gpu_verbose_level > 0:
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} report valid stat step {step}')
                     self._report_step(
@@ -349,21 +366,54 @@ class Trainer(object):
                         valid_stats=valid_stats,
                     )
 
+                    # Save checkpoint with metric tracking after validation
+                    if self.model_saver is not None:
+                        self.model_saver.save_with_metric(
+                            step, self._data_state, valid_stats, moving_average=self.moving_average
+                        )
+
                     # Run patience mechanism only on master rank
                     if self.earlystopper is not None:
                         self.earlystopper(valid_stats, step)
                         # If the patience has reached the limit, stop training
                         if self.earlystopper.has_stopped():
+                            logger.info(f"Early stopping triggered at step {step}")
+                            if self.earlystopper.current_step_best is not None:
+                                logger.info(f"Best checkpoint was at step {self.earlystopper.current_step_best}")
                             break
 
+            # Regular checkpoint saving (for save_strategy='steps' or when no validation has run yet)
+            # This is skipped when using metric-based strategies after validation
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
+                # Only use regular save if not already saved via save_with_metric in validation
+                if not (step % valid_steps == 0 and valid_iter is not None and device_context.is_master()):
+                    self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
                 break
 
-        if self.model_saver is not None:
-            self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
+        # Final checkpoint save
+        if self.model_saver is not None and device_context.is_master():
+            # Use save_with_metric if we have validation stats, otherwise use regular save
+            if hasattr(self, '_last_valid_stats') and self._last_valid_stats is not None:
+                self.model_saver.save_with_metric(
+                    step, self._data_state, self._last_valid_stats, moving_average=self.moving_average
+                )
+            else:
+                # Fallback to regular save if no validation has been run
+                self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
+
+            # Log final best checkpoint info
+            if self.model_saver.best_checkpoint_step is not None:
+                logger.info("=" * 80)
+                logger.info("Training completed!")
+                logger.info(f"Best checkpoint: step {self.model_saver.best_checkpoint_step}")
+                logger.info(
+                    f"Best {self.model_saver.metric_for_best_model}: "
+                    f"{self.model_saver.best_metric_value:.4f}"
+                )
+                logger.info("=" * 80)
+
         if device_context.is_master() and self.report_manager is not None:
             self.report_manager.report_end(step)
         return total_stats

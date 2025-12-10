@@ -217,8 +217,7 @@ def main(
     # Perform validation before training starts if requested
     if opts.valid_at_start and valid_iter is not None and device_context.is_master():
         logger.info("{} - Performing validation before training starts".format(device_context.id))
-        valid_iter = iter_on_device(valid_iter, device_context)
-        valid_stats = trainer.validate(valid_iter)
+        valid_stats = trainer.validate(iter_on_device(valid_iter, device_context))
 
         # Display BLEU validation results
         if valid_stats is not None:

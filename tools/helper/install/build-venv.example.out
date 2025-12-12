@@ -1,0 +1,174 @@
+Testing software integrity under /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper:
+- found file venv/README.md
+- found file install/common.sh
+- found file install/module-loads.sh
+- found file install/requirements_lumi.txt
+module-loads.sh...
+This file is in the directory /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install
+The helper functions' base is /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper
+Testing software integrity under /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper:
+- found file modules/pytorch-rocm-mammoth/6.0.lua
+- found file modules/pytorch-rocm-mammoth/load-pytorch-rocm-mammoth.txt
+- found file wrappers/python
+...use module paths...
+...CrayEnv...
+...LUMI...
+...partition/G...
+...systools...
+...singularity-AI-bindings...
+   The 'singularity-AI-bindings' module is the glue that makes PyTorch (and your MAMMOTH
+   training) run inside the supported ROCm container with the right
+   Slingshot/CXI networking and GPU libraries. Without it, things often
+   “work” but are slow/fragile (TCP fallback, plugin not found, odd CXI
+   warnings).
+
+The following shows that these variables are not yet set when we enter to the module
+   CXI_FORK_SAFE             : 
+   FI_CXI_DISABLE_CQ_HUGETLB : 
+   SINGULARITY_BIND          : 
+
+
+The following shows that these variables have been set by the module
+   CXI_FORK_SAFE             : 
+   FI_CXI_DISABLE_CQ_HUGETLB : 
+   SINGULARITY_BIND          : /var/spool/slurmd,
+                               /opt/cray,
+                               /usr/lib64/libcxi.so.1,
+                               /usr/lib64/libjansson.so.4,
+                               /pfs,
+                               /scratch,
+                               /projappl,
+                               /project,
+                               /flash,
+                               /appl
+
+
+loading pytorch-rocm-mammoth...
+
+The following shows that these variables are not yet set when we enter to the module
+The following shows that these variables have been set by the module
+   SING_IMAGE                    : 
+  +PATH (helper)                 : /appl/lumi/SW/LUMI-24.03/common/EB/systools/24.03-2/bin
+                                 : /appl/lumi/SW/LUMI-24.03/common/EB/syslibs/24.03-static-ncurses-6.5/bin
+                                 : /appl/lumi/SW/LUMI-24.03/common/EB/buildtools/24.03/bin
+                                 : /opt/cray/libfabric/1.15.2.0/bin
+                                 : /usr/local/bin
+                                 : /usr/bin
+                                 : /bin
+                                 : /usr/lib/mit/bin
+  +LD_LIBRARY_PATH (helper)      : /appl/lumi/SW/LUMI-24.03/common/EB/syslibs/24.03-static-ncurses-6.5/lib
+                                 : /appl/lumi/SW/LUMI-24.03/common/EB/buildtools/24.03/lib
+                                 : /opt/cray/libfabric/1.15.2.0/lib64
+
+   NCCL_SOCKET_IFNAME (hsn)      :  (-> use only high speed network)
+   MIOPEN_DISABLE_CACHE (1)      :  (disabled; enable later)
+   MIOPEN_USER_DB_PATH ()        :  (disabled; enable later)
+   CXI_FORK_SAFE (1)             :  (CXI forksafety for multi-node)
+   CXI_FORK_SAFE_HP (1)          : 
+   FI_CXI_DISABLE_CQ_HUGETLB (1) :  (for for safety)
+   NCCL_ENABLE_DMABUF_SUPPORT (1):  (set in pytorch)
+   SLURM_MPI_TYPE (pmix)         :  (leave unset; prefer PMIx over PMI2)
+   FI_PROVIDER (cxi)             :  (force libfabric to Slingshot)
+   FI_HMEM (rocr)                :  (enable ROCr GPU memory registry)
+   FI_LOG_LEVEL (warn)           :  (quiet CXI/libfabric logs)
+   FI_LOG_PROV (cxi)             :  (only CXI provider logs)
+   RCCL_ENABLE_OFI               :  (do not set this; prevents auto detect)
+   NCCL_SOCKET_IFNAME (hsn0,..)  :  (keep high-speed)
+
+
+This module is `pytorch-rcom-mammoth` (by AYJ)
+- derived from https://docs.csc.fi/apps/pytorch/
+
+- based on a CSC provided singularity container providing rocm6.2.4,
+  Python 3.12.11, torch 2.7.1, HIP 6.2.41134-65d174c3e.
+- contains important settings: FI_, -B, LD_LIBRARY_PATH etc.
+
+- To create venv: load this module (to activate the settings), launch
+  $SING_IMAGE, and create venv with --system-site-packages, activate
+  the environment, and install the requirements.
+  (mammoth/install/build-venv.sh)
+
+- Python commands will execute via a wrapper (mammoth/wrapper/python)
+  that does the image launching and the venv activation.
+
+
+The following shows that these variables have been set by the module
+   SING_IMAGE                    : /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif
+   SING_FLAGS                    : -B /bin/ip:/bin/ip
+                                -B /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0
+                                -B /opt/cray/libfabric/1.15.2.0/bin/fi_info:/bin/fi_info
+                                -B /usr/lib64/libcurl.so.4:/usr/lib/libcurl.so.4
+  +PATH (helper)                 : /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/wrappers
+                                 : /appl/lumi/SW/LUMI-24.03/common/EB/systools/24.03-2/bin
+                                 : /appl/lumi/SW/LUMI-24.03/common/EB/syslibs/24.03-static-ncurses-6.5/bin
+                                 : /appl/lumi/SW/LUMI-24.03/common/EB/buildtools/24.03/bin
+                                 : /opt/cray/libfabric/1.15.2.0/bin
+                                 : /usr/local/bin
+                                 : /usr/bin
+                                 : /bin
+                                 : /usr/lib/mit/bin
+  +LD_LIBRARY_PATH (helper)      : /appl/lumi/SW/LUMI-24.03/common/EB/syslibs/24.03-static-ncurses-6.5/lib
+                                 : /appl/lumi/SW/LUMI-24.03/common/EB/buildtools/24.03/lib
+                                 : /opt/cray/libfabric/1.15.2.0/lib64
+
+   NCCL_SOCKET_IFNAME (hsn)      : hsn0,hsn1,hsn2,hsn3 (-> use only high speed network)
+   MIOPEN_DISABLE_CACHE (1)      : 1 (disabled; enable later)
+   MIOPEN_USER_DB_PATH ()        :  (disabled; enable later)
+   CXI_FORK_SAFE (1)             : 1 (CXI forksafety for multi-node)
+   CXI_FORK_SAFE_HP (1)          : 1
+   FI_CXI_DISABLE_CQ_HUGETLB (1) : 1 (for for safety)
+   NCCL_ENABLE_DMABUF_SUPPORT (1): 1 (set in pytorch)
+   SLURM_MPI_TYPE (pmix)         : pmi2 (leave unset; prefer PMIx over PMI2)
+   FI_PROVIDER (cxi)             : cxi (force libfabric to Slingshot)
+   FI_HMEM (rocr)                : rocr (enable ROCr GPU memory registry)
+   FI_LOG_LEVEL (warn)           : warn (quiet CXI/libfabric logs)
+   FI_LOG_PROV (cxi)             : cxi (only CXI provider logs)
+   RCCL_ENABLE_OFI               :  (do not set this; prevents auto detect)
+   NCCL_SOCKET_IFNAME (hsn0,..)  : hsn0,hsn1,hsn2,hsn3 (keep high-speed)
+
+
+List of active modules:
+  1) LUMI/24.03              (S)   4) libfabric/1.15.2.0                     7) partition/G                      (S)  10) systools/24.03-2
+  2) craype-x86-trento             5) craype-network-ofi                     8) buildtools/24.03                      11) singularity-AI-bindings/24.03
+  3) craype-accel-amd-gfx90a       6) xpmem/2.8.2-1.0_5.1__g84a27a5.shasta   9) syslibs/24.03-static-ncurses-6.5      12) pytorch-rocm-mammoth/6.0
+
+Requirement already satisfied: pip in /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/venv/lib/python3.12/site-packages (25.0.1)
+Collecting pip
+  Using cached pip-25.3-py3-none-any.whl.metadata (4.7 kB)
+Using cached pip-25.3-py3-none-any.whl (1.8 MB)
+Installing collected packages: pip
+  Attempting uninstall: pip
+    Found existing installation: pip 25.0.1
+    Uninstalling pip-25.0.1:
+      Successfully uninstalled pip-25.0.1
+Successfully installed pip-25.3
+Collecting ConfigArgParse==1.7.1 (from -r /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/requirements_lumi.txt (line 1))
+  Using cached configargparse-1.7.1-py3-none-any.whl.metadata (24 kB)
+Collecting einx==0.3.0 (from -r /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/requirements_lumi.txt (line 2))
+  Using cached einx-0.3.0-py3-none-any.whl.metadata (6.9 kB)
+Collecting frozendict==2.4.6 (from -r /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/requirements_lumi.txt (line 3))
+  Using cached frozendict-2.4.6-py312-none-any.whl.metadata (23 kB)
+Collecting loguru==0.7.3 (from -r /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/requirements_lumi.txt (line 4))
+  Using cached loguru-0.7.3-py3-none-any.whl.metadata (22 kB)
+Requirement already satisfied: numpy in /opt/miniconda3/envs/pytorch/lib/python3.12/site-packages (from einx==0.3.0->-r /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/requirements_lumi.txt (line 2)) (2.2.6)
+Requirement already satisfied: sympy in /opt/miniconda3/envs/pytorch/lib/python3.12/site-packages (from einx==0.3.0->-r /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/requirements_lumi.txt (line 2)) (1.13.3)
+Requirement already satisfied: mpmath<1.4,>=1.1.0 in /opt/miniconda3/envs/pytorch/lib/python3.12/site-packages (from sympy->einx==0.3.0->-r /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/requirements_lumi.txt (line 2)) (1.3.0)
+Using cached configargparse-1.7.1-py3-none-any.whl (25 kB)
+Using cached einx-0.3.0-py3-none-any.whl (102 kB)
+Using cached frozendict-2.4.6-py312-none-any.whl (16 kB)
+Using cached loguru-0.7.3-py3-none-any.whl (61 kB)
+Installing collected packages: loguru, frozendict, ConfigArgParse, einx
+
+Successfully installed ConfigArgParse-1.7.1 einx-0.3.0 frozendict-2.4.6 loguru-0.7.3
+Usage: initialisation
+    . /pfs/lustrep1/projappl/project_462000964/shared/mammoth/tools/helper/install/module-loads.sh
+Usage: singularity + venv activation @ python
+    python
+    import loguru, frozendict, configargparse, einx
+    import torch
+    pip install   --no-user streamlit
+Usage: singularity + venv activation @ bash
+    sing-bash
+    python -m pip install --no-user -U pip
+    pip uninstall loguru streamlit
+    exit

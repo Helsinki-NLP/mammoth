@@ -1,0 +1,125 @@
+#!/bin/bash
+
+# DEBUG=1
+[ -n "${DEBUG:-}" ] && echo Running a python wrapper...
+
+if [ -z "$SING_IMAGE" ]; then
+    echo "ERROR: No singularity-based module loaded!"
+    THIS_DIR=$(dirname "$(readlink -f "$0")")
+    echo "You probably should not have $THIS_DIR in your PATH." >&2
+    exit 1
+fi
+
+THIS="${BASH_SOURCE[0]}"   # THIS is the wrapper file path (argv0 label to show in ps/top).
+BASENAME=$(basename "$0")  # BASENAME becomes the name you invoked the wrapper as (e.g. python, pip).
+THISDIR=$(cd -P -- "$(dirname -- "$THIS")" && pwd) || { echo "cannot resolve THISDIR" >&2; return 1 2>/dev/null || exit 1; }
+BASEDIR=$(cd -P -- "$THISDIR/.." && pwd)           || { echo "cannot resolve BASEDIR" >&2; return 1 2>/dev/null || exit 1; }
+VENV_DIR="$BASEDIR/venv"
+
+if [ "$BASENAME" = "sing-bash" ]; then
+    BASENAME="bash"
+fi
+if [ -d /.singularity.d/ ]; then
+    echo "Already inside the container...  True?"
+    exec -a "$BASENAME" "$@"
+fi
+
+# In module: setenv('SING_FLAGS', '-B /bin/ip:/bin/ip 
+#   -B /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0 
+#   -B /opt/cray/libfabric/1.15.2.0/bin/fi_info:/bin/fi_info 
+#   -B /usr/lib64/libcurl.so.4:/usr/lib/libcurl.so.4')
+#
+SING_FLAGS=${SING_FLAGS-}
+# SING_FLAGS="$SING_FLAGS -B /opt/cray"
+# SING_FLAGS="$SING_FLAGS -B /pfs:/pfs"
+# SING_FLAGS="$SING_FLAGS -B /scratch:/scratch"
+# SING_FLAGS="$SING_FLAGS -B /projappl:/projappl"
+# SING_FLAGS="$SING_FLAGS -B /project:/project"
+# SING_FLAGS="$SING_FLAGS -B /flash:/flash"
+SING_FLAGS="$SING_FLAGS -B /users:/users"
+SING_FLAGS="$SING_FLAGS -B /appl/local/csc/soft/ai/bin"
+SING_FLAGS="$SING_FLAGS -B /appl/lumi"
+if [ -d "$TMPDIR" ]; then
+    SING_FLAGS="$SING_FLAGS -B $TMPDIR:$TMPDIR"
+fi
+# This is needed for commands line lumi-allocations to work, but this path is not present in compute nodes
+if [ -d "/var/lib/project_info" ]; then
+    SING_FLAGS="$SING_FLAGS -B /var/lib/project_info"
+fi
+if [ -n "${VENV_DIR:-}" ]; then
+    PATH="${PATH-}"
+    export SINGULARITYENV_VIRTUAL_ENV="$VENV_DIR"
+    export SINGULARITYENV_PATH="$VENV_DIR/bin:$PATH"
+fi
+
+if [ -n "${DEBUG:-}" ]; then
+    rmprefix() {
+	base=${1%/}
+	path=$2
+	[ -z "$base" ] && { printf '%s\n' "$path"; return; }
+	if [ "$base" = "/" ]; then
+	    [ "$path" = "/" ] && { printf '.\n'; return; }
+	    printf '%s\n' "${path#/}"
+	    return
+	fi
+	case $path in
+	    "$base")    printf '.\n' ;;
+	    "$base"/*)  printf '%s\n' "${path#"$base"/}" ;;
+	    *)          printf '%s\n' "$path" ;;
+	esac
+	return
+    }
+    SING_SHORT=$(rmprefix "$BASEDIR" "$SING_IMAGE")
+    REAL_SHORT=$(rmprefix "$BASEDIR" "$THIS")
+    echo "==================================================================================="
+    echo " \$HELPER                  : $BASEDIR"
+    echo " Real binary              : \$HELPER/$REAL_SHORT"
+    echo " SING_IMAGE               : \$HELPER/$SING_SHORT"
+    printf '%s\n' " ${SING_FLAGS-}" \
+	| sed -E ' s/[[:space:]]+-/\n SING_FLAGS                 -/g' | sed '/^$/d' 
+    [ "$BASENAME" != "bash" ] && echo " VENV_DIR                 : $VENV_DIR"
+    [ "$BASENAME" != "bash" ] && printf '%s\n' ":$PYTHONPATH" \
+	| sed -E ' s/:/\n PYTHONPATH               : /g' | sed '/^$/d' | sed '/^ PYTHONPATH *: *$/d' 
+    echo " Running binary           : $BASENAME"
+    echo " Command-Line Arguments   :" "$@"
+    echo "==================================================================================="
+    echo 
+    echo Launching singularity...
+fi
+
+
+debug_venv() {
+    if [ -n "${DEBUG:-}" ]; then
+	local x p t final
+	for x in "$@"; do
+	    # If argument looks like a path, use it; otherwise search PATH
+	    if [[ "$x" == */* ]]; then
+		p="$x"
+		[[ -x "$p" || -L "$p" ]] || { echo "❌ $x: not executable or not found"; continue; }
+	    else
+		p="$(command -v -- "$x" 2>/dev/null)" || { echo "❌ $x: not found"; continue; }
+		# If it's a shell builtin/alias/function, just show type and continue
+		[[ -e "$p" || -L "$p" ]] || { type -a "$x"; continue; }
+	    fi
+	    printf '%s → (unwrap in container) %s' "$x" "$p"	    
+	    if [[ -L "$p" ]]; then
+		# immediate symlink target (resolve relative links)
+		t="$(readlink -- "$p")"
+		[[ "$t" == /* ]] || t="$(cd -P -- "$(dirname -- "$p")" && pwd -P)/$t"
+		printf '\n → (symlink to image) %s' "$t"
+		
+		# final real file (if multiple hops)
+		if command -v realpath >/dev/null 2>&1; then
+		    final="$(realpath -e -- "$p" 2>/dev/null || realpath -m -- "$p")"
+		    [[ "$final" != "$t" ]] && printf '\n → (final symlink) %s' "$final"
+		fi
+	    fi
+	    printf '\n'
+	done
+    fi
+}
+export -f debug_venv
+export DEBUG
+singularity exec $SING_FLAGS "$SING_IMAGE" bash --noprofile --norc -c 'debug_venv "$0"; exec "$0" "$@"' \
+	    "$BASENAME" "$@"
+exit $?

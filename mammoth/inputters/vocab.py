@@ -21,7 +21,7 @@ DEFAULT_SPECIALS = (
 )
 
 
-def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS, use_hf_tokenizer=False):
+def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS, use_hf_tokenizer=False, decoder_start_with_eos=False):
     """
     Factory function to load either traditional MAMMOTH vocab or HuggingFace tokenizer.
 
@@ -31,12 +31,13 @@ def get_vocab(path, lang, size, specials=DEFAULT_SPECIALS, use_hf_tokenizer=Fals
         size: Vocabulary size (ignored for HF tokenizers)
         specials: Special tokens (ignored for HF tokenizers)
         use_hf_tokenizer: If True, load as HuggingFace tokenizer
+        decoder_start_with_eos: If True, decoder sequences start with EOS (BART-specific)
 
     Returns:
         Vocab or HFTokenizerVocab instance
     """
     if use_hf_tokenizer or path.endswith('.json'):
-        new_vocab = HFTokenizerVocab(tokenizer_path=path, tag=lang)
+        new_vocab = HFTokenizerVocab(tokenizer_path=path, tag=lang, decoder_start_with_eos=decoder_start_with_eos)
     else:
         new_vocab = Vocab(path, items=None, tag=lang, size=size, specials=list(specials))
 
@@ -110,7 +111,7 @@ class Vocab:
 class HFTokenizerVocab:
     """Wrapper for HuggingFace tokenizers that provides MAMMOTH Vocab interface."""
 
-    def __init__(self, tokenizer_path, tag=""):
+    def __init__(self, tokenizer_path, tag="", decoder_start_with_eos=False):
         if not HF_TOKENIZERS_AVAILABLE:
             raise RuntimeError(
                 "HuggingFace tokenizers library not available. "
@@ -126,6 +127,13 @@ class HFTokenizerVocab:
         self.tokenizer = Tokenizer.from_file(tokenizer_path)
         self.path = tokenizer_path
         self.tag = tag
+
+        # BART-specific: decoder sequences start with </s> (EOS) then <s> (BOS)
+        # For BART: [</s>, <s>, tokens..., </s>]
+        # For others: [<s>, tokens..., </s>]
+        self.decoder_start_with_eos = decoder_start_with_eos
+        if decoder_start_with_eos:
+            logger.info(f"  BART mode: decoder sequences will start with EOS token")
 
         # Build stoi (string to index) and itos (index to string) mappings
         vocab_dict = self.tokenizer.get_vocab()

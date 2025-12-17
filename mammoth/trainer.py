@@ -20,6 +20,7 @@ import mammoth.distributed
 from mammoth.utils.logging import logger
 from mammoth.utils.loss import build_loss_function
 from mammoth.utils.statistics import Statistics
+from mammoth.inputters.vocab import HFTokenizerVocab
 
 try:
     import sacrebleu
@@ -518,36 +519,57 @@ class Trainer(object):
                     tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))
                     
                     if tgt_vocab is not None:
-                        # Decode predictions and references to text
-                        for b in range(pred_tokens.size(1)):  # batch dimension
-                            # Get prediction tokens for this batch item
-                            pred_seq = pred_tokens[:, b].tolist()
-                            ref_seq = target[:, b, 0].tolist()
-                            
-                            # Convert tokens to words, filtering out padding and special tokens
-                            pred_words = []
-                            ref_words = []
-                            
-                            for token in pred_seq:
-                                if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
-                                    word = tgt_vocab.itos[token]
-                                    # Skip special tokens like <s>, </s>, <pad>, <unk>
-                                    if not word.startswith('<') or not word.endswith('>'):
-                                        pred_words.append(word)
-                                        
-                            for token in ref_seq:
-                                if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
-                                    word = tgt_vocab.itos[token]
-                                    # Skip special tokens like <s>, </s>, <pad>, <unk>  
-                                    if not word.startswith('<') or not word.endswith('>'):
-                                        ref_words.append(word)
-                            
-                            # Join words to create sentences, only if we have content
-                            if pred_words and ref_words:
-                                pred_text = ' '.join(pred_words)
-                                ref_text = ' '.join(ref_words)
-                                predictions.append(pred_text)
-                                references.append(ref_text)
+                        # Use HF tokenizer's decode if available, otherwise fall back to manual decoding
+                        if isinstance(tgt_vocab, HFTokenizerVocab):
+                            # Decode using HF tokenizer's built-in decoder
+                            # This properly handles BPE merging, subword markers, and special token removal
+                            for b in range(pred_tokens.size(1)):  # batch dimension
+                                pred_seq = pred_tokens[:, b].tolist()
+                                ref_seq = target[:, b, 0].tolist()
+
+                                # Filter out padding tokens before decoding
+                                # (HF tokenizer handles special token removal via skip_special_tokens)
+                                pred_seq = [t for t in pred_seq if t != padding_idx]
+                                ref_seq = [t for t in ref_seq if t != padding_idx]
+
+                                if pred_seq and ref_seq:
+                                    # Use tokenizer's decode method - handles BPE merging, subword markers, etc.
+                                    pred_text = tgt_vocab.decode_tokens(pred_seq, skip_special_tokens=True).strip()
+                                    ref_text = tgt_vocab.decode_tokens(ref_seq, skip_special_tokens=True).strip()
+
+                                    if pred_text and ref_text:
+                                        predictions.append(pred_text)
+                                        references.append(ref_text)
+                        else:
+                            # Fallback for traditional Vocab (backward compatibility)
+                            for b in range(pred_tokens.size(1)):  # batch dimension
+                                pred_seq = pred_tokens[:, b].tolist()
+                                ref_seq = target[:, b, 0].tolist()
+
+                                # Convert tokens to words, filtering out padding and special tokens
+                                pred_words = []
+                                ref_words = []
+
+                                for token in pred_seq:
+                                    if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                        word = tgt_vocab.itos[token]
+                                        # Skip special tokens like <s>, </s>, <pad>, <unk>
+                                        if not word.startswith('<') or not word.endswith('>'):
+                                            pred_words.append(word)
+
+                                for token in ref_seq:
+                                    if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                        word = tgt_vocab.itos[token]
+                                        # Skip special tokens like <s>, </s>, <pad>, <unk>
+                                        if not word.startswith('<') or not word.endswith('>'):
+                                            ref_words.append(word)
+
+                                # Join words to create sentences, only if we have content
+                                if pred_words and ref_words:
+                                    pred_text = ' '.join(pred_words)
+                                    ref_text = ' '.join(ref_words)
+                                    predictions.append(pred_text)
+                                    references.append(ref_text)
                     else:
                         logger.warning(f"Could not find vocabulary for target language '{metadata.tgt_lang}', skipping BLEU computation for this batch")
                 

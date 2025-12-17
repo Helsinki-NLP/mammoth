@@ -232,10 +232,13 @@ def train(opts):
         for side in ('src', 'tgt'):
             for lang in global_task_queue_manager.get_langs(side):
                 vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
+                # BART-specific: decoder sequences start with </s> (EOS) then <s> (BOS)
+                decoder_start_with_eos = getattr(opts, 'decoder_start_with_eos', False) and side == 'tgt'
                 # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
                 vocabs_dict[(side, lang)] = get_vocab(
                     vocab_path, lang, vocab_size[side],
-                    specials=all_specials, use_hf_tokenizer=use_hf_tokenizer
+                    specials=all_specials, use_hf_tokenizer=use_hf_tokenizer,
+                    decoder_start_with_eos=decoder_start_with_eos
                 )
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')

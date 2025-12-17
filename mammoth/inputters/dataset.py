@@ -219,7 +219,13 @@ class ParallelCorpus(IterableDataset):
                 if actually_stripped:
                     logger.info(f'  Stripped special tokens: {actually_stripped}')
 
-            indices = torch.tensor([bos, *token_ids, eos], device='cpu')
+            # BART-specific: decoder sequences start with </s> (EOS) then <s> (BOS)
+            # For BART decoder: [</s>, <s>, tokens..., </s>]
+            # For others: [<s>, tokens..., </s>]
+            if side == 'tgt' and hasattr(vocab, 'decoder_start_with_eos') and vocab.decoder_start_with_eos:
+                indices = torch.tensor([eos, bos, *token_ids, eos], device='cpu')
+            else:
+                indices = torch.tensor([bos, *token_ids, eos], device='cpu')
 
             # Debug: Catch sequences that will exceed positional embedding limit
             final_length = len(indices)

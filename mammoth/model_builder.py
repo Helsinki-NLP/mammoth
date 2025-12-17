@@ -553,10 +553,47 @@ def build_model(
                     )
                     dec_token_embs = None
             else:
-                logger.warning(
-                    'Cannot share encoder-decoder embeddings: no overlapping languages. '
-                    f'Encoder languages: {sorted(encoder_langs)}, Decoder languages: {sorted(decoder_langs)}'
-                )
+                # No overlapping language labels, but check if vocabularies are identical
+                # This handles bilingual models like BART with shared vocab but different language labels
+                # (e.g., es→en translation with same tokenizer for both sides)
+
+                # Check if this is a simple bilingual case (one encoder lang, one decoder lang)
+                # or if all encoder-decoder vocab pairs are identical
+                all_vocabs_match = True
+                dec_token_embs = {}
+                cross_lingual_pairs = []
+
+                for enc_lang in encoder_langs:
+                    for dec_lang in decoder_langs:
+                        src_vocab = vocabs_dict.get(('src', enc_lang))
+                        tgt_vocab = vocabs_dict.get(('tgt', dec_lang))
+
+                        if src_vocab is None or tgt_vocab is None:
+                            all_vocabs_match = False
+                            break
+
+                        if len(src_vocab) != len(tgt_vocab):
+                            all_vocabs_match = False
+                            break
+
+                        # Vocabularies match - map decoder lang to encoder embeddings
+                        dec_token_embs[dec_lang] = encoder.token_embs[enc_lang]
+                        cross_lingual_pairs.append(f'{enc_lang}→{dec_lang}')
+
+                    if not all_vocabs_match:
+                        break
+
+                if all_vocabs_match and cross_lingual_pairs:
+                    logger.info(
+                        f'Sharing encoder-decoder embeddings across language pairs: {", ".join(cross_lingual_pairs)} '
+                        f'(vocabularies have matching sizes)'
+                    )
+                else:
+                    logger.warning(
+                        'Cannot share encoder-decoder embeddings: no overlapping languages and vocabularies do not match. '
+                        f'Encoder languages: {sorted(encoder_langs)}, Decoder languages: {sorted(decoder_langs)}'
+                    )
+                    dec_token_embs = None
 
     dec_adapters_by_name: Optional[Dict[str, Adapter]] = build_adapters(
         side=Side.decoder,

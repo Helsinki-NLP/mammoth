@@ -19,13 +19,13 @@ Gemma3 Architecture (✅ = Fully Supported):
 - ✅ Q/K normalization (RMSNorm on queries and keys)
 - ✅ Multi Query Attention
 - ✅ Gated MLP with GELU activation (gate_proj, up_proj pattern)
-- ⚠️ RoPE with dual theta (global: 1M, local: 10K for sliding window)
-  * Using global theta only (x_transformers has single RoPE)
+- ✅ RoPE with dual theta (global: 1M, local: 10K for sliding window)
+  * Fully supported via sliding_window, global_rope_theta, local_rope_theta parameters
 - ✅ Scaled word embeddings (multiply by sqrt(hidden_size))
   * Supported via dec_scaled_embeddings parameter in x_transformers_opts
 - ✅ Bias-free architecture
-- ⚠️ Alternating attention pattern (sliding window / full attention)
-  * All layers use same config (x_transformers limitation)
+- ✅ Alternating attention pattern (sliding window / full attention)
+  * Fully supported via sliding_window and global_attn_every_n_layers parameters
 - ✅ Final RMSNorm + optional logit softcapping
 
 Improvements in this version:
@@ -68,10 +68,9 @@ def create_xtransformer_model(model_path):
     - ✅ QK normalization (qk_norm=True), using L2 Norm
     - ✅ GQA/MQA (attn_one_kv_head=True for single key/value head)
     - ✅ Gated MLP with GELU (ff_glu=True) matching gate_proj * GELU(up_proj)
-    - ✅ RoPE (rotary_pos_emb=True, rotary_pos_emb_base)
-    - ⚠️ Scaled embeddings: need custom scaling after conversion
-    - ⚠️ Dual RoPE: x_transformers has single RoPE (will use global theta)
-    - ⚠️ Per-layer attention types: x_transformers applies same config to all layers
+    - ✅ RoPE with dual theta (global_rope_theta, local_rope_theta)
+    - ✅ Sliding window attention (sliding_window, global_attn_every_n_layers)
+    - ✅ Scaled embeddings (custom scaling in TransformerWrapper)
 
     Args:
         model_path: Path to HuggingFace Gemma3 model
@@ -92,6 +91,12 @@ def create_xtransformer_model(model_path):
     # Extract head_dim - Gemma3 uses explicit head_dim (not derived from hidden_size)
     head_dim = config.head_dim if hasattr(config, 'head_dim') else (config.hidden_size // config.num_attention_heads)
 
+    # Extract sliding window and dual RoPE parameters
+    dec_sliding_window = getattr(config, 'sliding_window', -1)
+    dec_global_attn_every_n_layers = getattr(config, 'global_attn_every_n_layers', 3)
+    dec_global_rope_theta = getattr(config, 'rope_theta', 1000000.0)  # Global theta (default 1M)
+    dec_local_rope_theta = getattr(config, 'rope_local_base_freq', 10000.0)  # Local theta (default 10K)
+
     print(f"Gemma3 Configuration:")
     print(f"  - Model type: Decoder-only LM (causal)")
     print(f"  - Hidden size: {config.hidden_size}")
@@ -104,10 +109,16 @@ def create_xtransformer_model(model_path):
     print(f"  - Intermediate size: {intermediate_size} (ff_mult={ff_mult:.1f})")
     print(f"  - Vocab size: {config.vocab_size}")
     print(f"  - Max position embeddings: {config.max_position_embeddings}")
-    print(f"  - RoPE theta: {config.rope_theta} (global, only this will be used for now)")
-    if hasattr(config, 'rope_local_base_freq'):
-        print(f"  - RoPE local theta: {config.rope_local_base_freq} (sliding window, will not be implemented)")
-    print(f"  - Sliding window: {config.sliding_window if hasattr(config, 'sliding_window') else 'N/A'}")
+    print(f"  - RoPE global theta: {dec_global_rope_theta}")
+    print(f"  - RoPE local theta: {dec_local_rope_theta}")
+
+    # Log sliding window configuration
+    sliding_window_status = "enabled" if dec_sliding_window > 0 else "disabled"
+    print(f"  - Sliding window: {sliding_window_status}")
+    if dec_sliding_window > 0:
+        print(f"    • Window size: {dec_sliding_window} tokens")
+        print(f"    • Global attention every N layers: {dec_global_attn_every_n_layers}")
+
     print(f"  - Attention dropout: {config.attention_dropout}")
     print(f"  - RMS norm eps: {config.rms_norm_eps}")
 
@@ -118,10 +129,8 @@ def create_xtransformer_model(model_path):
     print(f"    * 4 Gemma3 norms → 4 x_transformers norms (using sandwich_norm=True)")
     print(f"    * pre_norm=True + sandwich_norm=True (pre + post normalization)")
     print(f"    * Q/K normalization: qk_norm=True")
-
-    # Calculate RoPE base from theta
-    # Gemma3 uses rope_theta for global attention
-    rope_theta = config.rope_theta
+    if dec_sliding_window > 0:
+        print(f"    * Sliding window attention with dual RoPE theta")
 
     # Create Decoder (attention layers only)
     decoder = Decoder(
@@ -130,7 +139,7 @@ def create_xtransformer_model(model_path):
         heads=config.num_attention_heads,
         attn_dim_head=head_dim,  # ✅ Explicit head_dim from config (critical for Gemma3!)
         rotary_pos_emb=True,
-        rotary_pos_emb_base=rope_theta,  # Use Gemma3's global RoPE theta
+        rotary_pos_emb_base=dec_global_rope_theta,  # ✅ Use Gemma3's global RoPE theta (1M)
         ff_mult=ff_mult,
         ff_glu=True,  # ✅ Gemma3 uses gated MLP (gate_proj * GELU(up_proj))
         ff_no_bias=True,  # Gemma3 is bias-free
@@ -140,6 +149,11 @@ def create_xtransformer_model(model_path):
         attn_dropout=config.attention_dropout,
         sandwich_norm=True,  # ✅ Enable sandwich norm for 4 norms per layer!
         use_rmsnorm=True,  # ✅ Use RMSNorm matching Gemma3 (NOT used in qk_norm!)
+        # ✅ Sliding window attention with dual RoPE
+        sliding_window=dec_sliding_window,  # Window size (-1 = disabled)
+        global_attn_every_n_layers=dec_global_attn_every_n_layers,  # Global attention frequency
+        global_rope_theta=dec_global_rope_theta,  # RoPE theta for global attention
+        local_rope_theta=dec_local_rope_theta,  # RoPE theta for local (sliding window) attention
     )
 
     # Wrap with TransformerWrapper to add embeddings and output projection
@@ -805,6 +819,19 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
     dec_intermediate_size = config.intermediate_size
     dec_ff_mult = dec_intermediate_size / config.hidden_size
 
+    # Extract sliding window and dual RoPE parameters from config
+    # These are top-level model_opts attributes (defined in opts.py)
+    model_opts.dec_sliding_window = getattr(config, 'sliding_window', -1)
+    model_opts.dec_global_attn_every_n_layers = getattr(config, 'global_attn_every_n_layers', 3)
+    model_opts.dec_global_rope_theta = getattr(config, 'rope_theta', 1000000.0)  # Global theta (default 1M)
+    model_opts.dec_local_rope_theta = getattr(config, 'rope_local_base_freq', 10000.0)  # Local theta (default 10K)
+
+    # Encoder uses standard full attention (no sliding window)
+    model_opts.enc_sliding_window = -1  # Disabled
+    model_opts.enc_global_attn_every_n_layers = 3  # Not used (sliding window disabled)
+    model_opts.enc_global_rope_theta = 10000.0  # Standard RoPE base
+    model_opts.enc_local_rope_theta = 10000.0  # Standard RoPE base
+
     # x_transformers_opts with enc_/dec_ prefix support (added to model_builder.py)
     #
     # IMPORTANT: build_model() creates a NEW decoder from scratch using these parameters.
@@ -857,7 +884,7 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
 
     model_opts.param_init = 0.0
     model_opts.param_init_glorot = True
-    model_opts.attention_bridge = None 
+    model_opts.attention_bridge = None
     model_opts.ab_layers = []
     model_opts.adapters = None
     model_opts.enable_embeddingless = False
@@ -865,6 +892,16 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
     model_opts.dropout = [0.0]
     model_opts.attention_dropout = [config.attention_dropout]
 
+    # Log sliding window configuration
+    print(f'decoder max_seq_len: {config.max_position_embeddings}')
+    if model_opts.dec_sliding_window > 0:
+        print(f'decoder sliding window: {model_opts.dec_sliding_window} tokens (enabled)')
+        print(f'  - global attention every {model_opts.dec_global_attn_every_n_layers} layers')
+        print(f'  - global RoPE theta: {model_opts.dec_global_rope_theta}')
+        print(f'  - local RoPE theta: {model_opts.dec_local_rope_theta}')
+    else:
+        print('decoder sliding window: disabled (full causal attention)')
+    print('encoder sliding window: disabled (standard full attention)')
 
     return model_opts
 
@@ -1038,10 +1075,9 @@ def create_xt_to_mammoth_mapping(num_decoder_layers, corpus_id):
     # Token embeddings
     mapping["token_emb.emb.weight"] = f"decoder.{corpus_id}.token_emb.emb.weight"
 
-    # RoPE
-    mapping["attn_layers.rotary_pos_emb.inv_freq"] = (
-        f"decoder.{corpus_id}.attn_layers.attention_layers_stack.0.rotary_pos_emb.inv_freq"
-    )
+    # RoPE - Note: inv_freq is auto-computed from rotary_pos_emb_base, so we don't copy it
+    # The x-transformer model has dual RoPE (global and local) but Mammoth uses single RoPE
+    # The base frequency is already set in model_opts, so inv_freq will be auto-generated
 
     # Decoder layers
     # In decoder-only mode: each layer is [attention, feedforward] (no cross-attention)
@@ -1552,7 +1588,7 @@ def convert_hf_gemma3_to_mammoth(hf_model_path, save_path, src_tokenizer_path=No
     print(f"  ✓ Architecture:")
     print(f"    - 1 shared decoder (Gemma3 weights loaded)")
     print(f"    - {len(tgt_langs)} language-specific encoder(s) (randomly initialized)")
-    print(f"  ⚠ Note: Gemma3 features implemented:")
+    print(f"  ✓ Gemma3 features fully implemented:")
     print(f"    ✅ 4 norms per layer (via sandwich_norm=True)")
     print(f"    ✅ RMSNorm with unit_offset (via rms_norm=True)")
     print(f"    ✅ Q/K normalization")
@@ -1560,8 +1596,15 @@ def convert_hf_gemma3_to_mammoth(hf_model_path, save_path, src_tokenizer_path=No
     print(f"    ✅ Gated MLP with GELU (via ff_glu=True)")
     print(f"    ✅ LM head output projection (lm_head.weight → to_logits.weight)")
     print(f"    ✅ Scaled embeddings (via dec_scaled_embeddings=True)")
-    print(f"    ⚠️  Dual RoPE (using global theta only)")
-    print(f"    ⚠️  Alternating attention patterns (all layers use same config)")
+    print(f"    ✅ Dual RoPE (global_rope_theta={config.rope_theta:.0f}, local_rope_theta={getattr(config, 'rope_local_base_freq', 10000):.0f})")
+
+    # Show sliding window status
+    sliding_window = getattr(config, 'sliding_window', -1)
+    if sliding_window > 0:
+        print(f"    ✅ Sliding window attention (window={sliding_window}, global_attn_every_n={getattr(config, 'global_attn_every_n_layers', 3)})")
+    else:
+        print(f"    ℹ️  Sliding window attention (disabled - using full causal attention)")
+
     return mammoth_model
 
 

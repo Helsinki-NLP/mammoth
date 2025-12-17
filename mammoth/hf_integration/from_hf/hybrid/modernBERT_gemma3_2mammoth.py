@@ -76,12 +76,27 @@ def create_hybrid_xtransformer_model(encoder_model_path, decoder_model_path):
     print("\n[1/2] Loading ModernBERT encoder configuration...")
     enc_config = AutoConfig.from_pretrained(encoder_model_path, local_files_only=True, trust_remote_code=False)
 
+    # Extract ModernBERT sliding window and dual RoPE parameters
+    enc_sliding_window = getattr(enc_config, "local_attention", -1)
+    enc_global_attn_every_n_layers = getattr(enc_config, "global_attn_every_n_layers", 3)
+    enc_global_rope_theta = getattr(enc_config, "global_rope_theta", 160000.0)
+    enc_local_rope_theta = getattr(enc_config, "local_rope_theta", 10000.0)
+
     print(f"  ModernBERT Encoder:")
     print(f"    - Hidden size: {enc_config.hidden_size}")
     print(f"    - Layers: {enc_config.num_hidden_layers}")
     print(f"    - Attention heads: {enc_config.num_attention_heads}")
     print(f"    - Intermediate size: {getattr(enc_config, 'intermediate_size', enc_config.hidden_size * 4)}")
     print(f"    - Vocab size: {enc_config.vocab_size}")
+
+    # Log sliding window configuration for encoder
+    sliding_window_status = "enabled" if enc_sliding_window > 0 else "disabled"
+    print(f"    - Sliding window: {sliding_window_status}")
+    if enc_sliding_window > 0:
+        print(f"      • Window size: {enc_sliding_window} tokens")
+        print(f"      • Global attention every N layers: {enc_global_attn_every_n_layers}")
+        print(f"      • Global RoPE theta: {enc_global_rope_theta}")
+        print(f"      • Local RoPE theta: {enc_local_rope_theta}")
 
     # Load decoder config (Gemma3)
     print("\n[2/2] Loading Gemma3 decoder configuration...")
@@ -91,6 +106,12 @@ def create_hybrid_xtransformer_model(encoder_model_path, decoder_model_path):
     if hasattr(dec_config, 'text_config'):
         dec_config = dec_config.text_config
 
+    # Extract Gemma3 sliding window and dual RoPE parameters
+    dec_sliding_window = getattr(dec_config, 'sliding_window', -1)
+    dec_global_attn_every_n_layers = getattr(dec_config, 'global_attn_every_n_layers', 3)
+    dec_global_rope_theta = getattr(dec_config, 'rope_theta', 1000000.0)  # Global theta (default 1M)
+    dec_local_rope_theta = getattr(dec_config, 'rope_local_base_freq', 10000.0)  # Local theta (default 10K)
+
     print(f"  Gemma3 Decoder:")
     print(f"    - Hidden size: {dec_config.hidden_size}")
     print(f"    - Layers: {dec_config.num_hidden_layers}")
@@ -99,7 +120,15 @@ def create_hybrid_xtransformer_model(encoder_model_path, decoder_model_path):
     print(f"    - Head dim: {dec_config.head_dim}")
     print(f"    - Intermediate size: {dec_config.intermediate_size}")
     print(f"    - Vocab size: {dec_config.vocab_size}")
-    print(f"    - RoPE theta: {dec_config.rope_theta}")
+    print(f"    - RoPE global theta: {dec_global_rope_theta}")
+    print(f"    - RoPE local theta: {dec_local_rope_theta}")
+
+    # Log sliding window configuration for decoder
+    dec_sliding_window_status = "enabled" if dec_sliding_window > 0 else "disabled"
+    print(f"    - Sliding window: {dec_sliding_window_status}")
+    if dec_sliding_window > 0:
+        print(f"      • Window size: {dec_sliding_window} tokens")
+        print(f"      • Global attention every N layers: {dec_global_attn_every_n_layers}")
 
     # Calculate ff_mult for both encoder and decoder
     enc_intermediate_size = getattr(enc_config, "intermediate_size", enc_config.hidden_size * 4)
@@ -127,11 +156,15 @@ def create_hybrid_xtransformer_model(encoder_model_path, decoder_model_path):
         heads=enc_config.num_attention_heads,
         ff_mult=enc_ff_mult,
         rotary_pos_emb=True,  # ModernBERT uses RoPE
-        rotary_pos_emb_base=enc_config.local_rope_theta,
+        rotary_pos_emb_base=enc_global_rope_theta,  # Use global theta as base
         ff_glu=True,  # ModernBERT uses GeGLU
         ff_no_bias=True,  # ModernBERT is bias-free
         attn_dropout=getattr(enc_config, "attention_dropout", 0.0),
-
+        # Sliding window attention with dual RoPE
+        sliding_window=enc_sliding_window,
+        global_attn_every_n_layers=enc_global_attn_every_n_layers,
+        global_rope_theta=enc_global_rope_theta,
+        local_rope_theta=enc_local_rope_theta,
     )
 
     encoder_model = TransformerWrapper(
@@ -154,7 +187,7 @@ def create_hybrid_xtransformer_model(encoder_model_path, decoder_model_path):
         attn_dim_head=dec_config.head_dim,  # Explicit head dim (critical for Gemma3)
         ff_mult=dec_ff_mult,
         rotary_pos_emb=True,
-        rotary_pos_emb_base=dec_config.rope_theta,  # Gemma3's global RoPE theta
+        rotary_pos_emb_base=dec_global_rope_theta,  # Gemma3's global RoPE theta
         ff_glu=True,  # Gemma3 uses gated MLP
         ff_no_bias=True,  # Gemma3 is bias-free
         attn_qk_norm=True,  # Gemma3 has Q/K normalization
@@ -164,6 +197,11 @@ def create_hybrid_xtransformer_model(encoder_model_path, decoder_model_path):
         sandwich_norm=True,  # Gemma3 has 4 norms per layer
         use_rmsnorm=True,  # Gemma3 uses RMSNorm
         cross_attend=True,  # Enable cross-attention for encoder-decoder
+        # Sliding window attention with dual RoPE (Gemma3 alternating attention)
+        sliding_window=dec_sliding_window,
+        global_attn_every_n_layers=dec_global_attn_every_n_layers,
+        global_rope_theta=dec_global_rope_theta,
+        local_rope_theta=dec_local_rope_theta,
     )
 
     decoder_model = TransformerWrapper(
@@ -894,6 +932,28 @@ def create_model_opts_from_hybrid_model(encoder_model, decoder_model, enc_config
     dec_intermediate_size = dec_config.intermediate_size
     dec_ff_mult = dec_intermediate_size / dec_config.hidden_size
 
+    # Extract sliding window and dual RoPE parameters
+    enc_sliding_window = getattr(enc_config, "local_attention", -1)
+    enc_global_attn_every_n_layers = getattr(enc_config, "global_attn_every_n_layers", 3)
+    enc_global_rope_theta = getattr(enc_config, "global_rope_theta", 160000.0)
+    enc_local_rope_theta = getattr(enc_config, "local_rope_theta", 10000.0)
+
+    dec_sliding_window = getattr(dec_config, 'sliding_window', -1)
+    dec_global_attn_every_n_layers = getattr(dec_config, 'global_attn_every_n_layers', 3)
+    dec_global_rope_theta = getattr(dec_config, 'rope_theta', 1000000.0)
+    dec_local_rope_theta = getattr(dec_config, 'rope_local_base_freq', 10000.0)
+
+    # Set top-level model_opts attributes for sliding window and dual RoPE
+    model_opts.enc_sliding_window = enc_sliding_window
+    model_opts.enc_global_attn_every_n_layers = enc_global_attn_every_n_layers
+    model_opts.enc_global_rope_theta = enc_global_rope_theta
+    model_opts.enc_local_rope_theta = enc_local_rope_theta
+
+    model_opts.dec_sliding_window = dec_sliding_window
+    model_opts.dec_global_attn_every_n_layers = dec_global_attn_every_n_layers
+    model_opts.dec_global_rope_theta = dec_global_rope_theta
+    model_opts.dec_local_rope_theta = dec_local_rope_theta
+
     # x_transformers_opts with enc_/dec_ prefixes
     model_opts.x_transformers_opts = {
         # Shared options
@@ -908,7 +968,7 @@ def create_model_opts_from_hybrid_model(encoder_model, decoder_model, enc_config
         "enc_ff_glu": True,  # ModernBERT uses GeGLU
         "enc_ff_no_bias": True,
         "enc_rotary_pos_emb": True,
-        "enc_rotary_pos_emb_base": enc_config.local_rope_theta,
+        "enc_rotary_pos_emb_base": enc_global_rope_theta,  # Use global theta as base
         "enc_post_emb_norm": True,
         "enc_max_seq_len": enc_config.max_position_embeddings,
 
@@ -924,7 +984,7 @@ def create_model_opts_from_hybrid_model(encoder_model, decoder_model, enc_config
         "dec_ff_glu": True,
         "dec_ff_no_bias": True,
         "dec_rotary_pos_emb": True,
-        "dec_rotary_pos_emb_base": dec_config.rope_theta,
+        "dec_rotary_pos_emb_base": dec_global_rope_theta,  # Use global theta as base
         "dec_use_rmsnorm": True,
         "dec_sandwich_norm": True,
         "dec_post_emb_norm": False,
@@ -1075,9 +1135,9 @@ def create_hybrid_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, 
     # ======== ENCODER MAPPING (ModernBERT) ========
     mapping["encoder.token_emb.emb.weight"] = f"encoder.{task_name}.token_emb.emb.weight"
     mapping["encoder.post_emb_norm.gamma"] = f"encoder.{task_name}.post_emb_norm.gamma"
-    mapping["encoder.attn_layers.rotary_pos_emb.inv_freq"] = (
-        f"encoder.{task_name}.attn_layers.attention_layers_stack.0.rotary_pos_emb.inv_freq"
-    )
+
+    # Note: RoPE inv_freq is NOT mapped - it's auto-computed by Mammoth from the theta values
+    # With dual RoPE (global and local theta), Mammoth will generate inv_freq dynamically
 
     for layer_idx in range(num_encoder_layers):
         attn_idx = layer_idx * 2
@@ -1107,23 +1167,27 @@ def create_hybrid_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, 
 
     # ======== DECODER MAPPING (Gemma3) ========
     mapping["decoder.token_emb.emb.weight"] = f"decoder.{task_name}.token_emb.emb.weight"
-    mapping["decoder.attn_layers.rotary_pos_emb.inv_freq"] = (
-        f"decoder.{task_name}.attn_layers.attention_layers_stack.0.rotary_pos_emb.inv_freq"
-    )
+
+    # Note: RoPE inv_freq is NOT mapped - it's auto-computed by Mammoth from the theta values
+    # With dual RoPE (global and local theta), Mammoth will generate inv_freq dynamically
 
     for layer_idx in range(num_decoder_layers):
-        # x-transformers decoder-only: [attn, ff] pairs
-        xt_attn_idx = layer_idx * 2
-        xt_ff_idx = layer_idx * 2 + 1
+        # IMPORTANT: Since we created the standalone decoder with cross_attend=True,
+        # x-transformers creates [self_attn, cross_attn, ff] triplets, not pairs!
+        # So we use triplet indexing for both source (xt) and target (mammoth)
+        xt_self_attn_idx = layer_idx * 3      # Self-attention
+        xt_cross_attn_idx = layer_idx * 3 + 1  # Cross-attention (skip - no Gemma3 weights)
+        xt_ff_idx = layer_idx * 3 + 2         # Feedforward
 
-        # Mammoth encoder-decoder: [self_attn, cross_attn, ff] triplets
-        mammoth_attn_idx = layer_idx * 3
+        # Mammoth encoder-decoder: also [self_attn, cross_attn, ff] triplets
+        mammoth_self_attn_idx = layer_idx * 3
+        mammoth_cross_attn_idx = layer_idx * 3 + 1  # Will be randomly initialized
         mammoth_ff_idx = layer_idx * 3 + 2
 
-        xt_attn_base = f"decoder.attn_layers.layers.{xt_attn_idx}"
-        mammoth_attn_base = f"decoder.{task_name}.attn_layers.attention_layers_stack.0.layers.{mammoth_attn_idx}"
+        xt_attn_base = f"decoder.attn_layers.layers.{xt_self_attn_idx}"
+        mammoth_attn_base = f"decoder.{task_name}.attn_layers.attention_layers_stack.0.layers.{mammoth_self_attn_idx}"
 
-        # Self-attention
+        # Self-attention (map from standalone decoder to mammoth)
         mapping[f"{xt_attn_base}.0.0.g"] = f"{mammoth_attn_base}.0.0.g"
         mapping[f"{xt_attn_base}.1.to_q.weight"] = f"{mammoth_attn_base}.1.to_q.weight"
         mapping[f"{xt_attn_base}.1.to_k.weight"] = f"{mammoth_attn_base}.1.to_k.weight"
@@ -1132,6 +1196,10 @@ def create_hybrid_xt_to_mammoth_mapping(num_encoder_layers, num_decoder_layers, 
         mapping[f"{xt_attn_base}.1.qk_norm_q_scale"] = f"{mammoth_attn_base}.1.qk_norm_q_scale"
         mapping[f"{xt_attn_base}.1.qk_norm_k_scale"] = f"{mammoth_attn_base}.1.qk_norm_k_scale"
         mapping[f"{xt_attn_base}.0.1.g"] = f"{mammoth_attn_base}.0.1.g"  # Post-attn norm
+
+        # Cross-attention: Skip! Gemma3 doesn't have cross-attention weights
+        # The standalone decoder has placeholder cross-attn layers (randomly initialized)
+        # We don't map these - Mammoth's cross-attn will be randomly initialized too
 
         # Feedforward
         xt_ff_base = f"decoder.attn_layers.layers.{xt_ff_idx}"

@@ -13,12 +13,18 @@ echo "BASEDIR : $BASEDIR"  # helper/bin
 source $BASEDIR/../install/common.sh
 require_vars SLURM_PROCID SLURM_LOCALID SLURM_NODEID RUN_SCRIPT RUN_ARGS
 
-DEV="(${SLURM_NODEID},${SLURM_LOCALID}) ${SLURM_PROCID}  "
+DEV="GPU (${SLURM_NODEID},${SLURM_LOCALID}) "
 
 ###################################################
 #             SOFTWARE STACK LOADER               #
 ###################################################
-source helper/install/module-loads.sh 2>&1 
+
+echo $DEV "Loading the software stack at node ${SLURM_NODEID}"
+if [ "${SLURM_NODEID:-}" = 0 ]; then
+    source $BASEDIR/../install/module-loads.sh 
+else
+    source $BASEDIR/../install/module-loads.sh 2>/dev/null
+fi
 
 # 1) Loads standard modules:
 #
@@ -189,8 +195,8 @@ POST_ARGS=(--node_rank "${NODE_RANK}" --master_port "${MASTER_PORT}" \
 echo $DEV ==============================================
 echo $DEV " SLURM_JOB_NAME              : $SLURM_JOB_NAME"
 echo $DEV " SLURM_NODEID  (--node_rank) : $SLURM_NODEID"
-echo $DEF " SLURM_NTASKS (--world_size) : $SLURM_NTASKS"
-echo $DEF " MASTER_PORT (--master_port) : $MASTER_PORT"
+echo $DEV " SLURM_NTASKS (--world_size) : $SLURM_NTASKS"
+echo $DEV " MASTER_PORT (--master_port) : $MASTER_PORT"
 echo $DEV " MASTER_ADDR (--master_addr) : $MASTER_ADDR"
 echo $DEV ==============================================
 echo $DEV " RUNTIME           : $RUNTIME"

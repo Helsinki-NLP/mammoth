@@ -60,13 +60,6 @@ while [ $i -lt ${#args[@]} ]; do
   esac
 done
 
-if [ -s config.yaml ]; then
-  echo "✅ Config file './config.yaml' found ($PWD) and it is non-empty."
-else
-  echo "❌ config.yaml is missing or empty in the current directory.  Are you in the right directory?"
-  exit 1
-fi
-
 cwd_base=$(basename "$PWD")
 if [ -z "${job_name:-}" ]; then
   echo "❌ Could not determine job name. Please set it with -J/--job-name or JOB_NAME." >&2
@@ -88,22 +81,43 @@ else
   echo "✅ The current directory '../{$job_name}' matches the job-name"
 fi
 
+if [ -s config.yaml ]; then
+  echo "✅ Config file './config.yaml' found ($PWD) and it is non-empty."
+else
+  echo "❌ config.yaml is missing or empty in the current directory.  Are you in the right directory?"
+  exit 1
+fi
+
 script="$1"
 shift
 if [ ! -f "$script" ]; then
-  echo "❌ sbatch script '$script' not found." >&2
+  echo "❌ sbatch script '$script' not found.  The script name should be the first CL argument." >&2
   exit 1
 fi
+
+# Create a temporary copy of the script to make sure that the filename is specific to each sbatch launch.
+cp -p -n -- "$(readlink -f "$script")" "job_sbat_script.$$.waiting"  # make a copy for documentation purposes
+export JOB_SBAT_SCRIPT_TEMP="job_sbat_script.$$.waiting"
+export JOB_SBAT_SCRIPT_NAME=$(basename "$(readlink -f "$script")")
+
+echo The sbatch script will be copied temporarily to "job_sbat_script.$$"
 
 THIS="${BASH_SOURCE[0]}"   # THIS is the wrapper file path (argv0 label to show in ps/top).
 BASENAME=$(basename "$0")  # BASENAME becomes the name you invoked the wrapper as (e.g. python, pip).
 THISDIR=$(cd -P -- "$(dirname -- "$THIS")" && pwd) || { echo "cannot resolve THISDIR" >&2; return 1 2>/dev/null || exit 1; }
 BASEDIR=$(cd -P -- "$THISDIR/.." && pwd)           || { echo "cannot resolve BASEDIR" >&2; return 1 2>/dev/null || exit 1; }
 
-sbatch --test-only      -p "$PARTITION" --export=ALL,JOB_SBAT_SCRIPT="$(readlink -f "$script")" "$script" "$@"
+echo running...  sbatch --test-only     -p "$PARTITION" "$@" "$script" 
+  sbatch --test-only                    -p "$PARTITION" "$@" "$script" 
 echo "✅ Sbatch --test-only run on ../{$job_name}/${script} successfully"
 
-$THISDIR/sbatch-dry-run -p "$PARTITION" --export=ALL,JOB_SBAT_SCRIPT="$(readlink -f "$script")" "$@" "$script" 
+echo running...  sbatch-dry-run         -p "$PARTITION" "$@" "$script" 
+  $THISDIR/sbatch-dry-run               -p "$PARTITION" "$@" "$script" 
 echo "✅ Done with the dry-run of ../{$job_name}/${script}"
 
-sbatch                  -p "$PARTITION" --export=ALL,JOB_SBAT_SCRIPT="$(readlink -f "$script")" "$script" "$@"
+echo running...  sbatch                -p "$PARTITION" "$@" "$script" 
+  sbatch                               -p "$PARTITION" "$@" "$script" 
+
+echo The job should occur in the queue:
+squeue --me
+

@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-PARTITION="small-g"   # or standard-g, etc.
+PARTITION="standard-g"   # or standard-g, etc.
 
 # This command behaves like 'sbatch' but saves the batch file name to
 # variable JOB_SBAT_SCRIPT

@@ -1,6 +1,10 @@
 # Start lightweight GPU monitor by calling the following function:
 MON_PID=""
-MON_OUT="id-${SLURM_JOB_ID}/gpu_load-${SLURM_NODEID}.log"
+if [[ -n "${OUTPUT_DIR-}" ]]; then
+  MON_OUT="${OUTPUT_DIR}/gpu_load-${SLURM_NODEID}.log"
+else
+  MON_OUT="id-${SLURM_JOB_ID}/gpu_load-${SLURM_NODEID}.log"
+fi
 start_monitor() {
   if [[ "$SYSTEM" == "puhti" || "$SYSTEM" == "mahti" ]]; then
     if command -v nvidia-smi >/dev/null 2>&1; then

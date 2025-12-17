@@ -34,18 +34,27 @@ SLURM_JOB_NAME=""
 # --------- 1) Parse sbatch-like CLI options (before the script) --------------
 
 while [ $# -gt 0 ]; do
+  # echo parsing the commandline option "$1"    
   case "$1" in
     -A|--account)
       SLURM_JOB_ACCOUNT="$2"
       shift 2
+      continue
       ;;
     -J|--job-name)
       SLURM_JOB_NAME="$2"
       shift 2
+      continue
       ;;
     -p|--partition)
       SLURM_JOB_PARTITION="$2"
       shift 2
+      continue
+      ;;
+    --mail-user)
+      MAIL_USER="$2"
+      shift 2
+      continue
       ;;
     --export=*)
       # Example: --export=ALL,JOB_SBAT_SCRIPT=/path/to/script
@@ -209,6 +218,8 @@ while IFS= read -r line; do
   esac
 done < "$script"
 
+
+
 # Fallbacks / derivations
 SLURM_JOB_PARTITION=${SLURM_JOB_PARTITION:-dev-g}
 SLURM_JOB_NUM_NODES=${SLURM_JOB_NUM_NODES:-1}
@@ -285,6 +296,7 @@ echo "SBATCH_OUTPUT         = $SBATCH_OUTPUT"
 echo "  => OUT_PATH         = $OUT_PATH"
 echo "SBATCH_ERROR          = $SBATCH_ERROR"
 echo "  => ERR_PATH         = $ERR_PATH"
+echo "MAIL_USER             = $MAIL_USER"
 echo "==================================="
 
 # Export into environment (so your helper scripts see a Slurm-like context)
@@ -292,7 +304,7 @@ export SLURM_JOB_ID SLURM_SUBMIT_DIR SLURM_JOB_ACCOUNT SLURM_JOB_PARTITION
 export SLURM_JOB_NUM_NODES SLURM_NTASKS SLURM_NTASKS_PER_NODE SLURM_CPUS_PER_TASK
 export SLURM_CPUS_PER_GPU SLURM_MEM_PER_GPU SLURM_MEM_PER_CPU SLURM_MEM_PER_NODE 
 export SLURM_GPUS_PER_NODE SLURM_STEP_ID SLURM_JOB_NAME JOB_SBAT_SCRIPT
-export SLURM_JOB_NODELIST
+export SLURM_JOB_NODELIST MAIL_USER
 
 
 # -------- single exec with the right redirections --------
@@ -301,14 +313,14 @@ export DRY_RUN=1   # Make sbatch-tail skip the real srun
 
 # Refuse to overwrite an existing file
 if [ -n "$OUT_PATH" ] && [ -e "$OUT_PATH" ]; then
-    echo "ERROR: Overwriting existing file: '$OUT_PATH'" >&2
+    echo "WARNING: Overwriting existing file: '$OUT_PATH'" >&2
     # echo "ERROR: Refusing to overwrite existing file: '$OUT_PATH'" >&2
     # exit 1
 else
     mkdir -p -- "$(dirname "$OUT_PATH")"
 fi
 if [ -n "$ERR_PATH" ] && [ -e "$ERR_PATH" ]; then
-    echo "ERROR: Overwriting existing file: '$ERR_PATH'" >&2
+    echo "WARNING: Overwriting existing file: '$ERR_PATH'" >&2
     # echo "ERROR: Refusing to overwrite existing file: '$ERR_PATH'" >&2
     # exit 1
 else
@@ -344,7 +356,11 @@ else
 fi
 if [ "$status" -ne 0 ]; then
     echo "❌ The script seems to have an execution problem (exit code $status)." >&2
-    echo "   Please fix it and I can continue to submit it." >&2
+    echo "---------------------------------------------------------------------"
+    tail "$ERR_PATH"
+    echo "---------------------------------------------------------------------"
+    echo "Please fix it and I can continue to submit it." >&2
 else
     echo "✅ Dry-run of your sbatch script completed successfully."
 fi
+exit $status

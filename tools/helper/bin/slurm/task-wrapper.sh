@@ -1,14 +1,14 @@
 #!/usr/bin/env -S -u BASH_ENV bash --noprofile --norc
-echo running task-wrapper.sh...
+echo running task-wrapper.sh...  1>&2
 
 THIS="${BASH_SOURCE[0]}"   # THIS is the wrapper file path (argv0 label to show in ps/top).
 BASENAME=$(basename "$0")  # BASENAME becomes the name you invoked the wrapper as (e.g. python, pip).
 THISDIR=$(cd -P -- "$(dirname -- "$THIS")" && pwd) || { echo "cannot resolve THISDIR" >&2; return 1 2>/dev/null || exit 1; }
 BASEDIR=$(cd -P -- "$THISDIR/.." && pwd)           || { echo "cannot resolve BASEDIR" >&2; return 1 2>/dev/null || exit 1; }
 
-echo "THIS    : $THIS"     # helper/bin/slurm/task-wrapper.sh
-echo "THISDIR : $THISDIR"  # helper/bin/slurm
-echo "BASEDIR : $BASEDIR"  # helper/bin
+echo "THIS    : $THIS"     1>&2 # helper/bin/slurm/task-wrapper.sh
+echo "THISDIR : $THISDIR"  1>&2 # helper/bin/slurm
+echo "BASEDIR : $BASEDIR"  1>&2 # helper/bin
 
 source $BASEDIR/../install/common.sh
 require_vars SLURM_PROCID SLURM_LOCALID SLURM_NODEID RUN_SCRIPT RUN_ARGS
@@ -19,7 +19,7 @@ DEV="GPU (${SLURM_NODEID},${SLURM_LOCALID}) "
 #             SOFTWARE STACK LOADER               #
 ###################################################
 
-echo $DEV "Loading the software stack at node ${SLURM_NODEID}"
+echo $DEV "Loading the software stack at node ${SLURM_NODEID}" 1>&2
 if [ "${SLURM_NODEID:-}" = 0 ]; then
     source $BASEDIR/../install/module-loads.sh 
 else
@@ -134,12 +134,12 @@ fi
 # MAMMOTH use one launcher per node (the "else" branch).
 # Expose all local GPUs to the launcher, no VISIBILITY.
 #
-echo $DEV ==============================================
-echo $DEV " SYSTEM                    : $SYSTEM"
-echo $DEV " TASK_PATTERN              : $TASK_PATTERN"
-echo $DEV " CUDA_VISIBLE_DEVICES      : ${CUDA_VISIBLE_DEVICES-}"
-echo $DEV " HIP_VISIBLE_DEVICES       : ${HIP_VISIBLE_DEVICES-}"
-echo $DEV " ROCR_VISIBLE_DEVICES      : ${ROCR_VISIBLE_DEVICES-}"
+echo $DEV ============================================== 1>&2
+echo $DEV " SYSTEM                    : $SYSTEM"         1>&2
+echo $DEV " TASK_PATTERN              : $TASK_PATTERN"   1>&2
+echo $DEV " CUDA_VISIBLE_DEVICES      : ${CUDA_VISIBLE_DEVICES-}"  1>&2
+echo $DEV " HIP_VISIBLE_DEVICES       : ${HIP_VISIBLE_DEVICES-}"   1>&2
+echo $DEV " ROCR_VISIBLE_DEVICES      : ${ROCR_VISIBLE_DEVICES-}"  1>&2
 
 ###################################################
 #   OpenMP settings tied to SLURM_CPUS_PER_TASK   #
@@ -162,7 +162,7 @@ echo $DEV " ROCR_VISIBLE_DEVICES      : ${ROCR_VISIBLE_DEVICES-}"
 #   : "${OMP_PLACES:=cores}"
 #   export OMP_NUM_THREADS OMP_PROC_BIND OMP_PLACES
 # 
-# echo $DEV ==============================================
+# echo $DEV ==============================================  
 # echo $DEV " OMP_NUM_THREADS           : $OMP_NUM_THREADS"
 # echo $DEV " OMP_PROC_BIND             : $OMP_PROC_BIND"
 # echo $DEV " OMP_PLACES                : $OMP_PLACES"
@@ -192,17 +192,17 @@ RUNTIME_ARGS=("-u")
 require_vars MASTER_PORT MASTER_ADDR SLURM_NODEID
 POST_ARGS=(--node_rank "${NODE_RANK}" --master_port "${MASTER_PORT}" \
 		       --master_ip "${MASTER_ADDR}")
-echo $DEV ==============================================
-echo $DEV " SLURM_JOB_NAME              : $SLURM_JOB_NAME"
-echo $DEV " SLURM_NODEID  (--node_rank) : $SLURM_NODEID"
-echo $DEV " SLURM_NTASKS (--world_size) : $SLURM_NTASKS"
-echo $DEV " MASTER_PORT (--master_port) : $MASTER_PORT"
-echo $DEV " MASTER_ADDR (--master_addr) : $MASTER_ADDR"
-echo $DEV ==============================================
-echo $DEV " RUNTIME           : $RUNTIME"
-echo $DEV " RUNTIME_ARGS      : ${RUNTIME_ARGS[@]}"
-echo $DEV " COMMAND LINE ARGS : $RUN_SCRIPT $RUN_ARGS"
-echo $DEV " POST_ARGS         : ${POST_ARGS[@]}"
+echo $DEV ==============================================    1>&2
+echo $DEV " SLURM_JOB_NAME              : $SLURM_JOB_NAME"  1>&2
+echo $DEV " SLURM_NODEID  (--node_rank) : $SLURM_NODEID"    1>&2
+echo $DEV " SLURM_NTASKS (--world_size) : $SLURM_NTASKS"    1>&2
+echo $DEV " MASTER_PORT (--master_port) : $MASTER_PORT"     1>&2
+echo $DEV " MASTER_ADDR (--master_addr) : $MASTER_ADDR"     1>&2
+echo $DEV ==============================================    1>&2
+echo $DEV " RUNTIME           : $RUNTIME"                   1>&2
+echo $DEV " RUNTIME_ARGS      : ${RUNTIME_ARGS[@]}"         1>&2
+echo $DEV " COMMAND LINE ARGS : $RUN_SCRIPT $RUN_ARGS"      1>&2
+echo $DEV " POST_ARGS         : ${POST_ARGS[@]}"            1>&2
 
 
 ###################################################
@@ -237,9 +237,9 @@ export MIOPEN_USER_DB_PATH="${MIOPEN_USER_DB_PATH:-$BASE/$USER-miopen-${SLURM_JO
 export MIOPEN_CUSTOM_CACHE_DIR="${MIOPEN_CUSTOM_CACHE_DIR:-$MIOPEN_USER_DB_PATH}"
 mkdir -p -- "$MIOPEN_USER_DB_PATH" >/dev/null 2>&1 || true
 #
-echo $DEV ==============================================
-echo $DEV " MIOPEN_USER_DB_PATH       : $MIOPEN_USER_DB_PATH"
-echo $DEV " MIOPEN_CUSTOM_CACHE_DIR   : $MIOPEN_CUSTOM_CACHE_DIR"
+echo $DEV ==============================================          1>&2
+echo $DEV " MIOPEN_USER_DB_PATH       : $MIOPEN_USER_DB_PATH"     1>&2
+echo $DEV " MIOPEN_CUSTOM_CACHE_DIR   : $MIOPEN_CUSTOM_CACHE_DIR" 1>&2
 
 ###################################################
 #             ADDITIONAL RCCL VARIABLES           #
@@ -256,10 +256,10 @@ if [ "${COMMS_DEBUG:-0}" = 1 ]; then
     # export PLUGIN_DIR=base/mammoth-helper/helper/lib  # This has symlinks to /opt/aws-ofi-rccl/librccl-net.so
     # export LD_LIBRARY_PATH=base/mammoth-helper/helper/lib:$LD_LIBRARY_PATH
     
-    echo $DEV ==============================================
-    echo $DEV " RCCL_DEBUG                : ${RCCL_DEBUG:-}"
-    echo $DEV " RCCL_DEBUG_SUBSYS         : ${RCCL_DEBUG_SUBSYS:-}"
-    echo $DEV " TORCH_DISTRIBUTED_DEBUG   : ${TORCH_DISTRIBUTED_DEBUG:-}"
+    echo $DEV ==============================================             1>&2
+    echo $DEV " RCCL_DEBUG                : ${RCCL_DEBUG:-}"             1>&2
+    echo $DEV " RCCL_DEBUG_SUBSYS         : ${RCCL_DEBUG_SUBSYS:-}"      1>&2
+    echo $DEV " TORCH_DISTRIBUTED_DEBUG   : ${TORCH_DISTRIBUTED_DEBUG:-}"  1>&2
 fi
 
 ###################################################
@@ -268,10 +268,10 @@ fi
 
 .  $THISDIR/smi-monitor.sh
 
-echo $DEV ==============================================
-echo $DEV " MON_PID       : ${MON_PID:-}"
-echo $DEV " MON_OUT       : ${MON_OUT:-}"
-echo $DEV ==============================================
+echo $DEV ============================================== 1>&2
+echo $DEV " MON_PID       : ${MON_PID:-}"                1>&2
+echo $DEV " MON_OUT       : ${MON_OUT:-}"                1>&2
+echo $DEV ============================================== 1>&2
 
 ###################################################
 #        RUNNING THE TASK OF THE CURRENT NODE     #

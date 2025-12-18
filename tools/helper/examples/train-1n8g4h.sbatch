@@ -5,9 +5,9 @@
 #    sbatch-dev-g   -A <accoount> -J <job-name> <this-file> 
 #    sbatch-small-g -A <accoount> -J <job-name> <this-file> 
 
-#SBATCH --time=0-08:00:00                         
-#SBATCH --nodes=4
-#SBATCH --gpus-per-node=1                 # preferred way to specify GPUs
+#SBATCH --time=0-04:00:00                         
+#SBATCH --nodes=1
+#SBATCH --gpus-per-node=8                 # preferred way to specify GPUs
 
 # DO NOT CHANGE THE END OF THE SCRIPT REGULARLY
 

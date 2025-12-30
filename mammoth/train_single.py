@@ -215,7 +215,8 @@ def main(
     valid_iter = _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager)
 
     # Perform validation before training starts if requested
-    if opts.valid_at_start and valid_iter is not None and device_context.is_master():
+    # Each device validates its own assigned tasks (those with validation paths)
+    if opts.valid_at_start and valid_iter is not None:
         logger.info("{} - Performing validation before training starts".format(device_context.id))
         valid_stats = trainer.validate(iter_on_device(valid_iter, device_context))
 
@@ -233,6 +234,10 @@ def main(
                 logger.info("{} - Pre-training validation completed, but no BLEU metrics available".format(device_context.id))
         else:
             logger.info("{} - Pre-training validation returned no statistics".format(device_context.id))
+
+        # Synchronize all devices after pre-training validation
+        if device_context.is_distributed():
+            torch.distributed.barrier()
 
     if len(opts.gpu_ranks):
         if device_context.is_master():

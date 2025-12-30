@@ -79,18 +79,27 @@ def _reattach_batch_tensors(obj):
         return obj
 
 
-def multi_init(opts, global_rank):
+def multi_init(opts, global_rank, local_rank=None):
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
         master_ip=opts.master_ip, master_port=opts.master_port
     )
 
     dist_world_size = opts.world_size
-    torch.distributed.init_process_group(
-        backend=opts.gpu_backend,
-        init_method=dist_init_method,
-        rank=global_rank,
-        world_size=dist_world_size,
-    )
+
+    # Prepare init_process_group arguments
+    init_args = {
+        'backend': opts.gpu_backend,
+        'init_method': dist_init_method,
+        'rank': global_rank,
+        'world_size': dist_world_size,
+    }
+
+    # Add device_id for NCCL backend to avoid warnings
+    # This tells NCCL which GPU this process should use
+    if local_rank is not None and opts.gpu_backend == 'nccl':
+        init_args['device_id'] = torch.device(f'cuda:{local_rank}')
+
+    torch.distributed.init_process_group(**init_args)
 
     gpu_rank = torch.distributed.get_rank()
 
@@ -342,7 +351,7 @@ def consumer(
         )
         logger.info(f"opts.gpu_ranks {opts.gpu_ranks}")
         if device_context.context == DeviceContextEnum.MULTI_GPU:
-            multi_init(opts, device_context.global_rank)
+            multi_init(opts, device_context.global_rank, device_context.local_rank)
         # error_queue not passed (is this intentional?)
         process_fn(
             opts,

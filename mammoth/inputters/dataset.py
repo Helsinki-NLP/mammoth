@@ -63,7 +63,7 @@ def read_examples_from_files(
         # Only log during training, not validation (validation always resets to line 1)
         start_line = offset if offset is not None else 0
         if is_train and line_idx < start_line + 5:
-            logger.info(
+            logger.warning(
                 f"[DataLoader] Line {line_idx + 1}: "
                 f"SRC={src_str.strip()[:100]} "
                 f"TGT={tgt_str.strip()[:100] if tgt_str else 'None'}"
@@ -282,7 +282,7 @@ class ParallelCorpus(IterableDataset):
 
         # ensure we only restore the first time the corpus is restored
         if self._line_idx_restore is not None:
-            logger.info(f'restoring {self.corpus_id} to line: {self._line_idx_restore}')
+            logger.warning(f'restoring {self.corpus_id} to line: {self._line_idx_restore}')
             if self.stride is not None:
                 # sanity check
                 assert (self._line_idx_restore - self.offset) % self.stride == 0, \

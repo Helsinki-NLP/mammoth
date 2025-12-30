@@ -329,14 +329,14 @@ class DynamicDatasetIter(object):
                         # De-numericalize a few sentences for debugging
                         # FIXME should be debug, not warn
                         logger.warning(
-                            f'src shape: {batch.src[0].shape} tgt shape: {batch.tgt.shape} '
+                            f'src shape: {batch.src.tensor.shape} tgt shape: {batch.tgt.tensor.shape} '
                             f'batch size: {batch.batch_size}'
                         )
                         src_vocab = self.vocabs_dict[('src', metadata.src_lang)]
                         tgt_vocab = self.vocabs_dict[('tgt', metadata.tgt_lang)]
-                        for sent_idx in range(min(3, batch.src[0].shape[2])):
-                            toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src[0][:, sent_idx, 0]]
+                        for sent_idx in range(min(3, batch.src.tensor.shape[2])):
+                            toks = [src_vocab.itos[tok_id.item()] for tok_id in batch.src.tensor[:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.src_lang} src: {" ".join(toks)}')
-                            toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt[:, sent_idx, 0]]
+                            toks = [tgt_vocab.itos[tok_id.item()] for tok_id in batch.tgt.tensor[:, sent_idx, 0]]
                             logger.warning(f'{sent_idx} {metadata.tgt_lang} tgt: {" ".join(toks)}')
                     yield batch, metadata, batch_task_sample.training_step

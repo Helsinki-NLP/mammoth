@@ -3,10 +3,71 @@
 ## Overview
 
 This branch mainly works on two fronts:
-- Introduces HuggingFace model integration capabilities to Mammoth, enabling seamless conversion and use of pre-trained HuggingFace models within the Mammoth translation framework.  
+- Introduces HuggingFace model integration capabilities to Mammoth, enabling seamless conversion and use of pre-trained HuggingFace models within the Mammoth translation framework.
 - Improves Mammoth's core training and model architecture features.
 
 For usage instructions, please refer to README.md.
+
+## What Was Updated (30-Dec-2025)
+
+**Multi-Task Validation and Checkpoint Improvements**
+
+- **Multi-Task Best Checkpoint Selection (Issue #148)**: Complete reimplementation of best checkpoint saving with distributed metric aggregation
+  - Metrics gathered across all devices/tasks using conservative aggregation strategy
+  - For BLEU/accuracy (higher is better): uses `min` across tasks to ensure all tasks perform well
+  - For PPL/loss (lower is better): uses `max` across tasks to catch worst-performing tasks
+  - Best checkpoints now include all tasks, not just task on device 0:0
+  - Enhanced checkpoint discovery supporting explicit `*_best_frame.pt` naming pattern
+  - Comprehensive metadata tracking for all validation metrics across checkpoints
+
+- **Beam Search in Validation**: In-training validation now uses same generation method as inference
+  - Added `beam_size` parameter to training config for consistent validation metrics
+  - New `_generate_predictions_autoregressive()` method implementing beam search/greedy search
+  - Validation results now match post-training inference metrics
+  - Note: Practically, only `beam_size: 1` is viable due to OOM constraints with larger beams
+
+- **Conditional Validation Execution**: Validation now only runs on devices with validation data configured
+  - Only tasks with both `path_valid_src` and `path_valid_tgt` defined will perform validation
+  - Devices without validation data skip validation but participate in synchronization
+  - Pre-training validation (`valid_at_start`) runs on all devices with validation data, not just master
+
+- **Enhanced Restoration Logging**: Training restoration from checkpoints now shows information across all devices
+  - Dataset continuation logging changed from `info` to `warning` level for better visibility
+  - Restoration messages now appear for all tasks, showing correct starting points
+  - First 5 lines of data logged for verification during continuation
+
+**Distributed Training Stability**
+
+- **NCCL Synchronization Improvements**: Added distributed barriers to prevent timeout issues
+  - Barrier after validation steps ensures all devices stay synchronized
+  - Barrier after checkpoint file writes ensures all components saved before renaming
+  - NCCL backend now uses explicit `device_id` parameter to suppress warnings
+
+**Code Quality and Refactoring**
+
+- **Batch Structure Standardization**: Unified batch tensor access patterns
+  - Changed `batch.src[0]` → `batch.src.tensor` and `batch.tgt` → `batch.tgt.tensor`
+  - Improved code consistency across dataloader and dataset modules
+
+- **Training Options Consolidation**: Integrated decoding options into training configuration
+  - Beam search parameters now available in training config without parameter conflicts
+  - Conflict prevention for overlapping parameters (`max_length`, reproducibility options)
+
+- **Config Cleanup**: Removed obsolete configuration files
+  - Deleted `training_ft.yaml` and `translation_config.yaml`
+
+**Files Modified:**
+- `mammoth/distributed/communication.py`: NCCL device_id parameter (+7 lines)
+- `mammoth/inputters/dataloader.py`: Batch structure refactoring (+8 lines)
+- `mammoth/inputters/dataset.py`: Logging level adjustments (+4 lines)
+- `mammoth/opts.py`: Decoding options integration (+11 lines)
+- `mammoth/train_single.py`: Pre-training validation enhancement (+7 lines)
+- `mammoth/trainer.py`: Validation with beam search, distributed synchronization (+332 lines)
+- `mammoth/utils/model_saver.py`: Multi-task metric aggregation, checkpoint management (+287 lines)
+
+**Files Deleted:**
+- `training_ft.yaml`: Obsolete configuration (-92 lines)
+- `translation_config.yaml`: Obsolete configuration (-29 lines)
 
 ## What Was Updated (11-Dec-2025)
 

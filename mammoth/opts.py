@@ -910,9 +910,11 @@ def train_opts(parser):
     # options relate to train
     model_opts(parser)
     _add_train_general_opts(parser)
+    # Add decoding options for validation during training (skip reproducibility since already added)
+    _add_decoding_opts(parser, include_reproducibility=False)
 
 
-def _add_decoding_opts(parser):
+def _add_decoding_opts(parser, include_reproducibility=True):
     group = parser.add_argument_group('Beam Search')
     beam_size = group.add('--beam_size', '-beam_size', type=int, default=5, help='Beam size')
     group.add('--ratio', '-ratio', type=float, default=-0.0, help="Ratio based beam stop condition")
@@ -946,7 +948,8 @@ def _add_decoding_opts(parser):
         help="If doing random sampling, divide the logits by this before computing softmax during decoding.",
     )
     group._group_actions.append(beam_size)
-    _add_reproducibility_opts(parser)
+    if include_reproducibility:
+        _add_reproducibility_opts(parser)
 
     group = parser.add_argument_group('Penalties', '.. Note:: Coverage Penalty is not available in sampling.')
     # Alpha and Beta values for Google Length + Coverage penalty
@@ -987,7 +990,9 @@ def _add_decoding_opts(parser):
     )
     # Decoding Length constraint
     group.add('--min_length', '-min_length', type=int, default=0, help='Minimum prediction length')
-    group.add('--max_length', '-max_length', type=int, default=100, help='Maximum prediction length.')
+    # Only add max_length if not already added (training opts already has it)
+    if include_reproducibility:
+        group.add('--max_length', '-max_length', type=int, default=100, help='Maximum prediction length.')
     group.add(
         '--max_sent_length', '-max_sent_length', action=DeprecateAction, help="Deprecated, use `-max_length` instead"
     )

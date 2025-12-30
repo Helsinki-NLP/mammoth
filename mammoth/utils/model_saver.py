@@ -38,13 +38,34 @@ def load_frame_checkpoint(checkpoint_path):
     This function is intended to be called before the fork:
     the model itself has not yet been constructed, so we don't want to load its parameters.
     We need the vocabs and data loader state from the frame.
+
+    When a directory is passed, it tries to find checkpoints in this order:
+    1. Explicit "best" naming: *_best_frame.pt
+    2. Step-based naming: *_step_*_frame.pt (sorted by step number, takes latest)
     """
     checkpoint = None
     if checkpoint_path:
         if not checkpoint_path.endswith(".pt"):
-            frames = glob(os.path.join(checkpoint_path + "*frame*pt"))
-            frames.sort(key=lambda s: int(s.split("step_")[-1].split("_frame")[0]))
-            checkpoint_path = frames[-1]
+            # Directory passed - try explicit "best" naming first
+            best_frame = glob(os.path.join(checkpoint_path + "*_best_frame.pt"))
+
+            if best_frame:
+                # Found a best checkpoint with explicit naming
+                checkpoint_path = best_frame[0]
+                logger.info(f"Loading best checkpoint: {checkpoint_path}")
+            else:
+                # Fall back to step-based discovery
+                frames = glob(os.path.join(checkpoint_path + "*_step_*_frame.pt"))
+                if frames:
+                    frames.sort(key=lambda s: int(s.split("step_")[-1].split("_frame")[0]))
+                    checkpoint_path = frames[-1]
+                    logger.info(f"Loading checkpoint by step number: {checkpoint_path}")
+                else:
+                    raise FileNotFoundError(
+                        f"No checkpoint found at {checkpoint_path}. "
+                        f"Looked for both *_best_frame.pt and *_step_*_frame.pt patterns."
+                    )
+
         logger.info("Loading frame checkpoint from %s" % checkpoint_path)
         checkpoint = torch.load(
             checkpoint_path,
@@ -387,6 +408,60 @@ class ModelSaver(ModelSaverBase):
         else:
             return current < best
 
+    def _aggregate_metrics_across_devices(self, metric_value, device_context):
+        """Aggregate validation metrics across all devices in distributed training.
+
+        In multi-task distributed training, each device validates its own tasks.
+        This method collects metrics from all devices and uses a conservative
+        aggregation strategy that focuses on the worst-performing task:
+
+        - PPL/loss (lower is better): use max (worst-performing task)
+        - BLEU/accuracy (higher is better): use min (worst-performing task)
+
+        This ensures we don't save a checkpoint that excels at one task
+        while performing poorly on others.
+
+        Args:
+            metric_value: Metric value from this device (None if no validation data)
+            device_context: Distributed training device context
+
+        Returns:
+            float: Aggregated metric value
+        """
+        if not device_context.is_distributed():
+            # Single device - no aggregation needed
+            return metric_value
+
+        # Gather metrics from all devices
+        all_metrics = [None for _ in range(device_context.world_size)]
+        torch.distributed.all_gather_object(all_metrics, metric_value)
+
+        # Filter out None values (devices without validation data)
+        valid_metrics = [m for m in all_metrics if m is not None]
+
+        if not valid_metrics:
+            logger.warning("No validation metrics collected from any device!")
+            return metric_value if metric_value is not None else float('inf')
+
+        # Choose aggregation strategy based on metric type (conservative approach)
+        if self.greater_is_better:
+            # For BLEU, accuracy (higher is better): use min (worst-performing task)
+            aggregated = min(valid_metrics)
+            strategy = 'min'
+        else:
+            # For PPL, loss (lower is better): use max (worst-performing task)
+            aggregated = max(valid_metrics)
+            strategy = 'max'
+
+        if device_context.is_master():
+            logger.info(
+                f"Multi-task metric aggregation ({strategy}): "
+                f"collected {len(valid_metrics)} metrics {[f'{m:.4f}' for m in valid_metrics]}, "
+                f"aggregated = {aggregated:.4f}"
+            )
+
+        return aggregated
+
     def _extract_metric_value(self, valid_stats):
         """Extract the configured metric value from validation statistics.
 
@@ -496,7 +571,8 @@ class ModelSaver(ModelSaverBase):
                 "step": self.best_checkpoint_step,
                 "metric_name": self.metric_for_best_model,
                 "metric_value": float(self.best_metric_value) if self.best_checkpoint_step else None,
-                "all_metrics": self.checkpoint_metadata.get(self.best_checkpoint_step, {}) if self.best_checkpoint_step else {}
+                "all_metrics": self.checkpoint_metadata.get(self.best_checkpoint_step, {}) if self.best_checkpoint_step else {},
+                "uses_explicit_naming": self.save_strategy != 'steps'
             },
             "all_checkpoints": {
                 str(step): {k: float(v) if isinstance(v, (int, float)) else v
@@ -572,22 +648,24 @@ class ModelSaver(ModelSaverBase):
                 self._rm_checkpoint_by_step(step)
                 del self.checkpoint_metadata[step]
 
-    def save_with_metric(self, step, data_state, valid_stats, moving_average=None):
+    def save_with_metric(self, step, data_state, valid_stats, device_context, moving_average=None):
         """Save checkpoint with validation metric tracking.
 
         This is the main entry point that replaces the regular save() method
         when using metric-based checkpoint management. It:
         1. Extracts the metric value from validation stats
-        2. Saves the checkpoint (via _save)
-        3. Determines if this is a new best
-        4. Updates best checkpoint tracking
-        5. Rotates old checkpoints based on the strategy
-        6. Writes metadata file
+        2. Aggregates metrics across all devices (for multi-task training)
+        3. Saves the checkpoint (via _save)
+        4. Determines if this is a new best
+        5. Updates best checkpoint tracking
+        6. Rotates old checkpoints based on the strategy
+        7. Writes metadata file
 
         Args:
             step: Current training step
             data_state: Data iterator state
-            valid_stats: Statistics object with validation metrics
+            valid_stats: Statistics object with validation metrics (None if no validation on this device)
+            device_context: Distributed training device context
             moving_average: Optional moving average model state
 
         Returns:
@@ -596,19 +674,27 @@ class ModelSaver(ModelSaverBase):
         if self.keep_checkpoint == 0 or step == self.last_saved_step:
             return False
 
-        # Extract metric value from valid_stats
-        try:
-            metric_value = self._extract_metric_value(valid_stats)
-        except ValueError as e:
-            logger.warning(f"Could not extract metric: {e}. Falling back to regular save.")
-            self.save(step, data_state, moving_average)
-            return False
+        # Extract metric value from valid_stats (None if this device has no validation data)
+        metric_value = None
+        if valid_stats is not None:
+            try:
+                metric_value = self._extract_metric_value(valid_stats)
+            except ValueError as e:
+                logger.warning(f"Could not extract metric: {e}. Falling back to regular save.")
+                self.save(step, data_state, moving_average)
+                return False
 
-        # Store metadata for this checkpoint
-        self.checkpoint_metadata[step] = self._get_all_metrics(valid_stats)
+        # Aggregate metrics across all devices in distributed training
+        aggregated_metric = self._aggregate_metrics_across_devices(metric_value, device_context)
 
-        # Determine if this is a new best checkpoint
-        is_new_best = self._is_better_metric(metric_value, self.best_metric_value)
+        # Store metadata for this checkpoint (only on master device)
+        if device_context.is_master() and valid_stats is not None:
+            self.checkpoint_metadata[step] = self._get_all_metrics(valid_stats)
+            # Add aggregated metric to metadata
+            self.checkpoint_metadata[step]['aggregated_' + self.metric_for_best_model] = aggregated_metric
+
+        # Determine if this is a new best checkpoint (using aggregated metric)
+        is_new_best = self._is_better_metric(aggregated_metric, self.best_metric_value)
 
         # Handle moving average temporarily if provided
         save_model = self.model
@@ -627,33 +713,168 @@ class ModelSaver(ModelSaverBase):
             for param_data, param in zip(model_params_data, save_model.parameters()):
                 param.data = param_data
 
+        # CRITICAL: Synchronize all devices after saving checkpoint files
+        # This ensures all devices have finished writing their components to disk
+        # before we attempt to rename files (which requires all files to exist)
+        if device_context.is_distributed():
+            torch.distributed.barrier()
+
         # Update best checkpoint tracking
         if is_new_best:
             old_best_step = self.best_checkpoint_step
-            self.best_metric_value = metric_value
+            self.best_metric_value = aggregated_metric
             self.best_checkpoint_step = step
             self.best_checkpoint_files = checkpoint_files
 
             logger.info(
                 f"New best checkpoint at step {step} with "
-                f"{self.metric_for_best_model}={metric_value:.4f}"
+                f"aggregated {self.metric_for_best_model}={aggregated_metric:.4f}"
             )
             if old_best_step is not None:
                 logger.info(f"Previous best was step {old_best_step}")
 
-        # Handle checkpoint rotation based on strategy
-        if self.save_strategy != 'steps':  # Metric-based strategies
-            self._rotate_checkpoints_by_metric()
-        elif self.keep_checkpoint > 0:  # Original FIFO behavior
-            if len(self.checkpoint_queue) == self.checkpoint_queue.maxlen:
-                todel = self.checkpoint_queue.popleft()
-                self._rm_checkpoint(todel)
-            self.checkpoint_queue.append(checkpoint_files)
+            # Apply explicit naming when save_strategy is metric-based
+            # Only the master device should rename files to avoid race conditions
+            if self.save_strategy != 'steps' and device_context.is_master():
+                # Revert old best checkpoint to step-based naming (if exists)
+                if old_best_step is not None:
+                    self._revert_best_checkpoint_naming(old_best_step)
 
-        # Write checkpoint metadata file
-        self._write_checkpoint_metadata()
+                # Apply explicit naming to new best checkpoint
+                self._apply_best_checkpoint_naming(step, checkpoint_files)
+
+        # Handle checkpoint rotation based on strategy
+        # Only the master device should manage checkpoint files (rotation and metadata)
+        if device_context.is_master():
+            if self.save_strategy != 'steps':  # Metric-based strategies
+                self._rotate_checkpoints_by_metric()
+            elif self.keep_checkpoint > 0:  # Original FIFO behavior
+                if len(self.checkpoint_queue) == self.checkpoint_queue.maxlen:
+                    todel = self.checkpoint_queue.popleft()
+                    self._rm_checkpoint(todel)
+                self.checkpoint_queue.append(checkpoint_files)
+
+            # Write checkpoint metadata file
+            self._write_checkpoint_metadata()
 
         return is_new_best
+
+    def _apply_best_checkpoint_naming(self, step, checkpoint_files):
+        """Rename checkpoint files from step-based to explicit best naming.
+
+        Renames files matching pattern:
+            {base_path}_step_{step}_{component}.pt -> {base_path}_best_{component}.pt
+            {base_path}_step_{step}_{component}_optim.pt -> {base_path}_best_{component}_optim.pt
+
+        This makes the best checkpoint easy to identify and load with train_from.
+
+        IMPORTANT: In distributed training, each device only saves its own components,
+        but we need to rename ALL components for this step (across all devices).
+        Therefore, we use glob to find all files for this step, not just checkpoint_files.
+
+        Args:
+            step: Step number of the best checkpoint
+            checkpoint_files: List of checkpoint file paths that were just saved by THIS device
+        """
+        renamed_files = []
+
+        # Find ALL checkpoint files for this step (across all devices)
+        # Pattern: {base_path}_step_{step}_*.pt
+        checkpoint_dir = os.path.dirname(self.base_path) or '.'
+        base_name = os.path.basename(self.base_path)
+        step_pattern = f"{base_name}_step_{step}_*.pt"
+
+        all_step_files = glob(os.path.join(checkpoint_dir, step_pattern))
+
+        if not all_step_files:
+            logger.warning(f"No checkpoint files found for step {step} with pattern {step_pattern}")
+            return
+
+        logger.info(f"Renaming {len(all_step_files)} checkpoint files to 'best' naming for step {step}")
+
+        for old_path in all_step_files:
+            filename = os.path.basename(old_path)
+            # Remove the .pt extension
+            name_without_ext = filename.rsplit('.pt', 1)[0]
+            # Split by _step_{step}_
+            parts = name_without_ext.split(f'_step_{step}_', 1)
+
+            if len(parts) == 2:
+                # Get the directory path
+                dir_path = os.path.dirname(old_path)
+                base_prefix = parts[0]  # e.g., model (without path)
+                component_suffix = parts[1]  # e.g., encoder or encoder_optim
+
+                # Construct new path with "best" naming
+                new_filename = f"{base_prefix}_best_{component_suffix}.pt"
+                if dir_path:
+                    new_path = os.path.join(dir_path, new_filename)
+                else:
+                    new_path = new_filename
+
+                try:
+                    # Rename the file
+                    os.rename(old_path, new_path)
+                    renamed_files.append(new_path)
+                    logger.debug(f"Renamed best checkpoint: {old_path} -> {new_path}")
+                except OSError as e:
+                    logger.warning(f"Failed to rename {old_path} to {new_path}: {e}")
+                    renamed_files.append(old_path)  # Keep old path if rename fails
+            else:
+                logger.warning(f"Could not parse checkpoint path for renaming: {old_path}")
+                renamed_files.append(old_path)
+
+        # Update the tracked best checkpoint files with new paths
+        self.best_checkpoint_files = renamed_files
+
+        logger.info(f"Successfully renamed {len(renamed_files)} files to 'best' naming")
+
+    def _revert_best_checkpoint_naming(self, step):
+        """Revert checkpoint files from explicit best naming back to step-based naming.
+
+        This is called when a new best checkpoint is found, and we need to handle
+        the old best checkpoint. The old best checkpoint is reverted to step-based
+        naming so it can be managed by the normal rotation logic.
+
+        Renames files matching pattern:
+            {base_path}_best_{component}.pt -> {base_path}_step_{step}_{component}.pt
+            {base_path}_best_{component}_optim.pt -> {base_path}_step_{step}_{component}_optim.pt
+
+        Args:
+            step: Step number to revert to (the old best checkpoint's step)
+        """
+        # Find all files with "best" naming in the checkpoint directory
+        checkpoint_dir = os.path.dirname(self.base_path) or '.'
+        base_name = os.path.basename(self.base_path)
+        checkpoint_pattern = f"{base_name}_best_*.pt"
+
+        best_files = glob(os.path.join(checkpoint_dir, checkpoint_pattern))
+
+        for old_path in best_files:
+            filename = os.path.basename(old_path)
+            # Remove the .pt extension
+            name_without_ext = filename.rsplit('.pt', 1)[0]
+            # Split by _best_
+            parts = name_without_ext.split('_best_', 1)
+
+            if len(parts) == 2:
+                dir_path = os.path.dirname(old_path)
+                base_prefix = parts[0]  # e.g., model
+                component_suffix = parts[1]  # e.g., encoder or encoder_optim
+
+                # Construct new path with step-based naming
+                new_filename = f"{base_prefix}_step_{step}_{component_suffix}.pt"
+                if dir_path:
+                    new_path = os.path.join(dir_path, new_filename)
+                else:
+                    new_path = new_filename
+
+                try:
+                    # Rename the file
+                    os.rename(old_path, new_path)
+                    logger.debug(f"Reverted best checkpoint naming: {old_path} -> {new_path}")
+                except OSError as e:
+                    logger.warning(f"Failed to rename {old_path} to {new_path}: {e}")
 
     def _save(self, step, model, data_state, task_queue_manager):
         model = model.module if isinstance(model, nn.DataParallel) else model

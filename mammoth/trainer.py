@@ -114,6 +114,8 @@ def build_trainer(
         report_training_accuracy=opts.report_training_accuracy,
         valid_metrics=opts.valid_metrics,
         vocabs_dict=vocabs_dict,
+        beam_size=opts.beam_size,
+        max_length=opts.max_length,
     )
     return trainer
 
@@ -163,6 +165,8 @@ class Trainer(object):
         report_training_accuracy=False,
         valid_metrics=None,
         vocabs_dict=None,
+        beam_size=5,
+        max_length=100,
     ):
         # Basic attributes.
         self.model = model
@@ -189,6 +193,8 @@ class Trainer(object):
         self.task_queue_manager = task_queue_manager
         self.valid_metrics = valid_metrics or []
         self.vocabs_dict = vocabs_dict or {}
+        self.beam_size = beam_size
+        self.max_length = max_length
 
         self._data_state = {}
 
@@ -347,18 +353,25 @@ class Trainer(object):
                 sampled_task_counts=sampled_task_counts,
             )
 
-            if step % valid_steps == 0 and valid_iter is not None:
-                # Only run validation on master rank to avoid NCCL timeout issues
-                if device_context.is_master():
+            # Validation step - each device validates its own tasks with validation data
+            if step % valid_steps == 0:
+                valid_stats = None
+
+                # Only validate if this device has tasks with validation data
+                if valid_iter is not None:
+                    # Each device validates its own assigned tasks (those with validation paths)
                     if self.gpu_verbose_level > 0:
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
+
                     valid_stats = self.validate(
                         iter_on_device(valid_iter, device_context),
                         moving_average=self.moving_average,
                     )
+
                     # Store last validation stats for use at end of training
                     self._last_valid_stats = valid_stats
 
+                    # Report validation stats for this device's tasks
                     if self.gpu_verbose_level > 0:
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} report valid stat step {step}')
                     self._report_step(
@@ -366,15 +379,27 @@ class Trainer(object):
                         step,
                         valid_stats=valid_stats,
                     )
+                else:
+                    # This device has no tasks with validation data
+                    if self.gpu_verbose_level > 0:
+                        logger.info(f'{device_context.node_rank}:{device_context.local_rank} skipping validation (no validation data)')
 
-                    # Save checkpoint with metric tracking after validation
-                    if self.model_saver is not None:
-                        self.model_saver.save_with_metric(
-                            step, self._data_state, valid_stats, moving_average=self.moving_average
-                        )
+                # Synchronize all devices after validation to avoid timeouts
+                # This barrier ensures all devices (with or without validation data) stay in sync
+                if device_context.is_distributed():
+                    torch.distributed.barrier()
 
-                    # Run patience mechanism only on master rank
-                    if self.earlystopper is not None:
+                # All ranks must call save_with_metric to participate in collective operations
+                # (metric aggregation and data state gathering), but only master actually saves files
+                if self.model_saver is not None:
+                    self.model_saver.save_with_metric(
+                        step, self._data_state, valid_stats, device_context, moving_average=self.moving_average
+                    )
+
+                # Only master device handles early stopping
+                if device_context.is_master():
+                    # Run patience mechanism only on master rank (only if master has validation stats)
+                    if self.earlystopper is not None and valid_stats is not None:
                         self.earlystopper(valid_stats, step)
                         # If the patience has reached the limit, stop training
                         if self.earlystopper.has_stopped():
@@ -398,7 +423,7 @@ class Trainer(object):
             # Use save_with_metric if we have validation stats, otherwise use regular save
             if hasattr(self, '_last_valid_stats') and self._last_valid_stats is not None:
                 self.model_saver.save_with_metric(
-                    step, self._data_state, self._last_valid_stats, moving_average=self.moving_average
+                    step, self._data_state, self._last_valid_stats, device_context, moving_average=self.moving_average
                 )
             else:
                 # Fallback to regular save if no validation has been run
@@ -436,8 +461,187 @@ class Trainer(object):
                 
         return metrics
 
+    def _generate_predictions_autoregressive(self, batch, metadata, valid_model):
+        """Generate predictions using autoregressive decoding (like inference).
+
+        Args:
+            batch: Validation batch
+            metadata: Task metadata
+            valid_model: Model to use for generation
+
+        Returns:
+            List of predicted token sequences
+        """
+        from mammoth.translate.greedy_search import GreedySearch
+        from mammoth.translate.beam_search import BeamSearch, GNMTGlobalScorer
+
+        batch_size = batch.batch_size
+
+        # Activate the correct components
+        active_encoder = valid_model.encoder.activate(
+            task_id=metadata.corpus_id,
+            adapter_ids=metadata.encoder_adapter_ids,
+        )
+        active_decoder = valid_model.decoder.activate(
+            task_id=metadata.corpus_id,
+            adapter_ids=metadata.decoder_adapter_ids,
+        )
+
+        # Get device and dtype for mixed precision
+        device = torch.device(f'cuda:{self.device_context.local_rank}' if self.device_context.is_gpu() else 'cpu')
+        device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
+        dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
+
+        # Run encoder with autocast for consistent dtype
+        with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
+            src = rearrange(batch.src.tensor, 't b 1 -> b t')
+            src_mask = rearrange(batch.src.mask, 't b -> b t')
+            encoder_output = active_encoder(x=src, mask=src_mask, return_embeddings=True)
+
+            # Apply attention bridge if it exists
+            if valid_model.attention_bridge is not None:
+                encoder_output, alphas = valid_model.attention_bridge(encoder_output, src_mask)
+                if valid_model.attention_bridge.is_fixed_length:
+                    src_mask = None
+
+        # Get special tokens - need to access vocabulary
+        tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))
+
+        if isinstance(tgt_vocab, HFTokenizerVocab):
+            # HF tokenizer vocab - use specials dictionary
+            from mammoth.constants import DefaultTokens
+            pad_idx = tgt_vocab.specials.get(DefaultTokens.PAD)
+            bos_idx = tgt_vocab.specials.get(DefaultTokens.BOS)
+            eos_idx = tgt_vocab.specials.get(DefaultTokens.EOS)
+            unk_idx = tgt_vocab.specials.get(DefaultTokens.UNK)
+
+            if None in (pad_idx, bos_idx, eos_idx, unk_idx):
+                raise ValueError(
+                    f"Missing special tokens in vocabulary. Found: "
+                    f"PAD={pad_idx}, BOS={bos_idx}, EOS={eos_idx}, UNK={unk_idx}"
+                )
+        elif hasattr(tgt_vocab, 'stoi'):
+            # Traditional vocab
+            pad_idx = tgt_vocab.stoi.get('<pad>', 1)
+            bos_idx = tgt_vocab.stoi.get('<s>', 0)
+            eos_idx = tgt_vocab.stoi.get('</s>', 2)
+            unk_idx = tgt_vocab.stoi.get('<unk>', 3)
+        else:
+            raise ValueError(f"Unknown vocabulary type: {type(tgt_vocab)}")
+
+        # Get beam size and max_length from trainer attributes
+        beam_size = self.beam_size
+        max_length = self.max_length
+
+        # Create global scorer with default parameters
+        global_scorer = GNMTGlobalScorer(
+            alpha=0.0,
+            beta=0.0,
+            length_penalty='none',
+            coverage_penalty='none',
+        )
+
+        # Create decode strategy
+        if beam_size == 1:
+            # Greedy search for speed
+            decode_strategy = GreedySearch(
+                pad=pad_idx,
+                bos=bos_idx,
+                eos=eos_idx,
+                unk=unk_idx,
+                batch_size=batch_size,
+                global_scorer=global_scorer,
+                min_length=0,
+                max_length=max_length,
+                block_ngram_repeat=0,
+                exclusion_tokens=set(),
+                sampling_temp=0,
+                keep_topk=1,
+                keep_topp=0,
+                beam_size=1,
+                ban_unk_token=False,
+                device=device,
+            )
+        else:
+            # Beam search
+            decode_strategy = BeamSearch(
+                beam_size=beam_size,
+                batch_size=batch_size,
+                pad=pad_idx,
+                bos=bos_idx,
+                eos=eos_idx,
+                unk=unk_idx,
+                n_best=1,
+                global_scorer=global_scorer,
+                min_length=0,
+                max_length=max_length,
+                block_ngram_repeat=0,
+                exclusion_tokens=set(),
+                stepwise_penalty=False,
+                ratio=-0.0,
+                ban_unk_token=False,
+                device=device,
+                dtype=dtype,
+            )
+
+        # Initialize decode strategy
+        decode_strategy.initialize(
+            target_prefix=None,
+            encoder_output=encoder_output,
+            src_mask=src_mask,
+        )
+
+        # Autoregressive generation loop with autocast for consistent dtype
+        for step in range(max_length):
+            decoder_input = decode_strategy.alive_seq
+
+            with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
+                # Forward pass through decoder
+                logits_for_whole_sequence, new_cache = active_decoder(
+                    decoder_input,
+                    context=decode_strategy.encoder_output_tiled,
+                    context_mask=decode_strategy.src_mask_tiled,
+                    return_attn=False,
+                    return_embeddings=False,
+                    return_intermediates=True,
+                    cache=decode_strategy.cache,
+                    seq_start_pos=None,
+                )
+
+                if active_decoder.can_cache_kv:
+                    decode_strategy.set_cache(new_cache)
+
+                # Get logits for the last position
+                logits = logits_for_whole_sequence[:, -1]
+                log_probs = torch.log_softmax(logits, dim=-1)
+
+            # Advance decode strategy
+            decode_strategy.advance(log_probs)
+
+            # Check if done
+            if decode_strategy.is_finished.any():
+                decode_strategy.update_finished()
+                if decode_strategy.done:
+                    break
+
+        # Extract predictions (take first from n_best for each batch item)
+        predictions = []
+        for batch_idx in range(batch_size):
+            if len(decode_strategy.predictions[batch_idx]) > 0:
+                # Take the best prediction (first one)
+                pred_tokens = decode_strategy.predictions[batch_idx][0]
+                if isinstance(pred_tokens, torch.Tensor):
+                    pred_tokens = pred_tokens.tolist()
+                # Remove BOS and EOS tokens
+                pred_tokens = [t for t in pred_tokens if t not in (bos_idx, eos_idx, pad_idx)]
+                predictions.append(pred_tokens)
+            else:
+                predictions.append([])
+
+        return predictions
+
     def validate(self, valid_iter, moving_average=None, task=None):
-        """Validate model.
+        """Validate model using autoregressive generation.
             valid_iter: validate data iterator
         Returns:
             :obj:`nmt.Statistics`: validation loss statistics
@@ -466,7 +670,10 @@ class Trainer(object):
             # which would then cause a zero devision when normalizing PPL per words.
             stats = None  # mammoth.utils.Statistics()
 
+            import random
+
             for batch, metadata, _ in valid_iter:
+                logged_sample_idx = random.randint(0, batch.batch_size - 1)
                 if stats is None:
                     stats = mammoth.utils.Statistics(n_correct=0)
 
@@ -510,66 +717,63 @@ class Trainer(object):
                     padding_idx,
                 )
                 
-                # Collect predictions and references for additional metrics
+                # Collect predictions and references for additional metrics using AUTOREGRESSIVE GENERATION
                 if compute_metrics:
-                    # Get predicted tokens (argmax from logits)
-                    pred_tokens = logits.argmax(dim=-1)  # Shape: [seq_len, batch_size]
-                    
-                    # Get target vocab for decoding using the stored vocabs_dict
+                    # Generate predictions autoregressively (like real inference)
+                    logger.info("[VALIDATION] Generating translations autoregressively")
+                    pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model)
+
+                    # Get target vocab for decoding
                     tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))
-                    
+
                     if tgt_vocab is not None:
-                        # Use HF tokenizer's decode if available, otherwise fall back to manual decoding
-                        if isinstance(tgt_vocab, HFTokenizerVocab):
-                            # Decode using HF tokenizer's built-in decoder
-                            # This properly handles BPE merging, subword markers, and special token removal
-                            for b in range(pred_tokens.size(1)):  # batch dimension
-                                pred_seq = pred_tokens[:, b].tolist()
-                                ref_seq = target[:, b, 0].tolist()
+                        # Decode generated predictions and references
+                        for b in range(batch.batch_size):
+                            # Get reference sequence
+                            ref_seq = target[:, b, 0].tolist()
+                            # Filter out padding
+                            ref_seq = [t for t in ref_seq if t != padding_idx]
 
-                                # Filter out padding tokens before decoding
-                                # (HF tokenizer handles special token removal via skip_special_tokens)
-                                pred_seq = [t for t in pred_seq if t != padding_idx]
-                                ref_seq = [t for t in ref_seq if t != padding_idx]
+                            # Get generated prediction (already filtered in _generate_predictions_autoregressive)
+                            pred_seq = pred_token_seqs[b] if b < len(pred_token_seqs) else []
 
-                                if pred_seq and ref_seq:
-                                    # Use tokenizer's decode method - handles BPE merging, subword markers, etc.
+                            if pred_seq and ref_seq:
+                                # Decode to text
+                                if isinstance(tgt_vocab, HFTokenizerVocab):
                                     pred_text = tgt_vocab.decode_tokens(pred_seq, skip_special_tokens=True).strip()
                                     ref_text = tgt_vocab.decode_tokens(ref_seq, skip_special_tokens=True).strip()
-
-                                    if pred_text and ref_text:
-                                        predictions.append(pred_text)
-                                        references.append(ref_text)
-                        else:
-                            # Fallback for traditional Vocab (backward compatibility)
-                            for b in range(pred_tokens.size(1)):  # batch dimension
-                                pred_seq = pred_tokens[:, b].tolist()
-                                ref_seq = target[:, b, 0].tolist()
-
-                                # Convert tokens to words, filtering out padding and special tokens
-                                pred_words = []
-                                ref_words = []
-
-                                for token in pred_seq:
-                                    if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
-                                        word = tgt_vocab.itos[token]
-                                        # Skip special tokens like <s>, </s>, <pad>, <unk>
-                                        if not word.startswith('<') or not word.endswith('>'):
-                                            pred_words.append(word)
-
-                                for token in ref_seq:
-                                    if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
-                                        word = tgt_vocab.itos[token]
-                                        # Skip special tokens like <s>, </s>, <pad>, <unk>
-                                        if not word.startswith('<') or not word.endswith('>'):
-                                            ref_words.append(word)
-
-                                # Join words to create sentences, only if we have content
-                                if pred_words and ref_words:
+                                else:
+                                    # Traditional vocab
+                                    pred_words = []
+                                    ref_words = []
+                                    for token in pred_seq:
+                                        if hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                            word = tgt_vocab.itos[token]
+                                            if not (word.startswith('<') and word.endswith('>')):
+                                                pred_words.append(word)
+                                    for token in ref_seq:
+                                        if hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                            word = tgt_vocab.itos[token]
+                                            if not (word.startswith('<') and word.endswith('>')):
+                                                ref_words.append(word)
                                     pred_text = ' '.join(pred_words)
                                     ref_text = ' '.join(ref_words)
+
+                                # Log randomly sampled example from each batch
+                                if b == logged_sample_idx:
+                                    logger.info(f"[VALIDATION SAMPLE] Example {b} (AUTOREGRESSIVE)")
+                                    # logger.info(f"  pred_tokens: {pred_seq[:20]}")
+                                    # logger.info(f"  ref_tokens: {ref_seq[:20]}")
+                                    logger.info(f"  pred_text ({len(pred_text.split())} words): {pred_text[:200]}")
+                                    logger.info(f"  ref_text ({len(ref_text.split())} words):  {ref_text[:200]}")
+
+                                if pred_text and ref_text:
                                     predictions.append(pred_text)
                                     references.append(ref_text)
+                                else:
+                                    logger.warning(f"[VALIDATION] Empty text after decoding: pred_empty={not pred_text}, ref_empty={not ref_text}")
+                            else:
+                                logger.warning(f"[VALIDATION] Empty token sequences: pred_len={len(pred_seq)}, ref_len={len(ref_seq)}")
                     else:
                         logger.warning(f"Could not find vocabulary for target language '{metadata.tgt_lang}', skipping BLEU computation for this batch")
                 

@@ -44,6 +44,8 @@ def read_examples_from_files(
     stride=None,
     offset=None,
     is_train=False,
+    verbose_dataloader=False,
+    device_rank=0,
 ):
     """Helper function to read examples"""
 
@@ -61,10 +63,11 @@ def read_examples_from_files(
 
         # Log first 5 lines of this training session for dataset continuation testing
         # Only log during training, not validation (validation always resets to line 1)
+        # By default, only master device (rank 0) logs; set verbose_dataloader=True for all devices
         start_line = offset if offset is not None else 0
-        if is_train and line_idx < start_line + 5:
-            logger.warning(
-                f"[DataLoader] Line {line_idx + 1}: "
+        if is_train and line_idx < start_line + 5 and (verbose_dataloader or device_rank == 0):
+            logger.info(
+                f"[DataLoader Rank {device_rank}] Line {line_idx + 1}: "
                 f"SRC={src_str.strip()[:100]} "
                 f"TGT={tgt_str.strip()[:100] if tgt_str else 'None'}"
             )
@@ -126,6 +129,8 @@ class ParallelCorpus(IterableDataset):
         max_length=None,
         line_idx_restore=None,
         model_max_seq_len=None,
+        verbose_dataloader=False,
+        device_rank=0,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -142,6 +147,8 @@ class ParallelCorpus(IterableDataset):
         self.max_length = max_length # for padding
         self.model_max_seq_len = model_max_seq_len
         self._line_idx_restore = line_idx_restore
+        self.verbose_dataloader = verbose_dataloader
+        self.device_rank = device_rank
 
     def _tokenize(self, string, side='src'):
         """
@@ -308,6 +315,8 @@ class ParallelCorpus(IterableDataset):
             stride=self.stride,
             offset=offset,
             is_train=self.is_train,
+            verbose_dataloader=self.verbose_dataloader,
+            device_rank=self.device_rank,
         )
         examples = map(_cast, examples)
         yield from examples
@@ -340,6 +349,7 @@ def get_corpus(
     tgt_vocab: Vocab,
     is_train: bool = False,
     line_idx_restore: int = None,
+    device_rank: int = 0,
 ):
     """build an iterable Dataset object"""
     # get transform classes to infer special tokens
@@ -376,6 +386,8 @@ def get_corpus(
         max_length=max_length,
         line_idx_restore=line_idx_restore,
         model_max_seq_len=model_max_seq_len,
+        verbose_dataloader=getattr(opts, 'verbose_dataloader', False),
+        device_rank=device_rank,
     )
     return dataset
 

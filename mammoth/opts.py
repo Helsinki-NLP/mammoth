@@ -46,6 +46,13 @@ def _add_logging_opts(parser, is_train=True):
         else 'Print scores and predictions for each sentence',
     )
     group.add(
+        '--verbose_dataloader',
+        '-verbose_dataloader',
+        action="store_true",
+        help='Show DataLoader line checking info from all devices (default: only master device logs). '
+             'Useful for debugging dataset continuation across distributed training.'
+    )
+    group.add(
         '--log_model_structure',
         '-log_model_structure',
         action="store_true",
@@ -97,6 +104,72 @@ def _add_logging_opts(parser, is_train=True):
             default=1,
             help="If verbose is set, will output the n_best decoded sentences",
         )
+
+
+def _add_profiling_opts(parser):
+    """PyTorch profiler options for performance analysis."""
+    group = parser.add_argument_group('Profiling')
+    group.add(
+        '--enable_profiling',
+        '-enable_profiling',
+        action='store_true',
+        help='Enable PyTorch profiler to capture performance traces. '
+        'This enables both the main training loop profiler and data pipeline profiling annotations. '
+        'Traces can be viewed in TensorBoard for analyzing communication overhead and bottlenecks.'
+    )
+    group.add(
+        '--profile_output_dir',
+        '-profile_output_dir',
+        type=str,
+        default='./profiling_logs',
+        help='Directory where profiler traces will be saved. Each rank saves to a separate subdirectory.'
+    )
+    group.add(
+        '--profile_wait',
+        '-profile_wait',
+        type=int,
+        default=1,
+        help='Number of steps to skip before profiler starts recording (warmup period).'
+    )
+    group.add(
+        '--profile_warmup',
+        '-profile_warmup',
+        type=int,
+        default=1,
+        help='Number of steps for profiler warmup (profiler active but not recording).'
+    )
+    group.add(
+        '--profile_active',
+        '-profile_active',
+        type=int,
+        default=3,
+        help='Number of steps to actively profile and record traces.'
+    )
+    group.add(
+        '--profile_repeat',
+        '-profile_repeat',
+        type=int,
+        default=1,
+        help='Number of times to repeat the profiling cycle (wait->warmup->active).'
+    )
+    group.add(
+        '--profile_record_shapes',
+        '-profile_record_shapes',
+        action='store_true',
+        help='Record tensor shapes in profiler traces. Useful for debugging but increases trace size.'
+    )
+    group.add(
+        '--profile_memory',
+        '-profile_memory',
+        action='store_true',
+        help='Profile memory usage. Useful for identifying memory bottlenecks.'
+    )
+    group.add(
+        '--profile_with_stack',
+        '-profile_with_stack',
+        action='store_true',
+        help='Record Python stack traces. Useful for detailed profiling but increases overhead.'
+    )
 
 
 def _add_reproducibility_opts(parser):
@@ -912,11 +985,13 @@ def train_opts(parser):
     _add_train_general_opts(parser)
     # Add decoding options for validation during training (skip reproducibility since already added)
     _add_decoding_opts(parser, include_reproducibility=False)
+    # Add profiling options for performance analysis
+    _add_profiling_opts(parser)
 
 
 def _add_decoding_opts(parser, include_reproducibility=True):
     group = parser.add_argument_group('Beam Search')
-    beam_size = group.add('--beam_size', '-beam_size', type=int, default=5, help='Beam size')
+    beam_size = group.add('--beam_size', '-beam_size', type=int, default=1, help='Beam size')
     group.add('--ratio', '-ratio', type=float, default=-0.0, help="Ratio based beam stop condition")
 
     group = parser.add_argument_group('Random Sampling')

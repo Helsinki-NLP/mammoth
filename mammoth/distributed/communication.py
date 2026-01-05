@@ -302,6 +302,18 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     logger.info("BATCH PRODUCER")
     logger.info(generator_to_serve)
 
+    # Initialize profiler if requested
+    enable_profiling = getattr(opts, 'enable_profiling', False)
+    profiler = None
+    if enable_profiling:
+        profiler = torch.profiler.profile(
+            activities=[torch.profiler.ProfilerActivity.CPU],
+            record_shapes=True,
+            profile_memory=True,
+            with_stack=True,
+        )
+        profiler.start()
+
     try:
         for batch, metadata, communication_batch_id in generator_to_serve:
             semaphore.acquire()
@@ -310,14 +322,30 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
             # batch.fields = list(batch.fields)
 
             # Detach tensors to prevent shared memory race conditions in multi-node training
-            batch_detached = _detach_batch_tensors(batch)
-            metadata_detached = _detach_batch_tensors(metadata)
+            if enable_profiling:
+                with torch.profiler.record_function("batch_tensor_detach_to_cpu"):
+                    batch_detached = _detach_batch_tensors(batch)
+                    metadata_detached = _detach_batch_tensors(metadata)
+            else:
+                batch_detached = _detach_batch_tensors(batch)
+                metadata_detached = _detach_batch_tensors(metadata)
 
             queue.put((batch_detached, metadata_detached, communication_batch_id))
     except KeyboardInterrupt:
         # Graceful shutdown on termination signal
         logger.info(f"BATCH PRODUCER {device_id} - Received shutdown signal, cleaning up...")
     finally:
+        # Save profiler results if enabled
+        if profiler is not None:
+            profiler.stop()
+            trace_path = f"batch_producer_profile_gpu{device_id}.json"
+            profiler.export_chrome_trace(trace_path)
+            logger.info(f"BATCH PRODUCER {device_id} - Profile saved to {trace_path}")
+
+            # Print summary statistics
+            logger.info(f"BATCH PRODUCER {device_id} - Profiling Summary:")
+            logger.info(profiler.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+
         # Send sentinel value to signal end of data stream
         try:
             semaphore.acquire()

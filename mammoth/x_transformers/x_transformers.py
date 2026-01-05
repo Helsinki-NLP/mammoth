@@ -3400,9 +3400,9 @@ class TransformerWrapper(Module):
                 final_logits_bias = final_logits_bias.squeeze(0)
             assert final_logits_bias.shape[0] == logits_dim, f'final_logits_bias shape {final_logits_bias.shape} does not match logits_dim {logits_dim}'
             self.final_logits_bias = nn.Parameter(final_logits_bias)
-            print(f"[DEBUG TransformerWrapper] Created final_logits_bias parameter: shape={self.final_logits_bias.shape}")
-        else:
-            print(f"[DEBUG TransformerWrapper] No final_logits_bias provided (final_logits_bias={'None' if final_logits_bias is None else 'exists but empty'})")
+        #     print(f"[DEBUG TransformerWrapper] Created final_logits_bias parameter: shape={self.final_logits_bias.shape}")
+        # else:
+        #     print(f"[DEBUG TransformerWrapper] No final_logits_bias provided (final_logits_bias={'None' if final_logits_bias is None else 'exists but empty'})")
 
         if return_only_embed:
             self.to_logits = None

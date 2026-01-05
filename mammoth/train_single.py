@@ -15,6 +15,9 @@ from mammoth.distributed import broadcast_tensors, _reattach_batch_tensors
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
+# PyTorch profiler imports
+from torch.profiler import profile, ProfilerActivity, schedule
+
 
 def configure_process(opts, device_id):
     logger.info("logger set device {} ".format(device_id))
@@ -78,7 +81,11 @@ def init_distributed(model, task_queue_manager):
 
     logger.debug('After init_distributed')
     for name, p in model.named_parameters():
-        logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: {p.flatten()[:10]}')
+        try:
+            sample = p.flatten()[:10]
+            logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: {sample}')
+        except (RuntimeError, OverflowError) as e:
+            logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: shape={p.shape}, device={p.device} (overflow: {str(e)[:50]})')
 
 
 def main(
@@ -201,11 +208,20 @@ def main(
     assert semaphore is not None
 
     def _train_iter():
+        enable_profiling = getattr(opts, 'enable_profiling', False)
         while True:
-            batch, metadata, communication_batch_id = batch_queue.get()
-            # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
-            batch = _reattach_batch_tensors(batch)
-            metadata = _reattach_batch_tensors(metadata)
+            if enable_profiling:
+                with torch.profiler.record_function("batch_queue_get"):
+                    batch, metadata, communication_batch_id = batch_queue.get()
+                # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
+                with torch.profiler.record_function("batch_tensor_reattach_from_cpu"):
+                    batch = _reattach_batch_tensors(batch)
+                    metadata = _reattach_batch_tensors(metadata)
+            else:
+                batch, metadata, communication_batch_id = batch_queue.get()
+                # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
+                batch = _reattach_batch_tensors(batch)
+                metadata = _reattach_batch_tensors(metadata)
             semaphore.release()
             # TODO: confirm that batch-providing corpus has already been to'd to the correct place
             yield batch, metadata, communication_batch_id
@@ -218,7 +234,7 @@ def main(
     # Each device validates its own assigned tasks (those with validation paths)
     if opts.valid_at_start and valid_iter is not None:
         logger.info("{} - Performing validation before training starts".format(device_context.id))
-        valid_stats = trainer.validate(iter_on_device(valid_iter, device_context))
+        valid_stats = trainer.validate(iter_on_device(valid_iter, device_context, getattr(opts, 'enable_profiling', False)))
 
         # Display BLEU validation results
         if valid_stats is not None:
@@ -246,14 +262,73 @@ def main(
         logger.info('Starting training on CPU, could be very slow')
     train_steps = opts.train_steps
     logger.info("{} - Starting training".format(device_context.id))
-    trainer.train(
-        train_iter,
-        train_steps,
-        save_checkpoint_steps=opts.save_checkpoint_steps,
-        valid_iter=valid_iter,
-        valid_steps=opts.valid_steps,
-        device_context=device_context,
-    )
+
+    # PyTorch profiler wrapper for performance analysis
+    if getattr(opts, 'enable_profiling', False):
+        logger.info("{} - PyTorch profiler ENABLED".format(device_context.id))
+        logger.info("{} - Profiler config: wait={}, warmup={}, active={}, repeat={}".format(
+            device_context.id,
+            opts.profile_wait,
+            opts.profile_warmup,
+            opts.profile_active,
+            opts.profile_repeat
+        ))
+
+        # Create profiler output directory per rank to avoid conflicts
+        profile_dir = f'{opts.profile_output_dir}/rank_{device_context.global_rank}'
+        logger.info("{} - Profiler traces will be saved to: {}".format(device_context.id, profile_dir))
+
+        with profile(
+            activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+            schedule=schedule(
+                wait=opts.profile_wait,
+                warmup=opts.profile_warmup,
+                active=opts.profile_active,
+                repeat=opts.profile_repeat
+            ),
+            on_trace_ready=torch.profiler.tensorboard_trace_handler(profile_dir),
+            record_shapes=opts.profile_record_shapes,
+            profile_memory=opts.profile_memory,
+            with_stack=opts.profile_with_stack,
+        ) as prof:
+            # Training loop with profiler
+            class ProfiledTrainIter:
+                """Wrapper to call prof.step() after each batch"""
+                def __init__(self, train_iter, profiler):
+                    self.train_iter = train_iter
+                    self.profiler = profiler
+
+                def __iter__(self):
+                    return self
+
+                def __next__(self):
+                    batch = next(self.train_iter)
+                    self.profiler.step()
+                    return batch
+
+            profiled_iter = ProfiledTrainIter(train_iter, prof)
+            trainer.train(
+                profiled_iter,
+                train_steps,
+                save_checkpoint_steps=opts.save_checkpoint_steps,
+                valid_iter=valid_iter,
+                valid_steps=opts.valid_steps,
+                device_context=device_context,
+            )
+
+        logger.info("{} - Profiling complete. View traces with: tensorboard --logdir={}".format(
+            device_context.id, opts.profile_output_dir
+        ))
+    else:
+        # Normal training without profiling
+        trainer.train(
+            train_iter,
+            train_steps,
+            save_checkpoint_steps=opts.save_checkpoint_steps,
+            valid_iter=valid_iter,
+            valid_steps=opts.valid_steps,
+            device_context=device_context,
+        )
 
     if trainer.report_manager.tensorboard_writer is not None:
         trainer.report_manager.tensorboard_writer.close()

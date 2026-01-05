@@ -288,6 +288,7 @@ class DynamicDatasetIter(object):
                     tgt_vocab,
                     is_train=self.is_train,
                     line_idx_restore=self.line_idx_restore.get(task.corpus_id, None),
+                    device_rank=self.task_queue_manager.device_context.global_rank,
                 ).to(device)
 
                 # iterator over minibatches

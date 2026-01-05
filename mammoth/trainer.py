@@ -28,18 +28,45 @@ try:
 except ImportError:
     SACREBLEU_AVAILABLE = False
 
+# PyTorch profiler support - works across all platforms (AMD/NVIDIA/CPU)
+# Profiler is only imported and used when enable_profiling=True to avoid any overhead
+
+from contextlib import contextmanager
+
+@contextmanager
+def _noop_record_function(name):
+    """No-op context manager for when profiling is disabled"""
+    yield
+
+
+def _get_profiler_function(enable_profiling):
+    """Returns either torch.profiler.record_function or a no-op based on enable_profiling flag"""
+    if enable_profiling:
+        from torch.profiler import record_function
+        logger.info("PyTorch profiler annotations ENABLED")
+        return record_function
+    else:
+        logger.debug("PyTorch profiler annotations DISABLED")
+        return _noop_record_function
+
 
 class NanLossException(Exception):
     pass
 
 
-def iter_on_device(iterator, device_context):
+def iter_on_device(iterator, device_context, enable_profiling=False):
+    """Move batches to device with optional profiling annotation"""
     if device_context.is_gpu():
         device = torch.device(f'cuda:{device_context.local_rank}')
     else:
         device = torch.device('cpu')
+
+    record_function = _get_profiler_function(enable_profiling)
+
     for batch, meta, comm_batch_id in iterator:
-        yield batch.to(device), meta, comm_batch_id
+        with record_function("data_transfer_to_device"):
+            batch_on_device = batch.to(device)
+        yield batch_on_device, meta, comm_batch_id
 
 
 def build_trainer(
@@ -116,6 +143,7 @@ def build_trainer(
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,
+        enable_profiling=getattr(opts, 'enable_profiling', False),
     )
     return trainer
 
@@ -165,8 +193,9 @@ class Trainer(object):
         report_training_accuracy=False,
         valid_metrics=None,
         vocabs_dict=None,
-        beam_size=5,
+        beam_size=1,
         max_length=100,
+        enable_profiling=False,
     ):
         # Basic attributes.
         self.model = model
@@ -195,6 +224,10 @@ class Trainer(object):
         self.vocabs_dict = vocabs_dict or {}
         self.beam_size = beam_size
         self.max_length = max_length
+        self.enable_profiling = enable_profiling
+
+        # Get profiling function (either real profiler or no-op)
+        self.record_function = _get_profiler_function(enable_profiling)
 
         self._data_state = {}
 
@@ -251,7 +284,7 @@ class Trainer(object):
         Returns:
             The gathered statistics.
         """
-        train_iter = iter_on_device(train_iter, device_context)
+        train_iter = iter_on_device(train_iter, device_context, self.enable_profiling)
         if valid_iter is None:
             logger.info('Start training loop without validation...')
         else:
@@ -287,43 +320,55 @@ class Trainer(object):
 
             self.accum_count = self._accum_count(self.optim.training_step)
             self.task_queue_manager.accum_count = self.accum_count
-            batches_with_meta = islice(train_iter, self.accum_count)
+
+            with self.record_function(f"data_preparation_step_{step}"):
+                batches_with_meta = islice(train_iter, self.accum_count)
+                # Convert to list to materialize all batches and measure data loading time
+                batches_with_meta = list(batches_with_meta)
 
             batch_task_sample = self.task_queue_manager.sample_corpus_ids()
             my_task = batch_task_sample.tasks[self.task_queue_manager.global_rank]
 
             gradient_syncs = self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample)
 
-            self._gradient_accumulation(
-                batches_with_meta,
-                total_stats,
-                report_stats,
-                my_task,
-                gradient_syncs,
-            )
-
-            for gradient_sync in gradient_syncs:
-                component = gradient_sync.component
-                if not component.needs_communication():
-                    # Omit components not found elsewhere, as these don't need to be communicated
-                    # logger.warning(f'Omitting (single device) {component.get_name()}')   # DEBUG
-                    continue
-                # logger.warning(f'Syncing {component.get_name()}')   # DEBUG
-                params = component.named_parameters(self.model)
-                # gradient_sync.gradient_norm counts the number of devices that trained this component
-                # this doesn't normalize the number of masked tokens
-                mammoth.distributed.externally_managed_reduce_and_rescale_grads(
-                    named_parameters=params,
-                    has_local_gradient=gradient_sync.has_local_gradient,
-                    gradient_norm=gradient_sync.gradient_norm,
-                    group=component.group,
+            with self.record_function(f"gradient_accumulation_step_{step}"):
+                self._gradient_accumulation(
+                    batches_with_meta,
+                    total_stats,
+                    report_stats,
+                    my_task,
+                    gradient_syncs,
                 )
+
+            with self.record_function(f"gradient_sync_step_{step}"):
+                for idx, gradient_sync in enumerate(gradient_syncs):
+                    component = gradient_sync.component
+                    if not component.needs_communication():
+                        # Omit components not found elsewhere, as these don't need to be communicated
+                        # logger.warning(f'Omitting (single device) {component.get_name()}')   # DEBUG
+                        continue
+                    # logger.warning(f'Syncing {component.get_name()}')   # DEBUG
+
+                    # Annotate per-component gradient synchronization
+                    component_name = component.get_name() if hasattr(component, 'get_name') else f"component_{idx}"
+
+                    with self.record_function(f"allreduce_{component_name}"):
+                        params = component.named_parameters(self.model)
+                        # gradient_sync.gradient_norm counts the number of devices that trained this component
+                        # this doesn't normalize the number of masked tokens
+                        mammoth.distributed.externally_managed_reduce_and_rescale_grads(
+                            named_parameters=params,
+                            has_local_gradient=gradient_sync.has_local_gradient,
+                            gradient_norm=gradient_sync.gradient_norm,
+                            group=component.group,
+                        )
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
             # Including single-device components
-            self.optim.externally_managed_step(gradient_syncs)
-            self.optim.zero_grad()
+            with self.record_function(f"optimizer_step_{step}"):
+                self.optim.externally_managed_step(gradient_syncs)
+                self.optim.zero_grad()
 
             # if step % 1000 == 0 and step > 0:
             #     TODO: if you are going to uncomment that block, please make it optional
@@ -364,7 +409,7 @@ class Trainer(object):
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
 
                     valid_stats = self.validate(
-                        iter_on_device(valid_iter, device_context),
+                        iter_on_device(valid_iter, device_context, self.enable_profiling),
                         moving_average=self.moving_average,
                     )
 
@@ -387,7 +432,8 @@ class Trainer(object):
                 # Synchronize all devices after validation to avoid timeouts
                 # This barrier ensures all devices (with or without validation data) stay in sync
                 if device_context.is_distributed():
-                    torch.distributed.barrier()
+                    with self.record_function("barrier_post_validation"):
+                        torch.distributed.barrier()
 
                 # All ranks must call save_with_metric to participate in collective operations
                 # (metric aggregation and data state gathering), but only master actually saves files
@@ -658,7 +704,7 @@ class Trainer(object):
             model_params_data = []
             for avg, param in zip(self.moving_average, valid_model.parameters()):
                 model_params_data.append(param.data)
-                param.data = avg.data.half() if self.optim._fp16 == "legacy" else avg.data
+                param.data = avg.data
 
         # Set model in validating mode.
         valid_model.eval()
@@ -677,7 +723,8 @@ class Trainer(object):
                 if stats is None:
                     stats = mammoth.utils.Statistics(n_correct=0)
 
-                stats.n_src_words += batch.src.mask.sum().item()
+                # Use tensor accumulation instead of .item() to avoid GPU sync
+                stats._add_tensor('n_src_words_tensor', 'n_src_words', batch.src.mask.sum())
                 src = batch.src.tensor
                 src_mask = batch.src.mask
                 decoder_input = batch.tgt.tensor[:-1]
@@ -690,28 +737,31 @@ class Trainer(object):
                 # Determine device and dtype for mixed precision training
                 device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
                 dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
-                with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
-                    # F-prop through the model.
-                    logits, decoder_output = valid_model(
-                        rearrange(src, 't b 1 -> b t'),
-                        rearrange(decoder_input, 't b 1 -> b t'),
-                        rearrange(src_mask, 't b -> b t'),
-                        metadata=metadata,
-                    )
-                    logits = rearrange(logits, 'b t i -> t b i')
-                    decoder_output = rearrange(decoder_output, 'b t d -> t b d')
 
-                    # Compute loss.
-                    loss = self.loss_functions[metadata.tgt_lang](
-                        rearrange(logits, 't b i -> (t b) i'),
-                        rearrange(target, 't b 1 -> (t b)'),
-                    )
-                    # loss /= normalization
+                with self.record_function("validation_forward_pass"):
+                    with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
+                        # F-prop through the model.
+                        logits, decoder_output = valid_model(
+                            rearrange(src, 't b 1 -> b t'),
+                            rearrange(decoder_input, 't b 1 -> b t'),
+                            rearrange(src_mask, 't b -> b t'),
+                            metadata=metadata,
+                        )
+                        logits = rearrange(logits, 'b t i -> t b i')
+                        decoder_output = rearrange(decoder_output, 'b t d -> t b d')
+
+                        # Compute loss.
+                        loss = self.loss_functions[metadata.tgt_lang](
+                            rearrange(logits, 't b i -> (t b) i'),
+                            rearrange(target, 't b 1 -> (t b)'),
+                        )
+                        # loss /= normalization
 
                 # Update statistics.
+                # Pass loss as tensor to avoid GPU->CPU sync (Megatron-style optimization)
                 padding_idx = self.loss_functions[metadata.tgt_lang].ignore_index
                 batch_stats = Statistics.from_loss_logits_target(
-                    loss.item(),
+                    loss,  # Keep as tensor, no .item() call
                     logits,
                     target,
                     padding_idx,
@@ -802,6 +852,8 @@ class Trainer(object):
         gradient_syncs,
     ):
         normalization = 0
+        # Megatron-style: accumulate normalization as tensor on GPU
+        normalization_tensor = None
         seen_comm_batches = set()
         expected_metadata = my_task.get_serializable_metadata()
 
@@ -820,12 +872,23 @@ class Trainer(object):
             # update data state
             self._data_state[metadata.corpus_id] = batch.line_idx
 
-            num_tokens = batch.tgt.mask.sum().item()
+            # Use tensor accumulation for num_tokens to avoid GPU sync
+            # We keep it as a tensor and only sync when computing the final loss
+            num_tokens_tensor = batch.tgt.mask.sum()
+
             if self.norm_method == "tokens":
-                normalization += num_tokens
+                # Megatron-style: accumulate as tensor on GPU, avoid .item() sync
+                if normalization_tensor is None:
+                    normalization_tensor = num_tokens_tensor.detach()
+                else:
+                    normalization_tensor += num_tokens_tensor
+                # Keep scalar normalization for backward compatibility (but don't use it in hot path)
+                # normalization will be computed from normalization_tensor when needed
             else:
                 normalization += batch.batch_size
-            report_stats.n_src_words += batch.src.mask.sum().item()
+
+            # Use tensor accumulation instead of .item() to avoid GPU sync
+            report_stats._add_tensor('n_src_words_tensor', 'n_src_words', batch.src.mask.sum())
 
             # logger.info(f'batch with metadata {metadata}')
 
@@ -838,47 +901,58 @@ class Trainer(object):
 
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
-            with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
-                logits, decoder_output = self.model(
-                    src=rearrange(src, 't b 1 -> b t'),
-                    decoder_input=rearrange(decoder_input, 't b 1 -> b t'),
-                    src_mask=rearrange(src_mask, 't b -> b t'),
-                    metadata=metadata,
-                )
-                logits = rearrange(logits, 'b t i -> t b i')
-                decoder_output = rearrange(decoder_output, 'b t d -> t b d')
+            with self.record_function(f"forward_pass_batch_{k}"):
+                with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
+                    logits, decoder_output = self.model(
+                        src=rearrange(src, 't b 1 -> b t'),
+                        decoder_input=rearrange(decoder_input, 't b 1 -> b t'),
+                        src_mask=rearrange(src_mask, 't b -> b t'),
+                        metadata=metadata,
+                    )
+                    logits = rearrange(logits, 'b t i -> t b i')
+                    decoder_output = rearrange(decoder_output, 'b t d -> t b d')
 
-                # 3. Compute loss.
-                loss = self.loss_functions[metadata.tgt_lang](
-                    rearrange(logits, 't b i -> (t b) i'),
-                    rearrange(target, 't b 1 -> (t b)'),
-                )
-                # logger.info(loss)
+            with self.record_function(f"loss_computation_batch_{k}"):
+                with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
+                    # 3. Compute loss.
+                    loss = self.loss_functions[metadata.tgt_lang](
+                        rearrange(logits, 't b i -> (t b) i'),
+                        rearrange(target, 't b 1 -> (t b)'),
+                    )
+                    # logger.info(loss)
 
             if loss is not None:
                 if torch.isnan(loss):
                     raise NanLossException('Loss blowout')
                 # loss /= normalization
-                self.optim.backward(loss)
+                with self.record_function(f"backward_pass_batch_{k}"):
+                    self.optim.backward(loss)
 
+            # Megatron-style: defer loss.item() to reduce GPU->CPU synchronization
+            # We accumulate batch statistics with tensor values where possible
             if self.report_training_accuracy:
                 # Slow: requires max over logits, eq, masked_select
                 batch_stats = Statistics.from_loss_logits_target(
-                    loss.item(),
+                    loss,  # Keep as tensor to avoid GPU->CPU sync
                     logits,
                     target,
                     padding_idx=self.loss_functions[metadata.tgt_lang].ignore_index,
                 )
             else:
+                # Create statistics without calling .item() on loss or num_tokens
+                # Use the tensor version for both loss and n_words accumulation
                 batch_stats = Statistics(
-                    loss.item(),
-                    num_tokens,
+                    loss=0,  # Don't set scalar, will use tensor version
+                    n_words=0,   # Don't set scalar, will use tensor version
                     n_correct=None,
                 )
+                # Add loss and num_tokens as tensors to avoid GPU sync
+                batch_stats._add_tensor('loss_tensor', 'loss', loss)
+                batch_stats._add_tensor('n_words_tensor', 'n_words', num_tokens_tensor)
 
             total_stats.update(batch_stats)
             report_stats.update(batch_stats)
-            report_stats.update_task_loss(batch_stats.loss, metadata)
+            report_stats.update_task_loss(loss, metadata)
 
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')

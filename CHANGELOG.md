@@ -8,6 +8,35 @@ This branch mainly works on two fronts:
 
 For usage instructions, please refer to README.md.
 
+## What Was Updated (05-Jan-2026)
+
+**Training and Profiling Improvements**
+
+- **Verbose DataLoader Logging**: Added `--verbose_dataloader` option to show dataset continuation lines from all devices at INFO level
+  - Previous behavior: Only master device logged at INFO level, others logged at WARN level
+  - New behavior: All devices log at INFO level when flag is enabled
+  - Useful for debugging multi-device training synchronization
+
+- **PyTorch Profiler Integration**: Added comprehensive profiling support for performance optimization
+  - Master switch `--enable_profiling` controls all profiling (main training loop + data pipeline annotations)
+  - Removed separate `--profile_data_pipeline` option (now controlled by master switch)
+  - Zero profiling overhead when disabled (no-op context managers)
+  - Options include: `profile_output_dir`, `profile_wait`, `profile_warmup`, `profile_active`, `profile_repeat`
+  - Advanced options: `profile_record_shapes`, `profile_memory`, `profile_with_stack`
+  - **Note**: Only use for optimization/debugging due to overhead
+
+- **Default Beam Size for Validation**: Changed default `beam_size` from 5 to 1 for in-training validation
+  - Faster validation with greedy search (beam_size=1)
+  - Reduces validation time significantly during training
+  - Users can still set higher beam sizes for better quality validation if needed
+
+**Files Modified:**
+- `mammoth/opts.py`: Verbose dataloader option (+4 lines), profiling consolidation (-8 lines), beam_size default changed (1 line)
+- `mammoth/train_single.py`: Verbose dataloader logging (+2 lines), profiling flag updates (+2 lines)
+- `mammoth/trainer.py`: Conditional profiler implementation (+20 lines), profiling wrapper updates (+45 lines)
+- `mammoth/distributed/communication.py`: Profiling flag update (1 line)
+
+
 ## What Was Updated (30-Dec-2025)
 
 **Multi-Task Validation and Checkpoint Improvements**

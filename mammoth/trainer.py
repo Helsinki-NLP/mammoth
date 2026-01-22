@@ -370,6 +370,9 @@ class Trainer(object):
                 self.optim.externally_managed_step(gradient_syncs)
                 self.optim.zero_grad()
 
+            if device_context.is_gpu():
+                torch.cuda.empty_cache()
+
             # if step % 1000 == 0 and step > 0:
             #     TODO: if you are going to uncomment that block, please make it optional
             #     logger.info(f'After gradient sync {step}')
@@ -434,6 +437,10 @@ class Trainer(object):
                 if device_context.is_distributed():
                     with self.record_function("barrier_post_validation"):
                         torch.distributed.barrier()
+
+                # Clean up GPU memory after validation to free any remaining tensors
+                if device_context.is_gpu():
+                    torch.cuda.empty_cache()
 
                 # All ranks must call save_with_metric to participate in collective operations
                 # (metric aggregation and data state gathering), but only master actually saves files

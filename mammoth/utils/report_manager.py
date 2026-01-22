@@ -98,6 +98,12 @@ class ReportMgrBase(object):
             if optimizer is not None:
                 for line in optimizer.report_steps():
                     logger.info(line)
+
+            # Clear the counters after reporting to prevent memory leak
+            report_stats.loss_per_task.clear()
+            report_stats.param_magnitudes.clear()
+            report_stats.grad_magnitudes.clear()
+            
             n_correct = None if report_stats.n_correct is None else 0
             return mammoth.utils.Statistics(n_correct=n_correct)
         else:
@@ -168,6 +174,9 @@ class ReportMgr(ReportMgrBase):
             logger.info(f'Task sampling distribution: (total {total})')
             for task, count in sampled_task_counts.most_common():
                 logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+
+            # Clear the counter after reporting to prevent memory leak
+            sampled_task_counts.clear()                
 
         return report_stats
 

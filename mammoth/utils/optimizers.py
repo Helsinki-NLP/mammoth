@@ -158,9 +158,7 @@ class SubOptimizer(object):
         self.grad_scaler = grad_scaler
         self._training_step = 1
         self._decay_step = 1
-        self._n_clips = 0
-        self._n_params_tot = self._count_params()
-        self._max_grad_norm = max_grad_norm * self._n_params_tot
+        self._max_grad_norm = max_grad_norm
 
     @property
     def param_groups(self):
@@ -211,11 +209,8 @@ class SubOptimizer(object):
         for group in self._optimizer.param_groups:
             group['lr'] = learning_rate
             if self._max_grad_norm > 0:
-                orig_norm = clip_grad_norm_(group['params'], self._max_grad_norm)
-                if orig_norm.item() > self._max_grad_norm:
-                    # FIXME: debug. Count and log instead
-                    # print(f'Clipping {orig_norm} -> {self._max_grad_norm}')
-                    self._n_clips += 1
+                clip_grad_norm_(group['params'], self._max_grad_norm)
+
 
         if self.grad_scaler is not None:
             self.grad_scaler.step(self._optimizer)
@@ -363,9 +358,8 @@ class MultipleOptimizer(object):
         for name, optimizer in self.suboptimizers.items():
             count = optimizer.training_step
             lr = optimizer.learning_rate()
-            n_clips = optimizer._n_clips
-            result.append(f'Optimizer "{name}" has been stepped {count} times. LR {lr} n_clips {n_clips}')
-            optimizer._n_clips = 0
+            result.append(f'Optimizer "{name}" has been stepped {count} times. LR {lr}')
+
         return result
 
     def count_parameters(self):
@@ -416,9 +410,6 @@ class MultipleOptimizer(object):
     def amp(self):
         """True if use torch amp mix precision training."""
         return self.grad_scaler is not None
-
-    def n_clips(self):
-        return sum(optimizer._n_clips for optimizer in self.suboptimizers.values())
 
 
 # Code below is an implementation of https://arxiv.org/pdf/1804.04235.pdf

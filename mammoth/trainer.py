@@ -732,6 +732,7 @@ class Trainer(object):
 
                 # Use tensor accumulation instead of .item() to avoid GPU sync
                 stats._add_tensor('n_src_words_tensor', 'n_src_words', batch.src.mask.sum())
+                stats._add_tensor('n_sents_tensor', 'n_sents', batch.batch_size)
                 src = batch.src.tensor
                 src_mask = batch.src.mask
                 decoder_input = batch.tgt.tensor[:-1]
@@ -896,6 +897,10 @@ class Trainer(object):
 
             # Use tensor accumulation instead of .item() to avoid GPU sync
             report_stats._add_tensor('n_src_words_tensor', 'n_src_words', batch.src.mask.sum())
+            report_stats._add_tensor('n_sents_tensor', 'n_sents', batch.batch_size)
+
+            # Track cumulative sentence count (this persists across report_stats resets)
+            report_stats.cumulative_sents += batch.batch_size
 
             # logger.info(f'batch with metadata {metadata}')
 

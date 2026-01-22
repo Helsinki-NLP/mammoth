@@ -26,6 +26,8 @@ class Statistics(object):
         self.n_correct = n_correct
         self.n_src_words = 0
         self.start_time = time.time()
+        self.n_sents = 0
+        self.cumulative_sents = 0  # Cumulative sentence count since training began
 
         # Tensor versions (GPU) - for accumulation during training
         # These avoid expensive GPU->CPU synchronization
@@ -33,6 +35,7 @@ class Statistics(object):
         self.n_words_tensor = None
         self.n_correct_tensor = None
         self.n_src_words_tensor = None
+        self.n_sents_tensor = None
 
         # losses per task
         self.loss_per_task = Counter()
@@ -71,6 +74,9 @@ class Statistics(object):
         if self.n_src_words_tensor is not None:
             self.n_src_words = self.n_src_words_tensor.item()
             self.n_src_words_tensor = None
+        if self.n_sents_tensor is not None:
+            self.n_sents = self.n_sents_tensor.item()
+            self.n_sents_tensor = None
 
         # Materialize per-task loss tensors (Megatron-style)
         # Only sync when actually reporting, not during accumulation
@@ -227,6 +233,20 @@ class Statistics(object):
             else:
                 self.n_src_words += stat.n_src_words
 
+        # Handle n_sents - prefer tensor version if available
+        if stat.n_sents_tensor is not None:
+            self._add_tensor('n_sents_tensor', 'n_sents', stat.n_sents_tensor)
+        elif stat.n_sents:
+            # stat has scalar, but self might have tensor
+            if self.n_sents_tensor is not None:
+                # Convert scalar to tensor and accumulate
+                import torch
+                scalar_as_tensor = torch.tensor(stat.n_sents, device=self.n_sents_tensor.device)
+                self._add_tensor('n_sents_tensor', 'n_sents', scalar_as_tensor)
+            else:
+                # Both are scalars
+                self.n_sents += stat.n_sents
+
         # Handle per-task loss tensors
         # When gathering stats across GPUs or batches, merge the tensor dictionaries
         for task_key, loss_tensor in stat.loss_per_task_tensor.items():
@@ -377,7 +397,7 @@ class Statistics(object):
         ppl = self.ppl()
         ppl_str = f'{ppl:5.2f}' if ppl is not None else '--'
         logger.info(
-            ("%s: Step %s; acc: %s; ppl: %s; xent: %4.2f; %3.0f/%3.0f tok/s; %6.0f sec")
+            ("%s: Step %s; acc: %s; ppl: %s; xent: %4.2f; %3.0f/%3.0f tok/s; %6.0f sents; %6.0f sec;")
             % (
                 meta_str,
                 step_fmt,
@@ -387,6 +407,7 @@ class Statistics(object):
                 # learning_rate,    # was "lr: %7.5f;"
                 self.n_src_words / (t + 1e-5),
                 self.n_words / (t + 1e-5),
+                self.cumulative_sents,
                 time.time() - start,
             )
         )

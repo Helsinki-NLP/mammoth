@@ -103,9 +103,11 @@ class ReportMgrBase(object):
             report_stats.loss_per_task.clear()
             report_stats.param_magnitudes.clear()
             report_stats.grad_magnitudes.clear()
-            
+
             n_correct = None if report_stats.n_correct is None else 0
-            return mammoth.utils.Statistics(n_correct=n_correct)
+            new_stats = mammoth.utils.Statistics(n_correct=n_correct)
+            new_stats.cumulative_sents = report_stats.cumulative_sents
+            return new_stats
         else:
             return report_stats
 

@@ -118,7 +118,7 @@ class HFTokenizerVocab:
                 "Install with: pip install tokenizers"
             )
 
-        logger.info(f"Loading {tag} HuggingFace tokenizer from {tokenizer_path}")
+        logger.debug(f"Loading {tag} HuggingFace tokenizer from {tokenizer_path}")
 
         if not os.path.exists(tokenizer_path):
             raise RuntimeError(f"{tag} tokenizer not found at {tokenizer_path}")

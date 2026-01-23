@@ -497,8 +497,6 @@ class TaskQueueManager:
                     # going to be members of the group. Additionally, groups should be
                     # created in the same order in all processes.
                     component.group = new_group_func(sorted(component.global_ranks))
-                else:
-                    logger.info(f"{component.get_name()} is on a single device")
 
         sorted_components = list(builder)
         self.distributed_components = sorted_components

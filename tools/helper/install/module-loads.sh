@@ -23,7 +23,7 @@ fi
 . $MYDIR/common.sh
 # require_vars JOB_NODE_KIND || { is_sourced && return 1 || exit 1; }
 check_under "$HELPER" \
-	    modules/pytorch-rocm-mammoth/6.0.lua \
+	    modules/pytorch-rocm-mammoth/7.0.lua \
 	    modules/pytorch-rocm-mammoth/load-pytorch-rocm-mammoth.txt \
 	    wrappers/python || { is_sourced && return 1 || exit 1; }
 
@@ -143,6 +143,6 @@ if [ -n "${DEBUG:-}" ]; then
     echo
     echo "List of active modules:"
     module --redirect list 2>&1 |egrep '\)'
-    echo
+    echo "(end of the list.)"
 fi
 

@@ -27,27 +27,29 @@ rm -rf $BASEDIR/venv/{bin,include,lib,lib64,pyvenv.cfg,share}
 
 # building
 VENV="$BASEDIR/venv"
-singularity exec "$SING_IMAGE" bash -lc '
+echo "now: singularity exec "$SING_IMAGE"  env -u BASH_ENV  bash -lc "
+singularity exec "$SING_IMAGE"  env -u BASH_ENV bash -lc '
+            echo "now: python -m venv --system-site-packages '"$VENV"'"
 	    python -m venv --system-site-packages "'"$VENV"'"
+	    echo "now: . '"$VENV"'/bin/activate"
 	    . "'"$VENV"'/bin/activate"
+	    echo "now: PIP_REQUIRE_VIRTUALENV=1 python -m pip install --no-user -U pip"
 	    export PIP_REQUIRE_VIRTUALENV=1
 	    python -m pip install --no-user -U pip
+	    echo "now: PIP_REQUIRE_VIRTUALENV=1 python -m pip install --no-user -r '"$THISDIR"'/requirements_lumi.txt"'
 	    python -m pip install --no-user -r "'"$THISDIR"'/requirements_lumi.txt"'
 
 
 
-echo "Usage: initialisation"
+echo "To activate the modules, the singularity and the environment:"
 echo "    . $BASEDIR/install/module-loads.sh"
-echo "Usage: singularity + venv activation @ python"
-echo "    python"
-echo "    import loguru, frozendict, configargparse, einx"
-echo "    import torch"
-echo "    pip install   --no-user streamlit"
-echo "Usage: singularity + venv activation @ bash"
-echo "    sing-bash"
-echo "    python -m pip install --no-user -U pip"
-echo "    pip uninstall loguru streamlit"
-echo "    exit"
+echo "The activation does not execute singularity; it is delayed until pip/python/sing-bash commands"
+echo "After the activation you can use "
+echo "   python"
+echo "   pip" 
+echo "commands normally and they will be running insider the container.  You can also run"
+echo "   sing-bash"
+echo "to launch bash inside the activated singularity"
 
 
 

@@ -27,11 +27,14 @@ prepend_path('PATH', pathJoin(gparent .. '/wrappers'))
 
 setenv('SING_IMAGE', singName)
 
-setenv('SING_FLAGS', '-B /bin/ip:/bin/ip -B /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0 -B /opt/cray/libfabric/1.15.2.0/bin/fi_info:/bin/fi_info -B /usr/lib64/libcurl.so.4:/usr/lib/libcurl.so.4')
+setenv('SING_FLAGS', '-B /bin/ip:/bin/ip -B /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0 -B /opt/cray/libfabric/1.22.0/bin/fi_info:/bin/fi_info -B /usr/lib64/libcurl.so.4:/usr/lib/libcurl.so.4')
+-- setenv('SING_FLAGS', '-B /bin/ip:/bin/ip -B /usr/lib64/libmnl.so.0:/usr/lib64/libmnl.so.0 -B /opt/cray/libfabric/1.15.2.0/bin/fi_info:/bin/fi_info -B /usr/lib64/libcurl.so.4:/usr/lib/libcurl.so.4')
 --  REMOVE_CRAY_DEPS=rm -rf /opt/cray /opt/cray-deps /usr/lib64/libcxi.so*
 -- -B /opt/rocm/lib/librccl.so:/usr/local/lib/python3.10/dist-packages/torch/lib/librccl.so')
 
-setenv('SINGULARITY_CONTAINLIBS', '/usr/lib64/libcxi.so.1,/usr/lib64/libjson-c.so.3,/opt/rocm/lib/librocm_smi64.so.6')
+-- setenv('SINGULARITY_CONTAINLIBS', '/usr/lib64/libcxi.so.1,/usr/lib64/libjson-c.so.3,/opt/rocm/lib/librocm_smi64.so.6')
+-- 27 January 2026 introduced librocm_smi64.so.7, and generic .so should be always used:
+setenv('SINGULARITY_CONTAINLIBS', '/usr/lib64/libcxi.so.1,/usr/lib64/libjson-c.so.3,/opt/rocm/lib/librocm_smi64.so')
 
 -- setenv("WITH_CONDA", "source /opt/conda/etc/profile.d/conda.sh && conda activate pytorch")
 -- ROCm/PyTorch environment hook (so users can `eval $WITH_CONDA`)
@@ -99,7 +102,12 @@ setenv('RCCL_TRACE_PLUGIN','1')
 
 -- ############ providing rocm, librccl-net-ofi etc. ################
 
-setenv('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:/usr/local/lib:/opt/rocm/lib/:/usr/local/lib/python3.11/dist-packages/faiss:/opt/cray/libfabric/1.15.2.0/lib64')
+-- setenv('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:/usr/local/lib:/opt/rocm/lib/:/usr/local/lib/python3.11/dist-packages/faiss:/opt/cray/libfabric/1.15.2.0/lib64')
+-- no more valid on 27 Jan 2026
+
+-- New path n 27 Jan 2026:
+setenv('SINGULARITYENV_LD_LIBRARY_PATH', '/opt/aws-ofi-rccl:/usr/local/lib:/opt/rocm/lib/:/usr/local/lib/python3.11/dist-packages/faiss:/opt/cray/libfabric/1.22.0/lib64')
+
 prepend_path('SINGULARITYENV_LD_LIBRARY_PATH', gparent .. '/lib')  -- this contains alternative names referring to it
 
 if (mode() == "load") then

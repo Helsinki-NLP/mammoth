@@ -530,13 +530,12 @@ class Trainer(object):
                     metric_name = f'bleu/{src_lang}-{tgt_lang}'
                     metrics[metric_name] = bleu.score
                     bleu_scores.append(bleu.score)
-                    logger.info(f"BLEU {src_lang}→{tgt_lang}: {bleu.score:.2f}")
                 except Exception as e:
                     logger.warning(f"Error computing BLEU for {src_lang}→{tgt_lang}: {e}")
 
             # Compute average BLEU across all directions
-            if bleu_scores:
-                metrics['bleu/avg'] = sum(bleu_scores) / len(bleu_scores)
+            # if bleu_scores:
+            #     metrics['bleu/avg'] = sum(bleu_scores) / len(bleu_scores)
 
         return metrics
 

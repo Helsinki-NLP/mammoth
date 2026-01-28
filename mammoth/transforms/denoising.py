@@ -473,10 +473,11 @@ class NoiseTransform(Transform):
         return example
 
     def apply(self, example, is_train=False, stats=None, **kwargs):
+        # TODO: Note the `stats` is never used in denoising
         if self.denoising_objective == 'bart':
-            return self.apply_bart(example, is_train=False, stats=None, **kwargs)
+            return self.apply_bart(example, is_train=is_train, stats=stats, **kwargs)
         elif self.denoising_objective == 'mass':
-            return self.apply_mass(example, is_train=False, stats=None, **kwargs)
+            return self.apply_mass(example, is_train=is_train, stats=stats, **kwargs)
         else:
             raise NotImplementedError('Unknown denoising objective.')
 

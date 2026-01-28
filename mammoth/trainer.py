@@ -730,9 +730,8 @@ class Trainer(object):
                 if stats is None:
                     stats = mammoth.utils.Statistics(n_correct=0)
 
-                # Use tensor accumulation instead of .item() to avoid GPU sync
-                stats._add_tensor('n_src_words_tensor', 'n_src_words', batch.src.mask.sum())
-                stats._add_tensor('n_sents_tensor', 'n_sents', batch.batch_size)
+                stats.n_src_words += batch.src.mask.sum().item()
+                stats.n_sents += batch.batch_size
                 src = batch.src.tensor
                 src_mask = batch.src.mask
                 decoder_input = batch.tgt.tensor[:-1]
@@ -766,10 +765,9 @@ class Trainer(object):
                         # loss /= normalization
 
                 # Update statistics.
-                # Pass loss as tensor to avoid GPU->CPU sync (Megatron-style optimization)
                 padding_idx = self.loss_functions[metadata.tgt_lang].ignore_index
                 batch_stats = Statistics.from_loss_logits_target(
-                    loss,  # Keep as tensor, no .item() call
+                    loss.item(),
                     logits,
                     target,
                     padding_idx,
@@ -860,8 +858,6 @@ class Trainer(object):
         gradient_syncs,
     ):
         normalization = 0
-        # Megatron-style: accumulate normalization as tensor on GPU
-        normalization_tensor = None
         seen_comm_batches = set()
         expected_metadata = my_task.get_serializable_metadata()
 
@@ -880,24 +876,13 @@ class Trainer(object):
             # update data state
             self._data_state[metadata.corpus_id] = batch.line_idx
 
-            # Use tensor accumulation for num_tokens to avoid GPU sync
-            # We keep it as a tensor and only sync when computing the final loss
-            num_tokens_tensor = batch.tgt.mask.sum()
-
+            num_tokens = batch.tgt.mask.sum().item()
             if self.norm_method == "tokens":
-                # Megatron-style: accumulate as tensor on GPU, avoid .item() sync
-                if normalization_tensor is None:
-                    normalization_tensor = num_tokens_tensor.detach()
-                else:
-                    normalization_tensor += num_tokens_tensor
-                # Keep scalar normalization for backward compatibility (but don't use it in hot path)
-                # normalization will be computed from normalization_tensor when needed
+                normalization += num_tokens
             else:
                 normalization += batch.batch_size
-
-            # Use tensor accumulation instead of .item() to avoid GPU sync
-            report_stats._add_tensor('n_src_words_tensor', 'n_src_words', batch.src.mask.sum())
-            report_stats._add_tensor('n_sents_tensor', 'n_sents', batch.batch_size)
+            report_stats.n_src_words += batch.src.mask.sum().item()
+            report_stats.n_sents += batch.batch_size
 
             # Track cumulative sentence count (this persists across report_stats resets)
             report_stats.cumulative_sents += batch.batch_size
@@ -940,31 +925,24 @@ class Trainer(object):
                 with self.record_function(f"backward_pass_batch_{k}"):
                     self.optim.backward(loss)
 
-            # Megatron-style: defer loss.item() to reduce GPU->CPU synchronization
-            # We accumulate batch statistics with tensor values where possible
             if self.report_training_accuracy:
                 # Slow: requires max over logits, eq, masked_select
                 batch_stats = Statistics.from_loss_logits_target(
-                    loss,  # Keep as tensor to avoid GPU->CPU sync
+                    loss.item(),
                     logits,
                     target,
                     padding_idx=self.loss_functions[metadata.tgt_lang].ignore_index,
                 )
             else:
-                # Create statistics without calling .item() on loss or num_tokens
-                # Use the tensor version for both loss and n_words accumulation
                 batch_stats = Statistics(
-                    loss=0,  # Don't set scalar, will use tensor version
-                    n_words=0,   # Don't set scalar, will use tensor version
+                    loss.item(),
+                    num_tokens,
                     n_correct=None,
                 )
-                # Add loss and num_tokens as tensors to avoid GPU sync
-                batch_stats._add_tensor('loss_tensor', 'loss', loss)
-                batch_stats._add_tensor('n_words_tensor', 'n_words', num_tokens_tensor)
 
             total_stats.update(batch_stats)
             report_stats.update(batch_stats)
-            report_stats.update_task_loss(loss, metadata)
+            report_stats.update_task_loss(batch_stats.loss, metadata)
 
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')

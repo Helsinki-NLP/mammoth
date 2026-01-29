@@ -810,7 +810,6 @@ class Trainer(object):
                 # Collect predictions and references for additional metrics using AUTOREGRESSIVE GENERATION
                 if compute_metrics:
                     # Generate predictions autoregressively (like real inference)
-                    logger.info("[VALIDATION] Generating translations autoregressively")
                     pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model)
 
                     # Get target vocab for decoding

@@ -14,6 +14,8 @@ from mammoth.constants import DefaultTokens
 from mammoth.transforms import TransformPipe, get_transforms_cls, make_transforms
 from mammoth.utils.logging import logger
 from mammoth.inputters.vocab import Vocab
+from mammoth.inputters.indexed_corpus import IndexedCorpus
+from mammoth.inputters.indexed_dataset import exists as indexed_dataset_exists
 
 
 TensorWithMask = collections.namedtuple('TensorWithMask', ['tensor', 'mask'])
@@ -372,23 +374,80 @@ def get_corpus(
     if opts.pad_to_max_length:
         assert opts.max_length is not None and opts.max_length > 0, 'Please provide a --max_length'
         max_length = opts.max_length
-    # build Dataset proper
-    dataset = ParallelCorpus(
-        corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
-        corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],
-        src_vocab,
-        tgt_vocab,
-        TransformPipe(opts, transforms_to_apply),
-        stride=corpus_opts.get('stride', None),
-        offset=corpus_opts.get('offset', None),
-        is_train=is_train,
-        task=task,
-        max_length=max_length,
-        line_idx_restore=line_idx_restore,
-        model_max_seq_len=model_max_seq_len,
-        verbose_dataloader=getattr(opts, 'verbose_dataloader', False),
-        device_rank=device_rank,
-    )
+
+    # Check if using indexed (pre-tokenized) dataset
+    data_type = corpus_opts.get('data_type', 'text')
+
+    if data_type == 'indexed':
+        # Use indexed dataset (pre-tokenized binary files)
+        src_path = corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"]
+        tgt_path = corpus_opts.get("path_tgt") if is_train else corpus_opts.get("path_valid_tgt")
+
+        # Indexed paths should not have extensions (.bin/.idx are added automatically)
+        # Remove common text file extensions if present
+        for ext in ['.txt', '.gz', '.bin', '.idx']:
+            if src_path.endswith(ext):
+                src_path = src_path[:-len(ext)]
+            if tgt_path and tgt_path.endswith(ext):
+                tgt_path = tgt_path[:-len(ext)]
+
+        # Verify indexed datasets exist
+        if not indexed_dataset_exists(src_path):
+            raise FileNotFoundError(
+                f"Indexed dataset not found: {src_path}.bin / {src_path}.idx\n"
+                f"Please run preprocessing first: python -m mammoth.scripts.preprocess_indexed"
+            )
+        if tgt_path and not indexed_dataset_exists(tgt_path):
+            raise FileNotFoundError(
+                f"Indexed dataset not found: {tgt_path}.bin / {tgt_path}.idx\n"
+                f"Please run preprocessing first: python -m mammoth.scripts.preprocess_indexed"
+            )
+
+        # Warn if transforms are specified for indexed datasets
+        if transforms_to_apply:
+            logger.warning(
+                f"⚠️  Transforms specified for indexed dataset '{task.corpus_id}': {[t.__class__.__name__ for t in transforms_to_apply]}\n"
+                f"   Indexed datasets contain pre-tokenized token IDs and do NOT support transforms during training.\n"
+                f"   Transforms are IGNORED for indexed datasets.\n"
+                f"   To apply transforms, preprocess your data with the desired transforms first."
+            )
+
+        logger.info(f"Using indexed dataset: {src_path}")
+        dataset = IndexedCorpus(
+            src_path,
+            tgt_path,
+            src_vocab,
+            tgt_vocab,
+            TransformPipe(opts, transforms_to_apply),
+            stride=corpus_opts.get('stride', None),
+            offset=corpus_opts.get('offset', None),
+            is_train=is_train,
+            task=task,
+            max_length=max_length,
+            line_idx_restore=line_idx_restore,
+            model_max_seq_len=model_max_seq_len,
+            verbose_dataloader=getattr(opts, 'verbose_dataloader', False),
+            device_rank=device_rank,
+        )
+    else:
+        # Use traditional text dataset
+        dataset = ParallelCorpus(
+            corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
+            corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],
+            src_vocab,
+            tgt_vocab,
+            TransformPipe(opts, transforms_to_apply),
+            stride=corpus_opts.get('stride', None),
+            offset=corpus_opts.get('offset', None),
+            is_train=is_train,
+            task=task,
+            max_length=max_length,
+            line_idx_restore=line_idx_restore,
+            model_max_seq_len=model_max_seq_len,
+            verbose_dataloader=getattr(opts, 'verbose_dataloader', False),
+            device_rank=device_rank,
+        )
+
     return dataset
 
 

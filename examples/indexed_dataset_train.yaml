@@ -1,0 +1,106 @@
+# Example configuration for training with pre-tokenized indexed datasets
+#
+# This configuration shows how to use pre-tokenized binary datasets for training.
+# Pre-tokenization eliminates tokenization overhead during training, which can
+# significantly speed up data loading, especially with large vocabularies.
+#
+# Steps to use indexed datasets:
+#
+# 1. Preprocess your data:
+#    python -m mammoth.scripts.preprocess_indexed \
+#        --input data/train.src.txt \
+#        --output_prefix data/train.src \
+#        --vocab_path vocab.txt \
+#        --workers 8
+#
+# 2. Set data_type: indexed in your task configuration (see below)
+#
+# 3. Train as usual
+
+# Vocabulary files
+src_vocab: vocab.txt
+tgt_vocab: vocab.txt
+
+# Task configuration
+tasks:
+  # Translation task with indexed (pre-tokenized) data
+  train_corpus:
+    # IMPORTANT: Set data_type to 'indexed' to use pre-tokenized binary files
+    data_type: indexed
+
+    # Paths to indexed datasets (without .bin/.idx extensions)
+    # The system will automatically look for:
+    #   - data/train.src.bin and data/train.src.idx
+    #   - data/train.tgt.bin and data/train.tgt.idx
+    path_src: data/train.src
+    path_tgt: data/train.tgt
+
+    # Validation data (also indexed)
+    path_valid_src: data/valid.src
+    path_valid_tgt: data/valid.tgt
+
+    # Language pair
+    src_lang: en
+    tgt_lang: de
+
+    # Task weight (for multi-task learning)
+    weight: 1
+
+    # Curriculum learning: introduce this task at step 0
+    introduce_at_training_step: 0
+
+    # Transforms for indexed datasets
+    # IMPORTANT: Indexed datasets do NOT support transforms during training!
+    # Data is already pre-tokenized as token IDs, while transforms expect token strings.
+    # Any preprocessing (filtering, prefix tokens, etc.) should be done during
+    # the preprocessing step, not here.
+    # transforms: []  # Leave empty or omit for indexed datasets
+
+# Training configuration
+save_model: models/model
+batch_size: 4096
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 2048
+
+# Model architecture
+model_dim: 512
+enc_layers: [6]
+dec_layers: [6]
+dropout: 0.1
+weight_decay: 0.05
+label_smoothing: 0.2
+
+# Training steps
+train_steps: 50000
+valid_steps: 1000
+warmup_steps: 4000
+report_every: 100
+save_checkpoint_steps: 5000
+keep_checkpoint: 3
+
+# Optimizer
+optim: adam
+adam_beta1: 0.9
+adam_beta2: 0.998
+decay_method: noam
+learning_rate: 2.0
+max_grad_norm: 1.0
+
+# Random seed
+seed: 3435
+
+# Model type
+model_type: text
+
+# Sequence length limits
+src_seq_length: 512
+tgt_seq_length: 512
+max_length: 512
+
+# x-transformers options
+x_transformers_opts:
+  attn_flash: True
+  heads: 8
+  rotary_pos_emb: True
+  tie_embedding: True

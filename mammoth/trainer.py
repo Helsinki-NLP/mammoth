@@ -751,8 +751,14 @@ class Trainer(object):
 
             import random
 
+            # Log samples from only a few batches instead of every batch
+            max_batches_to_log = 3  # Only log samples from first 3 batches
+            batch_count = 0
+
             for batch, metadata, _ in valid_iter:
-                logged_sample_idx = random.randint(0, batch.batch_size - 1)
+                batch_count += 1
+                # Only set logged_sample_idx for the first few batches
+                logged_sample_idx = random.randint(0, batch.batch_size - 1) if batch_count <= max_batches_to_log else -1
                 if stats is None:
                     stats = mammoth.utils.Statistics(n_correct=0)
 
@@ -843,9 +849,9 @@ class Trainer(object):
                                     pred_text = ' '.join(pred_words)
                                     ref_text = ' '.join(ref_words)
 
-                                # Log randomly sampled example from each batch
+                                # Log randomly sampled example from a few batches only
                                 if b == logged_sample_idx:
-                                    logger.info(f"[VALIDATION SAMPLE] Example {b} (AUTOREGRESSIVE)")
+                                    logger.info(f"[VALIDATION SAMPLE] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, example={b} (AUTOREGRESSIVE)")
                                     # logger.info(f"  pred_tokens: {pred_seq[:20]}")
                                     # logger.info(f"  ref_tokens: {ref_seq[:20]}")
                                     logger.info(f"  pred_text ({len(pred_text.split())} words): {pred_text[:200]}")

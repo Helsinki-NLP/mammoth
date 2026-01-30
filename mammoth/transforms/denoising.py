@@ -445,38 +445,37 @@ class NoiseTransform(Transform):
         )
 
     def apply_bart(self, example, is_train=False, stats=None, **kwargs):
-        """Apply BART noise to src side tokens."""
-        if is_train:
-            src = self.bart_noise.apply(example['src'])
-            example['src'] = src
+        """Apply BART noise to src side tokens during both training and validation."""
+        src = self.bart_noise.apply(example['src'])
+        example['src'] = src
         return example
 
     def apply_mass(self, example, is_train=False, stats=None, **kwargs):
-        """Apply BART noise to src side tokens, then complete as MASS scheme."""
-        if is_train:
-            masked = self.bart_noise.apply(example['src'])
-            complement_masked = [
-                DefaultTokens.MASK if masked_item != DefaultTokens.MASK
-                else source_item
-                for masked_item, source_item in zip(masked, example['src'])
-            ]
-            labels = [
-                DefaultTokens.PAD if cmasked_item == DefaultTokens.MASK
-                else cmasked_item
-                for cmasked_item in complement_masked
-            ]
-            example = {
-                'src': masked,
-                'tgt': complement_masked,
-                'labels': labels,
-            }
+        """Apply BART noise to src side tokens during both training and validation, then complete as MASS scheme."""
+        masked = self.bart_noise.apply(example['src'])
+        complement_masked = [
+            DefaultTokens.MASK if masked_item != DefaultTokens.MASK
+            else source_item
+            for masked_item, source_item in zip(masked, example['src'])
+        ]
+        labels = [
+            DefaultTokens.PAD if cmasked_item == DefaultTokens.MASK
+            else cmasked_item
+            for cmasked_item in complement_masked
+        ]
+        example = {
+            'src': masked,
+            'tgt': complement_masked,
+            'labels': labels,
+        }
         return example
 
     def apply(self, example, is_train=False, stats=None, **kwargs):
+        # TODO: Note the `stats` is never used in denoising
         if self.denoising_objective == 'bart':
-            return self.apply_bart(example, is_train=False, stats=None, **kwargs)
+            return self.apply_bart(example, is_train=is_train, stats=stats, **kwargs)
         elif self.denoising_objective == 'mass':
-            return self.apply_mass(example, is_train=False, stats=None, **kwargs)
+            return self.apply_mass(example, is_train=is_train, stats=stats, **kwargs)
         else:
             raise NotImplementedError('Unknown denoising objective.')
 

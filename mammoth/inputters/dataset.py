@@ -218,13 +218,13 @@ class ParallelCorpus(IterableDataset):
                 token_ids = token_ids[:-1]
 
             # Log a few examples for debugging
-            import random
-            if random.random() < 0.0001:  # Log ~0.1% of examples
-                logger.info(f'HF Tokenizer {side} direct lookup example:')
-                logger.info(f'  Input tokens: {tokens[:10]}...')
-                logger.info(f'  Token IDs: {token_ids[:10]}...')
-                if actually_stripped:
-                    logger.info(f'  Stripped special tokens: {actually_stripped}')
+            # import random
+            # if random.random() < 0.0001:  # Log ~0.1% of examples
+            #     logger.info(f'HF Tokenizer {side} direct lookup example:')
+            #     logger.info(f'  Input tokens: {tokens[:10]}...')
+            #     logger.info(f'  Token IDs: {token_ids[:10]}...')
+            #     if actually_stripped:
+            #         logger.info(f'  Stripped special tokens: {actually_stripped}')
 
             # BART-specific: decoder sequences start with </s> (EOS) then <s> (BOS)
             # For BART decoder: [</s>, <s>, tokens..., </s>]

@@ -497,21 +497,46 @@ class Trainer(object):
             self.report_manager.report_end(step)
         return total_stats
 
-    def _compute_validation_metrics(self, predictions, references, valid_metrics):
-        """Compute additional validation metrics like BLEU."""
+    def _compute_validation_metrics(self, predictions_by_direction, references_by_direction, valid_metrics):
+        """Compute additional validation metrics like BLEU.
+
+        Args:
+            predictions_by_direction: Dict mapping (src_lang, tgt_lang) to list of predictions
+            references_by_direction: Dict mapping (src_lang, tgt_lang) to list of references
+            valid_metrics: List of metric names to compute
+
+        Returns:
+            Dict of metric names to values
+        """
         metrics = {}
-        
+
         if not SACREBLEU_AVAILABLE and 'bleu' in valid_metrics:
             logger.warning("sacrebleu not available, skipping BLEU computation")
             return metrics
-            
+
         if 'bleu' in valid_metrics and SACREBLEU_AVAILABLE:
-            try:
-                bleu_score = sacrebleu.corpus_bleu(predictions, [references])
-                metrics['bleu'] = bleu_score.score
-            except Exception as e:
-                logger.warning(f"Error computing BLEU: {e}")
-                
+            bleu_scores = []
+
+            # Compute BLEU for each translation direction separately
+            for (src_lang, tgt_lang), preds in predictions_by_direction.items():
+                refs = references_by_direction.get((src_lang, tgt_lang), [])
+
+                if not preds or not refs:
+                    logger.warning(f"Skipping BLEU for {src_lang}→{tgt_lang}: empty predictions or references")
+                    continue
+
+                try:
+                    bleu = sacrebleu.corpus_bleu(preds, [refs])
+                    metric_name = f'bleu/{src_lang}-{tgt_lang}'
+                    metrics[metric_name] = bleu.score
+                    bleu_scores.append(bleu.score)
+                except Exception as e:
+                    logger.warning(f"Error computing BLEU for {src_lang}→{tgt_lang}: {e}")
+
+            # Compute average BLEU across all directions
+            # if bleu_scores:
+            #     metrics['bleu/avg'] = sum(bleu_scores) / len(bleu_scores)
+
         return metrics
 
     def _generate_predictions_autoregressive(self, batch, metadata, valid_model):
@@ -700,10 +725,11 @@ class Trainer(object):
             :obj:`nmt.Statistics`: validation loss statistics
         """
         valid_model = self.model
-        
+
         # Initialize collections for BLEU computation if needed
-        predictions = []
-        references = []
+        # Group by translation direction to avoid mixing languages in BLEU computation
+        predictions_by_direction = {}  # {(src_lang, tgt_lang): [predictions]}
+        references_by_direction = {}   # {(src_lang, tgt_lang): [references]}
         compute_metrics = bool(self.valid_metrics)
         if moving_average:
             # swap model params w/ moving average
@@ -725,8 +751,14 @@ class Trainer(object):
 
             import random
 
+            # Log samples from only a few batches instead of every batch
+            max_batches_to_log = 3  # Only log samples from first 3 batches
+            batch_count = 0
+
             for batch, metadata, _ in valid_iter:
-                logged_sample_idx = random.randint(0, batch.batch_size - 1)
+                batch_count += 1
+                # Only set logged_sample_idx for the first few batches
+                logged_sample_idx = random.randint(0, batch.batch_size - 1) if batch_count <= max_batches_to_log else -1
                 if stats is None:
                     stats = mammoth.utils.Statistics(n_correct=0)
 
@@ -778,7 +810,6 @@ class Trainer(object):
                 # Collect predictions and references for additional metrics using AUTOREGRESSIVE GENERATION
                 if compute_metrics:
                     # Generate predictions autoregressively (like real inference)
-                    logger.info("[VALIDATION] Generating translations autoregressively")
                     pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model)
 
                     # Get target vocab for decoding
@@ -817,17 +848,22 @@ class Trainer(object):
                                     pred_text = ' '.join(pred_words)
                                     ref_text = ' '.join(ref_words)
 
-                                # Log randomly sampled example from each batch
+                                # Log randomly sampled example from a few batches only
                                 if b == logged_sample_idx:
-                                    logger.info(f"[VALIDATION SAMPLE] Example {b} (AUTOREGRESSIVE)")
+                                    logger.info(f"[VALIDATION SAMPLE] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, example={b} (AUTOREGRESSIVE)")
                                     # logger.info(f"  pred_tokens: {pred_seq[:20]}")
                                     # logger.info(f"  ref_tokens: {ref_seq[:20]}")
                                     logger.info(f"  pred_text ({len(pred_text.split())} words): {pred_text[:200]}")
                                     logger.info(f"  ref_text ({len(ref_text.split())} words):  {ref_text[:200]}")
 
                                 if pred_text and ref_text:
-                                    predictions.append(pred_text)
-                                    references.append(ref_text)
+                                    # Group by translation direction to avoid mixing languages in BLEU
+                                    direction_key = (metadata.src_lang, metadata.tgt_lang)
+                                    if direction_key not in predictions_by_direction:
+                                        predictions_by_direction[direction_key] = []
+                                        references_by_direction[direction_key] = []
+                                    predictions_by_direction[direction_key].append(pred_text)
+                                    references_by_direction[direction_key].append(ref_text)
                                 else:
                                     logger.warning(f"[VALIDATION] Empty text after decoding: pred_empty={not pred_text}, ref_empty={not ref_text}")
                             else:
@@ -842,10 +878,10 @@ class Trainer(object):
 
         # Set model back to training mode.
         valid_model.train()
-        
+
         # Compute additional validation metrics
-        if compute_metrics and predictions and references:
-            metrics = self._compute_validation_metrics(predictions, references, self.valid_metrics)
+        if compute_metrics and predictions_by_direction:
+            metrics = self._compute_validation_metrics(predictions_by_direction, references_by_direction, self.valid_metrics)
             if stats is not None:
                 stats.validation_metrics.update(metrics)
 

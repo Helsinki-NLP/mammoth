@@ -81,9 +81,6 @@ class ReportMgrBase(object):
             )
 
         if step % self.report_every == 0:
-            # Materialize scalars before reporting (synchronizes GPU->CPU)
-            report_stats.materialize_scalars()
-
             # if multigpu:
             #    report_stats = \
             #        mammoth.utils.Statistics.all_gather_stats(report_stats)

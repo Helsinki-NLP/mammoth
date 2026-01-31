@@ -17,7 +17,6 @@ Inspired by Megatron-LM's preprocess_data.py
 """
 
 import argparse
-import json
 import multiprocessing
 import os
 import sys
@@ -63,7 +62,7 @@ class Encoder:
         Encoder.vocab = get_vocab(
             path=self.args.vocab_path,
             lang=self.args.lang,
-            size=self.args.vocab_size if not use_hf else None,
+            size=None,
             use_hf_tokenizer=use_hf,
             decoder_start_with_eos=self.args.decoder_start_with_eos,
         )
@@ -79,7 +78,7 @@ class Encoder:
         Encode a single line of text.
 
         Args:
-            line: Text line to encode (can be JSON or plain text)
+            line: Text line to encode
 
         Returns:
             Tuple of (token_ids, num_bytes_processed)
@@ -88,20 +87,8 @@ class Encoder:
         if not line:
             return [], len(line)
 
-        # Parse input format
-        if self.args.json_keys:
-            # JSON input
-            try:
-                data = json.loads(line)
-                # Concatenate specified keys
-                texts = [data[key] for key in self.args.json_keys if key in data]
-                text = ' '.join(texts)
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse JSON line: {line[:100]}...")
-                return [], len(line)
-        else:
-            # Plain text input
-            text = line
+        # Use plain text input
+        text = line
 
         # Tokenize
         if Encoder.tokenizer is not None:
@@ -118,12 +105,6 @@ class Encoder:
                 # Use get() with default UNK token for words not in vocabulary
                 token_id = Encoder.vocab.stoi.get(word, unk_id)
                 token_ids.append(token_id)
-
-        # Add EOS token if requested
-        if self.args.append_eos and len(token_ids) > 0:
-            eos_id = Encoder.vocab.specials.get('</s>', None)
-            if eos_id is not None:
-                token_ids.append(eos_id)
 
         return token_ids, len(line)
 
@@ -189,7 +170,7 @@ class Preprocessor:
         vocab = get_vocab(
             path=self.args.vocab_path,
             lang=self.args.lang,
-            size=self.args.vocab_size if not use_hf else None,
+            size=None,
             use_hf_tokenizer=use_hf,
             decoder_start_with_eos=self.args.decoder_start_with_eos,
         )
@@ -270,12 +251,6 @@ def get_args():
         required=True,
         help='Path prefix for output files (will create .bin and .idx)',
     )
-    group.add_argument(
-        '--json_keys',
-        nargs='+',
-        default=None,
-        help='If input is JSON, extract and concatenate these keys',
-    )
 
     # Vocabulary
     group = parser.add_argument_group('Vocabulary')
@@ -284,12 +259,6 @@ def get_args():
         type=str,
         required=True,
         help='Path to vocabulary file (.txt) or HF tokenizer (.json)',
-    )
-    group.add_argument(
-        '--vocab_size',
-        type=int,
-        default=None,
-        help='Vocabulary size (for traditional vocab, ignored for HF tokenizers)',
     )
     group.add_argument(
         '--lang',
@@ -301,14 +270,6 @@ def get_args():
         '--decoder_start_with_eos',
         action='store_true',
         help='BART-style: decoder sequences start with EOS token',
-    )
-
-    # Tokenization
-    group = parser.add_argument_group('Tokenization')
-    group.add_argument(
-        '--append_eos',
-        action='store_true',
-        help='Append EOS token to end of each document',
     )
 
     # Processing

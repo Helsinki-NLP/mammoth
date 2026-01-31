@@ -7,6 +7,7 @@ indexed binary files during training.
 
 import itertools
 import torch
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import IterableDataset
 
 from mammoth.constants import DefaultTokens
@@ -209,6 +210,78 @@ class IndexedCorpus(IterableDataset):
             #   python -m mammoth.scripts.preprocess_indexed ...
 
             yield example
+
+    def _pad_sequence(self, tensors: list, padding_value: int = 0):
+        """
+        Pad list of tensors to same length.
+
+        Args:
+            tensors: List of 1D tensors to pad
+            padding_value: Value to use for padding
+
+        Returns:
+            Padded tensor of shape (max_len, batch_size, 1)
+        """
+        padded = None
+        if self.max_length is not None:
+            # Use fixed max_length if specified
+            padded = torch.full((self.max_length, len(tensors)), padding_value, device='cpu')
+            for idx, tensor in enumerate(tensors):
+                if tensor.numel() > self.max_length:
+                    tensor = tensor[:self.max_length]
+                padded[:tensor.numel(), idx] = tensor
+        else:
+            # Use dynamic padding to longest sequence in batch
+            padded = pad_sequence(tensors, padding_value=padding_value)
+        return padded.unsqueeze(-1)
+
+    def collate_fn(self, examples, line_idx):
+        """
+        Batch examples together with padding.
+
+        Args:
+            examples: List of example dictionaries with 'src' and 'tgt' tensors
+            line_idx: Line index for this batch
+
+        Returns:
+            Batch object with padded tensors and masks
+        """
+        # Import here to avoid circular imports (dataset.py imports IndexedCorpus)
+        from mammoth.inputters.dataset import Batch, TensorWithMask
+
+        has_tgt = 'tgt' in examples[0].keys()
+        src_padding_idx = self.vocabs['src'][DefaultTokens.PAD]
+        tgt_padding_idx = self.vocabs['tgt'][DefaultTokens.PAD]
+
+        # Pad source sequences
+        src = self._pad_sequence([ex['src'] for ex in examples], padding_value=src_padding_idx)
+        src_mask = src[:, :, 0].ne(src_padding_idx)
+
+        # Pad target sequences if present
+        if has_tgt:
+            tgt = self._pad_sequence([ex['tgt'] for ex in examples], padding_value=tgt_padding_idx)
+            tgt_mask = tgt[:, :, 0].ne(tgt_padding_idx)
+
+            # Handle labels (for teacher forcing)
+            if 'labels' not in examples[0].keys():
+                labels = tgt
+            else:
+                labels = self._pad_sequence([ex['labels'] for ex in examples], padding_value=tgt_padding_idx)
+
+            tgt_with_mask = TensorWithMask(tgt, tgt_mask)
+        else:
+            tgt_with_mask = None
+            labels = None
+
+        # Create batch object
+        batch = Batch(
+            src=TensorWithMask(src, src_mask),
+            tgt=tgt_with_mask,
+            labels=labels,
+            batch_size=len(examples),
+            line_idx=line_idx,
+        )
+        return batch
 
     def __len__(self):
         """Return approximate length (for progress tracking)."""

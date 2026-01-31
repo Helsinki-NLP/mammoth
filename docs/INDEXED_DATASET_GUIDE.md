@@ -43,7 +43,7 @@ python -m mammoth.scripts.preprocess_indexed \
 - `--output_prefix`: Output path prefix (creates `.bin` and `.idx` files)
 - `--vocab_path`: Vocabulary file (`.txt`) or HF tokenizer (`.json`)
 - `--workers`: Number of parallel worker processes
-- `--append_eos`: Add EOS token to each document
+- `--append_eos`: Add EOS token to each document (will discontinue this feature)
 - `--json_keys`: Extract specific keys from JSON input (e.g., `--json_keys text`)
 - `--log_interval`: Progress logging frequency (default: 1000)
 
@@ -62,10 +62,6 @@ tasks:
     path_tgt: data/train.tgt
     path_valid_src: data/valid.src
     path_valid_tgt: data/valid.tgt
-
-    # Language pair
-    src_lang: en
-    tgt_lang: de
 
     # Other task settings
     weight: 1

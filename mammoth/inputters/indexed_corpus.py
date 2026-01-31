@@ -176,6 +176,11 @@ class IndexedCorpus(IterableDataset):
             'line_idx': idx,
         }
 
+    def to(self, device):
+        """Move dataset to specified device."""
+        self.device = device
+        return self
+
     def __iter__(self):
         """Iterate over examples."""
         # Determine start index

@@ -327,6 +327,12 @@ def train(opts):
             local_rank=local_rank,
             opts=opts
         )
+
+        # Preprocess indexed datasets before spawning producer
+        # This must happen in the main process (not daemon) to allow multiprocessing
+        from mammoth.inputters.dataloader import preprocess_indexed_datasets_distributed
+        preprocess_indexed_datasets_distributed(global_task_queue_manager, opts)
+
         # Get the iterator to generate from
         line_idx_restore = None
         if frame_checkpoint is not None:

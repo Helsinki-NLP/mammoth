@@ -184,20 +184,28 @@ class SentenceMinibatcher():
             yield self.collate_fn(minibatch, self._sie._current_line_idx)
 
 
-def preprocess_indexed_datasets_single_node(task_queue_manager, opts):
+def preprocess_indexed_datasets_parallel_nodes(
+    task_queue_manager,
+    opts,
+    current_node_rank,
+    total_nodes
+):
     """
-    Preprocess all indexed datasets on a single node (CPU-only).
+    Preprocess indexed datasets using all nodes' CPUs in parallel.
 
-    This function runs in the main train.py process BEFORE spawning any
-    consumer/producer processes. Only node 0 does actual preprocessing,
-    other nodes wait for files to appear on shared filesystem.
+    Each node is assigned different datasets using consistent hashing:
+    - Node i processes datasets where hash(dataset_path) % total_nodes == i
+    - No coordination needed - each node independently knows its work
+    - Files appear on shared filesystem (Lustre on LUMI)
 
-    This is CPU-only work - no GPUs involved. Uses multiprocessing for
-    parallel tokenization across CPU cores.
+    This is CPU-only work - no GPUs involved. Each dataset uses all
+    available CPU cores on the assigned node for parallel tokenization.
 
     Args:
         task_queue_manager: TaskQueueManager instance
         opts: Training options
+        current_node_rank: This node's rank (0 to total_nodes-1)
+        total_nodes: Total number of nodes
 
     Returns:
         None
@@ -253,24 +261,47 @@ def preprocess_indexed_datasets_single_node(task_queue_manager, opts):
         if path not in unique_datasets:
             unique_datasets[path] = dataset_info
 
-    num_datasets = len(unique_datasets)
+    total_datasets = len(unique_datasets)
 
-    if num_datasets == 0:
-        logger.info("No indexed datasets need preprocessing - all files exist")
+    if total_datasets == 0:
+        logger.info(f"[Node {current_node_rank}] No indexed datasets need preprocessing - all files exist")
         return
+
+    # Assign datasets to this node using consistent hashing
+    my_datasets = {}
+    for indexed_path, dataset_info in unique_datasets.items():
+        # Consistent hashing: assign dataset to node based on path hash
+        assigned_node = hash(indexed_path) % total_nodes
+        if assigned_node == current_node_rank:
+            my_datasets[indexed_path] = dataset_info
+
+    num_my_datasets = len(my_datasets)
 
     # Get number of CPU cores to use (use all available cores)
     num_workers = max(1, multiprocessing.cpu_count())
 
     logger.info("=" * 80)
-    logger.info(f"CPU-only pretokenization for {num_datasets} datasets")
+    logger.info(f"[Node {current_node_rank}/{total_nodes}] Parallel CPU-only pretokenization")
+    logger.info(f"Total datasets needing preprocessing: {total_datasets}")
+    logger.info(f"Datasets assigned to this node: {num_my_datasets}")
     logger.info(f"Using {num_workers} CPU workers per dataset")
-    logger.info("Note: This is CPU work, not using GPUs")
+    logger.info(f"Note: This is CPU work, not using GPUs")
     logger.info("=" * 80)
 
-    # Process all datasets sequentially (simple approach - no multi-node coordination needed)
-    for idx, (indexed_path, dataset_info) in enumerate(unique_datasets.items(), 1):
-        logger.info(f"Processing dataset {idx}/{num_datasets}: {dataset_info['text_path']}")
+    if num_my_datasets == 0:
+        logger.info(f"[Node {current_node_rank}] No datasets assigned to this node, waiting for others...")
+        # Still need to wait for other nodes to finish
+        _wait_for_all_datasets(unique_datasets, current_node_rank)
+        return
+
+    # Process datasets assigned to this node
+    processed = 0
+    for indexed_path, dataset_info in my_datasets.items():
+        processed += 1
+        logger.info(
+            f"[Node {current_node_rank}] Processing {processed}/{num_my_datasets}: "
+            f"{dataset_info['text_path']}"
+        )
 
         try:
             _run_pretokenization(
@@ -280,14 +311,77 @@ def preprocess_indexed_datasets_single_node(task_queue_manager, opts):
                 dataset_info['indexed_path'],
                 dataset_info['is_src']
             )
-            logger.info(f"Completed dataset {idx}/{num_datasets}: {indexed_path}")
+            logger.info(
+                f"[Node {current_node_rank}] Completed {processed}/{num_my_datasets}: "
+                f"{indexed_path}"
+            )
         except Exception as e:
-            logger.error(f"Failed to preprocess dataset {idx}: {dataset_info['text_path']}: {e}")
+            logger.error(
+                f"[Node {current_node_rank}] Failed to preprocess dataset {processed}: "
+                f"{dataset_info['text_path']}: {e}"
+            )
             raise
 
     logger.info("=" * 80)
-    logger.info(f"All {num_datasets} datasets preprocessed successfully!")
+    logger.info(
+        f"[Node {current_node_rank}] Finished preprocessing {num_my_datasets} datasets. "
+        f"Waiting for other nodes..."
+    )
     logger.info("=" * 80)
+
+    # Wait for all datasets to be ready (other nodes may still be processing)
+    _wait_for_all_datasets(unique_datasets, current_node_rank)
+
+    logger.info("=" * 80)
+    logger.info(f"[Node {current_node_rank}] All {total_datasets} datasets ready!")
+    logger.info("=" * 80)
+
+
+def _wait_for_all_datasets(all_datasets, node_rank):
+    """
+    Wait for all datasets to be preprocessed by polling filesystem.
+
+    Args:
+        all_datasets: Dict of all datasets that need preprocessing
+        node_rank: Current node rank for logging
+    """
+    import time
+    from mammoth.inputters.indexed_dataset import exists as indexed_dataset_exists
+
+    max_wait_seconds = 3600  # 1 hour timeout
+    check_interval = 5  # Check every 5 seconds
+    elapsed = 0
+
+    missing_datasets = list(all_datasets.keys())
+
+    while missing_datasets:
+        # Check which datasets still don't exist
+        still_missing = []
+        for indexed_path in missing_datasets:
+            if not indexed_dataset_exists(indexed_path):
+                still_missing.append(indexed_path)
+
+        if not still_missing:
+            # All datasets ready!
+            break
+
+        missing_datasets = still_missing
+
+        if elapsed >= max_wait_seconds:
+            raise TimeoutError(
+                f"[Node {node_rank}] Timeout waiting for preprocessing to complete.\n"
+                f"Still missing {len(missing_datasets)} datasets after {max_wait_seconds}s:\n"
+                f"{missing_datasets[:5]}..."  # Show first 5
+            )
+
+        if elapsed % 30 == 0 and elapsed > 0:  # Log every 30 seconds
+            logger.info(
+                f"[Node {node_rank}] Waiting for {len(missing_datasets)} datasets "
+                f"(elapsed: {elapsed}s)..."
+            )
+
+        time.sleep(check_interval)
+        elapsed += check_interval
 
 
 class DynamicDatasetIter(object):

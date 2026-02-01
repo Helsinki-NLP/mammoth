@@ -184,13 +184,16 @@ class SentenceMinibatcher():
             yield self.collate_fn(minibatch, self._sie._current_line_idx)
 
 
-def preprocess_indexed_datasets_distributed(task_queue_manager, opts):
+def preprocess_indexed_datasets_single_node(task_queue_manager, opts):
     """
-    Preprocess all indexed datasets in distributed mode.
+    Preprocess all indexed datasets on a single node (CPU-only).
 
-    This function should be called BEFORE spawning producer processes,
-    in the main training process. It coordinates preprocessing across
-    all ranks using barriers, so all ranks must call this function.
+    This function runs in the main train.py process BEFORE spawning any
+    consumer/producer processes. Only node 0 does actual preprocessing,
+    other nodes wait for files to appear on shared filesystem.
+
+    This is CPU-only work - no GPUs involved. Uses multiprocessing for
+    parallel tokenization across CPU cores.
 
     Args:
         task_queue_manager: TaskQueueManager instance
@@ -199,25 +202,12 @@ def preprocess_indexed_datasets_distributed(task_queue_manager, opts):
     Returns:
         None
     """
+    import time
+    import multiprocessing
     from mammoth.inputters.dataset import _get_indexed_path, _run_pretokenization
     from mammoth.inputters.indexed_dataset import exists as indexed_dataset_exists
 
-    # Check if running in distributed mode
-    try:
-        import torch.distributed as dist
-        is_distributed = dist.is_initialized()
-    except (ImportError, AttributeError):
-        is_distributed = False
-
-    if not is_distributed:
-        # Single-process training: no coordination needed
-        logger.info("Single-process mode: preprocessing will happen on-demand")
-        return
-
-    world_size = dist.get_world_size()
-    current_rank = dist.get_rank()
-
-    # Step 1: Collect all dataset paths from ALL tasks
+    # Collect all datasets that need preprocessing
     datasets_to_preprocess = []
 
     for task in task_queue_manager.get_all_tasks():
@@ -256,92 +246,48 @@ def preprocess_indexed_datasets_distributed(task_queue_manager, opts):
                         'task': task,
                     })
 
-    # Step 2: Gather all datasets across all ranks
-    all_datasets_per_rank = [None] * world_size
-    dist.all_gather_object(all_datasets_per_rank, datasets_to_preprocess)
-
     # Deduplicate based on indexed_path
     unique_datasets = {}
-    for rank_datasets in all_datasets_per_rank:
-        for dataset_info in rank_datasets:
-            path = dataset_info['indexed_path']
-            if path not in unique_datasets:
-                unique_datasets[path] = dataset_info
+    for dataset_info in datasets_to_preprocess:
+        path = dataset_info['indexed_path']
+        if path not in unique_datasets:
+            unique_datasets[path] = dataset_info
 
-    unique_datasets_list = list(unique_datasets.values())
-    num_datasets = len(unique_datasets_list)
+    num_datasets = len(unique_datasets)
 
     if num_datasets == 0:
-        # No preprocessing needed
-        if current_rank == 0:
-            logger.info("No indexed datasets need preprocessing - all files exist")
+        logger.info("No indexed datasets need preprocessing - all files exist")
         return
 
-    # Step 3: Multi-round assignment
-    num_rounds = math.ceil(num_datasets / world_size)
+    # Get number of CPU cores to use (use all available cores)
+    num_workers = max(1, multiprocessing.cpu_count())
 
-    if current_rank == 0:
-        logger.info("=" * 80)
-        logger.info(f"Starting distributed pretokenization for {num_datasets} datasets")
-        logger.info(f"World size: {world_size} ranks")
-        logger.info(f"Number of rounds: {num_rounds}")
-        logger.info("=" * 80)
+    logger.info("=" * 80)
+    logger.info(f"CPU-only pretokenization for {num_datasets} datasets")
+    logger.info(f"Using {num_workers} CPU workers per dataset")
+    logger.info("Note: This is CPU work, not using GPUs")
+    logger.info("=" * 80)
 
-    datasets_processed_by_this_rank = 0
+    # Process all datasets sequentially (simple approach - no multi-node coordination needed)
+    for idx, (indexed_path, dataset_info) in enumerate(unique_datasets.items(), 1):
+        logger.info(f"Processing dataset {idx}/{num_datasets}: {dataset_info['text_path']}")
 
-    for round_idx in range(num_rounds):
-        # Calculate dataset index for this rank in this round
-        dataset_idx = round_idx * world_size + current_rank
-
-        if dataset_idx < num_datasets:
-            # This rank has a dataset to process in this round
-            dataset_info = unique_datasets_list[dataset_idx]
-            logger.info(
-                f"[Rank {current_rank}] Round {round_idx + 1}/{num_rounds}: "
-                f"Processing dataset {dataset_idx + 1}/{num_datasets}: "
-                f"{dataset_info['text_path']}"
+        try:
+            _run_pretokenization(
+                opts,
+                dataset_info['task'],
+                dataset_info['text_path'],
+                dataset_info['indexed_path'],
+                dataset_info['is_src']
             )
+            logger.info(f"Completed dataset {idx}/{num_datasets}: {indexed_path}")
+        except Exception as e:
+            logger.error(f"Failed to preprocess dataset {idx}: {dataset_info['text_path']}: {e}")
+            raise
 
-            try:
-                _run_pretokenization(
-                    opts,
-                    dataset_info['task'],
-                    dataset_info['text_path'],
-                    dataset_info['indexed_path'],
-                    dataset_info['is_src']
-                )
-                datasets_processed_by_this_rank += 1
-                logger.info(
-                    f"[Rank {current_rank}] Completed dataset {dataset_idx + 1}/{num_datasets}: "
-                    f"{dataset_info['indexed_path']}"
-                )
-            except Exception as e:
-                logger.error(
-                    f"[Rank {current_rank}] Failed to preprocess dataset {dataset_idx + 1}: "
-                    f"{dataset_info['text_path']}: {e}"
-                )
-                raise
-        else:
-            # This rank has no dataset in this round
-            logger.info(
-                f"[Rank {current_rank}] Round {round_idx + 1}/{num_rounds}: "
-                f"No dataset assigned (dataset_idx {dataset_idx} >= {num_datasets})"
-            )
-
-        # Synchronize after each round to ensure all ranks finish before next round
-        logger.info(f"[Rank {current_rank}] Waiting at barrier (end of round {round_idx + 1}/{num_rounds})...")
-        dist.barrier()
-
-    # All preprocessing complete
-    if current_rank == 0:
-        logger.info("=" * 80)
-        logger.info(f"All {num_datasets} datasets preprocessed successfully!")
-        logger.info("=" * 80)
-    else:
-        logger.info(
-            f"[Rank {current_rank}] Preprocessing complete. "
-            f"This rank processed {datasets_processed_by_this_rank} dataset(s)."
-        )
+    logger.info("=" * 80)
+    logger.info(f"All {num_datasets} datasets preprocessed successfully!")
+    logger.info("=" * 80)
 
 
 class DynamicDatasetIter(object):

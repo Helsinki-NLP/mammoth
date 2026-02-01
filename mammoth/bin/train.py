@@ -266,6 +266,18 @@ def train(opts):
     procs = []
     producers = []
 
+    # Preprocess indexed datasets ONCE per node, before spawning any processes
+    # Only node 0, local rank 0 does the actual preprocessing
+    # This runs on CPU in the main process, not on GPUs
+    if world_context.context == DeviceContextEnum.MULTI_GPU:
+        should_preprocess = (node_rank == 0)
+    else:
+        should_preprocess = True
+
+    if should_preprocess:
+        from mammoth.inputters.dataloader import preprocess_indexed_datasets_single_node
+        preprocess_indexed_datasets_single_node(global_task_queue_manager, opts)
+
     for local_rank in range(n_local_ranks):
         if world_context.context == DeviceContextEnum.MULTI_GPU:
             device_context: DeviceContext = world_context.global_to_local(
@@ -327,11 +339,6 @@ def train(opts):
             local_rank=local_rank,
             opts=opts
         )
-
-        # Preprocess indexed datasets before spawning producer
-        # This must happen in the main process (not daemon) to allow multiprocessing
-        from mammoth.inputters.dataloader import preprocess_indexed_datasets_distributed
-        preprocess_indexed_datasets_distributed(global_task_queue_manager, opts)
 
         # Get the iterator to generate from
         line_idx_restore = None

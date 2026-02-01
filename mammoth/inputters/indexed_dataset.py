@@ -275,3 +275,204 @@ def exists(path_prefix):
         True if both .bin and .idx files exist
     """
     return os.path.exists(path_prefix + '.bin') and os.path.exists(path_prefix + '.idx')
+
+
+class _PreprocessEncoder:
+    """
+    Encoder class for tokenizing text in worker processes.
+
+    This class is used for multiprocessing-based tokenization.
+    """
+
+    def __init__(self, vocab_path, lang, decoder_start_with_eos):
+        self.vocab_path = vocab_path
+        self.lang = lang
+        self.decoder_start_with_eos = decoder_start_with_eos
+
+    def initializer(self):
+        """Initialize tokenizer in worker process."""
+        from mammoth.inputters.vocab import get_vocab
+
+        use_hf = self.vocab_path.endswith('.json')
+        _PreprocessEncoder.vocab = get_vocab(
+            path=self.vocab_path,
+            lang=self.lang,
+            size=None,
+            use_hf_tokenizer=use_hf,
+            decoder_start_with_eos=self.decoder_start_with_eos,
+        )
+
+        if hasattr(_PreprocessEncoder.vocab, 'tokenizer'):
+            _PreprocessEncoder.tokenizer = _PreprocessEncoder.vocab.tokenizer
+        else:
+            _PreprocessEncoder.tokenizer = None
+
+    def encode(self, line):
+        """Encode a single line of text."""
+        line = line.strip()
+        if not line:
+            return [], len(line)
+
+        text = line
+
+        if _PreprocessEncoder.tokenizer is not None:
+            # HuggingFace tokenizer
+            token_ids = _PreprocessEncoder.tokenizer.encode(text).ids
+        else:
+            # Traditional tokenizer (word-level)
+            words = text.split()
+            unk_id = _PreprocessEncoder.vocab.specials.get('<unk>', 0)
+            token_ids = []
+            for word in words:
+                token_id = _PreprocessEncoder.vocab.stoi.get(word, unk_id)
+                token_ids.append(token_id)
+
+        return token_ids, len(line)
+
+
+def preprocess_text_to_indexed(
+    input_path,
+    output_prefix,
+    vocab_path,
+    lang='',
+    decoder_start_with_eos=False,
+    workers=4,
+    log_interval=1000
+):
+    """
+    Preprocess text file to indexed dataset format.
+
+    This is the programmatic API for preprocessing. The CLI wrapper
+    is in mammoth/scripts/preprocess_indexed.py.
+
+    Args:
+        input_path: Path to input text file
+        output_prefix: Path prefix for output files (without .bin/.idx)
+        vocab_path: Path to vocabulary file
+        lang: Language tag
+        decoder_start_with_eos: Whether to use BART-style EOS
+        workers: Number of worker processes
+        log_interval: Log progress every N documents
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import time
+    import multiprocessing
+    from mammoth.inputters.vocab import get_vocab
+    from mammoth.utils.logging import logger
+
+    try:
+        # Validate inputs
+        if not os.path.exists(input_path):
+            logger.error(f"Input file not found: {input_path}")
+            return False
+
+        if not os.path.exists(vocab_path):
+            logger.error(f"Vocabulary file not found: {vocab_path}")
+            return False
+
+        # Open input file
+        logger.info(f"Opening input file: {input_path}")
+        fin = open(input_path, 'r', encoding='utf-8')
+
+        # Create encoder and multiprocessing pool
+        encoder = _PreprocessEncoder(vocab_path, lang, decoder_start_with_eos)
+        logger.info(f"Creating worker pool with {workers} workers")
+        pool = multiprocessing.Pool(workers, initializer=encoder.initializer)
+
+        # Process documents in parallel
+        logger.info("Starting tokenization...")
+        encoded_docs = pool.imap(encoder.encode, fin, 32)
+
+        # Load vocab to get size for optimal dtype
+        use_hf = vocab_path.endswith('.json')
+        vocab = get_vocab(
+            path=vocab_path,
+            lang=lang,
+            size=None,
+            use_hf_tokenizer=use_hf,
+            decoder_start_with_eos=decoder_start_with_eos,
+        )
+
+        dtype = optimal_dtype(len(vocab))
+        logger.info(f"Using dtype {dtype} for vocab size {len(vocab)}")
+
+        output_bin = output_prefix + '.bin'
+        output_idx = output_prefix + '.idx'
+
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(os.path.abspath(output_bin)) or '.', exist_ok=True)
+
+        builder = IndexedDatasetBuilder(output_bin, dtype=dtype)
+
+        # Process all documents
+        start_time = time.time()
+        total_bytes = 0
+        total_docs = 0
+        total_tokens = 0
+
+        for i, (token_ids, bytes_processed) in enumerate(encoded_docs, start=1):
+            if len(token_ids) == 0:
+                continue
+
+            total_bytes += bytes_processed
+            total_docs += 1
+            total_tokens += len(token_ids)
+
+            # Add document to builder
+            builder.add_document(token_ids)
+
+            # Print statistics
+            if i % log_interval == 0:
+                elapsed = time.time() - start_time
+                docs_per_sec = total_docs / elapsed if elapsed > 0 else 0
+                mb_per_sec = (total_bytes / elapsed / 1024 / 1024) if elapsed > 0 else 0
+                logger.info(
+                    f"Processed {total_docs} documents "
+                    f"({docs_per_sec:.1f} docs/s, {mb_per_sec:.1f} MB/s)"
+                )
+
+        # Finalize dataset
+        logger.info("Finalizing dataset...")
+        builder.finalize(output_idx)
+
+        # Close files
+        fin.close()
+        pool.close()
+        pool.join()
+
+        # Final statistics
+        elapsed = time.time() - start_time
+        logger.info("=" * 60)
+        logger.info(f"Pretokenization complete!")
+        logger.info(f"  Total documents: {total_docs}")
+        logger.info(f"  Total tokens: {total_tokens}")
+        logger.info(f"  Average tokens/doc: {total_tokens/total_docs:.1f}")
+        logger.info(f"  Time elapsed: {elapsed:.1f}s")
+        logger.info(f"  Throughput: {total_docs/elapsed:.1f} docs/s")
+        logger.info(f"  Output files:")
+        logger.info(f"    {output_bin}")
+        logger.info(f"    {output_idx}")
+        logger.info("=" * 60)
+
+        return True
+
+    except Exception as e:
+        logger.error(f"Pretokenization failed: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+
+        # Clean up partial files
+        try:
+            output_bin = output_prefix + '.bin'
+            output_idx = output_prefix + '.idx'
+            if os.path.exists(output_bin):
+                os.remove(output_bin)
+            if os.path.exists(output_idx):
+                os.remove(output_idx)
+            logger.info("Cleaned up partial output files")
+        except:
+            pass
+
+        return False

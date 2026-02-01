@@ -268,10 +268,15 @@ def preprocess_indexed_datasets_parallel_nodes(
         return
 
     # Assign datasets to this node using consistent hashing
+    # Note: Use deterministic hash (MD5) instead of Python's hash() which is randomized per-process
+    import hashlib
+
     my_datasets = {}
     for indexed_path, dataset_info in unique_datasets.items():
         # Consistent hashing: assign dataset to node based on path hash
-        assigned_node = hash(indexed_path) % total_nodes
+        # Use MD5 hash for deterministic assignment across all nodes
+        path_hash = int(hashlib.md5(indexed_path.encode('utf-8')).hexdigest(), 16)
+        assigned_node = path_hash % total_nodes
         if assigned_node == current_node_rank:
             my_datasets[indexed_path] = dataset_info
 
@@ -286,6 +291,13 @@ def preprocess_indexed_datasets_parallel_nodes(
     logger.info(f"Datasets assigned to this node: {num_my_datasets}")
     logger.info(f"Using {num_workers} CPU workers per dataset")
     logger.info(f"Note: This is CPU work, not using GPUs")
+
+    # Log which datasets are assigned to this node
+    if num_my_datasets > 0:
+        logger.info(f"[Node {current_node_rank}] Assigned datasets:")
+        for i, indexed_path in enumerate(my_datasets.keys(), 1):
+            logger.info(f"  {i}. {indexed_path}")
+
     logger.info("=" * 80)
 
     if num_my_datasets == 0:
@@ -379,6 +391,9 @@ def _wait_for_all_datasets(all_datasets, node_rank):
                 f"[Node {node_rank}] Waiting for {len(missing_datasets)} datasets "
                 f"(elapsed: {elapsed}s)..."
             )
+            # Log which specific datasets are missing
+            for path in missing_datasets[:5]:  # Show first 5
+                logger.info(f"[Node {node_rank}]   Missing: {path}")
 
         time.sleep(check_interval)
         elapsed += check_interval

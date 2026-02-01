@@ -423,18 +423,18 @@ def preprocess_text_to_indexed(
             # Add document to builder
             builder.add_document(token_ids)
 
-            # Print statistics
-            if i % log_interval == 0:
-                elapsed = time.time() - start_time
-                docs_per_sec = total_docs / elapsed if elapsed > 0 else 0
-                mb_per_sec = (total_bytes / elapsed / 1024 / 1024) if elapsed > 0 else 0
-                logger.info(
-                    f"Processed {total_docs} documents "
-                    f"({docs_per_sec:.1f} docs/s, {mb_per_sec:.1f} MB/s)"
-                )
+            # # Print statistics
+            # if i % log_interval == 0:
+            #     elapsed = time.time() - start_time
+            #     docs_per_sec = total_docs / elapsed if elapsed > 0 else 0
+            #     mb_per_sec = (total_bytes / elapsed / 1024 / 1024) if elapsed > 0 else 0
+            #     logger.info(
+            #         # f"Processed {total_docs} documents "
+            #         # f"({docs_per_sec:.1f} docs/s, {mb_per_sec:.1f} MB/s)"
+            #     )
 
         # Finalize dataset
-        logger.info("Finalizing dataset...")
+        # logger.info("Finalizing dataset...")
         builder.finalize(output_idx)
 
         # Close files

@@ -134,14 +134,14 @@ class Preprocessor:
             start_time: Processing start time
             total_bytes: Total bytes processed
         """
-        if count % self.args.log_interval == 0:
-            elapsed = time.time() - start_time
-            docs_per_sec = count / elapsed if elapsed > 0 else 0
-            mb_per_sec = (total_bytes / elapsed / 1024 / 1024) if elapsed > 0 else 0
-            logger.info(
-                f"Processed {count} documents "
-                f"({docs_per_sec:.1f} docs/s, {mb_per_sec:.1f} MB/s)"
-            )
+        # if count % self.args.log_interval == 0:
+        #     elapsed = time.time() - start_time
+        #     docs_per_sec = count / elapsed if elapsed > 0 else 0
+        #     mb_per_sec = (total_bytes / elapsed / 1024 / 1024) if elapsed > 0 else 0
+        #     logger.info(
+        #         f"Processed {count} documents "
+        #         f"({docs_per_sec:.1f} docs/s, {mb_per_sec:.1f} MB/s)"
+        #     )
 
     def process_file(self):
         """Process input file and create indexed dataset."""

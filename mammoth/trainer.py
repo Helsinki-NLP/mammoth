@@ -28,43 +28,27 @@ try:
 except ImportError:
     SACREBLEU_AVAILABLE = False
 
-# PyTorch profiler support - works across all platforms (AMD/NVIDIA/CPU)
-# Profiler is only imported and used when enable_profiling=True to avoid any overhead
+# ROCTx profiler support for AMD GPU profiling on LUMI
+# Markers are always active; profiling controlled by rocprofv3 wrapper
 
-from contextlib import contextmanager
-
-@contextmanager
-def _noop_record_function(name):
-    """No-op context manager for when profiling is disabled"""
-    yield
-
-
-def _get_profiler_function(enable_profiling):
-    """Returns either torch.profiler.record_function or a no-op based on enable_profiling flag"""
-    if enable_profiling:
-        from torch.profiler import record_function
-        logger.info("PyTorch profiler annotations ENABLED")
-        return record_function
-    else:
-        logger.debug("PyTorch profiler annotations DISABLED")
-        return _noop_record_function
+from mammoth.utils.profiling import get_roctx_range
 
 
 class NanLossException(Exception):
     pass
 
 
-def iter_on_device(iterator, device_context, enable_profiling=False):
-    """Move batches to device with optional profiling annotation"""
+def iter_on_device(iterator, device_context):
+    """Move batches to device with ROCTx profiling annotation"""
     if device_context.is_gpu():
         device = torch.device(f'cuda:{device_context.local_rank}')
     else:
         device = torch.device('cpu')
 
-    record_function = _get_profiler_function(enable_profiling)
+    roctx_range = get_roctx_range()
 
     for batch, meta, comm_batch_id in iterator:
-        with record_function("data_transfer_to_device"):
+        with roctx_range("data_transfer_to_device"):
             batch_on_device = batch.to(device)
         yield batch_on_device, meta, comm_batch_id
 
@@ -143,7 +127,6 @@ def build_trainer(
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,
-        enable_profiling=getattr(opts, 'enable_profiling', False),
     )
     return trainer
 
@@ -195,7 +178,6 @@ class Trainer(object):
         vocabs_dict=None,
         beam_size=1,
         max_length=100,
-        enable_profiling=False,
     ):
         # Basic attributes.
         self.model = model
@@ -224,10 +206,9 @@ class Trainer(object):
         self.vocabs_dict = vocabs_dict or {}
         self.beam_size = beam_size
         self.max_length = max_length
-        self.enable_profiling = enable_profiling
 
-        # Get profiling function (either real profiler or no-op)
-        self.record_function = _get_profiler_function(enable_profiling)
+        # Get ROCTx range function (markers always active, profiling controlled by rocprofv3)
+        self.roctx_range = get_roctx_range()
 
         self._data_state = {}
 
@@ -284,7 +265,7 @@ class Trainer(object):
         Returns:
             The gathered statistics.
         """
-        train_iter = iter_on_device(train_iter, device_context, self.enable_profiling)
+        train_iter = iter_on_device(train_iter, device_context)
         if valid_iter is None:
             logger.info('Start training loop without validation...')
         else:
@@ -321,7 +302,7 @@ class Trainer(object):
             self.accum_count = self._accum_count(self.optim.training_step)
             self.task_queue_manager.accum_count = self.accum_count
 
-            with self.record_function(f"data_preparation_step_{step}"):
+            with self.roctx_range(f"data_preparation_step_{step}"):
                 batches_with_meta = islice(train_iter, self.accum_count)
                 # Convert to list to materialize all batches and measure data loading time
                 batches_with_meta = list(batches_with_meta)
@@ -331,7 +312,7 @@ class Trainer(object):
 
             gradient_syncs = self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample)
 
-            with self.record_function(f"gradient_accumulation_step_{step}"):
+            with self.roctx_range(f"gradient_accumulation_step_{step}"):
                 self._gradient_accumulation(
                     batches_with_meta,
                     total_stats,
@@ -340,7 +321,7 @@ class Trainer(object):
                     gradient_syncs,
                 )
 
-            with self.record_function(f"gradient_sync_step_{step}"):
+            with self.roctx_range(f"gradient_sync_step_{step}"):
                 for idx, gradient_sync in enumerate(gradient_syncs):
                     component = gradient_sync.component
                     if not component.needs_communication():
@@ -352,7 +333,7 @@ class Trainer(object):
                     # Annotate per-component gradient synchronization
                     component_name = component.get_name() if hasattr(component, 'get_name') else f"component_{idx}"
 
-                    with self.record_function(f"allreduce_{component_name}"):
+                    with self.roctx_range(f"allreduce_{component_name}"):
                         params = component.named_parameters(self.model)
                         # gradient_sync.gradient_norm counts the number of devices that trained this component
                         # this doesn't normalize the number of masked tokens
@@ -366,7 +347,7 @@ class Trainer(object):
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
             # Including single-device components
-            with self.record_function(f"optimizer_step_{step}"):
+            with self.roctx_range(f"optimizer_step_{step}"):
                 self.optim.externally_managed_step(gradient_syncs)
                 self.optim.zero_grad()
 
@@ -412,7 +393,7 @@ class Trainer(object):
                         logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
 
                     valid_stats = self.validate(
-                        iter_on_device(valid_iter, device_context, self.enable_profiling),
+                        iter_on_device(valid_iter, device_context),
                         moving_average=self.moving_average,
                     )
 
@@ -435,7 +416,7 @@ class Trainer(object):
                 # Synchronize all devices after validation to avoid timeouts
                 # This barrier ensures all devices (with or without validation data) stay in sync
                 if device_context.is_distributed():
-                    with self.record_function("barrier_post_validation"):
+                    with self.roctx_range("barrier_post_validation"):
                         torch.distributed.barrier()
 
                 # Clean up GPU memory after validation to free any remaining tensors
@@ -777,7 +758,7 @@ class Trainer(object):
                 device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
                 dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
 
-                with self.record_function("validation_forward_pass"):
+                with self.roctx_range("validation_forward_pass"):
                     with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                         # F-prop through the model.
                         logits, decoder_output = valid_model(
@@ -934,7 +915,7 @@ class Trainer(object):
 
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
-            with self.record_function(f"forward_pass_batch_{k}"):
+            with self.roctx_range(f"forward_pass_batch_{k}"):
                 with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                     logits, decoder_output = self.model(
                         src=rearrange(src, 't b 1 -> b t'),
@@ -945,7 +926,7 @@ class Trainer(object):
                     logits = rearrange(logits, 'b t i -> t b i')
                     decoder_output = rearrange(decoder_output, 'b t d -> t b d')
 
-            with self.record_function(f"loss_computation_batch_{k}"):
+            with self.roctx_range(f"loss_computation_batch_{k}"):
                 with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                     # 3. Compute loss.
                     loss = self.loss_functions[metadata.tgt_lang](
@@ -958,7 +939,7 @@ class Trainer(object):
                 if torch.isnan(loss):
                     raise NanLossException('Loss blowout')
                 # loss /= normalization
-                with self.record_function(f"backward_pass_batch_{k}"):
+                with self.roctx_range(f"backward_pass_batch_{k}"):
                     self.optim.backward(loss)
 
             if self.report_training_accuracy:

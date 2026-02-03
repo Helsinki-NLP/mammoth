@@ -1,0 +1,1444 @@
+++ scontrol show hostnames 'nid[007971-007972]'
+++ head -n 1
++ MASTER_NODE=nid007971
++ MASTER_PORT=9973
++ echo 'Master node: nid007971'
++ echo 'Master port: 9973'
++ echo 'Node list: nid[007971-007972]'
++ cat
++ chmod +x /scratch/project_462000964/members/wangchao/profiling/amd_profiler.sh
++ srun /usr/bin/singularity exec --env MASTER_NODE=nid007971 --env MASTER_PORT=9973 -B /scratch/project_462000964/members/wangchao:/scratch/project_462000964/members/wangchao:rw -B /scratch/project_462000964/shared:/scratch/project_462000964/shared:ro /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif /scratch/project_462000964/members/wangchao/profiling/amd_profiler.sh
+[2025-12-31 13:04:59,248 109542  INFO] Validated save_model path: /scratch/project_462000964/members/wangchao/training/291225/saving_best_test
+[2025-12-31 13:04:59,248 92001  INFO] Validated save_model path: /scratch/project_462000964/members/wangchao/training/291225/saving_best_test
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpora
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_ar': {'src_tgt': 'en-ar', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:0', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['ar'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_eu': {'src_tgt': 'en-eu', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:1', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['eu'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_eu.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_eu.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_fi': {'src_tgt': 'en-fi', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:2', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['fi'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_he': {'src_tgt': 'en-he', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:3', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['he'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_he.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_he.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_hi': {'src_tgt': 'en-hi', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:0', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['hi'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_hi.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_hi.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_hr': {'src_tgt': 'en-hr', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:1', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['hr'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_hr.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_hr.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_is': {'src_tgt': 'en-is', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:2', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['is'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_is.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_is.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsing corpus 'task_en_sw': {'src_tgt': 'en-sw', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:3', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['sw'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_sw.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_sw.txt'}
+[2025-12-31 13:05:18,482 92001  INFO] Parsed 8 corpora from -data.
+[2025-12-31 13:05:18,482 92001  INFO] Parsed 1 vocabs from -src_vocab.
+[2025-12-31 13:05:18,483 92001  INFO] Parsed 8 vocabs from -tgt_vocab.
+[2025-12-31 13:05:18,512 92001  INFO] Training on WorldContext(context=<DeviceContextEnum.MULTI_GPU: 3>, n_nodes=2, gpus_per_node=4)
+[2025-12-31 13:05:18,512 92001  INFO] All transforms: {'filtertoolong': <class 'mammoth.transforms.filtering.FilterTooLongTransform'>}
+[2025-12-31 13:05:18,512 92001  INFO] Final all specials: ('</s>', '<pad>', '<s>', '<unk>')
+[2025-12-31 13:05:18,512 92001  INFO] Extracted 0 unique language tokens from config: []
+[2025-12-31 13:05:18,512 92001  INFO] Extracted 0 language tokens directly from config
+[2025-12-31 13:05:18,512 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,655 109542  INFO] Parsing corpora
+[2025-12-31 13:05:18,655 109542  INFO] Parsing corpus 'task_en_ar': {'src_tgt': 'en-ar', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:0', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['ar'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar.txt'}
+[2025-12-31 13:05:18,655 109542  INFO] Parsing corpus 'task_en_eu': {'src_tgt': 'en-eu', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:1', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['eu'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_eu.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_eu.txt'}
+[2025-12-31 13:05:18,655 109542  INFO] Parsing corpus 'task_en_fi': {'src_tgt': 'en-fi', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:2', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['fi'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt'}
+[2025-12-31 13:05:18,655 109542  INFO] Parsing corpus 'task_en_he': {'src_tgt': 'en-he', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '0:3', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['he'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_he.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_he.txt'}
+[2025-12-31 13:05:18,655 109542  INFO] Parsing corpus 'task_en_hi': {'src_tgt': 'en-hi', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:0', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['hi'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_hi.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_hi.txt'}
+[2025-12-31 13:05:18,655 109542  INFO] Parsing corpus 'task_en_hr': {'src_tgt': 'en-hr', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:1', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['hr'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_hr.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_hr.txt'}
+[2025-12-31 13:05:18,656 109542  INFO] Parsing corpus 'task_en_is': {'src_tgt': 'en-is', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:2', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['is'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_is.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_is.txt'}
+[2025-12-31 13:05:18,656 109542  INFO] Parsing corpus 'task_en_sw': {'src_tgt': 'en-sw', 'weight': 1.0, 'introduce_at_training_step': 0, 'node_gpu': '1:3', 'enc_sharing_group': ['shared'], 'dec_sharing_group': ['sw'], 'transforms': ['filtertoolong'], 'path_src': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_en.txt', 'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_sw.txt', 'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_en.txt', 'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_sw.txt'}
+[2025-12-31 13:05:18,656 109542  INFO] Parsed 8 corpora from -data.
+[2025-12-31 13:05:18,656 109542  INFO] Parsed 1 vocabs from -src_vocab.
+[2025-12-31 13:05:18,656 109542  INFO] Parsed 8 vocabs from -tgt_vocab.
+[2025-12-31 13:05:18,659 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,672 109542  INFO] Training on WorldContext(context=<DeviceContextEnum.MULTI_GPU: 3>, n_nodes=2, gpus_per_node=4)
+[2025-12-31 13:05:18,673 109542  INFO] All transforms: {'filtertoolong': <class 'mammoth.transforms.filtering.FilterTooLongTransform'>}
+[2025-12-31 13:05:18,673 109542  INFO] Final all specials: ('</s>', '<pad>', '<s>', '<unk>')
+[2025-12-31 13:05:18,673 109542  INFO] Extracted 0 unique language tokens from config: []
+[2025-12-31 13:05:18,673 109542  INFO] Extracted 0 language tokens directly from config
+[2025-12-31 13:05:18,673 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,705 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,753 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,798 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,812 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,842 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,862 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,887 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,909 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,931 92001  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,954 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,975 92001  INFO] Loading ar HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:18,999 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,044 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,050 92001  INFO] Loading eu HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,088 109542  INFO] Loading en HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,127 92001  INFO] Loading fi HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,132 109542  INFO] Loading ar HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,187 109542  INFO] Loading eu HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,205 92001  INFO] Loading he HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,255 109542  INFO] Loading fi HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,289 92001  INFO] Loading hi HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,323 109542  INFO] Loading he HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,372 92001  INFO] Loading hr HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,399 109542  INFO] Loading hi HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,457 92001  INFO] Loading is HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,476 109542  INFO] Loading hr HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,537 109542  INFO] Loading is HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,542 92001  INFO] Loading sw HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,600 109542  INFO] Loading sw HuggingFace tokenizer from /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/tgt_tokenizer/tokenizer.json
+[2025-12-31 13:05:19,621 92001  INFO] world_size = 8, queue_size = 40
+[2025-12-31 13:05:19,626 92001  INFO] in task_queue_manager: node_rank 1 local_rank 0
+[2025-12-31 13:05:19,668 109542  INFO] world_size = 8, queue_size = 40
+[2025-12-31 13:05:19,673 109542  INFO] in task_queue_manager: node_rank 0 local_rank 0
+[2025-12-31 13:05:19,674 109542  INFO] TaskQueueManager: TaskQueueManager(
+tasks=[TaskSpecs(node_rank=0,
+           local_rank=0,
+           src_lang='en',
+           tgt_lang='ar',
+           encoder_id=['shared'],
+           decoder_id=['ar'],
+           corpus_id='task_en_ar',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['ar'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '0:0',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-ar',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None),
+ TaskSpecs(node_rank=0,
+           local_rank=1,
+           src_lang='en',
+           tgt_lang='eu',
+           encoder_id=['shared'],
+           decoder_id=['eu'],
+           corpus_id='task_en_eu',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['eu'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '0:1',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_eu.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_eu.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-eu',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None),
+ TaskSpecs(node_rank=0,
+           local_rank=2,
+           src_lang='en',
+           tgt_lang='fi',
+           encoder_id=['shared'],
+           decoder_id=['fi'],
+           corpus_id='task_en_fi',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['fi'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '0:2',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-fi',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None),
+ TaskSpecs(node_rank=0,
+           local_rank=3,
+           src_lang='en',
+           tgt_lang='he',
+           encoder_id=['shared'],
+           decoder_id=['he'],
+           corpus_id='task_en_he',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['he'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '0:3',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_he.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_he.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-he',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None),
+ TaskSpecs(node_rank=1,
+           local_rank=0,
+           src_lang='en',
+           tgt_lang='hi',
+           encoder_id=['shared'],
+           decoder_id=['hi'],
+           corpus_id='task_en_hi',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['hi'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '1:0',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_hi.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_hi.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-hi',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None),
+ TaskSpecs(node_rank=1,
+           local_rank=1,
+           src_lang='en',
+           tgt_lang='hr',
+           encoder_id=['shared'],
+           decoder_id=['hr'],
+           corpus_id='task_en_hr',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['hr'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '1:1',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_hr.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_hr.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-hr',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None),
+ TaskSpecs(node_rank=1,
+           local_rank=2,
+           src_lang='en',
+           tgt_lang='is',
+           encoder_id=['shared'],
+           decoder_id=['is'],
+           corpus_id='task_en_is',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['is'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '1:2',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_is.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_is.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-is',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None),
+ TaskSpecs(node_rank=1,
+           local_rank=3,
+           src_lang='en',
+           tgt_lang='sw',
+           encoder_id=['shared'],
+           decoder_id=['sw'],
+           corpus_id='task_en_sw',
+           weight=1.0,
+           introduce_at_training_step=0,
+           corpus_opts={'dec_sharing_group': ['sw'],
+                        'enc_sharing_group': ['shared'],
+                        'introduce_at_training_step': 0,
+                        'node_gpu': '1:3',
+                        'path_src': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_en.txt',
+                        'path_tgt': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_sw.txt',
+                        'path_valid_src': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_en.txt',
+                        'path_valid_tgt': '/scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_sw.txt',
+                        'src_feats': None,
+                        'src_tgt': 'en-sw',
+                        'transforms': ['filtertoolong'],
+                        'weight': 1.0},
+           src_vocab=None,
+           tgt_vocab=None,
+           encoder_adapter_ids=None,
+           decoder_adapter_ids=None)],
+ world_context=WorldContext(context=<DeviceContextEnum.MULTI_GPU: 3>,
+             n_nodes=2,
+             gpus_per_node=4),
+ uses_adapters=False
+)
+[2025-12-31 13:05:22,625 92001  INFO]  Starting process pid: 92086  
+[2025-12-31 13:05:22,625 92001  INFO] in task_queue_manager: node_rank 1 local_rank 0
+[2025-12-31 13:05:22,715 109542  INFO]  Starting process pid: 109634  
+[2025-12-31 13:05:22,715 109542  INFO] in task_queue_manager: node_rank 0 local_rank 0
+[2025-12-31 13:05:25,588 109542  INFO]  Starting producer process pid: 109651  
+[2025-12-31 13:05:25,588 109542  INFO] in task_queue_manager: node_rank 0 local_rank 1
+[2025-12-31 13:05:25,619 92001  INFO]  Starting producer process pid: 92101  
+[2025-12-31 13:05:25,619 92001  INFO] in task_queue_manager: node_rank 1 local_rank 1
+[2025-12-31 13:05:25,621 109651  INFO] BATCH PRODUCER
+[2025-12-31 13:05:25,621 109651  INFO] <mammoth.inputters.dataloader.DynamicDatasetIter object at 0x14d5765115b0>
+[2025-12-31 13:05:25,621 109651  INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:05:25,621 109651  INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:05:25,621 109651  INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:05:25,622 109651  INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:05:25,622 109651  INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:05:25,632 92101  INFO] BATCH PRODUCER
+[2025-12-31 13:05:25,632 92101  INFO] <mammoth.inputters.dataloader.DynamicDatasetIter object at 0x150541fdfe90>
+[2025-12-31 13:05:25,632 92101  INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:05:25,632 92101  INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:05:25,632 92101  INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:05:25,632 92101  INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:05:25,632 92101  INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:05:25,659 92101  WARNING] [DataLoader] Line 1: SRC=Q4: I am a designer, Can you help me to produce the sample which we designed? TGT=प्रश्न 4: मैं एक डिजाइनर हूं, क्या आप मुझे नमूने तैयार करने में मदद कर सकते हैं जिसे हमने डिजाइन किय
+[2025-12-31 13:05:25,659 109651  WARNING] [DataLoader] Line 1: SRC=Use the Personal info page to change your name, mobile phone number, and alternate email address. Th TGT=استخدم صفحة المعلومات الشخصية لتغيير اسمك ورقم هاتفك الجوال وعنوان بريدك الإلكتروني البديل. يتم استخ
+[2025-12-31 13:05:25,676 92101  WARNING] [DataLoader] Line 2: SRC=You will find a lot of people talking about why you should use a VPN and how it can protect your ide TGT=उसका सिर्फ हमे ही पता होता है बस ऐसे ही वीपीएन भी एक प्रकार का Private Network होता है जिससे हम कौनस
+[2025-12-31 13:05:25,677 92101  WARNING] [DataLoader] Line 3: SRC=You like to prepare a? poison for cockroaches that out 100 % natural and not resorting to any kind o TGT=तैयार करने के लिए की तरह एक? तिलचट्टे के लिए जहर यह था कि 100 % प्राकृतिक और करने के लिए रासायनिक की
+[2025-12-31 13:05:25,677 92101  WARNING] [DataLoader] Line 4: SRC=Master of Science in Operations Management TGT=विज्ञान के व्यावहारिक सांख्यिकी में मास्टर
+[2025-12-31 13:05:25,677 92101  WARNING] [DataLoader] Line 5: SRC=More than 20 years of experience in international business trading. TGT=अंतरराष्ट्रीय व्यापार में अनुभव के 20 से अधिक वर्षों ट्रेडिंग.
+[2025-12-31 13:05:25,677 109651  WARNING] [DataLoader] Line 2: SRC=Disasters, tsunamis, torrential rains, storms and hurricanes strike the Earth with rage, strength an TGT=الكوارث والتسونامي والأمطار الغزيرة والعواصف والأعاصير ضرب الأرض بقوة، والغضب exponentialité.
+[2025-12-31 13:05:25,678 109651  WARNING] [DataLoader] Line 3: SRC=- Medical insurance for the duration of the study. TGT=- تأمين طبي طيلة فترة الدراسة.
+[2025-12-31 13:05:25,678 109651  WARNING] [DataLoader] Line 4: SRC=- If you are allergic to aspirin, do not take it and take nitroglycerin. TGT=- في حال كانت لديك حساسية اتجاه الأسبرين لا تقم بتناوله وقم بتناول نيتروغلسرين.
+[2025-12-31 13:05:25,678 109651  WARNING] [DataLoader] Line 5: SRC=Al Ain city has popular historical attractions ranging from one of the forts built by the ruling Al  TGT=مدينة العين عِنْدَها جاذبيةُ تأريخيةُ شعبيةُ تَتراوحُ مِنْ إحدى الحصونِ بَنتْ مِن قِبل الNahayan الع
+[2025-12-31 13:05:26,509 109651  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:05:26,509 109651  INFO]   Input tokens: ['▁The', '▁extrem', 'ist,', '▁Ye', 'h', 'ud', 'ah', '▁G', 'lick', ',']...
+[2025-12-31 13:05:26,509 109651  INFO]   Token IDs: [9593, 13724, 14551, 20100, 77, 9699, 9920, 9626, 10355, 17]...
+[2025-12-31 13:05:28,583 109542  INFO]  Starting process pid: 109674  
+[2025-12-31 13:05:28,583 109542  INFO] in task_queue_manager: node_rank 0 local_rank 1
+[2025-12-31 13:05:28,625 92001  INFO]  Starting process pid: 92131  
+[2025-12-31 13:05:28,625 92001  INFO] in task_queue_manager: node_rank 1 local_rank 1
+[2025-12-31 13:05:31,616 109542  INFO]  Starting producer process pid: 109710  
+[2025-12-31 13:05:31,616 109542  INFO] in task_queue_manager: node_rank 0 local_rank 2
+[2025-12-31 13:05:31,624 92001  INFO]  Starting producer process pid: 92165  
+[2025-12-31 13:05:31,624 92001  INFO] in task_queue_manager: node_rank 1 local_rank 2
+[2025-12-31 13:05:31,646 109710  WARNING] [DataLoader] Line 1: SRC=Free time is directly associated with industry and with production patterns. TGT=Aisialdia zuzenean lotuta dago industriarekin eta produkzio-patroiekin.
+[2025-12-31 13:05:31,648 109710  WARNING] [DataLoader] Line 2: SRC=Both the furniture and some ideas can help you make the office a place without chaos. TGT=Altzariek eta ideia batzuek bulegoa kaosik gabeko tokia bihurtzen lagun zaitzakete.
+[2025-12-31 13:05:31,648 109710  WARNING] [DataLoader] Line 3: SRC=Can the portable button get wet? TGT=Busti al daiteke sakagailu eramangarria?
+[2025-12-31 13:05:31,648 109710  WARNING] [DataLoader] Line 4: SRC=We have a wide range of deposits to adapt to any ice machine. TGT=Gordetegi-gama handia daukagu, izotz-makina guztietara egokitzeko.
+[2025-12-31 13:05:31,648 109710  WARNING] [DataLoader] Line 5: SRC=Itsasmendi Artizar and Anima Negra in the Iberdrola tower TGT=Itsasmendi Artizar eta Anima Negra Iberdrola dorrean
+[2025-12-31 13:05:31,655 92165  WARNING] [DataLoader] Line 1: SRC=Professional riders like the mountain bike Olympic Champion Sabine Spitz, who is traveling on wheels TGT=Profesionalni vozači poput mountain bike olimpijski prvak Sabine Spitz, koji je putovao na kotačima 
+[2025-12-31 13:05:31,657 92165  WARNING] [DataLoader] Line 2: SRC=Make sure to apply it to videos with good lighting, as the effect will look more natural. TGT=Obavezno ga primijenite na videozapise s dobrim osvjetljenjem jer će efekt izgledati prirodnije.
+[2025-12-31 13:05:31,657 92165  WARNING] [DataLoader] Line 3: SRC=After the expiry of the period, the corresponding data is routinely deleted, provided that it is no  TGT=Nakon isteka tog razdoblja, odgovarajući podatci rutinski se brišu, sve dok više nisu potrebni za iz
+[2025-12-31 13:05:31,657 92165  WARNING] [DataLoader] Line 4: SRC=Personal data means any information relating to an identified or identifiable natural person (‘data  TGT=Osobni podaci su bilo koji podaci koji se odnose na identificiranu ili utvrdivu osobu.
+[2025-12-31 13:05:31,658 92165  WARNING] [DataLoader] Line 5: SRC=- Great for semi-solid foods, liquids, and laboratory TGT=- Izvrsno za polukrutu hranu, tekućinu i laboratorij
+[2025-12-31 13:05:34,553 92001  INFO]  Starting process pid: 92191  
+[2025-12-31 13:05:34,553 92001  INFO] in task_queue_manager: node_rank 1 local_rank 2
+[2025-12-31 13:05:34,612 109542  INFO]  Starting process pid: 109735  
+[2025-12-31 13:05:34,612 109542  INFO] in task_queue_manager: node_rank 0 local_rank 2
+[2025-12-31 13:05:37,561 92001  INFO]  Starting producer process pid: 92210  
+[2025-12-31 13:05:37,561 92001  INFO] in task_queue_manager: node_rank 1 local_rank 3
+[2025-12-31 13:05:37,600 92210  WARNING] [DataLoader] Line 1: SRC=Montezemolo, Chairman of Ferrari “Today a dream comes true” – Ferrari World Abu Dhabi TGT=Montezemolo, stjórnarformaður Ferrari "Í dag er draumur koma sannur" - Ferrari World Abu Dhabi
+[2025-12-31 13:05:37,602 92210  WARNING] [DataLoader] Line 2: SRC=Excellent 4.3 / 5 (108 reviews) 118 people looked at this hotel in the last hour Spa hotels within 2 TGT=95 einstaklingar skoðuðu þetta hótel á síðustu klukkustund Hótel með heilsulind gististaðir innan 35
+[2025-12-31 13:05:37,602 92210  WARNING] [DataLoader] Line 3: SRC=13 I will dwell among the children of Israel, and will not forsake my people Israel.” TGT=13 og ég mun búa meðal Ísraelsmanna og eigi yfirgefa lýð minn Ísrael."
+[2025-12-31 13:05:37,602 92210  WARNING] [DataLoader] Line 4: SRC=Today, it is just the name of Oxandrolone steroid is readily available in Panama and also it is pres TGT=Í dag, það er aðeins nafn oxandrólón vefaukandi stera stafla er til staðar í Danmörku og er nú afhen
+[2025-12-31 13:05:37,603 92210  WARNING] [DataLoader] Line 5: SRC=8 They shattered and crushed the Israelites that year, and for 18 years they did the same to all the TGT=8 Og þeir þjáðu og þjökuðu Ísraelsmenn það ár. Í átján ár þjökuðu þeir alla Ísraelsmenn, sem bjuggu 
+[2025-12-31 13:05:37,645 109542  INFO]  Starting producer process pid: 109802  
+[2025-12-31 13:05:37,645 109542  INFO] in task_queue_manager: node_rank 0 local_rank 3
+[2025-12-31 13:05:37,673 109802  WARNING] [DataLoader] Line 1: SRC=We created EcoChoice to help anglers make sustainable decisions by highlighting the most sustainable TGT=Loimme EcoChoicen helpottamaan kalastajien vastuullisten valintojen tekemistä, korostamalla vastuull
+[2025-12-31 13:05:37,674 109802  WARNING] [DataLoader] Line 2: SRC=The soft towel is also suitable to use for different dining settings as a serviette. - ABSORBENT TGT=Liina soveltuu myös käytettäväksi erilaisten kattausten ruokaservetteinä. - IMUKYKYINEN - NUKKAAMATO
+[2025-12-31 13:05:37,675 109802  WARNING] [DataLoader] Line 3: SRC=They may pay Booking.com a bit more to be in this programme. Lisbon9.1 Superb 462 reviewsDescription TGT=Majoituspaikka saattaa maksaa Booking.comille enemmän ollakseen mukana tässä ohjelmassa. Lissabon9,1
+[2025-12-31 13:05:37,675 109802  WARNING] [DataLoader] Line 4: SRC=Almost 10% of the city’s residents are students. TGT=Lähes 10% kaupungin asukkaista on opiskelijoita.
+[2025-12-31 13:05:37,675 109802  WARNING] [DataLoader] Line 5: SRC=Italy ratifies the Treaty instituting a Council and Commission of the European Communities. TGT=Italia ratifioi Euroopan yhteisöjen yhteisen neuvoston ja yhteisen komission perustamisesta tehdyn s
+[2025-12-31 13:05:40,482 92001  INFO]  Starting process pid: 92236  
+[2025-12-31 13:05:40,482 92001  INFO] in task_queue_manager: node_rank 1 local_rank 3
+[2025-12-31 13:05:40,558 109542  INFO]  Starting process pid: 110394  
+[2025-12-31 13:05:40,558 109542  INFO] in task_queue_manager: node_rank 0 local_rank 3
+[2025-12-31 13:05:43,418 92001  INFO]  Starting producer process pid: 92271  
+[2025-12-31 13:05:43,418 92001  INFO] DD logger
+[2025-12-31 13:05:43,459 92271  WARNING] [DataLoader] Line 1: SRC=And because my attention is all on him, I can see so clearly what an awesome kid he has turned out t TGT=Na kwa sababu mawazo yangu ni wote juu yake, Naweza kuona hivyo wazi kile mtoto kutisha yeye aligeuk
+[2025-12-31 13:05:43,461 92271  WARNING] [DataLoader] Line 2: SRC=We must have more time to reach this world for the kingdom of Heaven. TGT=Lazima tuwe na muda zaidi wa kufikia hii dunia kwa ajili ya Ufalme wa Mbinguni.
+[2025-12-31 13:05:43,461 92271  WARNING] [DataLoader] Line 3: SRC=A sports bra may be the best choice if you intend to exercise. TGT=Sidiria ya michezo inaweza kuwa chaguo bora ikiwa unakusudia kufanya mazoezi.
+[2025-12-31 13:05:43,462 92271  WARNING] [DataLoader] Line 4: SRC=Tho di military don promise not to remove protesters from wia dem siddon, dem don also ask dem to "l TGT=Omaral Bashir. Japo jeshi limeahidi kutowakamata au kuwaondoa waandamanaji barabarani limewaomba kus
+[2025-12-31 13:05:43,462 92271  WARNING] [DataLoader] Line 5: SRC=2nd Trinity - God is one: Father, Son and Holy Spirit, a unity of three persons from eternity. TGT=2 Utatu - Mungu ni mmoja: Baba, Mwana na Roho Mtakatifu, umoja wa watu watatu kutoka milele.
+[2025-12-31 13:05:43,663 109542  INFO]  Starting producer process pid: 110435  
+[2025-12-31 13:05:43,663 109542  INFO] DD logger
+[2025-12-31 13:05:43,713 110435  WARNING] [DataLoader] Line 1: SRC=The machine is widely used for cutting various nonmetal materials by forming cutter such as: Leather TGT=המכונה נמצאת בשימוש נרחב לחיתוך חומרים nonmetal שונים על ידי יצירת מחתך כגון: עור, פלסטיק, אריזה פלס
+[2025-12-31 13:05:43,715 110435  WARNING] [DataLoader] Line 2: SRC=List of application fees TGT=רשימת דמי בקשה
+[2025-12-31 13:05:43,715 110435  WARNING] [DataLoader] Line 3: SRC=27 And Manasseh did not drive out the inhabitants of Beth-shean and her towns, nor of Taanach and he TGT=1:27 ולא-הוריש מנשה את-בית-שאן ואת-בנותיה ואת-תענך ואת-בנתיה ואת-ישב דור ואת-בנותיה ואת-יושבי יבלעם 
+[2025-12-31 13:05:43,715 110435  WARNING] [DataLoader] Line 4: SRC=Sometime when you have enabled many YUM Repositories like local repository, rpmforge, ATrpms for you TGT=לפעמים, כאשר הפעלת מאגרים YUM רבים כמו מאגר מקומי, rpmforge, ATrpms עבור השרת שלך, וזה די קשה לנהל א
+[2025-12-31 13:05:43,716 110435  WARNING] [DataLoader] Line 5: SRC=Oyo 9426 Oak Field Resorts is set 80 km from Cochin International airport. Guests can avail of 24-ho TGT=לנוחות האורחים בית המלון מציע קבלה 24 שעות, שירות רפואי ושירות חדרים וגם החלפת כספים, אחסון מזוודות 
+[2025-12-31 13:05:43,867 110435  WARNING] FilterTooLong: Sequence near threshold PASSED. src_len=254 (threshold=254), tgt_len=134 (threshold=254), ratio=0.53. After numericalization will add ~3 special tokens.
+[2025-12-31 13:05:43,867 110435  WARNING]   SRC tokens: ['▁YOU', '▁AC', 'K', 'N', 'OW', 'L', 'ED', 'GE', '▁AND', '▁AG', 'REE', '▁TH', 'AT', '▁THE', '▁PL', 'AT', 'FORM', '▁(', 'OR', '▁C'] ...
+[2025-12-31 13:05:43,867 110435  WARNING]   TGT tokens: ['▁מלבד', '▁אחריות', '▁זו,', '▁במידה', '▁המותרת', '▁ע"פ', '▁החוקים', '▁והתקנות', '▁הרלוונטי', 'ים,', '▁כל', '▁השירותים', '▁והת', 'וכנות', '▁שלנו', '▁מוצעים', '▁"כ', 'פי', '▁שהם', '"'] ...
+[2025-12-31 13:05:43,867 110435  WARNING] ⚠️  Sequence near limit after numericalization. src: tokens=254 → token_ids=254 → final=256
+[2025-12-31 13:05:46,293 109674 GPU 0:1 WARNING] sleeping 3s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,293 109634 GPU 0:0 WARNING] sleeping 0s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,293 110394 GPU 0:3 WARNING] sleeping 9s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,293 109735 GPU 0:2 WARNING] sleeping 6s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,294 109634 GPU 0:0 INFO] logger set device 0 
+[2025-12-31 13:05:46,303 92131 GPU 1:1 WARNING] sleeping 3s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,303 92191 GPU 1:2 WARNING] sleeping 6s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,303 92236 GPU 1:3 WARNING] sleeping 9s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,304 92086 GPU 1:0 WARNING] sleeping 0s to alleviate ROCm deadlock
+[2025-12-31 13:05:46,304 92086 GPU 1:0 INFO] logger set device 0 
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] RANK GPU FROM TORCH 0
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:46,316 109634 GPU 0:0 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] RANK GPU FROM TORCH 4
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:46,359 92086 GPU 1:0 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:46,360 92086 GPU 1:0 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:46,360 92086 GPU 1:0 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:46,360 92086 GPU 1:0 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:46,360 92086 GPU 1:0 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:46,360 92086 GPU 1:0 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:46,360 92086 GPU 1:0 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:49,294 109674 GPU 0:1 INFO] logger set device 1 
+[2025-12-31 13:05:49,304 92131 GPU 1:1 INFO] logger set device 1 
+[2025-12-31 13:05:49,310 109674 GPU 0:1 INFO] RANK GPU FROM TORCH 1
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:49,311 109674 GPU 0:1 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] RANK GPU FROM TORCH 5
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:49,323 92131 GPU 1:1 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:52,294 109735 GPU 0:2 INFO] logger set device 2 
+[2025-12-31 13:05:52,304 92191 GPU 1:2 INFO] logger set device 2 
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] RANK GPU FROM TORCH 2
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:52,345 109735 GPU 0:2 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:52,346 109735 GPU 0:2 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:52,363 92191 GPU 1:2 INFO] RANK GPU FROM TORCH 6
+[2025-12-31 13:05:52,363 92191 GPU 1:2 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:52,363 92191 GPU 1:2 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:52,364 92191 GPU 1:2 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,294 110394 GPU 0:3 INFO] logger set device 3 
+[2025-12-31 13:05:55,304 92236 GPU 1:3 INFO] logger set device 3 
+[2025-12-31 13:05:55,314 110394 GPU 0:3 INFO] RANK GPU FROM TORCH 3
+[2025-12-31 13:05:55,314 110394 GPU 0:3 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:55,314 110394 GPU 0:3 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:55,314 110394 GPU 0:3 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:55,314 110394 GPU 0:3 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:55,315 110394 GPU 0:3 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,323 92236 GPU 1:3 INFO] RANK GPU FROM TORCH 7
+[2025-12-31 13:05:55,323 92236 GPU 1:3 INFO] decoder_0_ar is on a single device
+[2025-12-31 13:05:55,323 92236 GPU 1:3 INFO] decoder_0_eu is on a single device
+[2025-12-31 13:05:55,323 92236 GPU 1:3 INFO] decoder_0_fi is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_0_he is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_0_hi is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_0_hr is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_0_is is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_0_sw is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_he is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_is is on a single device
+[2025-12-31 13:05:55,324 92236 GPU 1:3 INFO] decoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,989 92131 GPU 1:1 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,989 92086 GPU 1:0 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,989 92236 GPU 1:3 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,989 92191 GPU 1:2 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,990 92131 GPU 1:1 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 92236 GPU 1:3 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 92086 GPU 1:0 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 92191 GPU 1:2 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 92131 GPU 1:1 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 92236 GPU 1:3 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 92086 GPU 1:0 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 92191 GPU 1:2 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 92236 GPU 1:3 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 92086 GPU 1:0 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 92191 GPU 1:2 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 92131 GPU 1:1 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 92236 GPU 1:3 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 92086 GPU 1:0 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 92191 GPU 1:2 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 92086 GPU 1:0 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 92236 GPU 1:3 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 92131 GPU 1:1 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 92191 GPU 1:2 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 92236 GPU 1:3 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 92086 GPU 1:0 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 92191 GPU 1:2 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 92236 GPU 1:3 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,990 92131 GPU 1:1 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 92086 GPU 1:0 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,990 92191 GPU 1:2 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,990 92131 GPU 1:1 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 92131 GPU 1:1 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_ar is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_eu is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_fi is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_he is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_hi is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 109634 GPU 0:0 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,990 109674 GPU 0:1 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_hr is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_is is on a single device
+[2025-12-31 13:05:55,990 109735 GPU 0:2 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:55,990 110394 GPU 0:3 INFO] encoder_task_en_sw is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,589 92131 GPU 1:1 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,589 92131 GPU 1:1 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,589 92131 GPU 1:1 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,589 92131 GPU 1:1 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,589 92191 GPU 1:2 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,589 92131 GPU 1:1 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,589 92236 GPU 1:3 INFO] Building model...
+[2025-12-31 13:05:56,589 92131 GPU 1:1 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,589 92191 GPU 1:2 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,590 92131 GPU 1:1 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,590 92236 GPU 1:3 INFO] cuda
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,590 92131 GPU 1:1 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,590 92236 GPU 1:3 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,590 92131 GPU 1:1 INFO] Building model...
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,590 92131 GPU 1:1 INFO] cuda
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,590 92131 GPU 1:1 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] Building model...
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] cuda
+[2025-12-31 13:05:56,590 92191 GPU 1:2 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:56,590 92086 GPU 1:0 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,590 92086 GPU 1:0 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,590 92086 GPU 1:0 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,590 92086 GPU 1:0 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,590 92086 GPU 1:0 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,590 92086 GPU 1:0 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,590 92086 GPU 1:0 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,591 92086 GPU 1:0 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,591 92086 GPU 1:0 INFO] Building model...
+[2025-12-31 13:05:56,591 92086 GPU 1:0 INFO] cuda
+[2025-12-31 13:05:56,591 92086 GPU 1:0 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_ar is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_eu is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_fi is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_he is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] Building model...
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_hi is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] Building model...
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_hr is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] cuda
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_is is on a single device
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] cuda
+[2025-12-31 13:05:56,624 109735 GPU 0:2 INFO] tgt_embeddings_sw is on a single device
+[2025-12-31 13:05:56,624 110394 GPU 0:3 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:56,624 109634 GPU 0:0 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:56,625 109735 GPU 0:2 INFO] Building model...
+[2025-12-31 13:05:56,624 109674 GPU 0:1 INFO] Building model...
+[2025-12-31 13:05:56,625 109735 GPU 0:2 INFO] cuda
+[2025-12-31 13:05:56,625 109674 GPU 0:1 INFO] cuda
+[2025-12-31 13:05:56,625 109735 GPU 0:2 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:56,625 109674 GPU 0:1 INFO] Initializing model in bf16 precision
+[2025-12-31 13:05:59,412 92191 GPU 1:2 INFO] Building model - done!
+[2025-12-31 13:05:59,412 92191 GPU 1:2 INFO] GPU 1:2 - Init model
+[2025-12-31 13:05:59,420 92236 GPU 1:3 INFO] Building model - done!
+[2025-12-31 13:05:59,420 92236 GPU 1:3 INFO] GPU 1:3 - Init model
+[2025-12-31 13:05:59,447 109735 GPU 0:2 INFO] Building model - done!
+[2025-12-31 13:05:59,448 109735 GPU 0:2 INFO] GPU 0:2 - Init model
+[2025-12-31 13:05:59,448 109674 GPU 0:1 INFO] Building model - done!
+[2025-12-31 13:05:59,448 109674 GPU 0:1 INFO] GPU 0:1 - Init model
+[2025-12-31 13:05:59,450 110394 GPU 0:3 INFO] Building model - done!
+[2025-12-31 13:05:59,450 110394 GPU 0:3 INFO] GPU 0:3 - Init model
+[2025-12-31 13:05:59,456 109634 GPU 0:0 INFO] Building model - done!
+[2025-12-31 13:05:59,456 109634 GPU 0:0 INFO] No parameters frozen - all parameters are trainable
+[2025-12-31 13:05:59,456 109634 GPU 0:0 INFO] GPU 0:0 - Init model
+[2025-12-31 13:05:59,501 92131 GPU 1:1 INFO] Building model - done!
+[2025-12-31 13:05:59,501 92131 GPU 1:1 INFO] GPU 1:1 - Init model
+[2025-12-31 13:05:59,515 92086 GPU 1:0 INFO] Building model - done!
+[2025-12-31 13:05:59,515 92086 GPU 1:0 INFO] GPU 1:0 - Init model
+[2025-12-31 13:05:59,728 109674 GPU 0:1 INFO] GPU 0:1 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,728 109674 GPU 0:1 INFO] GPU 0:1 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,728 109674 GPU 0:1 INFO] GPU 0:1 - Build optimizer
+[2025-12-31 13:05:59,729 109674 GPU 0:1 INFO] GPU 0:1 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,730 109674 GPU 0:1 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,730 109674 GPU 0:1 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,730 109674 GPU 0:1 INFO] GPU 0:1 - Build trainer
+[2025-12-31 13:05:59,730 109674 GPU 0:1 INFO] BUILD TRAINER
+[2025-12-31 13:05:59,731 110394 GPU 0:3 INFO] GPU 0:3 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,731 110394 GPU 0:3 INFO] GPU 0:3 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,731 110394 GPU 0:3 INFO] GPU 0:3 - Build optimizer
+[2025-12-31 13:05:59,732 109735 GPU 0:2 INFO] GPU 0:2 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,732 109735 GPU 0:2 INFO] GPU 0:2 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,732 109735 GPU 0:2 INFO] GPU 0:2 - Build optimizer
+[2025-12-31 13:05:59,733 110394 GPU 0:3 INFO] GPU 0:3 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,733 92131 GPU 1:1 INFO] GPU 1:1 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,733 92131 GPU 1:1 INFO] GPU 1:1 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,733 92131 GPU 1:1 INFO] GPU 1:1 - Build optimizer
+[2025-12-31 13:05:59,733 109735 GPU 0:2 INFO] GPU 0:2 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,733 92236 GPU 1:3 INFO] GPU 1:3 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,733 92236 GPU 1:3 INFO] GPU 1:3 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,733 92236 GPU 1:3 INFO] GPU 1:3 - Build optimizer
+[2025-12-31 13:05:59,733 110394 GPU 0:3 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,733 110394 GPU 0:3 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,733 110394 GPU 0:3 INFO] GPU 0:3 - Build trainer
+[2025-12-31 13:05:59,734 110394 GPU 0:3 INFO] BUILD TRAINER
+[2025-12-31 13:05:59,734 109735 GPU 0:2 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,734 109735 GPU 0:2 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,734 109735 GPU 0:2 INFO] GPU 0:2 - Build trainer
+[2025-12-31 13:05:59,734 109735 GPU 0:2 INFO] BUILD TRAINER
+[2025-12-31 13:05:59,734 92131 GPU 1:1 INFO] GPU 1:1 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,735 92236 GPU 1:3 INFO] GPU 1:3 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,735 92131 GPU 1:1 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,735 92131 GPU 1:1 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,735 92131 GPU 1:1 INFO] GPU 1:1 - Build trainer
+[2025-12-31 13:05:59,735 92131 GPU 1:1 INFO] BUILD TRAINER
+[2025-12-31 13:05:59,735 92236 GPU 1:3 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,735 92236 GPU 1:3 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,735 92236 GPU 1:3 INFO] GPU 1:3 - Build trainer
+[2025-12-31 13:05:59,735 92236 GPU 1:3 INFO] BUILD TRAINER
+[2025-12-31 13:05:59,736 92086 GPU 1:0 INFO] GPU 1:0 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,736 92191 GPU 1:2 INFO] GPU 1:2 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,736 92191 GPU 1:2 INFO] GPU 1:2 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,736 92086 GPU 1:0 INFO] GPU 1:0 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,736 92191 GPU 1:2 INFO] GPU 1:2 - Build optimizer
+[2025-12-31 13:05:59,736 92086 GPU 1:0 INFO] GPU 1:0 - Build optimizer
+[2025-12-31 13:05:59,736 109634 GPU 0:0 INFO] GPU 0:0 - total encoder parameters: 81444864
+[2025-12-31 13:05:59,736 109634 GPU 0:0 INFO] GPU 0:0 - total decoder parameters: 72960768
+[2025-12-31 13:05:59,736 109634 GPU 0:0 INFO] GPU 0:0 - Build optimizer
+[2025-12-31 13:05:59,737 92086 GPU 1:0 INFO] GPU 1:0 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,737 92191 GPU 1:2 INFO] GPU 1:2 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,737 109634 GPU 0:0 INFO] GPU 0:0 - total optimized parameters: 154405632
+[2025-12-31 13:05:59,738 92086 GPU 1:0 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,738 92191 GPU 1:2 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,738 92191 GPU 1:2 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,738 92086 GPU 1:0 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,738 92191 GPU 1:2 INFO] GPU 1:2 - Build trainer
+[2025-12-31 13:05:59,738 92086 GPU 1:0 INFO] GPU 1:0 - Build trainer
+[2025-12-31 13:05:59,738 92191 GPU 1:2 INFO] BUILD TRAINER
+[2025-12-31 13:05:59,738 92086 GPU 1:0 INFO] BUILD TRAINER
+[2025-12-31 13:05:59,738 109634 GPU 0:0 INFO] All non-frozen parameters have an optimizer
+[2025-12-31 13:05:59,738 109634 GPU 0:0 INFO] Using metric-based checkpoint strategy 'best_n'. Checkpoints will be saved at validation time (--valid_steps), not at --save_checkpoint_steps.
+[2025-12-31 13:05:59,738 109634 GPU 0:0 INFO] GPU 0:0 - Build trainer
+[2025-12-31 13:05:59,738 109634 GPU 0:0 INFO] BUILD TRAINER
+[2025-12-31 13:06:00,302 92086 GPU 1:0 INFO] GPU 1:0 - Trainer built
+[2025-12-31 13:06:00,302 92131 GPU 1:1 INFO] GPU 1:1 - Trainer built
+[2025-12-31 13:06:00,302 92086 GPU 1:0 INFO] creating validation iterator
+[2025-12-31 13:06:00,302 92131 GPU 1:1 INFO] creating validation iterator
+[2025-12-31 13:06:00,302 92131 GPU 1:1 INFO] GPU 1:1 - Starting training
+[2025-12-31 13:06:00,302 92086 GPU 1:0 INFO] GPU 1:0 - Starting training
+[2025-12-31 13:06:00,302 109674 GPU 0:1 INFO] GPU 0:1 - Trainer built
+[2025-12-31 13:06:00,302 92131 GPU 1:1 INFO] GPU 1:1 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,302 109674 GPU 0:1 INFO] creating validation iterator
+[2025-12-31 13:06:00,302 92086 GPU 1:0 INFO] GPU 1:0 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,302 92131 GPU 1:1 INFO] GPU 1:1 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,302 109674 GPU 0:1 INFO] GPU 0:1 - Starting training
+[2025-12-31 13:06:00,302 92131 GPU 1:1 INFO] GPU 1:1 - Profiler traces will be saved to: ./profiling_logs/rank_5
+[2025-12-31 13:06:00,302 92191 GPU 1:2 INFO] GPU 1:2 - Trainer built
+[2025-12-31 13:06:00,302 92086 GPU 1:0 INFO] GPU 1:0 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,302 109674 GPU 0:1 INFO] GPU 0:1 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,302 92086 GPU 1:0 INFO] GPU 1:0 - Profiler traces will be saved to: ./profiling_logs/rank_4
+[2025-12-31 13:06:00,302 92191 GPU 1:2 INFO] creating validation iterator
+[2025-12-31 13:06:00,302 109674 GPU 0:1 INFO] GPU 0:1 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,302 92191 GPU 1:2 INFO] GPU 1:2 - Starting training
+[2025-12-31 13:06:00,302 109674 GPU 0:1 INFO] GPU 0:1 - Profiler traces will be saved to: ./profiling_logs/rank_1
+[2025-12-31 13:06:00,302 92191 GPU 1:2 INFO] GPU 1:2 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] GPU 0:0 - Trainer built
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] creating validation iterator
+[2025-12-31 13:06:00,302 92191 GPU 1:2 INFO] GPU 1:2 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] Starting training on GPU: [0, 1, 2, 3]
+[2025-12-31 13:06:00,302 92191 GPU 1:2 INFO] GPU 1:2 - Profiler traces will be saved to: ./profiling_logs/rank_6
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] GPU 0:0 - Starting training
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] GPU 0:0 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,303 92086 GPU 1:0 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] GPU 0:0 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] GPU 0:0 - Profiler traces will be saved to: ./profiling_logs/rank_0
+[2025-12-31 13:06:00,303 92131 GPU 1:1 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:00,303 109674 GPU 0:1 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:00,303 92191 GPU 1:2 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:00,303 109634 GPU 0:0 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:00,304 110394 GPU 0:3 INFO] GPU 0:3 - Trainer built
+[2025-12-31 13:06:00,304 110394 GPU 0:3 INFO] creating validation iterator
+[2025-12-31 13:06:00,304 110394 GPU 0:3 INFO] GPU 0:3 - Starting training
+[2025-12-31 13:06:00,304 110394 GPU 0:3 INFO] GPU 0:3 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,305 110394 GPU 0:3 INFO] GPU 0:3 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,305 110394 GPU 0:3 INFO] GPU 0:3 - Profiler traces will be saved to: ./profiling_logs/rank_3
+[2025-12-31 13:06:00,305 110394 GPU 0:3 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:00,305 92236 GPU 1:3 INFO] GPU 1:3 - Trainer built
+[2025-12-31 13:06:00,305 92236 GPU 1:3 INFO] creating validation iterator
+[2025-12-31 13:06:00,306 92236 GPU 1:3 INFO] GPU 1:3 - Starting training
+[2025-12-31 13:06:00,306 92236 GPU 1:3 INFO] GPU 1:3 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,306 92236 GPU 1:3 INFO] GPU 1:3 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,306 92236 GPU 1:3 INFO] GPU 1:3 - Profiler traces will be saved to: ./profiling_logs/rank_7
+[2025-12-31 13:06:00,306 92236 GPU 1:3 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:00,319 109735 GPU 0:2 INFO] GPU 0:2 - Trainer built
+[2025-12-31 13:06:00,319 109735 GPU 0:2 INFO] creating validation iterator
+[2025-12-31 13:06:00,319 109735 GPU 0:2 INFO] GPU 0:2 - Starting training
+[2025-12-31 13:06:00,319 109735 GPU 0:2 INFO] GPU 0:2 - PyTorch profiler ENABLED
+[2025-12-31 13:06:00,319 109735 GPU 0:2 INFO] GPU 0:2 - Profiler config: wait=100, warmup=100, active=200, repeat=0
+[2025-12-31 13:06:00,319 109735 GPU 0:2 INFO] GPU 0:2 - Profiler traces will be saved to: ./profiling_logs/rank_2
+[2025-12-31 13:06:00,320 109735 GPU 0:2 INFO] Start training loop and validate every 300 steps...
+[2025-12-31 13:06:15,601 92101  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:06:15,602 92101  INFO]   Input tokens: ['▁[', 'd', ']', '▁John', '▁Tra', 'ic', 'os', '▁Answer', '▁and', '▁Expl']...
+[2025-12-31 13:06:15,602 92101  INFO]   Token IDs: [10430, 73, 66, 11880, 11356, 9540, 9617, 27268, 9533, 14446]...
+[2025-12-31 13:06:18,612 92165  WARNING] FilterTooLong: Sequence near threshold PASSED. src_len=215 (threshold=254), tgt_len=252 (threshold=254), ratio=1.17. After numericalization will add ~3 special tokens.
+[2025-12-31 13:06:18,612 92165  WARNING]   SRC tokens: ['▁Behold,', '▁now', '▁is', '▁the', '▁acceptable', '▁time', '!', '▁behold,', '▁now', '▁is', '▁the', '▁day', '▁of', '▁salvation', '!', '▁3', '▁I', '▁am', '▁giving', '▁no'] ...
+[2025-12-31 13:06:18,612 92165  WARNING]   TGT tokens: ['▁Evo', '▁sad', '▁je', '▁vrijeme', '▁milo', 'sno,', '▁evo', '▁sad', '▁je', '▁vrijeme', '▁spa', 'sa.', '▁3', '▁Ni', '▁u', '▁čemu', '▁ne', '▁dajemo', '▁nikakve', '▁sa'] ...
+[2025-12-31 13:06:18,612 92165  WARNING] ⚠️  Sequence near limit after numericalization. tgt: tokens=252 → token_ids=252 → final=254
+[2025-12-31 13:06:20,805 109651  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:06:20,805 109651  INFO]   Input tokens: ['▁In', '▁Java', '▁or', '▁other', '▁languages', '▁you', '▁can', '▁have', '▁a', '\n']...
+[2025-12-31 13:06:20,805 109651  INFO]   Token IDs: [9692, 15934, 9611, 9814, 14589, 9558, 9670, 9690, 9506, 5]...
+[2025-12-31 13:06:21,335 92101  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:06:21,335 92101  INFO]   Input tokens: ['▁(O', 'f', '▁course,', '▁Allah', '▁is', '▁Better', ').', '▁Is', '▁not', '▁He']...
+[2025-12-31 13:06:21,335 92101  INFO]   Token IDs: [12981, 75, 14173, 13536, 9563, 20823, 11855, 10079, 9676, 9921]...
+[2025-12-31 13:06:22,999 109651  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:06:22,999 109651  INFO]   Input tokens: ['▁آ', 'فة', '▁الإغاثة', '▁من', '▁بضعة', '▁مم', '▁أو', '▁سم', '،', '▁من']...
+[2025-12-31 13:06:22,999 109651  INFO]   Token IDs: [2171, 2017, 13731, 1926, 10398, 5059, 1977, 3979, 415, 1926]...
+[2025-12-31 13:06:23,531 92101  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:06:23,531 92101  INFO]   Input tokens: ['▁साफ', '▁करने', '▁के', '▁लिए', '▁इस्तेमाल', '▁किया', '▁और', '▁मोबाइल', '▁फोन', '▁की']...
+[2025-12-31 13:06:23,531 92101  INFO]   Token IDs: [4214, 1616, 1547, 1582, 2476, 1663, 1567, 2694, 2668, 1572]...
+[2025-12-31 13:06:27,986 109651  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:06:27,986 109651  INFO]   Input tokens: ['▁Er', 'c', 'iy', 'es', '▁S', 'ok', 'ak', '▁No', ':', '7,']...
+[2025-12-31 13:06:27,986 109651  INFO]   Token IDs: [16477, 72, 14368, 9520, 9554, 9716, 9649, 11085, 31, 12004]...
+[2025-12-31 13:06:28,548 92101  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:06:28,548 92101  INFO]   Input tokens: ['▁It', '▁ev', 'okes', '▁the', '▁sound', '▁of', '▁winter', '▁wind', ',', '▁sh']...
+[2025-12-31 13:06:28,548 92101  INFO]   Token IDs: [9844, 10595, 26228, 9509, 11935, 9528, 15156, 11564, 17, 9683]...
+[2025-12-31 13:06:29,332 92086 GPU 1:0 INFO] : Step 100/  500; acc:   2.29; ppl: 25246.43; xent: 10.14; 5805/6215 tok/s;     29 sec
+[2025-12-31 13:06:29,332 92086 GPU 1:0 INFO] 100 loss_per_task/en_hi: 1828928.0
+[2025-12-31 13:06:29,332 109735 GPU 0:2 INFO] : Step 100/  500; acc:   2.64; ppl: 28050.65; xent: 10.24; 5771/5244 tok/s;     29 sec
+[2025-12-31 13:06:29,332 92086 GPU 1:0 INFO] Optimizer "decoder_0_hi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,332 92086 GPU 1:0 INFO] Optimizer "decoder_task_en_hi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,332 109735 GPU 0:2 INFO] 100 loss_per_task/en_fi: 1558080.0
+[2025-12-31 13:06:29,332 109674 GPU 0:1 INFO] : Step 100/  500; acc:   2.68; ppl: 28295.74; xent: 10.25; 6430/5519 tok/s;     29 sec
+[2025-12-31 13:06:29,332 92086 GPU 1:0 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,332 92086 GPU 1:0 INFO] Optimizer "encoder_task_en_hi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109674 GPU 0:1 INFO] 100 loss_per_task/en_eu: 1642176.0
+[2025-12-31 13:06:29,333 92086 GPU 1:0 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] : Step 100/  500; acc:   1.99; ppl: 27135.17; xent: 10.21; 6590/6447 tok/s;     29 sec
+[2025-12-31 13:06:29,333 92086 GPU 1:0 INFO] Optimizer "tgt_embeddings_hi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] 100 loss_per_task/en_ar: 1910496.0
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] : Step 100/  500; acc:   2.96; ppl: 22618.24; xent: 10.03; 6750/6032 tok/s;     29 sec
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] 100 loss_per_task/en_sw: 1755552.0
+[2025-12-31 13:06:29,333 109735 GPU 0:2 INFO] Optimizer "decoder_0_fi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109674 GPU 0:1 INFO] Optimizer "decoder_0_eu" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] Optimizer "decoder_0_sw" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109674 GPU 0:1 INFO] Optimizer "decoder_task_en_eu" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] Optimizer "decoder_task_en_sw" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109735 GPU 0:2 INFO] Optimizer "decoder_task_en_fi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109674 GPU 0:1 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109735 GPU 0:2 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] Optimizer "encoder_task_en_sw" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109674 GPU 0:1 INFO] Optimizer "encoder_task_en_eu" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109735 GPU 0:2 INFO] Optimizer "encoder_task_en_fi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109674 GPU 0:1 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 92236 GPU 1:3 INFO] Optimizer "tgt_embeddings_sw" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109674 GPU 0:1 INFO] Optimizer "tgt_embeddings_eu" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] : Step 100/  500; acc:   2.68; ppl: 23830.04; xent: 10.08; 6357/5959 tok/s;     29 sec
+[2025-12-31 13:06:29,333 109735 GPU 0:2 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109735 GPU 0:2 INFO] Optimizer "tgt_embeddings_fi" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] 100 loss_per_task/en_is: 1743424.0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task sampling distribution: (total 800)
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] : Step 100/  500; acc:   2.46; ppl: 26242.14; xent: 10.18; 5803/5417 tok/s;     29 sec
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_ar	count: 100	12.5 %
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_eu	count: 100	12.5 %
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] 100 loss_per_task/en_hr: 1600160.0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_fi	count: 100	12.5 %
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] Optimizer "decoder_0_is" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_he	count: 100	12.5 %
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] Optimizer "decoder_task_en_is" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_hi	count: 100	12.5 %
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_hr	count: 100	12.5 %
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] Optimizer "encoder_task_en_is" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_is	count: 100	12.5 %
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Task: task_en_sw	count: 100	12.5 %
+[2025-12-31 13:06:29,334 92191 GPU 1:2 INFO] Optimizer "tgt_embeddings_is" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Optimizer "decoder_0_ar" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] Optimizer "decoder_0_hr" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Optimizer "decoder_task_en_ar" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] Optimizer "decoder_task_en_hr" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Optimizer "encoder_task_en_ar" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] Optimizer "encoder_task_en_hr" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 109634 GPU 0:0 INFO] Optimizer "tgt_embeddings_ar" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 92131 GPU 1:1 INFO] Optimizer "tgt_embeddings_hr" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,333 110394 GPU 0:3 INFO] : Step 100/  500; acc:   2.17; ppl: 29069.76; xent: 10.28; 5945/5443 tok/s;     29 sec
+[2025-12-31 13:06:29,333 110394 GPU 0:3 INFO] 100 loss_per_task/en_he: 1623776.0
+[2025-12-31 13:06:29,334 110394 GPU 0:3 INFO] Optimizer "decoder_0_he" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 110394 GPU 0:3 INFO] Optimizer "decoder_task_en_he" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 110394 GPU 0:3 INFO] Optimizer "encoder_0_shared" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 110394 GPU 0:3 INFO] Optimizer "encoder_task_en_he" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 110394 GPU 0:3 INFO] Optimizer "src_embeddings_en" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:29,334 110394 GPU 0:3 INFO] Optimizer "tgt_embeddings_he" has been stepped 101 times. LR 3.0299999999999998e-05 n_clips 0
+[2025-12-31 13:06:30,303 109651  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:06:30,303 109651  INFO]   Input tokens: ['▁ربما', '▁يكون', '▁هذا', '▁هو', '▁أهم', '▁شيء', '▁عندما', '▁يتعلق', '▁الأمر', '▁بإنشاء']...
+[2025-12-31 13:06:30,303 109651  INFO]   Token IDs: [5464, 2401, 2075, 2115, 3251, 3190, 2541, 3538, 3240, 8096]...
+[2025-12-31 13:06:30,327 92101  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:06:30,327 92101  INFO]   Input tokens: ['▁यूपी', '▁छात्रवृत्ति', '▁की', '▁पात्रता', '▁(E', 'l', 'ig', 'bl', 'ity', '▁Of']...
+[2025-12-31 13:06:30,327 92101  INFO]   Token IDs: [4198, 10171, 1572, 5486, 7747, 81, 3121, 24637, 4165, 11082]...
+[2025-12-31 13:06:39,827 92101  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:06:39,827 92101  INFO]   Input tokens: ['▁-', '▁Own', 'er’s', '▁identity', '▁card,', '▁address', '▁certific', 'ate,', '▁passport', '▁size']...
+[2025-12-31 13:06:39,827 92101  INFO]   Token IDs: [9606, 19439, 17645, 15786, 20190, 10901, 13446, 11403, 17627, 12006]...
+[2025-12-31 13:06:40,417 109651  INFO] HF Tokenizer src direct lookup example:
+[2025-12-31 13:06:40,417 109651  INFO]   Input tokens: ['▁However,', '▁it', '▁is', '▁not', 'ew', 'orthy', '▁that', '▁studies', '▁and', '▁evidence']...
+[2025-12-31 13:06:40,417 109651  INFO]   Token IDs: [11069, 9620, 9563, 9676, 10042, 31581, 9596, 14079, 9533, 14517]...
+[2025-12-31 13:06:42,221 110435  WARNING] FilterTooLong: Sequence near threshold PASSED. src_len=194 (threshold=254), tgt_len=250 (threshold=254), ratio=1.29. After numericalization will add ~3 special tokens.
+[2025-12-31 13:06:42,221 110435  WARNING]   SRC tokens: ['▁The', '▁computer', '▁is', '▁used', '▁for', '▁Internet', '▁and', '▁Office', '▁and', '▁there', '▁are', '▁no', '▁complaint', 's.', '▁A', '▁few', '▁days', '▁ago', '▁I', '▁started'] ...
+[2025-12-31 13:06:42,221 110435  WARNING]   TGT tokens: ['▁שבוע', '▁טוב,', '▁יש', '▁לי', '▁מחשב', '▁(ש', 'ני', ')', '▁עם', '▁לוח', '▁אם', '▁מסוג', '▁g', 'ig', 'ab', 'y', 'te', '▁g', 'a', '-p'] ...
+[2025-12-31 13:06:42,222 110435  WARNING] ⚠️  Sequence near limit after numericalization. tgt: tokens=250 → token_ids=250 → final=252
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] : Step 200/  500; acc:   3.73; ppl: 14082.10; xent: 9.55; 12483/12276 tok/s;     44 sec
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] 200 loss_per_task/en_ar: 1808672.0
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task sampling distribution: (total 1600)
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_ar	count: 200	12.5 %
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_eu	count: 200	12.5 %
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_fi	count: 200	12.5 %
+[2025-12-31 13:06:44,757 92086 GPU 1:0 INFO] : Step 200/  500; acc:   4.87; ppl: 9026.96; xent: 9.11; 11345/12106 tok/s;     44 sec
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_he	count: 200	12.5 %
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_hi	count: 200	12.5 %
+[2025-12-31 13:06:44,757 92236 GPU 1:3 INFO] : Step 200/  500; acc:   5.95; ppl: 9152.61; xent: 9.12; 11888/10581 tok/s;     44 sec
+[2025-12-31 13:06:44,757 92086 GPU 1:0 INFO] 200 loss_per_task/en_hi: 1700704.0
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_hr	count: 200	12.5 %
+[2025-12-31 13:06:44,757 92236 GPU 1:3 INFO] 200 loss_per_task/en_sw: 1488768.0
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_is	count: 200	12.5 %
+[2025-12-31 13:06:44,757 109674 GPU 0:1 INFO] : Step 200/  500; acc:   4.83; ppl: 15653.56; xent: 9.66; 12712/10946 tok/s;     44 sec
+[2025-12-31 13:06:44,757 109634 GPU 0:0 INFO] Task: task_en_sw	count: 200	12.5 %
+[2025-12-31 13:06:44,757 92086 GPU 1:0 INFO] Optimizer "decoder_0_hi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,757 109674 GPU 0:1 INFO] 200 loss_per_task/en_eu: 1630656.0
+[2025-12-31 13:06:44,758 109634 GPU 0:0 INFO] Optimizer "decoder_0_ar" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109634 GPU 0:0 INFO] Optimizer "decoder_task_en_ar" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] : Step 200/  500; acc:   4.83; ppl: 15969.21; xent: 9.68; 12190/11111 tok/s;     44 sec
+[2025-12-31 13:06:44,757 92236 GPU 1:3 INFO] Optimizer "decoder_0_sw" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92086 GPU 1:0 INFO] Optimizer "decoder_task_en_hi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109634 GPU 0:0 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92236 GPU 1:3 INFO] Optimizer "decoder_task_en_sw" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92086 GPU 1:0 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] 200 loss_per_task/en_fi: 1658784.0
+[2025-12-31 13:06:44,758 92236 GPU 1:3 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92086 GPU 1:0 INFO] Optimizer "encoder_task_en_hi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109634 GPU 0:0 INFO] Optimizer "encoder_task_en_ar" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92236 GPU 1:3 INFO] Optimizer "encoder_task_en_sw" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92086 GPU 1:0 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109674 GPU 0:1 INFO] Optimizer "decoder_0_eu" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92236 GPU 1:3 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92086 GPU 1:0 INFO] Optimizer "tgt_embeddings_hi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109674 GPU 0:1 INFO] Optimizer "decoder_task_en_eu" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109634 GPU 0:0 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92236 GPU 1:3 INFO] Optimizer "tgt_embeddings_sw" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109674 GPU 0:1 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109634 GPU 0:0 INFO] Optimizer "tgt_embeddings_ar" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109674 GPU 0:1 INFO] Optimizer "encoder_task_en_eu" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109674 GPU 0:1 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109674 GPU 0:1 INFO] Optimizer "tgt_embeddings_eu" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] Optimizer "decoder_0_fi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] Optimizer "decoder_task_en_fi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] : Step 200/  500; acc:   4.17; ppl: 12851.48; xent: 9.46; 12244/11469 tok/s;     44 sec
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] 200 loss_per_task/en_hr: 1673632.0
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] Optimizer "encoder_task_en_fi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 109735 GPU 0:2 INFO] Optimizer "tgt_embeddings_fi" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92191 GPU 1:2 INFO] : Step 200/  500; acc:   5.05; ppl: 10349.34; xent: 9.24; 11849/11076 tok/s;     44 sec
+[2025-12-31 13:06:44,758 92191 GPU 1:2 INFO] 200 loss_per_task/en_is: 1579296.0
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] Optimizer "decoder_0_hr" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] Optimizer "decoder_task_en_hr" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 110394 GPU 0:3 INFO] : Step 200/  500; acc:   3.54; ppl: 16802.16; xent: 9.73; 12316/11344 tok/s;     44 sec
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] Optimizer "encoder_task_en_hr" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 110394 GPU 0:3 INFO] 200 loss_per_task/en_he: 1702368.0
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92131 GPU 1:1 INFO] Optimizer "tgt_embeddings_hr" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92191 GPU 1:2 INFO] Optimizer "decoder_0_is" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92191 GPU 1:2 INFO] Optimizer "decoder_task_en_is" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92191 GPU 1:2 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,758 92191 GPU 1:2 INFO] Optimizer "encoder_task_en_is" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 92191 GPU 1:2 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 92191 GPU 1:2 INFO] Optimizer "tgt_embeddings_is" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 110394 GPU 0:3 INFO] Optimizer "decoder_0_he" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 110394 GPU 0:3 INFO] Optimizer "decoder_task_en_he" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 110394 GPU 0:3 INFO] Optimizer "encoder_0_shared" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 110394 GPU 0:3 INFO] Optimizer "encoder_task_en_he" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 110394 GPU 0:3 INFO] Optimizer "src_embeddings_en" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:44,759 110394 GPU 0:3 INFO] Optimizer "tgt_embeddings_he" has been stepped 201 times. LR 6.0299999999999995e-05 n_clips 0
+[2025-12-31 13:06:47,099 110435  WARNING] FilterTooLong: Sequence near threshold PASSED. src_len=250 (threshold=254), tgt_len=195 (threshold=254), ratio=0.78. After numericalization will add ~3 special tokens.
+[2025-12-31 13:06:47,100 110435  WARNING]   SRC tokens: ['▁The', '▁SM', '.7', '9', "'s", '▁overall', '▁pay', 'load', '▁of', '▁3,', '800', '▁kg', '▁(', '8,', '3', '80', '▁l', 'b', ')', '▁pre'] ...
+[2025-12-31 13:06:47,100 110435  WARNING]   TGT tokens: ['▁משנת', '▁193', '9', '▁והלא', 'ה,', '▁נשא', '▁ה-S', 'M', '.7', '9', '▁טור', 'פד', 'ו', '▁ופ', 'צ', 'צות', '▁גדולות', '▁יותר', '▁במת', 'לים'] ...
+[2025-12-31 13:06:47,100 110435  WARNING] ⚠️  Sequence near limit after numericalization. src: tokens=250 → token_ids=250 → final=252
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] : Step 300/  500; acc:   6.67; ppl: 5262.71; xent: 8.57; 11435/10187 tok/s;     60 sec
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] 300 loss_per_task/en_sw: 1386016.0
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] : Step 300/  500; acc:   6.51; ppl: 4610.99; xent: 8.44; 11211/11933 tok/s;     60 sec
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] 300 loss_per_task/en_hi: 1598592.0
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] Optimizer "decoder_0_sw" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] Optimizer "decoder_task_en_sw" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] Optimizer "encoder_task_en_sw" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 109634 GPU 0:0 INFO] : Step 300/  500; acc:   3.82; ppl: 9370.21; xent: 9.15; 11710/11592 tok/s;     60 sec
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] Optimizer "decoder_0_hi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92236 GPU 1:3 INFO] Optimizer "tgt_embeddings_sw" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] Optimizer "decoder_task_en_hi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 109634 GPU 0:0 INFO] 300 loss_per_task/en_ar: 1683392.0
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] Optimizer "encoder_task_en_hi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 109735 GPU 0:2 INFO] : Step 300/  500; acc:   5.19; ppl: 11124.22; xent: 9.32; 10815/9870 tok/s;     60 sec
+[2025-12-31 13:07:00,637 92086 GPU 1:0 INFO] Optimizer "tgt_embeddings_hi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,637 109735 GPU 0:2 INFO] 300 loss_per_task/en_fi: 1460160.0
+[2025-12-31 13:07:00,637 109634 GPU 0:0 INFO] Task sampling distribution: (total 2400)
+[2025-12-31 13:07:00,637 109634 GPU 0:0 INFO] Task: task_en_ar	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Task: task_en_eu	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Task: task_en_fi	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Task: task_en_he	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109735 GPU 0:2 INFO] Optimizer "decoder_0_fi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Task: task_en_hi	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109735 GPU 0:2 INFO] Optimizer "decoder_task_en_fi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] : Step 300/  500; acc:   5.30; ppl: 10298.85; xent: 9.24; 11790/10098 tok/s;     60 sec
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Task: task_en_hr	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109735 GPU 0:2 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109735 GPU 0:2 INFO] Optimizer "encoder_task_en_fi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Task: task_en_is	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] 300 loss_per_task/en_eu: 1481600.0
+[2025-12-31 13:07:00,638 109735 GPU 0:2 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Task: task_en_sw	count: 300	12.5 %
+[2025-12-31 13:07:00,638 109735 GPU 0:2 INFO] Optimizer "tgt_embeddings_fi" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] : Step 300/  500; acc:   6.20; ppl: 5935.58; xent: 8.69; 12160/11414 tok/s;     60 sec
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Optimizer "decoder_0_ar" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] 300 loss_per_task/en_is: 1574848.0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Optimizer "decoder_task_en_ar" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] : Step 300/  500; acc:   4.95; ppl: 8141.50; xent: 9.00; 10727/10027 tok/s;     60 sec
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] Optimizer "decoder_0_eu" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] 300 loss_per_task/en_hr: 1433760.0
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] Optimizer "decoder_task_en_eu" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] Optimizer "decoder_0_is" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Optimizer "encoder_task_en_ar" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] Optimizer "decoder_task_en_is" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] Optimizer "encoder_task_en_eu" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] Optimizer "encoder_task_en_is" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109674 GPU 0:1 INFO] Optimizer "tgt_embeddings_eu" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 109634 GPU 0:0 INFO] Optimizer "tgt_embeddings_ar" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] Optimizer "decoder_0_hr" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92191 GPU 1:2 INFO] Optimizer "tgt_embeddings_is" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] Optimizer "decoder_task_en_hr" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] Optimizer "encoder_task_en_hr" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 92131 GPU 1:1 INFO] Optimizer "tgt_embeddings_hr" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,638 110394 GPU 0:3 INFO] : Step 300/  500; acc:   3.61; ppl: 11142.06; xent: 9.32; 11055/10200 tok/s;     60 sec
+[2025-12-31 13:07:00,639 110394 GPU 0:3 INFO] 300 loss_per_task/en_he: 1509296.0
+[2025-12-31 13:07:00,639 110394 GPU 0:3 INFO] Optimizer "decoder_0_he" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,639 110394 GPU 0:3 INFO] Optimizer "decoder_task_en_he" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,639 110394 GPU 0:3 INFO] Optimizer "encoder_0_shared" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,639 110394 GPU 0:3 INFO] Optimizer "encoder_task_en_he" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,639 110394 GPU 0:3 INFO] Optimizer "src_embeddings_en" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,639 110394 GPU 0:3 INFO] Optimizer "tgt_embeddings_he" has been stepped 301 times. LR 9.029999999999999e-05 n_clips 0
+[2025-12-31 13:07:00,639 92236 GPU 1:3 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,639 92236 GPU 1:3 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,639 92236 GPU 1:3 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,639 92236 GPU 1:3 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,639 92236 GPU 1:3 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,639 92086 GPU 1:0 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,639 92086 GPU 1:0 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 92086 GPU 1:0 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 92086 GPU 1:0 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,640 92086 GPU 1:0 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,640 109735 GPU 0:2 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,640 109735 GPU 0:2 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 109735 GPU 0:2 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 109735 GPU 0:2 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,640 109735 GPU 0:2 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,640 109674 GPU 0:1 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,640 109674 GPU 0:1 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 109674 GPU 0:1 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 109674 GPU 0:1 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,640 109674 GPU 0:1 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,640 109634 GPU 0:0 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,640 92191 GPU 1:2 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,640 109634 GPU 0:0 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 109634 GPU 0:0 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 92191 GPU 1:2 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 92191 GPU 1:2 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 109634 GPU 0:0 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,640 109634 GPU 0:0 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,640 92191 GPU 1:2 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,640 92131 GPU 1:1 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,640 92191 GPU 1:2 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,640 92131 GPU 1:1 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,640 92131 GPU 1:1 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,641 92131 GPU 1:1 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,641 92131 GPU 1:1 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,641 110394 GPU 0:3 INFO] FilterTooLongTransform.warm_up() called with vocabs: ['src', 'tgt']
+[2025-12-31 13:07:00,641 110394 GPU 0:3 INFO]   src vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,641 110394 GPU 0:3 INFO]   tgt vocab type: <class 'mammoth.inputters.vocab.HFTokenizerVocab'>
+[2025-12-31 13:07:00,641 110394 GPU 0:3 INFO]   uses_hf_tokenizer: True
+[2025-12-31 13:07:00,641 110394 GPU 0:3 INFO] ✅ FilterTooLongTransform: Adjusted thresholds for HF tokenizer overhead. src: 256 → 254, tgt: 256 → 254 (reserves 2 tokens for special tokens + re-encoding)
+[2025-12-31 13:07:00,786 109634 GPU 0:0 WARNING] FilterTooLong: Sequence near threshold PASSED. src_len=199 (threshold=254), tgt_len=254 (threshold=254), ratio=1.28. After numericalization will add ~3 special tokens.
+[2025-12-31 13:07:00,786 109634 GPU 0:0 WARNING]   SRC tokens: ['▁-', '▁Asia', '▁&', '▁Pacific', '▁--', '▁Afghanistan,', '▁American', '▁Sam', 'o', 'a,', '▁Antar', 'ct', 'ica,', '▁Armen', 'ia,', '▁Australia,', '▁Azerbaij', 'an,', '▁Bangladesh,', '▁Bh'] ...
+[2025-12-31 13:07:00,786 109634 GPU 0:0 WARNING]   TGT tokens: ['▁ألبانيا', '▁والجزائر', '▁وأ', 'ند', 'ورا', '▁وأن', 'غ', 'ولا', '▁والأ', 'رج', 'نتين', '▁وأر', 'مين', 'يا', '▁وأستراليا', '▁والنمسا', '▁وأ', 'ذربيجان', '▁وبلجيكا', '▁وب'] ...
+[2025-12-31 13:07:00,786 109634 GPU 0:0 WARNING] ⚠️  Sequence near limit after numericalization. tgt: tokens=254 → token_ids=254 → final=256
+[2025-12-31 13:07:01,850 92086 GPU 1:0 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:01,868 109735 GPU 0:2 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:02,068 92236 GPU 1:3 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:02,103 109674 GPU 0:1 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:02,182 92191 GPU 1:2 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:02,275 110394 GPU 0:3 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:02,464 109634 GPU 0:0 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:02,548 92131 GPU 1:1 INFO] [VALIDATION] Generating translations autoregressively
+[2025-12-31 13:07:04,516 109674 GPU 0:1 INFO] [VALIDATION SAMPLE] Example 315 (AUTOREGRESSIVE)
+[2025-12-31 13:07:04,516 109674 GPU 0:1 INFO]   pred_text (3 words): - - eta
+[2025-12-31 13:07:04,516 109674 GPU 0:1 INFO]   ref_text (9 words):  Gauza nagusia ez da produktu erabilgarria hau potentziarako abusatzea.
+[2025-12-31 13:07:04,626 109674 GPU 0:1 INFO] Validation perplexity: 8798.53
+[2025-12-31 13:07:04,626 109674 GPU 0:1 INFO] Validation accuracy: 5.71
+[2025-12-31 13:07:04,626 109674 GPU 0:1 INFO] Validation BLEU: 0.00816614
+[2025-12-31 13:07:04,626 109674 GPU 0:1 INFO] {"type": "validation", "step": 300, "perplexity": 8798.534758297395, "accuracy": 5.709999117465361, "crossentropy": 9.082340481863913, "bleu": 0.008166143589343446}
+[2025-12-31 13:07:04,654 92086 GPU 1:0 INFO] [VALIDATION SAMPLE] Example 208 (AUTOREGRESSIVE)
+[2025-12-31 13:07:04,654 92086 GPU 1:0 INFO]   pred_text (15 words): - - के लिए के लिए के लिए के लिए के लिए के लिए लिए
+[2025-12-31 13:07:04,654 92086 GPU 1:0 INFO]   ref_text (20 words):  पोर्टफोलियो निवेश योजना एनआरआई/पीआईओ के लिए भारत में गौण स्टॉक बाजार में निवेश हेतु आरबीआई द्वारा नामित अनिवार्य मार्ग है.
+[2025-12-31 13:07:04,809 92086 GPU 1:0 INFO] Validation perplexity: 3783.83
+[2025-12-31 13:07:04,809 92086 GPU 1:0 INFO] Validation accuracy: 6.90035
+[2025-12-31 13:07:04,809 92086 GPU 1:0 INFO] Validation BLEU: 0.0589963
+[2025-12-31 13:07:04,809 92086 GPU 1:0 INFO] {"type": "validation", "step": 300, "perplexity": 3783.826468855446, "accuracy": 6.900350525788683, "crossentropy": 8.23849106993824, "bleu": 0.058996318259116484}
+[2025-12-31 13:07:04,852 109735 GPU 0:2 INFO] [VALIDATION SAMPLE] Example 527 (AUTOREGRESSIVE)
+[2025-12-31 13:07:04,852 109735 GPU 0:2 INFO]   pred_text (10 words): - - on ja ja ja ja ja ja ja
+[2025-12-31 13:07:04,852 109735 GPU 0:2 INFO]   ref_text (19 words):  Seinät ja metalliset esteet sekä Wi-Fi- tai muiden langattomien laitteiden aiheuttamat häiriöt ja eri laitevalmistajien Bluetooth-sovellukset saattavat vaikuttaa suorituskykyyn.
+[2025-12-31 13:07:04,941 109735 GPU 0:2 INFO] Validation perplexity: 9541.64
+[2025-12-31 13:07:04,941 109735 GPU 0:2 INFO] Validation accuracy: 5.6276
+[2025-12-31 13:07:04,941 109735 GPU 0:2 INFO] Validation BLEU: 0.0232179
+[2025-12-31 13:07:04,941 109735 GPU 0:2 INFO] {"type": "validation", "step": 300, "perplexity": 9541.639325047163, "accuracy": 5.627602048140881, "crossentropy": 9.163420586687085, "bleu": 0.023217902481011462}
+[2025-12-31 13:07:05,367 110394 GPU 0:3 INFO] [VALIDATION SAMPLE] Example 268 (AUTOREGRESSIVE)
+[2025-12-31 13:07:05,368 110394 GPU 0:3 INFO]   pred_text (10 words): - - - של - של - של של של
+[2025-12-31 13:07:05,368 110394 GPU 0:3 INFO]   ref_text (27 words):  Huao פלסטיק ושות, בע"מ היא יצרנית מקצועית יותר מ 10 שנים. כאן אתה wil למצוא לייצר מידע עבור מגוון רחב של אום-PE שלנו, HDPE וניילון וכן על.
+[2025-12-31 13:07:05,421 92191 GPU 1:2 INFO] [VALIDATION SAMPLE] Example 753 (AUTOREGRESSIVE)
+[2025-12-31 13:07:05,421 92191 GPU 1:2 INFO]   pred_text (11 words): Það er að er að er að er að er að
+[2025-12-31 13:07:05,421 92191 GPU 1:2 INFO]   ref_text (13 words):  Varan var högg og var valinn upp með helstu innlendum verslun matvöruverslun keðju.”
+[2025-12-31 13:07:05,487 110394 GPU 0:3 INFO] Validation perplexity: 9275.59
+[2025-12-31 13:07:05,487 110394 GPU 0:3 INFO] Validation accuracy: 3.914
+[2025-12-31 13:07:05,487 110394 GPU 0:3 INFO] Validation BLEU: 0.00788094
+[2025-12-31 13:07:05,487 110394 GPU 0:3 INFO] {"type": "validation", "step": 300, "perplexity": 9275.591431084718, "accuracy": 3.914004420333534, "crossentropy": 9.135141651597348, "bleu": 0.007880944348390175}
+[2025-12-31 13:07:05,499 92191 GPU 1:2 INFO] Validation perplexity: 5226.98
+[2025-12-31 13:07:05,499 92191 GPU 1:2 INFO] Validation accuracy: 6.92053
+[2025-12-31 13:07:05,500 92191 GPU 1:2 INFO] Validation BLEU: 0.0492501
+[2025-12-31 13:07:05,500 92191 GPU 1:2 INFO] {"type": "validation", "step": 300, "perplexity": 5226.98236026686, "accuracy": 6.920529801324503, "crossentropy": 8.56158940397351, "bleu": 0.04925010470951619}
+[2025-12-31 13:07:05,770 92131 GPU 1:1 INFO] [VALIDATION SAMPLE] Example 516 (AUTOREGRESSIVE)
+[2025-12-31 13:07:05,771 92131 GPU 1:1 INFO]   pred_text (12 words): - - je i i i i i i i i i
+[2025-12-31 13:07:05,771 92131 GPU 1:1 INFO]   ref_text (24 words):  Upotreba: voće ima ljekovita svojstva - oni se koriste u gastrointestinalnih bolesti, oni poboljšati cirkulaciju krvi i promicati izlučivanje radioaktivnih tvari i teških metala.
+[2025-12-31 13:07:05,862 92131 GPU 1:1 INFO] Validation perplexity: 7209.42
+[2025-12-31 13:07:05,862 92131 GPU 1:1 INFO] Validation accuracy: 4.8265
+[2025-12-31 13:07:05,862 92131 GPU 1:1 INFO] Validation BLEU: 0.0230432
+[2025-12-31 13:07:05,862 92131 GPU 1:1 INFO] {"type": "validation", "step": 300, "perplexity": 7209.417177643028, "accuracy": 4.826501105630209, "crossentropy": 8.883143391733288, "bleu": 0.02304323831586369}
+[2025-12-31 13:07:05,964 92236 GPU 1:3 INFO] [VALIDATION SAMPLE] Example 230 (AUTOREGRESSIVE)
+[2025-12-31 13:07:05,964 92236 GPU 1:3 INFO]   pred_text (16 words): Kwa ya ya ya ya ya ya ya ya ya ya ya ya ya ya ya
+[2025-12-31 13:07:05,964 92236 GPU 1:3 INFO]   ref_text (11 words):  ● Yesu si Mungu aliyefanyika mwili; Utatu Mtakatifu si wa kweli
+[2025-12-31 13:07:06,118 92236 GPU 1:3 INFO] Validation perplexity: 4245.98
+[2025-12-31 13:07:06,119 92236 GPU 1:3 INFO] Validation accuracy: 6.82004
+[2025-12-31 13:07:06,119 92236 GPU 1:3 INFO] Validation BLEU: 0.00954881
+[2025-12-31 13:07:06,119 92236 GPU 1:3 INFO] {"type": "validation", "step": 300, "perplexity": 4245.981042728774, "accuracy": 6.820035894925764, "crossentropy": 8.353728177516723, "bleu": 0.009548806419920267}
+[2025-12-31 13:07:06,942 109634 GPU 0:0 INFO] [VALIDATION SAMPLE] Example 163 (AUTOREGRESSIVE)
+[2025-12-31 13:07:06,942 109634 GPU 0:0 INFO]   pred_text (18 words): - في في في في في في في في في في في في في في في في في
+[2025-12-31 13:07:06,942 109634 GPU 0:0 INFO]   ref_text (25 words):  - الحياة الصحية ، الدقيقة لميزان مطبخ 0.1 جرام ، تجعل من السهل عليك التحكم في حياة صحية ، ومناسبة لوزن الفاكهة والأدوية والخبز والوزن.
+[2025-12-31 13:07:07,142 109634 GPU 0:0 INFO] Validation perplexity: 8004.88
+[2025-12-31 13:07:07,142 109634 GPU 0:0 INFO] Validation accuracy: 4.32902
+[2025-12-31 13:07:07,142 109634 GPU 0:0 INFO] Validation BLEU: 0.00769797
+[2025-12-31 13:07:07,142 109634 GPU 0:0 INFO] {"type": "validation", "step": 300, "perplexity": 8004.875118640893, "accuracy": 4.32901789912542, "crossentropy": 8.987806024889501, "bleu": 0.007697974333800962}
+[2025-12-31 13:07:07,161 109634 GPU 0:0 INFO] Multi-task metric aggregation (max): collected 8 metrics ['8004.8751', '8798.5348', '9541.6393', '9275.5914', '3783.8265', '7209.4172', '5226.9824', '4245.9810'], aggregated = 9541.6393
+[2025-12-31 13:07:07,166 109634 GPU 0:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_ar.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_ar_optim.pt
+[2025-12-31 13:07:07,166 110394 GPU 0:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_he.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_he_optim.pt
+[2025-12-31 13:07:07,166 92191 GPU 1:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_is.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_is_optim.pt
+[2025-12-31 13:07:07,166 109674 GPU 0:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_eu.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_eu_optim.pt
+[2025-12-31 13:07:07,166 109735 GPU 0:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_fi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_fi_optim.pt
+[2025-12-31 13:07:07,167 92131 GPU 1:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_hr.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_hr_optim.pt
+[2025-12-31 13:07:07,167 92236 GPU 1:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_sw.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_sw_optim.pt
+[2025-12-31 13:07:07,167 92086 GPU 1:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_hi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_0_hi_optim.pt
+[2025-12-31 13:07:07,390 92236 GPU 1:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_sw.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_sw_optim.pt
+[2025-12-31 13:07:07,392 110394 GPU 0:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_he.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_he_optim.pt
+[2025-12-31 13:07:07,392 109634 GPU 0:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_ar.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_ar_optim.pt
+[2025-12-31 13:07:07,393 109735 GPU 0:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_fi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_fi_optim.pt
+[2025-12-31 13:07:07,394 109674 GPU 0:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_eu.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_eu_optim.pt
+[2025-12-31 13:07:07,422 92131 GPU 1:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_hr.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_hr_optim.pt
+[2025-12-31 13:07:07,428 92191 GPU 1:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_is.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_is_optim.pt
+[2025-12-31 13:07:07,448 92086 GPU 1:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_hi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_decoder_task_en_hi_optim.pt
+[2025-12-31 13:07:07,659 92236 GPU 1:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_sw.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_sw_optim.pt
+[2025-12-31 13:07:07,666 109634 GPU 0:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_0_shared.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_0_shared_optim.pt
+[2025-12-31 13:07:07,667 110394 GPU 0:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_he.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_he_optim.pt
+[2025-12-31 13:07:07,668 109735 GPU 0:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_fi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_fi_optim.pt
+[2025-12-31 13:07:07,670 92236 GPU 1:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_sw.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_sw_optim.pt
+[2025-12-31 13:07:07,670 109674 GPU 0:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_eu.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_eu_optim.pt
+[2025-12-31 13:07:07,672 110394 GPU 0:3 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_he.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_he_optim.pt
+[2025-12-31 13:07:07,673 109735 GPU 0:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_fi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_fi_optim.pt
+[2025-12-31 13:07:07,676 109674 GPU 0:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_eu.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_eu_optim.pt
+[2025-12-31 13:07:07,684 92131 GPU 1:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_hr.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_hr_optim.pt
+[2025-12-31 13:07:07,689 92131 GPU 1:1 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_hr.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_hr_optim.pt
+[2025-12-31 13:07:07,692 92191 GPU 1:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_is.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_is_optim.pt
+[2025-12-31 13:07:07,697 92191 GPU 1:2 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_is.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_is_optim.pt
+[2025-12-31 13:07:07,750 92086 GPU 1:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_hi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_hi_optim.pt
+[2025-12-31 13:07:07,759 92086 GPU 1:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_hi.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_hi_optim.pt
+[2025-12-31 13:07:08,162 109634 GPU 0:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_ar.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_encoder_task_en_ar_optim.pt
+[2025-12-31 13:07:08,166 109634 GPU 0:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_src_embeddings_en.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_src_embeddings_en_optim.pt
+[2025-12-31 13:07:08,410 109634 GPU 0:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_ar.pt and optimizer /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_tgt_embeddings_ar_optim.pt
+[2025-12-31 13:07:08,655 109634 GPU 0:0 INFO] Saving module checkpoint /scratch/project_462000964/members/wangchao/training/291225/saving_best_test/_step_300_frame.pt (no optimizer to save)
+[2025-12-31 13:07:09,139 109634 GPU 0:0 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,139 92236 GPU 1:3 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,139 109735 GPU 0:2 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,139 110394 GPU 0:3 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,140 109674 GPU 0:1 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,140 92191 GPU 1:2 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,140 92086 GPU 1:0 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,140 92131 GPU 1:1 INFO] New best checkpoint at step 300 with aggregated ppl=9541.6393
+[2025-12-31 13:07:09,141 109634 GPU 0:0 INFO] Renaming 69 checkpoint files to 'best' naming for step 300
+[2025-12-31 13:07:09,182 109634 GPU 0:0 INFO] Successfully renamed 69 files to 'best' naming
+[2025-12-31 13:07:19,770 92101  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:07:19,770 92101  INFO]   Input tokens: ['▁बॉक्स', '▁के', '▁ढक्कन', '▁में', '▁एक', '▁दरार', '▁बनाएं', '▁ताकि', '▁अंदर', '▁से']...
+[2025-12-31 13:07:19,770 92101  INFO]   Token IDs: [3299, 1547, 14233, 1561, 1596, 17407, 7651, 3133, 4131, 1574]...
+[2025-12-31 13:07:20,417 109651  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:07:20,417 109651  INFO]   Input tokens: ['▁أكثر', '▁من', '▁10', '▁سنوات', '▁من', '▁الخبرة', '▁في', '▁الإنتاج', '▁في', '▁صناعة']...
+[2025-12-31 13:07:20,417 109651  INFO]   Token IDs: [2269, 1926, 2610, 3250, 1926, 5240, 1925, 4046, 1925, 4938]...
+[2025-12-31 13:07:23,956 92101  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:07:23,956 92101  INFO]   Input tokens: ['▁स्पोर्ट्स', 'बेट', '▁में', '▁फुटबॉल', '▁पर', '▁दांव', '▁लगाना', '▁मजेदार', '▁और', '▁लाभदायक']...
+[2025-12-31 13:07:23,956 92101  INFO]   Token IDs: [8619, 14458, 1561, 7831, 1589, 7395, 7716, 9046, 1567, 11027]...
+[2025-12-31 13:07:25,210 109651  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:07:25,210 109651  INFO]   Input tokens: ['▁تنطوي', '▁الرحلات', '▁الاستكشاف', 'ية', '▁في', '▁الصحراء', '▁على', '▁الكثير', '▁من', '▁الأنشطة']...
+[2025-12-31 13:07:25,210 109651  INFO]   Token IDs: [14431, 8939, 26558, 1920, 1925, 10730, 1943, 3135, 1926, 5137]...
+[rank1]:[W1231 13:07:36.441689738 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258489 (function operator())
+[rank3]:[W1231 13:07:36.468538813 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258521 (function operator())
+[rank4]:[W1231 13:07:36.406568673 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258257 (function operator())
+[rank5]:[W1231 13:07:36.463006217 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258425 (function operator())
+[rank2]:[W1231 13:07:36.672601823 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258512 (function operator())
+[rank0]:[W1231 13:07:36.704681445 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258537 (function operator())
+[rank7]:[W1231 13:07:36.634717095 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258488 (function operator())
+[rank6]:[W1231 13:07:36.673147518 collection.cpp:1110] Warning: ROCTracer produced duplicate flow start: 258403 (function operator())
+[2025-12-31 13:07:57,368 109634 GPU 0:0 INFO] : Step 400/  500; acc:   4.51; ppl: 7542.33; xent: 8.93; 3343/3289 tok/s;    117 sec
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] 400 loss_per_task/en_ar: 1665920.0
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task sampling distribution: (total 3200)
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_ar	count: 400	12.5 %
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_eu	count: 400	12.5 %
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_fi	count: 400	12.5 %
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_he	count: 400	12.5 %
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_hi	count: 400	12.5 %
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] : Step 400/  500; acc:   8.07; ppl: 3270.03; xent: 8.09; 2976/3186 tok/s;    117 sec
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] : Step 400/  500; acc:   7.65; ppl: 3869.37; xent: 8.26; 3243/2885 tok/s;    117 sec
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_hr	count: 400	12.5 %
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] : Step 400/  500; acc:   5.87; ppl: 8975.47; xent: 9.10; 2966/2695 tok/s;    117 sec
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] : Step 400/  500; acc:   5.82; ppl: 8376.29; xent: 9.03; 3366/2885 tok/s;    117 sec
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_is	count: 400	12.5 %
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] 400 loss_per_task/en_eu: 1478656.0
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Task: task_en_sw	count: 400	12.5 %
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] 400 loss_per_task/en_fi: 1391552.0
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Optimizer "decoder_0_ar" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] : Step 400/  500; acc:   4.16; ppl: 8794.28; xent: 9.08; 3254/2986 tok/s;    117 sec
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Optimizer "decoder_task_en_ar" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] 400 loss_per_task/en_he: 1538176.0
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] 400 loss_per_task/en_hi: 1462624.0
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] Optimizer "decoder_0_eu" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] 400 loss_per_task/en_sw: 1351904.0
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Optimizer "encoder_task_en_ar" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] Optimizer "decoder_0_hi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] Optimizer "decoder_task_en_eu" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] Optimizer "decoder_0_sw" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] Optimizer "decoder_task_en_hi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109634 GPU 0:0 INFO] Optimizer "tgt_embeddings_ar" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] Optimizer "decoder_0_fi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] Optimizer "decoder_task_en_sw" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] Optimizer "encoder_task_en_eu" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] Optimizer "encoder_task_en_hi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] Optimizer "decoder_0_he" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109674 GPU 0:1 INFO] Optimizer "tgt_embeddings_eu" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] Optimizer "decoder_task_en_fi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92086 GPU 1:0 INFO] Optimizer "tgt_embeddings_hi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] Optimizer "decoder_task_en_he" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] Optimizer "encoder_task_en_sw" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92236 GPU 1:3 INFO] Optimizer "tgt_embeddings_sw" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] Optimizer "encoder_task_en_fi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] Optimizer "encoder_task_en_he" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92191 GPU 1:2 INFO] : Step 400/  500; acc:   8.01; ppl: 4362.15; xent: 8.38; 3318/3116 tok/s;    117 sec
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 92191 GPU 1:2 INFO] 400 loss_per_task/en_is: 1481728.0
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92191 GPU 1:2 INFO] Optimizer "decoder_0_is" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 110394 GPU 0:3 INFO] Optimizer "tgt_embeddings_he" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92191 GPU 1:2 INFO] Optimizer "decoder_task_en_is" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,369 109735 GPU 0:2 INFO] Optimizer "tgt_embeddings_fi" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92191 GPU 1:2 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92191 GPU 1:2 INFO] Optimizer "encoder_task_en_is" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92191 GPU 1:2 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] : Step 400/  500; acc:   6.01; ppl: 6370.40; xent: 8.76; 3352/3143 tok/s;    117 sec
+[2025-12-31 13:07:57,370 92191 GPU 1:2 INFO] Optimizer "tgt_embeddings_is" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] 400 loss_per_task/en_hr: 1561664.0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] Optimizer "decoder_0_hr" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] Optimizer "decoder_task_en_hr" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] Optimizer "encoder_0_shared" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] Optimizer "encoder_task_en_hr" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] Optimizer "src_embeddings_en" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:07:57,370 92131 GPU 1:1 INFO] Optimizer "tgt_embeddings_hr" has been stepped 401 times. LR 0.0001203 n_clips 0
+[2025-12-31 13:08:03,481 92101  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:08:03,481 92101  INFO]   Input tokens: ['▁जी', '▁हां,', '▁ओ', '2', '▁कुछ', '▁मामलों', '▁में', '▁उ', 'नी', 'ंद']...
+[2025-12-31 13:08:03,481 92101  INFO]   Token IDs: [1897, 7118, 1997, 23, 1832, 3704, 1561, 1573, 1647, 1696]...
+[2025-12-31 13:08:04,552 109651  INFO] HF Tokenizer tgt direct lookup example:
+[2025-12-31 13:08:04,552 109651  INFO]   Input tokens: ['▁يضم', '▁فريق', '▁Z', 'e', 'al', '▁للح', 'لول', '▁التقنية', '▁أكثر', '▁من']...
+[2025-12-31 13:08:04,552 109651  INFO]   Token IDs: [7634, 3487, 4939, 74, 2364, 2515, 4689, 5745, 2269, 1926]...
+[2025-12-31 13:08:06,139 92165  WARNING] FilterTooLong: Sequence near threshold PASSED. src_len=230 (threshold=254), tgt_len=252 (threshold=254), ratio=1.10. After numericalization will add ~3 special tokens.
+[2025-12-31 13:08:06,139 92165  WARNING]   SRC tokens: ['▁City', '▁tour', '▁on', '▁foot', '▁and', '▁public', '▁transport', '▁accompanied', '▁by', '▁an', '▁official', '▁city', '▁guide', ':', '▁Forum', '▁Roman', 'um,', '▁the', '▁heart', '▁of'] ...
+[2025-12-31 13:08:06,139 92165  WARNING]   TGT tokens: ['▁Raz', 'gled', '▁grada', '▁pješice', '▁i', '▁javnim', '▁prijevoz', 'om', '▁uz', '▁pra', 'tnju', '▁službenog', '▁gradskog', '▁vodiča', ':', '▁Fo', 'rum', '▁Ro', 'manu', 'm,'] ...
+[2025-12-31 13:08:06,139 92165  WARNING] ⚠️  Sequence near limit after numericalization. tgt: tokens=252 → token_ids=252 → final=254
+[2025-12-31 13:08:14,707 109634 GPU 0:0 INFO] : Step 500/  500; acc:   5.46; ppl: 6797.41; xent: 8.82; 10521/10369 tok/s;    134 sec
+[2025-12-31 13:08:14,707 109634 GPU 0:0 INFO] 500 loss_per_task/en_ar: 1586432.0
+[2025-12-31 13:08:14,707 109634 GPU 0:0 INFO] Task sampling distribution: (total 4000)
+[2025-12-31 13:08:14,707 92086 GPU 1:0 INFO] : Step 500/  500; acc:   9.63; ppl: 2624.24; xent: 7.87; 9862/10517 tok/s;    134 sec
+[2025-12-31 13:08:14,707 109634 GPU 0:0 INFO] Task: task_en_ar	count: 500	12.5 %
+[2025-12-31 13:08:14,707 92086 GPU 1:0 INFO] 500 loss_per_task/en_hi: 1435488.0
+[2025-12-31 13:08:14,707 109634 GPU 0:0 INFO] Task: task_en_eu	count: 500	12.5 %
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Task: task_en_fi	count: 500	12.5 %
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Task: task_en_he	count: 500	12.5 %
+[2025-12-31 13:08:14,708 92086 GPU 1:0 INFO] Optimizer "decoder_0_hi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Task: task_en_hi	count: 500	12.5 %
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Task: task_en_hr	count: 500	12.5 %
+[2025-12-31 13:08:14,708 92086 GPU 1:0 INFO] Optimizer "decoder_task_en_hi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Task: task_en_is	count: 500	12.5 %
+[2025-12-31 13:08:14,708 92086 GPU 1:0 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Task: task_en_sw	count: 500	12.5 %
+[2025-12-31 13:08:14,708 92086 GPU 1:0 INFO] Optimizer "encoder_task_en_hi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] : Step 500/  500; acc:   6.64; ppl: 7388.53; xent: 8.91; 10424/8908 tok/s;    134 sec
+[2025-12-31 13:08:14,708 92086 GPU 1:0 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Optimizer "decoder_0_ar" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 92086 GPU 1:0 INFO] Optimizer "tgt_embeddings_hi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] 500 loss_per_task/en_eu: 1375872.0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Optimizer "decoder_task_en_ar" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Optimizer "encoder_task_en_ar" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109634 GPU 0:0 INFO] Optimizer "tgt_embeddings_ar" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] Optimizer "decoder_0_eu" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] Optimizer "decoder_task_en_eu" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] Optimizer "encoder_task_en_eu" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109674 GPU 0:1 INFO] Optimizer "tgt_embeddings_eu" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] : Step 500/  500; acc:  10.01; ppl: 3223.06; xent: 8.08; 10929/9750 tok/s;    134 sec
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] 500 loss_per_task/en_sw: 1365552.0
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] Optimizer "decoder_0_sw" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] Optimizer "decoder_task_en_sw" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] Optimizer "encoder_task_en_sw" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109735 GPU 0:2 INFO] : Step 500/  500; acc:   6.74; ppl: 7965.58; xent: 8.98; 10502/9584 tok/s;    134 sec
+[2025-12-31 13:08:14,708 92236 GPU 1:3 INFO] Optimizer "tgt_embeddings_sw" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,708 109735 GPU 0:2 INFO] 500 loss_per_task/en_fi: 1492704.0
+[2025-12-31 13:08:14,708 92131 GPU 1:1 INFO] : Step 500/  500; acc:   7.17; ppl: 5537.78; xent: 8.62; 9516/8919 tok/s;    134 sec
+[2025-12-31 13:08:14,708 92191 GPU 1:2 INFO] : Step 500/  500; acc:  10.15; ppl: 3470.93; xent: 8.15; 11564/10851 tok/s;    134 sec
+[2025-12-31 13:08:14,708 92131 GPU 1:1 INFO] 500 loss_per_task/en_hr: 1332896.0
+[2025-12-31 13:08:14,709 92191 GPU 1:2 INFO] 500 loss_per_task/en_is: 1533824.0
+[2025-12-31 13:08:14,709 109735 GPU 0:2 INFO] Optimizer "decoder_0_fi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92131 GPU 1:1 INFO] Optimizer "decoder_0_hr" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 109735 GPU 0:2 INFO] Optimizer "decoder_task_en_fi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 109735 GPU 0:2 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92191 GPU 1:2 INFO] Optimizer "decoder_0_is" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 109735 GPU 0:2 INFO] Optimizer "encoder_task_en_fi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92131 GPU 1:1 INFO] Optimizer "decoder_task_en_hr" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92191 GPU 1:2 INFO] Optimizer "decoder_task_en_is" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92131 GPU 1:1 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 109735 GPU 0:2 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 109735 GPU 0:2 INFO] Optimizer "tgt_embeddings_fi" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92191 GPU 1:2 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92131 GPU 1:1 INFO] Optimizer "encoder_task_en_hr" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] : Step 500/  500; acc:   5.21; ppl: 7686.11; xent: 8.95; 10193/9396 tok/s;    134 sec
+[2025-12-31 13:08:14,709 92191 GPU 1:2 INFO] Optimizer "encoder_task_en_is" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92131 GPU 1:1 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] 500 loss_per_task/en_he: 1457664.0
+[2025-12-31 13:08:14,709 92191 GPU 1:2 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92131 GPU 1:1 INFO] Optimizer "tgt_embeddings_hr" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 92191 GPU 1:2 INFO] Optimizer "tgt_embeddings_is" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] Optimizer "decoder_0_he" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] Optimizer "decoder_task_en_he" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] Optimizer "encoder_0_shared" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] Optimizer "encoder_task_en_he" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] Optimizer "src_embeddings_en" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,709 110394 GPU 0:3 INFO] Optimizer "tgt_embeddings_he" has been stepped 501 times. LR 0.0001503 n_clips 0
+[2025-12-31 13:08:14,718 109674 GPU 0:1 INFO] GPU 0:1 - Profiling complete. View traces with: tensorboard --logdir=./profiling_logs
+[2025-12-31 13:08:14,719 109735 GPU 0:2 INFO] GPU 0:2 - Profiling complete. View traces with: tensorboard --logdir=./profiling_logs
+[2025-12-31 13:08:14,720 92236 GPU 1:3 INFO] GPU 1:3 - Profiling complete. View traces with: tensorboard --logdir=./profiling_logs
+[2025-12-31 13:08:14,720 110394 GPU 0:3 INFO] GPU 0:3 - Profiling complete. View traces with: tensorboard --logdir=./profiling_logs
+[2025-12-31 13:08:14,719 92086 GPU 1:0 INFO] GPU 1:0 - Profiling complete. View traces with: tensorboard --logdir=./profiling_logs
+[2025-12-31 13:08:14,722 92131 GPU 1:1 INFO] GPU 1:1 - Profiling complete. View traces with: tensorboard --logdir=./profiling_logs
+[2025-12-31 13:08:14,722 92191 GPU 1:2 INFO] GPU 1:2 - Profiling complete. View traces with: tensorboard --logdir=./profiling_logs
+[2025-12-31 13:08:14,723 109674 GPU 0:1 INFO] GPU 0:1 - Cleaning up distributed process group
+[2025-12-31 13:08:14,724 109735 GPU 0:2 INFO] GPU 0:2 - Cleaning up distributed process group
+[2025-12-31 13:08:14,725 110394 GPU 0:3 INFO] GPU 0:3 - Cleaning up distributed process group
+[2025-12-31 13:08:14,725 92086 GPU 1:0 INFO] GPU 1:0 - Cleaning up distributed process group
+[2025-12-31 13:08:14,725 92236 GPU 1:3 INFO] GPU 1:3 - Cleaning up distributed process group
+[2025-12-31 13:08:14,727 92191 GPU 1:2 INFO] GPU 1:2 - Cleaning up distributed process group
+[2025-12-31 13:08:14,727 92131 GPU 1:1 INFO] GPU 1:1 - Cleaning up distributed process group
+[2025-12-31 13:08:15,771 109674 GPU 0:1 INFO] GPU 0:1 - Distributed cleanup complete
+[2025-12-31 13:08:15,771 109735 GPU 0:2 INFO] GPU 0:2 - Distributed cleanup complete
+[2025-12-31 13:08:15,776 92191 GPU 1:2 INFO] GPU 1:2 - Distributed cleanup complete
+[2025-12-31 13:08:15,776 92086 GPU 1:0 INFO] GPU 1:0 - Distributed cleanup complete
+[2025-12-31 13:08:15,776 92236 GPU 1:3 INFO] GPU 1:3 - Distributed cleanup complete
+[2025-12-31 13:08:15,776 110394 GPU 0:3 INFO] GPU 0:3 - Distributed cleanup complete
+[2025-12-31 13:08:15,781 92131 GPU 1:1 INFO] GPU 1:1 - Distributed cleanup complete
+[2025-12-31 13:08:20,535 92001  INFO] DD logger
+[2025-12-31 13:08:21,555 92001  INFO] DD logger
+[2025-12-31 13:08:21,555 92001  INFO] DD logger
+[2025-12-31 13:08:21,555 92001  INFO] Training complete, shutting down producers...
+[2025-12-31 13:08:21,608 92001  INFO] Cleaning up queues and semaphores...
+[2025-12-31 13:08:21,608 92001  INFO] Shutdown complete

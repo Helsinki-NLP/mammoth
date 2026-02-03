@@ -122,3 +122,6 @@ sftp.config*.json
 # claude
 CLAUDE.md
 .claude/*
+
+# other libraries
+other_libraries

@@ -11,6 +11,7 @@ import torch.distributed
 from mammoth.distributed.contexts import DeviceContextEnum
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
+from mammoth.utils.profiling import get_roctx_range
 
 
 def _detach_batch_tensors(obj):
@@ -302,17 +303,8 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     logger.info("BATCH PRODUCER")
     logger.info(generator_to_serve)
 
-    # Initialize profiler if requested
-    enable_profiling = getattr(opts, 'enable_profiling', False)
-    profiler = None
-    if enable_profiling:
-        profiler = torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU],
-            record_shapes=True,
-            profile_memory=True,
-            with_stack=True,
-        )
-        profiler.start()
+    # Initialize ROCTx profiling markers (always active, controlled by rocprofv3 wrapper)
+    roctx_range = get_roctx_range()
 
     try:
         for batch, metadata, communication_batch_id in generator_to_serve:
@@ -322,11 +314,7 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
             # batch.fields = list(batch.fields)
 
             # Detach tensors to prevent shared memory race conditions in multi-node training
-            if enable_profiling:
-                with torch.profiler.record_function("batch_tensor_detach_to_cpu"):
-                    batch_detached = _detach_batch_tensors(batch)
-                    metadata_detached = _detach_batch_tensors(metadata)
-            else:
+            with roctx_range("batch_tensor_detach_to_cpu"):
                 batch_detached = _detach_batch_tensors(batch)
                 metadata_detached = _detach_batch_tensors(metadata)
 
@@ -335,16 +323,8 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
         # Graceful shutdown on termination signal
         logger.info(f"BATCH PRODUCER {device_id} - Received shutdown signal, cleaning up...")
     finally:
-        # Save profiler results if enabled
-        if profiler is not None:
-            profiler.stop()
-            trace_path = f"batch_producer_profile_gpu{device_id}.json"
-            profiler.export_chrome_trace(trace_path)
-            logger.info(f"BATCH PRODUCER {device_id} - Profile saved to {trace_path}")
-
-            # Print summary statistics
-            logger.info(f"BATCH PRODUCER {device_id} - Profiling Summary:")
-            logger.info(profiler.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+        # ROCTx profiling markers always active (traces saved by rocprofv3 if enabled)
+        logger.info(f"BATCH PRODUCER {device_id} - Batch producer complete")
 
         # Send sentinel value to signal end of data stream
         try:

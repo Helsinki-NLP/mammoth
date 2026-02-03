@@ -1,0 +1,218 @@
+# Training configuration for 2-node setup with 8 GPUs total (4 GPUs per node)
+# Node 0: GPUs 0,1,2,3 | Node 1: GPUs 4,5,6,7
+# Shared encoder across all tasks, language-specific decoders distributed across nodes
+# Disclaimer: Model training settings, parameters and values are only for testing purpose. 
+
+
+# Task Configuration - 4 tasks distributed across 2 nodes (8 GPUs total)
+tasks:
+  task_en_ar:
+    src_tgt: "en-ar"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: 0:0  # Node 0, GPU 0
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["ar"]      # Arabic-specific decoder
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar.txt
+
+
+  task_en_eu:
+    src_tgt: "en-eu"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: 0:1  # Node 0, GPU 1
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["eu"]      # Basque-specific decoder
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/train_eu.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/val_eu.txt
+
+
+  task_en_fi:
+    src_tgt: "en-fi"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: 0:2  # Node 0, GPU 2
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["fi"]      # Finnish-specific decoder
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt
+
+
+  task_en_he:
+    src_tgt: "en-he"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: 0:3  # Node 0, GPU 3
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["he"]      # Hebrew-specific decoder
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/train_he.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/val_he.txt
+
+
+  task_en_hi:
+    src_tgt: "en-hi"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:0"  # Node 1, GPU 0 (global GPU 4)
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["hi"]      
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/train_hi.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/val_hi.txt
+
+
+  task_en_hr:
+    src_tgt: "en-hr"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:1"  # Node 1, GPU 1 (global GPU 5)
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["hr"]      
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/train_hr.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/val_hr.txt
+
+  task_en_is:
+    src_tgt: "en-is"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:2"  # Node 1, GPU 2 (global GPU 6)
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["is"]      # Spanish-specific decoder
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/train_is.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/val_is.txt
+
+
+  task_en_sw:
+    src_tgt: "en-sw"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: "1:3"  # Node 1, GPU 3 (global GPU 7)
+    enc_sharing_group: ["shared"]  # Shared encoder across all tasks
+    dec_sharing_group: ["sw"]      # Italian-specific decoder
+    transforms: [denoising,filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/train_sw.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/val_sw.txt
+
+# Vocabulary and Tokenizers
+use_hf_tokenizer: true
+
+src_vocab:
+  en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+
+tgt_vocab:
+  hi: /scratch/project_462000964/shared/hplt_bilingual/hi-en.tmx/tgt_tokenizer/tokenizer.json
+  hr: /scratch/project_462000964/shared/hplt_bilingual/hr-en.tmx/tgt_tokenizer/tokenizer.json
+  ar: /scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/tgt_tokenizer/tokenizer.json
+  sw: /scratch/project_462000964/shared/hplt_bilingual/sw-en.tmx/tgt_tokenizer/tokenizer.json
+  eu: /scratch/project_462000964/shared/hplt_bilingual/eu-en.tmx/tgt_tokenizer/tokenizer.json
+  fi: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
+  is: /scratch/project_462000964/shared/hplt_bilingual/is-en.tmx/tgt_tokenizer/tokenizer.json
+  he: /scratch/project_462000964/shared/hplt_bilingual/he-en.tmx/tgt_tokenizer/tokenizer.json
+
+
+src_seq_length_max: 256
+tgt_seq_length_max: 256
+src_seq_length_min: 10
+tgt_seq_length_min: 10
+max_length: 256
+
+# Denoising transform parameters
+denoising_objective: bart
+mask_ratio: 0.2              # Fraction of tokens to mask
+mask_length: span-poisson    # Options: 'subword', 'word', 'span-poisson'
+poisson_lambda: 3.0          # Lambda for span length distribution
+replace_length: 1            # -1: keep N tokens, 0: remove all, 1: single mask per span
+
+# Model Architecture Options
+enc_layers: [9]                   # Shared encoder layers
+dec_layers: [3]                   # Decoder layers for each language-specific decoder
+model_dim: 768                    # Transformer model dimension
+dropout: 0.1                      # Dropout rate
+model_dtype: bf16
+
+# x-transformers specific options
+x_transformers_opts:
+  attn_flash: true            
+  rotary_pos_emb: true          # Use rotary positional embeddings
+  tie_embedding: false           # Tie input/output embeddings
+  heads: 12
+  pre_norm: false
+  post_emb_norm: true
+  post_emb_norm_bias: true
+  attn_dropout: 0.1
+  ff_dropout: 0.1
+  layernorm_bias: true
+  use_abs_pos_emb: false
+
+# Training Configuration
+
+# Training specifics - adjusted for 2-node setup
+train_steps: 62500
+accum_count: [1]                  # gradient accumulation
+batch_size: 8196                    # per-GPU batch size
+batch_type: tokens   
+valid_batch_size: 4096 
+normalization: tokens            
+valid_steps: 5000
+valid_metrics: [bleu]
+save_checkpoint_steps: 5000      # checkpoint saving frequency
+keep_checkpoint: 5 # number of checkpoints to keep
+
+# Optimizer settings
+optim: adamw
+learning_rate: 0.0003
+adam_beta1: 0.9
+adam_beta2: 0.999
+weight_decay: 0.0
+max_grad_norm: 1.0
+
+# Learning rate scheduling
+warmup_steps: 5000
+decay_method: linear_warmup
+learning_rate_decay: 0
+start_decay_steps: 0
+
+# Distributed training (2-node, 8 GPU setup)
+world_size: 8               # Total number of GPUs across all nodes
+gpu_ranks: [0,1,2,3]  # Global GPU ranks
+n_nodes: 2                    
+task_distribution_strategy: weighted_sampling
+
+
+# Logging and Monitoring
+log_model_structure: false         # log model structure
+tensorboard: true                 # enable tensorboard logging
+tensorboard_log_dir: ./logs     # tensorboard log directory
+report_every: 100
+report_training_accuracy: true     # reporting accuracy
+
+# Miscellaneous
+seed: 42                            # random seed
+reset_optim: all                    # reset optimizer state
+label_smoothing: 0.1              # Label smoothing for better generalization
+
+# Model saving
+save_model: /scratch/project_462000964/members/wangchao/training/081225/two_nodes_models/  # model save path

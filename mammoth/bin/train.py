@@ -266,6 +266,25 @@ def train(opts):
     procs = []
     producers = []
 
+    # Preprocess indexed datasets before spawning any GPU processes
+    # This runs on CPU in the main process, using all nodes in parallel
+    # Each node gets assigned different datasets to maximize CPU utilization
+    from mammoth.inputters.dataloader import preprocess_indexed_datasets_parallel_nodes
+
+    if world_context.context == DeviceContextEnum.MULTI_GPU:
+        current_node_rank = node_rank
+        total_nodes = opts.world_size // world_context.gpus_per_node
+    else:
+        current_node_rank = 0
+        total_nodes = 1
+
+    preprocess_indexed_datasets_parallel_nodes(
+        global_task_queue_manager,
+        opts,
+        current_node_rank=current_node_rank,
+        total_nodes=total_nodes
+    )
+
     for local_rank in range(n_local_ranks):
         if world_context.context == DeviceContextEnum.MULTI_GPU:
             device_context: DeviceContext = world_context.global_to_local(
@@ -327,6 +346,7 @@ def train(opts):
             local_rank=local_rank,
             opts=opts
         )
+
         # Get the iterator to generate from
         line_idx_restore = None
         if frame_checkpoint is not None:

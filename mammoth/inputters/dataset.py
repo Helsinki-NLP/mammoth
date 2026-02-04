@@ -14,6 +14,7 @@ from mammoth.constants import DefaultTokens
 from mammoth.transforms import TransformPipe, get_transforms_cls, make_transforms
 from mammoth.utils.logging import logger
 from mammoth.inputters.vocab import Vocab
+from mammoth.inputters.indexed_corpus import IndexedCorpus
 
 
 TensorWithMask = collections.namedtuple('TensorWithMask', ['tensor', 'mask'])
@@ -342,6 +343,162 @@ class ParallelCorpus(IterableDataset):
         return batch
 
 
+def _get_indexed_path(text_path):
+    """
+    Convert text file path to indexed dataset path prefix.
+
+    Examples:
+        /data/train.txt -> /data/train
+        /data/train.txt.gz -> /data/train
+        /data/train -> /data/train
+
+    Args:
+        text_path: Path to text file
+
+    Returns:
+        Path prefix for indexed files (without .bin/.idx extension)
+    """
+    path = str(text_path)
+    # Remove common extensions
+    for ext in ['.txt.gz', '.txt', '.gz']:
+        if path.endswith(ext):
+            path = path[:-len(ext)]
+            break
+    return path
+
+
+def _check_and_create_indexed(opts, task, text_path, is_src, device_rank):
+    """
+    Check if indexed files exist, and create them if needed (single-process only).
+
+    In distributed mode, preprocessing should already be done by
+    _preprocess_all_indexed_datasets() in dataloader.py before this is called.
+
+    In single-process mode, this function will preprocess on-the-fly.
+
+    Args:
+        opts: Configuration options
+        task: TaskSpecs object
+        text_path: Path to text file
+        is_src: True if source side, False if target side
+        device_rank: Global rank of current device
+
+    Returns:
+        Path prefix for indexed files
+    """
+    import os
+    from mammoth.inputters.indexed_dataset import exists as indexed_dataset_exists
+    from mammoth.utils.logging import logger
+
+    # Get indexed path prefix
+    indexed_path = _get_indexed_path(text_path)
+
+    # Check if indexed files already exist
+    if indexed_dataset_exists(indexed_path):
+        return indexed_path
+
+    # Check if running in distributed mode
+    try:
+        import torch.distributed as dist
+        is_distributed = dist.is_initialized()
+    except (ImportError, AttributeError):
+        is_distributed = False
+
+    if is_distributed:
+        # In distributed mode, preprocessing should already be done
+        # If we reach here, something went wrong
+        raise RuntimeError(
+            f"[Rank {device_rank}] Indexed files not found: {indexed_path}\n"
+            f"Expected files: {indexed_path}.bin / {indexed_path}.idx\n"
+            f"These files should have been created during the preprocessing phase.\n"
+            f"This indicates a bug in the preprocessing logic."
+        )
+
+    # Single-process mode: preprocess on-the-fly
+    if not os.path.exists(text_path):
+        raise FileNotFoundError(
+            f"Neither indexed files nor source text file found:\n"
+            f"  Text file: {text_path}\n"
+            f"  Indexed files: {indexed_path}.bin / {indexed_path}.idx\n"
+            f"Please provide either pre-tokenized indexed files or a text file for preprocessing."
+        )
+
+    logger.info(f"Starting pretokenization: {text_path}")
+    _run_pretokenization(opts, task, text_path, indexed_path, is_src)
+
+    # Verify files were created successfully
+    if not indexed_dataset_exists(indexed_path):
+        raise RuntimeError(
+            f"Pretokenization failed: indexed files not found at {indexed_path}\n"
+            f"Expected files: {indexed_path}.bin and {indexed_path}.idx"
+        )
+
+    logger.info(f"Using indexed files: {indexed_path}")
+    return indexed_path
+
+
+def _run_pretokenization(opts, task, text_path, output_prefix, is_src):
+    """
+    Run pretokenization for a text file.
+
+    Args:
+        opts: Configuration options
+        task: TaskSpecs object
+        text_path: Path to input text file
+        output_prefix: Path prefix for output files
+        is_src: True if source side, False if target side
+    """
+    import os
+    import multiprocessing
+    from mammoth.inputters.indexed_dataset import preprocess_text_to_indexed
+    from mammoth.utils.logging import logger
+
+    # Determine language and vocab
+    lang = task.src_lang if is_src else task.tgt_lang
+    vocab_dict = opts.src_vocab if is_src else opts.tgt_vocab
+
+    if lang not in vocab_dict:
+        raise ValueError(
+            f"Vocabulary not found for language '{lang}'\n"
+            f"Available vocabularies: {list(vocab_dict.keys())}"
+        )
+
+    vocab_path = vocab_dict[lang]
+
+    # Validate vocab file exists
+    if not os.path.exists(vocab_path):
+        raise FileNotFoundError(
+            f"Vocabulary file not found: {vocab_path}\n"
+            f"Please ensure the vocabulary file exists for language '{lang}'"
+        )
+
+    # Determine worker count
+    workers = max(1, multiprocessing.cpu_count() // 2)
+
+    # Get decoder_start_with_eos setting
+    decoder_start_with_eos = getattr(opts, 'decoder_start_with_eos', False)
+
+    # Run preprocessing
+    logger.info("Pretokenization settings:")
+    logger.info(f"  Input: {text_path}")
+    logger.info(f"  Output: {output_prefix}")
+    logger.info(f"  Vocab: {vocab_path}")
+    logger.info(f"  Language: {lang}")
+    logger.info(f"  Workers: {workers}")
+
+    success = preprocess_text_to_indexed(
+        input_path=text_path,
+        output_prefix=output_prefix,
+        vocab_path=vocab_path,
+        lang=lang,
+        decoder_start_with_eos=decoder_start_with_eos,
+        workers=workers,
+    )
+
+    if not success:
+        raise RuntimeError(f"Pretokenization failed for {text_path}")
+
+
 def get_corpus(
     opts,
     task,
@@ -372,23 +529,70 @@ def get_corpus(
     if opts.pad_to_max_length:
         assert opts.max_length is not None and opts.max_length > 0, 'Please provide a --max_length'
         max_length = opts.max_length
-    # build Dataset proper
-    dataset = ParallelCorpus(
-        corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
-        corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],
-        src_vocab,
-        tgt_vocab,
-        TransformPipe(opts, transforms_to_apply),
-        stride=corpus_opts.get('stride', None),
-        offset=corpus_opts.get('offset', None),
-        is_train=is_train,
-        task=task,
-        max_length=max_length,
-        line_idx_restore=line_idx_restore,
-        model_max_seq_len=model_max_seq_len,
-        verbose_dataloader=getattr(opts, 'verbose_dataloader', False),
-        device_rank=device_rank,
-    )
+
+    # Check if using indexed (pre-tokenized) dataset
+    data_type = corpus_opts.get('data_type', 'text')
+
+    if data_type == 'indexed':
+        # Use indexed dataset with automatic pretokenization
+        src_path = corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"]
+        tgt_path = corpus_opts.get("path_tgt") if is_train else corpus_opts.get("path_valid_tgt")
+
+        # Auto-detect and create indexed files if needed
+        src_indexed_path = _check_and_create_indexed(
+            opts, task, src_path, is_src=True, device_rank=device_rank
+        )
+        tgt_indexed_path = None
+        if tgt_path:
+            tgt_indexed_path = _check_and_create_indexed(
+                opts, task, tgt_path, is_src=False, device_rank=device_rank
+            )
+
+        # Warn if transforms are specified for indexed datasets
+        if transforms_to_apply:
+            logger.warning(
+                f"⚠️  Transforms specified for indexed dataset '{task.corpus_id}': {[t.__class__.__name__ for t in transforms_to_apply]}\n"
+                f"   Indexed datasets contain pre-tokenized token IDs and do NOT support transforms during training.\n"
+                f"   Transforms are IGNORED for indexed datasets.\n"
+                f"   To apply transforms, preprocess your data with the desired transforms first."
+            )
+
+        logger.info(f"Using indexed dataset: {src_indexed_path}")
+        dataset = IndexedCorpus(
+            src_indexed_path,
+            tgt_indexed_path,
+            src_vocab,
+            tgt_vocab,
+            TransformPipe(opts, transforms_to_apply),
+            stride=corpus_opts.get('stride', None),
+            offset=corpus_opts.get('offset', None),
+            is_train=is_train,
+            task=task,
+            max_length=max_length,
+            line_idx_restore=line_idx_restore,
+            model_max_seq_len=model_max_seq_len,
+            verbose_dataloader=getattr(opts, 'verbose_dataloader', False),
+            device_rank=device_rank,
+        )
+    else:
+        # Use traditional text dataset
+        dataset = ParallelCorpus(
+            corpus_opts["path_src"] if is_train else corpus_opts["path_valid_src"],
+            corpus_opts["path_tgt"] if is_train else corpus_opts["path_valid_tgt"],
+            src_vocab,
+            tgt_vocab,
+            TransformPipe(opts, transforms_to_apply),
+            stride=corpus_opts.get('stride', None),
+            offset=corpus_opts.get('offset', None),
+            is_train=is_train,
+            task=task,
+            max_length=max_length,
+            line_idx_restore=line_idx_restore,
+            model_max_seq_len=model_max_seq_len,
+            verbose_dataloader=getattr(opts, 'verbose_dataloader', False),
+            device_rank=device_rank,
+        )
+
     return dataset
 
 

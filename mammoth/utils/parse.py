@@ -78,7 +78,7 @@ class DataOptsCheckerMixin(object):
             # Check Transforms
             _transforms = corpus.get('transforms', None)
             if _transforms is None:
-                logger.info(f"Missing transforms field for {cname} data, set to default: {default_transforms}.")
+                # logger.info(f"Missing transforms field for {cname} data, set to default: {default_transforms}.")
                 corpus['transforms'] = default_transforms
             opts.data_task = ModelTask.SEQ2SEQ
             """

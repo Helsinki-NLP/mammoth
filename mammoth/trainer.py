@@ -351,8 +351,6 @@ class Trainer(object):
                 self.optim.externally_managed_step(gradient_syncs)
                 self.optim.zero_grad()
 
-            if device_context.is_gpu():
-                torch.cuda.empty_cache()
 
             # if step % 1000 == 0 and step > 0:
             #     TODO: if you are going to uncomment that block, please make it optional

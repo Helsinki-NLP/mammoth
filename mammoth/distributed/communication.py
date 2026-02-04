@@ -13,72 +13,6 @@ from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
 
 
-def _detach_batch_tensors(obj):
-    """
-    Recursively convert all tensors in a batch to CPU NumPy arrays to prevent shared memory usage.
-    This avoids /dev/shm race conditions in multi-node containerized environments.
-
-    PyTorch's custom pickle implementation automatically uses shared memory (/dev/shm) for tensors,
-    even after .detach().clone(). Converting to NumPy forces standard Python serialization.
-
-    The consumer will convert NumPy arrays back to tensors and move to the appropriate device.
-    """
-    if isinstance(obj, torch.Tensor):
-        # Convert to CPU NumPy array to bypass PyTorch's shared memory pickling
-        # Store dtype as string to preserve it through serialization
-        return {'__tensor__': True, 'data': obj.detach().cpu().numpy(), 'dtype': str(obj.dtype)}
-    elif isinstance(obj, dict):
-        return {k: _detach_batch_tensors(v) for k, v in obj.items()}
-    elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
-        # Handle namedtuples (which have _fields attribute)
-        # Reconstruct by passing detached values to constructor
-        return type(obj)(*(_detach_batch_tensors(item) for item in obj))
-    elif isinstance(obj, (list, tuple)):
-        return type(obj)(_detach_batch_tensors(item) for item in obj)
-    elif hasattr(obj, '__dict__'):
-        # Handle custom objects with attributes
-        new_obj = type(obj).__new__(type(obj))
-        for key, value in obj.__dict__.items():
-            setattr(new_obj, key, _detach_batch_tensors(value))
-        return new_obj
-    else:
-        return obj
-
-
-def _reattach_batch_tensors(obj):
-    """
-    Recursively convert NumPy arrays back to PyTorch tensors.
-    This is the inverse operation of _detach_batch_tensors.
-
-    Tensors are reconstructed on CPU; the consumer will move them to the appropriate device.
-    """
-    if isinstance(obj, dict):
-        # Check if this is a serialized tensor
-        if obj.get('__tensor__') is True:
-            # Convert NumPy array back to tensor
-            numpy_array = obj['data']
-            dtype_str = obj['dtype']
-            # Parse dtype string (e.g., "torch.float32" -> torch.float32)
-            dtype = getattr(torch, dtype_str.replace('torch.', ''))
-            return torch.from_numpy(numpy_array).to(dtype)
-        else:
-            # Regular dict, recurse
-            return {k: _reattach_batch_tensors(v) for k, v in obj.items()}
-    elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
-        # Handle namedtuples
-        return type(obj)(*(_reattach_batch_tensors(item) for item in obj))
-    elif isinstance(obj, (list, tuple)):
-        return type(obj)(_reattach_batch_tensors(item) for item in obj)
-    elif hasattr(obj, '__dict__'):
-        # Handle custom objects with attributes
-        new_obj = type(obj).__new__(type(obj))
-        for key, value in obj.__dict__.items():
-            setattr(new_obj, key, _reattach_batch_tensors(value))
-        return new_obj
-    else:
-        return obj
-
-
 def multi_init(opts, global_rank, local_rank=None):
     dist_init_method = "tcp://{master_ip}:{master_port}".format(
         master_ip=opts.master_ip, master_port=opts.master_port
@@ -320,17 +254,7 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
             # Move batch to correspond device_id when consumer iterate
             # hack to dodge unpicklable `dict_keys`
             # batch.fields = list(batch.fields)
-
-            # Detach tensors to prevent shared memory race conditions in multi-node training
-            if enable_profiling:
-                with torch.profiler.record_function("batch_tensor_detach_to_cpu"):
-                    batch_detached = _detach_batch_tensors(batch)
-                    metadata_detached = _detach_batch_tensors(metadata)
-            else:
-                batch_detached = _detach_batch_tensors(batch)
-                metadata_detached = _detach_batch_tensors(metadata)
-
-            queue.put((batch_detached, metadata_detached, communication_batch_id))
+            queue.put((batch, metadata, communication_batch_id))
     except KeyboardInterrupt:
         # Graceful shutdown on termination signal
         logger.info(f"BATCH PRODUCER {device_id} - Received shutdown signal, cleaning up...")

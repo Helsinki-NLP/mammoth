@@ -11,7 +11,7 @@ from mammoth.utils.model_saver import build_model_saver, load_parameters_from_ch
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
-from mammoth.distributed import broadcast_tensors, _reattach_batch_tensors
+from mammoth.distributed import broadcast_tensors
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
@@ -208,20 +208,8 @@ def main(
     assert semaphore is not None
 
     def _train_iter():
-        enable_profiling = getattr(opts, 'enable_profiling', False)
         while True:
-            if enable_profiling:
-                with torch.profiler.record_function("batch_queue_get"):
-                    batch, metadata, communication_batch_id = batch_queue.get()
-                # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
-                with torch.profiler.record_function("batch_tensor_reattach_from_cpu"):
-                    batch = _reattach_batch_tensors(batch)
-                    metadata = _reattach_batch_tensors(metadata)
-            else:
-                batch, metadata, communication_batch_id = batch_queue.get()
-                # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
-                batch = _reattach_batch_tensors(batch)
-                metadata = _reattach_batch_tensors(metadata)
+            batch, metadata, communication_batch_id = batch_queue.get()
             semaphore.release()
             # TODO: confirm that batch-providing corpus has already been to'd to the correct place
             yield batch, metadata, communication_batch_id

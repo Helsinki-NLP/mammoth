@@ -571,6 +571,12 @@ def _add_train_general_opts(parser):
     group.add(
         '--queue_size', '-queue_size', default=40, type=int, help="Size of queue for each process in producer/consumer"
     )
+    group.add(
+        '--prefetch_buffer_size', '-prefetch_buffer_size', default=16, type=int,
+        help="Size of prefetch buffer for background thread batch prefetching. "
+             "Larger values hide longer disk I/O latency but use more memory. "
+             "Recommended: 16-32 for datasets with occasional slow batches."
+    )
 
     _add_reproducibility_opts(parser)
 

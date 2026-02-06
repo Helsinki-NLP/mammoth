@@ -293,7 +293,12 @@ class ErrorHandler(object):
 
 
 def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
-    """Produce batches to `queues` from `generator_to_serve`."""
+    """
+    Produce batches to `queues` from `generator_to_serve` with background prefetching.
+
+    Uses a background thread to prepare batches in advance, hiding disk I/O latency
+    and preventing GPU stalls when waiting for the next batch.
+    """
     # Set sharing strategy in spawned subprocess (not inherited from parent)
     torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -306,25 +311,116 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     # Initialize ROCTx profiling markers (always active, controlled by rocprofv3 wrapper)
     roctx_range = get_roctx_range()
 
+    # Get prefetch buffer size
+    prefetch_buffer_size = getattr(opts, 'prefetch_buffer_size', 16)
+    logger.info(f"BATCH PRODUCER {device_id} - Prefetching with buffer size {prefetch_buffer_size}")
+
+    _batch_producer_with_prefetch(
+        generator_to_serve, queue, semaphore, opts, device_id,
+        prefetch_buffer_size, roctx_range
+    )
+
+
+def _batch_producer_with_prefetch(generator_to_serve, queue, semaphore, opts, device_id,
+                                   prefetch_buffer_size, roctx_range):
+    """
+    Batch producer with background thread prefetching.
+
+    Architecture:
+    - Main thread: Pulls from prefetch_buffer → Puts in main queue for consumer
+    - Prefetch thread: Reads from generator → Prepares batches → Puts in prefetch_buffer
+
+    This decouples slow disk I/O (in prefetch thread) from queue serving (main thread),
+    preventing GPU stalls when waiting for next batch.
+    """
+    import threading
+    import queue as queue_module
+
+    # Internal buffer for prefetched batches (thread-safe queue)
+    prefetch_buffer = queue_module.Queue(maxsize=prefetch_buffer_size)
+    stop_event = threading.Event()
+    prefetch_exception = [None]  # Mutable container to share exceptions across threads
+
+    def prefetch_worker():
+        """
+        Background worker thread that continuously fetches batches from generator.
+
+        This runs concurrently with main thread, preparing batches in advance so
+        they're ready when consumer needs them. The thread:
+        1. Fetches batch from generator (may block on disk I/O)
+        2. Detaches tensors to CPU (prevents shared memory issues)
+        3. Puts prepared batch in prefetch_buffer
+        """
+        try:
+            for batch, metadata, communication_batch_id in generator_to_serve:
+                if stop_event.is_set():
+                    break
+
+                # Do expensive work (disk I/O, tensor detach) in background thread
+                with roctx_range("batch_prefetch_read"):
+                    batch_detached = _detach_batch_tensors(batch)
+                    metadata_detached = _detach_batch_tensors(metadata)
+
+                # Put in prefetch buffer (blocks if buffer is full)
+                prefetch_buffer.put((batch_detached, metadata_detached, communication_batch_id))
+
+        except Exception as e:
+            # Capture exception to propagate to main thread
+            logger.error(f"BATCH PRODUCER {device_id} - Prefetch thread exception: {e}")
+            import traceback
+            prefetch_exception[0] = (e, traceback.format_exc())
+        finally:
+            # Signal end of data
+            prefetch_buffer.put(None)
+
+    # Start prefetch thread
+    prefetch_thread = threading.Thread(target=prefetch_worker, daemon=True, name=f"BatchPrefetch-{device_id}")
+    prefetch_thread.start()
+    logger.info(f"BATCH PRODUCER {device_id} - Started prefetch thread")
+
     try:
-        for batch, metadata, communication_batch_id in generator_to_serve:
+        batch_count = 0
+        while True:
+            # Check for exceptions in prefetch thread
+            if prefetch_exception[0] is not None:
+                exc, tb = prefetch_exception[0]
+                logger.error(f"BATCH PRODUCER {device_id} - Prefetch thread failed:\n{tb}")
+                raise exc
+
+            # Get batch from prefetch buffer (blocks if buffer is empty)
+            # This should rarely block since prefetch thread is continuously filling it
+            with roctx_range("batch_queue_get"):
+                item = prefetch_buffer.get()
+
+            if item is None:
+                # End of data signal from prefetch thread
+                logger.info(f"BATCH PRODUCER {device_id} - Received end-of-data signal after {batch_count} batches")
+                break
+
+            batch_detached, metadata_detached, communication_batch_id = item
+            batch_count += 1
+
+            # Wait for space in main queue (blocks if consumer is slow)
             semaphore.acquire()
-            # Move batch to correspond device_id when consumer iterate
-            # hack to dodge unpicklable `dict_keys`
-            # batch.fields = list(batch.fields)
 
-            # Detach tensors to prevent shared memory race conditions in multi-node training
-            with roctx_range("batch_tensor_detach_to_cpu"):
-                batch_detached = _detach_batch_tensors(batch)
-                metadata_detached = _detach_batch_tensors(metadata)
-
+            # Put in main queue for consumer (GPU trainer)
             queue.put((batch_detached, metadata_detached, communication_batch_id))
+
     except KeyboardInterrupt:
         # Graceful shutdown on termination signal
         logger.info(f"BATCH PRODUCER {device_id} - Received shutdown signal, cleaning up...")
+        stop_event.set()
     finally:
+        # Stop prefetch thread
+        stop_event.set()
+
+        # Wait for prefetch thread to finish (with timeout)
+        prefetch_thread.join(timeout=5.0)
+        if prefetch_thread.is_alive():
+            logger.warning(f"BATCH PRODUCER {device_id} - Prefetch thread did not exit cleanly")
+
         # ROCTx profiling markers always active (traces saved by rocprofv3 if enabled)
-        logger.info(f"BATCH PRODUCER {device_id} - Batch producer complete")
+        logger.info(f"BATCH PRODUCER {device_id} - Batch producer complete (produced {batch_count} batches)")
 
         # Send sentinel value to signal end of data stream
         try:

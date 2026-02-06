@@ -46,10 +46,14 @@ def _detach_batch_tensors(obj):
         return obj
 
 
-def _reattach_batch_tensors(obj):
+def _reattach_batch_tensors(obj, pin_memory=False):
     """
     Recursively convert NumPy arrays back to PyTorch tensors.
     This is the inverse operation of _detach_batch_tensors.
+
+    Args:
+        obj: Object to process (may contain serialized tensors)
+        pin_memory: If True, pin reconstructed tensors for faster GPU transfer
 
     Tensors are reconstructed on CPU; the consumer will move them to the appropriate device.
     """
@@ -61,20 +65,23 @@ def _reattach_batch_tensors(obj):
             dtype_str = obj['dtype']
             # Parse dtype string (e.g., "torch.float32" -> torch.float32)
             dtype = getattr(torch, dtype_str.replace('torch.', ''))
-            return torch.from_numpy(numpy_array).to(dtype)
+            tensor = torch.from_numpy(numpy_array).to(dtype)
+            if pin_memory:
+                tensor = tensor.pin_memory()
+            return tensor
         else:
             # Regular dict, recurse
-            return {k: _reattach_batch_tensors(v) for k, v in obj.items()}
+            return {k: _reattach_batch_tensors(v, pin_memory=pin_memory) for k, v in obj.items()}
     elif isinstance(obj, tuple) and hasattr(obj, '_fields'):
         # Handle namedtuples
-        return type(obj)(*(_reattach_batch_tensors(item) for item in obj))
+        return type(obj)(*(_reattach_batch_tensors(item, pin_memory=pin_memory) for item in obj))
     elif isinstance(obj, (list, tuple)):
-        return type(obj)(_reattach_batch_tensors(item) for item in obj)
+        return type(obj)(_reattach_batch_tensors(item, pin_memory=pin_memory) for item in obj)
     elif hasattr(obj, '__dict__'):
         # Handle custom objects with attributes
         new_obj = type(obj).__new__(type(obj))
         for key, value in obj.__dict__.items():
-            setattr(new_obj, key, _reattach_batch_tensors(value))
+            setattr(new_obj, key, _reattach_batch_tensors(value, pin_memory=pin_memory))
         return new_obj
     else:
         return obj

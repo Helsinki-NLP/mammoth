@@ -215,9 +215,10 @@ def main(
                 batch, metadata, communication_batch_id = batch_queue.get()
 
             # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
+            # Pin memory for faster async GPU transfers
             with roctx_range("batch_tensor_reattach_from_cpu"):
-                batch = _reattach_batch_tensors(batch)
-                metadata = _reattach_batch_tensors(metadata)
+                batch = _reattach_batch_tensors(batch, pin_memory=True)
+                metadata = _reattach_batch_tensors(metadata, pin_memory=True)
             semaphore.release()
             # TODO: confirm that batch-providing corpus has already been to'd to the correct place
             yield batch, metadata, communication_batch_id

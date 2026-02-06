@@ -49,7 +49,9 @@ def iter_on_device(iterator, device_context):
 
     for batch, meta, comm_batch_id in iterator:
         with roctx_range("data_transfer_to_device"):
-            batch_on_device = batch.to(device)
+            # Use non_blocking=True for async transfer (requires pinned memory)
+            # Pinned memory is enabled in train_single.py (_reattach_batch_tensors)
+            batch_on_device = batch.to(device, non_blocking=True)
         yield batch_on_device, meta, comm_batch_id
 
 

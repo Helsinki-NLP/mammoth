@@ -28,12 +28,43 @@ class Batch():
     batch_size: int
     line_idx: int
 
-    def to(self, device):
-        self.src = TensorWithMask(self.src.tensor.to(device), self.src.mask.to(device))
+    def to(self, device, non_blocking=False):
+        """
+        Transfer batch to device.
+
+        Args:
+            device: Target device (cpu or cuda)
+            non_blocking: If True, use async transfer (requires pinned memory)
+        """
+        self.src = TensorWithMask(
+            self.src.tensor.to(device, non_blocking=non_blocking),
+            self.src.mask.to(device, non_blocking=non_blocking)
+        )
         if self.tgt is not None:
-            self.tgt = TensorWithMask(self.tgt.tensor.to(device), self.tgt.mask.to(device))
+            self.tgt = TensorWithMask(
+                self.tgt.tensor.to(device, non_blocking=non_blocking),
+                self.tgt.mask.to(device, non_blocking=non_blocking)
+            )
         if self.labels is not None:
-            self.labels = self.labels.to(device)
+            self.labels = self.labels.to(device, non_blocking=non_blocking)
+        return self
+
+    def pin_memory(self):
+        """
+        Pin all tensors in this batch to enable faster CPU->GPU transfers.
+        Should be called on CPU tensors before transfer to GPU.
+        """
+        self.src = TensorWithMask(
+            self.src.tensor.pin_memory(),
+            self.src.mask.pin_memory()
+        )
+        if self.tgt is not None:
+            self.tgt = TensorWithMask(
+                self.tgt.tensor.pin_memory(),
+                self.tgt.mask.pin_memory()
+            )
+        if self.labels is not None:
+            self.labels = self.labels.pin_memory()
         return self
 
 

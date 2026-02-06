@@ -635,37 +635,41 @@ class LocalTaskQueueManager(TaskQueueManager):
         self,
         batch_task_sample: BatchTaskSample,
     ) -> List[DistributedComponentGradientSync]:
-        # All components on device, in consistent order across devices
-        my_components = self.get_my_distributed_components()
+        # ALL components in globally consistent order (not just this GPU's components)
+        # This is needed for world-group gradient sync where all GPUs participate
+        # in a single allreduce regardless of which components they own.
+        if self.distributed_components is None:
+            raise Exception("Call create_all_distributed_components first")
+        all_components = self.distributed_components
+
         my_task = batch_task_sample.tasks[self.global_rank]
         my_task_id = my_task.corpus_id
         everyones_tasks = list(batch_task_sample.tasks.values())
         everyones_task_ids = [task.corpus_id for task in everyones_tasks]
         # logger.warning(f'my_task_id: {my_task_id} everyones_task_ids: {everyones_task_ids}')   # DEBUG
         result = []
-        for component in my_components:
-            # Note: Omitting components on a single device is left to the caller
-            # These don't need to be communicated, but the optimizer should be stepped
+        for component in all_components:
+            # Determine whether this GPU owns this component (has parameters for it)
+            owns_component = self.global_rank in component.global_ranks
 
             # Determine whether we trained this component in this step
-            has_local_gradient = my_task_id in component.task_ids
+            has_local_gradient = owns_component and (my_task_id in component.task_ids)
             # Determine how many in total trained this component
             total_gradients = sum(
                 task_id in component.task_ids for task_id in everyones_task_ids
             )
             if total_gradients == 0:
-                # Omit component if nobody trained it
+                # Omit component if nobody trained it.
+                # This is globally consistent: all GPUs compute the same total_gradients
+                # from the deterministic batch_task_sample, so all skip together.
                 # logger.warning(f'Omitting (nobody trained) {component.get_name()}')   # DEBUG
                 continue
-            # use as normalization denominator if someone trained it
-            # Note that this normalization can not be token-based,
-            # as we don't have access to the other device's batches, and we don't want to communicate the size.
-            # However, each device can apply token-based normalization before sending the gradient.
             result.append(
                 DistributedComponentGradientSync(
                     component=component,
                     has_local_gradient=has_local_gradient,
                     gradient_norm=total_gradients,
+                    owns_component=owns_component,
                 )
             )
         return result

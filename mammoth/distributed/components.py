@@ -277,3 +277,6 @@ class DistributedComponentGradientSync:
     has_local_gradient: bool
     # Normalization denominator
     gradient_norm: int
+    # True: this GPU owns the component (has parameters for it)
+    # False: participating in allreduce for global consistency only
+    owns_component: bool = True

@@ -11,7 +11,7 @@ from mammoth.utils.model_saver import build_model_saver, load_parameters_from_ch
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
-from mammoth.distributed import broadcast_tensors, _reattach_batch_tensors
+from mammoth.distributed import broadcast_tensors, _reattach_batch_tensors, WorldGroupGradientSync
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
@@ -129,8 +129,16 @@ def main(
         freeze_model_components(model, opts, task_queue_manager)
 
     logger.info("{} - Init model".format(device_context.id))
+    world_group_sync = None
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
+        # Create world-group gradient sync: replaces per-component allreduce
+        # with a single allreduce on the world group to avoid NCCL deadlock at scale
+        world_group_sync = WorldGroupGradientSync(
+            all_components=task_queue_manager.distributed_components,
+            model=model,
+            global_rank=task_queue_manager.global_rank,
+        )
     enc, dec = model.count_parameters()
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
     logger.info("{} - total decoder parameters: {}".format(device_context.id, dec))
@@ -200,6 +208,7 @@ def main(
         optim,
         task_queue_manager=task_queue_manager,
         model_saver=model_saver,
+        world_group_sync=world_group_sync,
     )
     logger.info("{} - Trainer built".format(device_context.id))
 

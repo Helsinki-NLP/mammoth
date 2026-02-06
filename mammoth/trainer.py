@@ -63,6 +63,7 @@ def build_trainer(
     optim,
     task_queue_manager,
     model_saver=None,
+    world_group_sync=None,
 ):
     """
     Simplify `Trainer` creation based on user `opts`s*
@@ -129,6 +130,7 @@ def build_trainer(
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,
+        world_group_sync=world_group_sync,
     )
     return trainer
 
@@ -180,6 +182,7 @@ class Trainer(object):
         vocabs_dict=None,
         beam_size=1,
         max_length=100,
+        world_group_sync=None,
     ):
         # Basic attributes.
         self.model = model
@@ -208,6 +211,7 @@ class Trainer(object):
         self.vocabs_dict = vocabs_dict or {}
         self.beam_size = beam_size
         self.max_length = max_length
+        self.world_group_sync = world_group_sync
 
         # Get ROCTx range function (markers always active, profiling controlled by rocprofv3)
         self.roctx_range = get_roctx_range()
@@ -324,33 +328,34 @@ class Trainer(object):
                 )
 
             with self.roctx_range(f"gradient_sync_step_{step}"):
-                for idx, gradient_sync in enumerate(gradient_syncs):
-                    component = gradient_sync.component
-                    if not component.needs_communication():
-                        # Omit components not found elsewhere, as these don't need to be communicated
-                        # logger.warning(f'Omitting (single device) {component.get_name()}')   # DEBUG
-                        continue
-                    # logger.warning(f'Syncing {component.get_name()}')   # DEBUG
+                if self.world_group_sync is not None:
+                    # World-group gradient sync: single allreduce on world group
+                    # Replaces per-component allreduce to avoid NCCL deadlock at scale
+                    self.world_group_sync.sync(self.model, gradient_syncs)
+                else:
+                    # Fallback: per-component gradient sync (non-distributed or legacy mode)
+                    for idx, gradient_sync in enumerate(gradient_syncs):
+                        component = gradient_sync.component
+                        if not component.needs_communication():
+                            continue
 
-                    # Annotate per-component gradient synchronization
-                    component_name = component.get_name() if hasattr(component, 'get_name') else f"component_{idx}"
+                        component_name = component.get_name() if hasattr(component, 'get_name') else f"component_{idx}"
 
-                    with self.roctx_range(f"allreduce_{component_name}"):
-                        params = component.named_parameters(self.model)
-                        # gradient_sync.gradient_norm counts the number of devices that trained this component
-                        # this doesn't normalize the number of masked tokens
-                        mammoth.distributed.externally_managed_reduce_and_rescale_grads(
-                            named_parameters=params,
-                            has_local_gradient=gradient_sync.has_local_gradient,
-                            gradient_norm=gradient_sync.gradient_norm,
-                            group=component.group,
-                        )
+                        with self.roctx_range(f"allreduce_{component_name}"):
+                            params = component.named_parameters(self.model)
+                            mammoth.distributed.externally_managed_reduce_and_rescale_grads(
+                                named_parameters=params,
+                                has_local_gradient=gradient_sync.has_local_gradient,
+                                gradient_norm=gradient_sync.gradient_norm,
+                                group=component.group,
+                            )
 
             self._maybe_update_stats_from_parameters(report_stats, self.model.named_parameters())
 
-            # Including single-device components
+            # Filter to owned components only: the optimizer should only step components this GPU owns
+            owned_gradient_syncs = [gs for gs in gradient_syncs if gs.owns_component]
             with self.roctx_range(f"optimizer_step_{step}"):
-                self.optim.externally_managed_step(gradient_syncs)
+                self.optim.externally_managed_step(owned_gradient_syncs)
                 self.optim.zero_grad()
 
 

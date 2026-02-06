@@ -4,6 +4,7 @@ import math
 import os
 import pickle
 import signal
+from collections import OrderedDict
 
 import torch
 import torch.distributed
@@ -261,6 +262,146 @@ def all_gather_list(data, max_size=4096):
         result = pickle.loads(bytes_list)
         results.append(result)
     return results
+
+
+class WorldGroupGradientSync:
+    """
+    Replaces per-component allreduce calls with a single allreduce on the world group.
+
+    Problem: With many languages, Mammoth creates hundreds of overlapping NCCL process groups
+    (one per shared model component). At scale, per-component allreduce across these overlapping
+    communicators causes NCCL deadlock/timeout.
+
+    Solution: Pack all component gradients into a single flat buffer, do one allreduce on the
+    world group (group=None), then unpack. One collective operation, zero overlapping groups.
+
+    Trade-off: The buffer includes zeros for components a GPU doesn't own (~bandwidth overhead).
+    This is acceptable because (a) compute dominates communication and (b) one large allreduce
+    is more efficient per-byte than many small ones.
+    """
+
+    def __init__(self, all_components, model, global_rank):
+        """
+        Build the global buffer layout by gathering param counts across all GPUs.
+
+        Args:
+            all_components: list of all DistributedComponent objects (globally consistent order)
+            model: the NMTModel (already on GPU)
+            global_rank: this GPU's global rank
+        """
+        self.global_rank = global_rank
+        self.roctx_range = get_roctx_range()
+
+        # Step 1: For each component this GPU owns, compute param count
+        my_param_counts = OrderedDict()
+        for component in all_components:
+            name = component.get_name()
+            if global_rank in component.global_ranks:
+                count = sum(p.numel() for _, p in component.named_parameters(model) if p.requires_grad)
+                my_param_counts[name] = count
+            else:
+                my_param_counts[name] = 0
+
+        # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size
+        all_counts = all_gather_list(my_param_counts)
+
+        # Step 3: Compute global buffer layout
+        # For each component, take the max param count across all GPUs that own it
+        # (they should all agree, but max is safe)
+        global_param_counts = OrderedDict()
+        for name in sorted(my_param_counts.keys()):
+            sizes = [counts.get(name, 0) for counts in all_counts]
+            global_param_counts[name] = max(sizes)
+
+        # Compute offsets in sorted name order
+        self.component_layout = OrderedDict()  # {name: (offset, size)}
+        offset = 0
+        for name in sorted(global_param_counts.keys()):
+            size = global_param_counts[name]
+            if size > 0:
+                self.component_layout[name] = (offset, size)
+                offset += size
+
+        self.total_size = offset
+
+        # Step 4: Pre-allocate the flat buffer (on GPU, matching model dtype)
+        # Find the dtype from any model parameter
+        dtype = torch.float32
+        for p in model.parameters():
+            dtype = p.dtype
+            break
+        device = torch.device(f'cuda:{torch.cuda.current_device()}')
+        self.buffer = torch.zeros(self.total_size, dtype=dtype, device=device)
+
+        logger.info(
+            f"WorldGroupGradientSync: rank {global_rank}, buffer size {self.total_size} elements "
+            f"({self.total_size * self.buffer.element_size() / 1024 / 1024:.1f} MB), "
+            f"{len(self.component_layout)} components"
+        )
+
+    def sync(self, model, all_gradient_syncs):
+        """
+        Perform a single world-group allreduce for all component gradients.
+
+        Args:
+            model: the NMTModel
+            all_gradient_syncs: list of DistributedComponentGradientSync (for ALL components,
+                including those this GPU doesn't own)
+        """
+        with self.roctx_range("world_group_sync"):
+            # Step 1: Zero the buffer
+            self.buffer.zero_()
+
+            # Step 2: Pack gradients from owned components into the buffer
+            with self.roctx_range("world_group_sync_pack"):
+                for gradient_sync in all_gradient_syncs:
+                    component = gradient_sync.component
+                    name = component.get_name()
+                    if name not in self.component_layout:
+                        continue
+                    if not gradient_sync.owns_component:
+                        # This GPU doesn't own this component — contributes zeros (already zeroed)
+                        continue
+                    if not gradient_sync.has_local_gradient:
+                        # This GPU owns the component but didn't train it this step — contributes zeros
+                        continue
+
+                    offset, size = self.component_layout[name]
+                    pos = offset
+                    for _, p in component.named_parameters(model):
+                        if not p.requires_grad:
+                            continue
+                        numel = p.numel()
+                        if p.grad is not None:
+                            self.buffer[pos:pos + numel].copy_(p.grad.data.view(-1))
+                        pos += numel
+
+            # Step 3: Single allreduce on world group
+            with self.roctx_range("world_group_sync_allreduce"):
+                torch.distributed.all_reduce(self.buffer)
+
+            # Step 4: Unpack from buffer back to gradients (only for owned components)
+            with self.roctx_range("world_group_sync_unpack"):
+                for gradient_sync in all_gradient_syncs:
+                    component = gradient_sync.component
+                    name = component.get_name()
+                    if name not in self.component_layout:
+                        continue
+                    if not gradient_sync.owns_component:
+                        continue
+
+                    offset, size = self.component_layout[name]
+                    pos = offset
+                    for _, p in component.named_parameters(model):
+                        if not p.requires_grad:
+                            continue
+                        numel = p.numel()
+                        if p.grad is None:
+                            p.grad = torch.zeros_like(p)
+                        p.grad.data.copy_(
+                            self.buffer[pos:pos + numel].view_as(p.grad.data) / gradient_sync.gradient_norm
+                        )
+                        pos += numel
 
 
 class ErrorHandler(object):

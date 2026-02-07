@@ -303,7 +303,10 @@ class WorldGroupGradientSync:
                 my_param_counts[name] = 0
 
         # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size
-        all_counts = all_gather_list(my_param_counts)
+        # Use larger max_size because with many components the serialized dict can exceed the 4096 default
+        enc_size = len(pickle.dumps(my_param_counts))
+        gather_max_size = max(enc_size * 2 + 2, 4096)
+        all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
 
         # Step 3: Compute global buffer layout
         # For each component, take the max param count across all GPUs that own it

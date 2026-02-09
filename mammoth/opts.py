@@ -569,7 +569,7 @@ def _add_train_general_opts(parser):
         '--master_port', '-master_port', default=10000, type=int, help="Port of master for torch.distributed training."
     )
     group.add(
-        '--queue_size', '-queue_size', default=40, type=int, help="Size of queue for each process in producer/consumer"
+        '--queue_size', '-queue_size', default=80, type=int, help="Size of queue for each process in producer/consumer"
     )
     group.add(
         '--prefetch_buffer_size', '-prefetch_buffer_size', default=16, type=int,

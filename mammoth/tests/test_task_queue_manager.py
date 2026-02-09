@@ -1,6 +1,5 @@
 import pytest
 from argparse import Namespace
-from unittest.mock import MagicMock
 
 from mammoth.distributed import TaskQueueManager, WorldContext
 from mammoth.distributed.components import (
@@ -142,24 +141,17 @@ def test_init_basic():
 
 
 def test_create_all_distributed_components():
-    class MockGroup:
-        def __init__(self):
-            self.group_idx = 0
-
-        def __call__(self, sorted_global_ranks):
-            result = f"Group {self.group_idx} with GPU ranks {sorted_global_ranks}"
-            self.group_idx += 1
-            return result
-
     global_task_queue_manager, opts = create_basic_task_queue_manager()
     all_components = global_task_queue_manager.create_all_distributed_components(
-        use_attention_bridge=False, new_group_func=MockGroup()
+        use_attention_bridge=False,
     )
+    # Per-component groups are no longer created (world-group allreduce is used instead)
+    # All group fields should be None
     assert all_components == [
         DistributedDecoderAttentionLayersBlock(
             global_ranks={0, 2},
             task_ids={'train_3_e-b', 'train_0_a-b'},
-            group="Group 0 with GPU ranks [0, 2]",
+            group=None,
             layer_stack_index=0,
             xcoder_id="y",
         ),
@@ -201,7 +193,7 @@ def test_create_all_distributed_components():
         DistributedEncoderAttentionLayersBlock(
             global_ranks={0, 1},
             task_ids={"train_2_a-d", "train_0_a-b"},
-            group="Group 1 with GPU ranks [0, 1]",
+            group=None,
             layer_stack_index=0,
             xcoder_id="x",
         ),
@@ -250,7 +242,7 @@ def test_create_all_distributed_components():
         DistributedEmbedding(
             global_ranks={0, 1},
             task_ids={"train_0_a-b", "train_2_a-d"},
-            group="Group 2 with GPU ranks [0, 1]",
+            group=None,
             side=Side.encoder,
             lang="a",
         ),
@@ -263,7 +255,7 @@ def test_create_all_distributed_components():
         DistributedEmbedding(
             global_ranks={0, 2},
             task_ids={'train_3_e-b', 'train_0_a-b'},
-            group="Group 3 with GPU ranks [0, 2]",
+            group=None,
             side=Side.decoder,
             lang="b",
         ),
@@ -275,21 +267,15 @@ def test_create_all_distributed_components():
             lang="d",
         ),
     ]
+    # Verify needs_communication is based on global_ranks, not group
+    shared = [c for c in all_components if c.needs_communication()]
+    assert len(shared) == 4  # y(0,2), x(0,1), a(0,1), b(0,2)
 
 
 def test_get_my_distributed_components():
-    class MockGroup:
-        def __init__(self):
-            self.group_idx = 0
-
-        def __call__(self, sorted_global_ranks):
-            result = f"Group {self.group_idx} with GPU ranks {sorted_global_ranks}"
-            self.group_idx += 1
-            return result
-
     global_task_queue_manager, opts = create_basic_task_queue_manager()
     all_components = global_task_queue_manager.create_all_distributed_components(
-        use_attention_bridge=False, new_group_func=MockGroup()
+        use_attention_bridge=False,
     )
     task_queue_manager = global_task_queue_manager.global_to_local(
         node_rank=0, local_rank=1, opts=opts
@@ -400,17 +386,14 @@ def test_cpu_distributed_groups():
     opts = Namespace(**opt_dict)
     world_context = WorldContext.from_opts(opts)
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
-    new_group_func = MagicMock().new_group_func
     all_components = global_task_queue_manager.create_all_distributed_components(
         use_attention_bridge=False,
-        new_group_func=new_group_func,
     )
     task_queue_manager = global_task_queue_manager.global_to_local(
         node_rank=0, local_rank=0, opts=opts
     )
     my_components = task_queue_manager.get_my_distributed_components()
-    # No groups should be created when running on CPU
-    new_group_func.assert_not_called()
+    # No groups are created (per-component groups removed)
     for component in all_components:
         assert component.group is None
     for component in my_components:
@@ -460,20 +443,15 @@ def test_distributed_groups_no_encoder_group():
     opts = Namespace(**opt_dict)
     world_context = WorldContext.from_opts(opts)
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
-    new_group_func = MagicMock().new_group_func
     all_components = global_task_queue_manager.create_all_distributed_components(
         use_attention_bridge=False,
-        new_group_func=new_group_func,
     )
     task_queue_manager = global_task_queue_manager.global_to_local(
         node_rank=0, local_rank=0, opts=opts
     )
     my_components = task_queue_manager.get_my_distributed_components()
 
-    # No groups should be created:
-    # AB is fully shared (doesn't need a group),
-    # and all other components are not shared at all
-    new_group_func.assert_not_called()
+    # No groups are created (per-component groups removed)
     for component in all_components:
         assert component.group is None
     for component in my_components:

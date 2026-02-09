@@ -80,7 +80,6 @@ def translate(opts):
     # FIXME: fix the attention bridge in translation
     task_queue_manager.create_all_distributed_components(
         use_attention_bridge=False,     # (opts.ab_layers is not None and len(opts.ab_layers) != 0),
-        new_group_func=lambda: None,
     )
     
     translator = build_translator(opts, task_queue_manager, task, logger=logger, report_score=True)

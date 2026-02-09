@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
-import torch.distributed
 
 from mammoth.distributed.components import (
     DistributedAdapter,
@@ -377,11 +376,11 @@ class TaskQueueManager:
     def create_all_distributed_components(
         self,
         use_attention_bridge: bool,
-        new_group_func=torch.distributed.new_group,
     ) -> List[DistributedComponent]:
         """
         Creates DistributedComponent objects.
-        For all components that are on more than one device, creats a communication group.
+        Components track which global ranks share them, but no per-component
+        NCCL process groups are created (all communication uses the world group).
         """
         builder = DistributedComponentBuilder()
         for task in self.tasks:
@@ -486,19 +485,13 @@ class TaskQueueManager:
                     )
                 )
 
-        # once all DistributedComponents are created, we can initialize communication groups
-        if self.world_context.is_distributed():
-            for component in builder:
-                # do not create communication groups for components on a single device
-                if len(component.global_ranks) > 1:
-                    # The torch.distributed.new_group function requires that all
-                    # processes in the main group (i.e. all processes that are part of
-                    # the distributed job) enter the function, even if they are not
-                    # going to be members of the group. Additionally, groups should be
-                    # created in the same order in all processes.
-                    component.group = new_group_func(sorted(component.global_ranks))
-                    #TODO: try a default process group and sync with that
-                    
+        # Note: Per-component process groups are NOT created here.
+        # Creating hundreds of NCCL communicators via new_group() causes deadlock at scale
+        # (RCCL hangs during communicator bootstrap for large cross-node groups).
+        # Instead, all communication uses the world group:
+        # - Initial weight sync: world-group allreduce in init_distributed()
+        # - Gradient sync: WorldGroupGradientSync (single allreduce on world group)
+
         sorted_components = list(builder)
         self.distributed_components = sorted_components
         return sorted_components

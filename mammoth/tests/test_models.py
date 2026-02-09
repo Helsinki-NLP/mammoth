@@ -44,14 +44,7 @@ TASK_SPECS = {
 }
 
 
-class MockGroup:
-    def __init__(self):
-        self.group_idx = 0
 
-    def __call__(self, sorted_global_ranks):
-        result = f"Group {self.group_idx} with GPU ranks {sorted_global_ranks}"
-        self.group_idx += 1
-        return result
 
 
 class TestModel():
@@ -78,7 +71,7 @@ class TestModel():
         })
 
         self.tqm.create_all_distributed_components(
-            use_attention_bridge=False, new_group_func=MockGroup()
+            use_attention_bridge=False,
         )
 
     def parse_args(self, args):

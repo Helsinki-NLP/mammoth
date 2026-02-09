@@ -11,7 +11,11 @@ from mammoth.utils.model_saver import build_model_saver, load_parameters_from_ch
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
-from mammoth.distributed import broadcast_tensors, _reattach_batch_tensors, WorldGroupGradientSync
+import pickle
+from collections import OrderedDict
+
+from mammoth.distributed import _reattach_batch_tensors, WorldGroupGradientSync
+from mammoth.distributed.communication import all_gather_list
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
@@ -67,25 +71,109 @@ def _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager):
 
 
 def init_distributed(model, task_queue_manager):
-    # All components on device, in consistent order across devices
-    my_components = task_queue_manager.get_my_distributed_components()
-    # Omit components not found elsewhere, as these don't need to be communicated
-    components_to_communicate = [
-        component for component in my_components
-        if component.needs_communication()
-    ]
+    """
+    Synchronize initial weights across GPUs using a single world-group allreduce.
 
-    for component in components_to_communicate:
-        weights = [p.data for name, p in component.named_parameters(model)]
-        broadcast_tensors(weights, src=component.min_rank, group=component.group)
+    For each shared component (on multiple devices), only the min_rank GPU
+    contributes its weights into a flat buffer; all others contribute zeros.
+    After allreduce(SUM), every GPU has the min_rank's weights and can unpack
+    the components it owns.
 
-    logger.debug('After init_distributed')
-    for name, p in model.named_parameters():
-        try:
-            sample = p.flatten()[:10]
-            logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: {sample}')
-        except (RuntimeError, OverflowError) as e:
-            logger.debug(f'{task_queue_manager.node_rank}:{task_queue_manager.local_rank} {name}: shape={p.shape}, device={p.device} (overflow: {str(e)[:50]})')
+    This replaces the previous per-component broadcast approach, which required
+    per-component NCCL process groups. Creating hundreds of process groups via
+    new_group() causes RCCL to deadlock at scale during communicator bootstrap.
+    """
+    all_components = task_queue_manager.distributed_components
+    my_global_rank = task_queue_manager.global_rank
+
+    # Only shared (multi-device) components need synchronization
+    shared_components = [c for c in all_components if c.needs_communication()]
+    if not shared_components:
+        logger.info("init_distributed: no shared components to synchronize")
+        return
+
+    # Step 1: Compute param counts for each shared component on this GPU
+    my_param_counts = OrderedDict()
+    for component in shared_components:
+        name = component.get_name()
+        if my_global_rank in component.global_ranks:
+            count = sum(p.numel() for _, p in component.named_parameters(model))
+            my_param_counts[name] = count
+        else:
+            my_param_counts[name] = 0
+
+    # Step 2: All-gather param counts so every GPU agrees on buffer layout
+    enc_size = len(pickle.dumps(my_param_counts))
+    gather_max_size = max(enc_size * 2 + 2, 4096)
+    all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
+
+    # Step 3: Build buffer layout (max param count per component across all GPUs)
+    global_param_counts = OrderedDict()
+    for name in sorted(my_param_counts.keys()):
+        sizes = [counts.get(name, 0) for counts in all_counts]
+        global_param_counts[name] = max(sizes)
+
+    layout = OrderedDict()
+    offset = 0
+    for name in sorted(global_param_counts.keys()):
+        size = global_param_counts[name]
+        if size > 0:
+            layout[name] = (offset, size)
+            offset += size
+
+    total_size = offset
+    if total_size == 0:
+        logger.info("init_distributed: no parameters to synchronize")
+        return
+
+    # Step 4: Allocate flat buffer on GPU
+    dtype = torch.float32
+    for p in model.parameters():
+        dtype = p.dtype
+        break
+    device = torch.device(f'cuda:{torch.cuda.current_device()}')
+    buffer = torch.zeros(total_size, dtype=dtype, device=device)
+
+    # Step 5: Pack — only the min_rank of each component contributes weights
+    for component in shared_components:
+        name = component.get_name()
+        if name not in layout:
+            continue
+        if my_global_rank not in component.global_ranks:
+            continue
+        if my_global_rank != component.min_rank:
+            continue
+        buf_offset, _ = layout[name]
+        pos = buf_offset
+        for _, p in component.named_parameters(model):
+            numel = p.numel()
+            buffer[pos:pos + numel].copy_(p.data.view(-1))
+            pos += numel
+
+    # Step 6: Single allreduce on world group (only min_rank contributed non-zero)
+    torch.distributed.all_reduce(buffer)
+
+    # Step 7: Unpack — each GPU copies weights for shared components it owns
+    # (skip min_rank since it already has the correct weights)
+    for component in shared_components:
+        name = component.get_name()
+        if name not in layout:
+            continue
+        if my_global_rank not in component.global_ranks:
+            continue
+        if my_global_rank == component.min_rank:
+            continue
+        buf_offset, _ = layout[name]
+        pos = buf_offset
+        for _, p in component.named_parameters(model):
+            numel = p.numel()
+            p.data.copy_(buffer[pos:pos + numel].view_as(p.data))
+            pos += numel
+
+    logger.info(
+        f"init_distributed: synchronized {len(shared_components)} shared components "
+        f"via world-group allreduce (buffer: {total_size * buffer.element_size() / 1024 / 1024:.1f} MB)"
+    )
 
 
 def main(

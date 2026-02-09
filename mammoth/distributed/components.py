@@ -86,8 +86,8 @@ class DistributedComponent(ABC):
         return min(self.global_ranks)
 
     def needs_communication(self) -> bool:
-        # if the component needs communication, a group must be set
-        return self.group is not None
+        # A component needs communication if it exists on more than one device
+        return len(self.global_ranks) > 1
 
 
 @dataclass  # type: ignore

@@ -1019,7 +1019,7 @@ def create_task_queue_manager(vocabs_dict=None, num_decoder_layers=18, src_lang=
         node_rank=0, local_rank=0, opts=opts
     )
     local_task_manager.create_all_distributed_components(
-        use_attention_bridge=False, new_group_func=lambda ranks: None
+        use_attention_bridge=False
     )
 
     return local_task_manager

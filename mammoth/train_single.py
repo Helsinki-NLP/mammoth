@@ -103,8 +103,14 @@ def init_distributed(model, task_queue_manager):
             my_param_counts[name] = 0
 
     # Step 2: All-gather param counts so every GPU agrees on buffer layout
-    enc_size = len(pickle.dumps(my_param_counts))
-    gather_max_size = max(enc_size * 2 + 2, 4096)
+    # IMPORTANT: max_size must be identical across all ranks, otherwise all_gather
+    # will deadlock due to mismatched buffer sizes. Compute it from a zero-valued
+    # dict (same keys on all ranks → identical pickle size) plus generous padding.
+    zero_dict = OrderedDict((name, 0) for name in my_param_counts.keys())
+    base_enc_size = len(pickle.dumps(zero_dict))
+    # Pad for varying integer sizes: large ints add ~10 bytes each in pickle encoding
+    gather_max_size = base_enc_size + len(my_param_counts) * 20 + 256
+    gather_max_size = max(gather_max_size, 4096)
     all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
 
     # Step 3: Build buffer layout (max param count per component across all GPUs)

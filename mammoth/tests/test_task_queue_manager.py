@@ -311,7 +311,7 @@ def test_get_my_distributed_components():
         DistributedEncoderAttentionLayersBlock(
             global_ranks={0, 1},
             task_ids={"train_2_a-d", "train_0_a-b"},
-            group="Group 1 with GPU ranks [0, 1]",
+            group=None,
             layer_stack_index=0,
             xcoder_id="x",
         ),
@@ -339,7 +339,7 @@ def test_get_my_distributed_components():
         DistributedEmbedding(
             global_ranks={0, 1},
             task_ids={"train_0_a-b", "train_2_a-d"},
-            group="Group 2 with GPU ranks [0, 1]",
+            group=None,
             side=Side.encoder,
             lang="a",
         ),

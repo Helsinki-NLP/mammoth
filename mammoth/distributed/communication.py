@@ -303,9 +303,13 @@ class WorldGroupGradientSync:
                 my_param_counts[name] = 0
 
         # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size
-        # Use larger max_size because with many components the serialized dict can exceed the 4096 default
-        enc_size = len(pickle.dumps(my_param_counts))
-        gather_max_size = max(enc_size * 2 + 2, 4096)
+        # IMPORTANT: max_size must be identical across all ranks, otherwise all_gather
+        # will deadlock due to mismatched buffer sizes. Compute it from a zero-valued
+        # dict (same keys on all ranks → identical pickle size) plus generous padding.
+        zero_dict = OrderedDict((name, 0) for name in my_param_counts.keys())
+        base_enc_size = len(pickle.dumps(zero_dict))
+        gather_max_size = base_enc_size + len(my_param_counts) * 20 + 256
+        gather_max_size = max(gather_max_size, 4096)
         all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
 
         # Step 3: Compute global buffer layout
@@ -410,10 +414,17 @@ class WorldGroupGradientSync:
 class BucketedGradientSync:
     """
     Overlapped gradient sync: breaks the flat buffer into fixed-size buckets (~25MB)
-    and launches async allreduce on each bucket as it fills during the backward pass.
+    and launches async allreduce on each bucket during the backward pass.
 
-    By the time backward finishes, most allreduce ops are already done, overlapping
-    communication with computation. This is the same strategy used by Megatron-LM.
+    Key invariant: buckets are dispatched in **monotonic ascending order** (bucket 0
+    first, then bucket 1, etc.) on ALL GPUs. This is critical because NCCL matches
+    allreduce operations by call order. If different GPUs dispatched buckets in different
+    orders, NCCL would allreduce mismatched buffer regions — causing either data
+    corruption (same-size buckets) or deadlock (last bucket is smaller than the rest).
+
+    Mammoth's modular architecture means different GPUs own different subsets of model
+    components, so buckets fill at different times on different GPUs. The monotonic
+    watermark ensures globally consistent dispatch despite this.
 
     Uses the same globally-consistent buffer layout as WorldGroupGradientSync.
     """
@@ -444,8 +455,13 @@ class BucketedGradientSync:
             else:
                 my_param_counts[name] = 0
 
-        enc_size = len(pickle.dumps(my_param_counts))
-        gather_max_size = max(enc_size * 2 + 2, 4096)
+        # IMPORTANT: max_size must be identical across all ranks, otherwise all_gather
+        # will deadlock due to mismatched buffer sizes. Compute it from a zero-valued
+        # dict (same keys on all ranks → identical pickle size) plus generous padding.
+        zero_dict = OrderedDict((name, 0) for name in my_param_counts.keys())
+        base_enc_size = len(pickle.dumps(zero_dict))
+        gather_max_size = base_enc_size + len(my_param_counts) * 20 + 256
+        gather_max_size = max(gather_max_size, 4096)
         all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
 
         global_param_counts = OrderedDict()
@@ -509,7 +525,7 @@ class BucketedGradientSync:
             self.buckets.append({
                 'start': start,
                 'end': end,
-                'total_params': 0,  # will be filled below
+                'total_params': 0,  # will be filled in prepare_for_backward
                 'ready_count': 0,
                 'handle': None,
             })
@@ -527,32 +543,14 @@ class BucketedGradientSync:
             self._param_to_bucket_idx[param_id] = bucket_idx
             self.buckets[bucket_idx]['total_params'] += 1
 
-        # Count total params per bucket for non-owned / non-active components (filled in prepare_for_backward)
-        # Also track all component params per bucket for pre-marking
-        self._component_params_in_bucket = {}  # {component_name: {bucket_idx: count}}
-        for comp_name in self.component_layout:
-            self._component_params_in_bucket[comp_name] = {}
-        for param_id, (buf_offset, numel, comp_name) in self._param_info.items():
-            bucket_idx = self._param_to_bucket_idx[param_id]
-            bucket_params = self._component_params_in_bucket[comp_name]
-            bucket_params[bucket_idx] = bucket_params.get(bucket_idx, 0) + 1
-
         # ── Step 5: Register grad hooks ──
 
         self._dispatch_enabled = False
+        self._next_bucket_to_dispatch = 0  # monotonic watermark
         self._hooks = []
         for p in self._all_owned_params:
             hook = p.register_post_accumulate_grad_hook(self._make_hook(p))
             self._hooks.append(hook)
-
-        # Track components not owned by this GPU (for bucket counting)
-        self._non_owned_components = set()
-        for component in all_components:
-            name = component.get_name()
-            if name not in self.component_layout:
-                continue
-            if global_rank not in component.global_ranks:
-                self._non_owned_components.add(name)
 
         # Store all_components for prepare_for_backward
         self._all_components = all_components
@@ -578,8 +576,8 @@ class BucketedGradientSync:
             bucket_idx = self._param_to_bucket_idx[param_id]
             bucket = self.buckets[bucket_idx]
             bucket['ready_count'] += 1
-            if bucket['ready_count'] >= bucket['total_params']:
-                self._dispatch_bucket(bucket)
+            # Try to dispatch consecutive ready buckets starting from the watermark
+            self._try_dispatch_next_buckets()
 
         return hook
 
@@ -590,14 +588,34 @@ class BucketedGradientSync:
             self.buffer[start:end], async_op=True
         )
 
+    def _try_dispatch_next_buckets(self):
+        """
+        Dispatch all consecutive ready buckets starting from the watermark.
+
+        This enforces monotonic ascending order: bucket K is only dispatched after
+        bucket K-1. This ensures all GPUs issue allreduce operations in the same
+        bucket order, which is required because NCCL matches operations by call order.
+        """
+        while self._next_bucket_to_dispatch < len(self.buckets):
+            bucket = self.buckets[self._next_bucket_to_dispatch]
+            if bucket['handle'] is not None:
+                # Already dispatched (shouldn't happen, but be safe)
+                self._next_bucket_to_dispatch += 1
+                continue
+            if bucket['ready_count'] < bucket['total_params']:
+                break  # This bucket is not ready yet — stop
+            self._dispatch_bucket(bucket)
+            self._next_bucket_to_dispatch += 1
+
     def prepare_for_backward(self, gradient_syncs):
         """
         Called before the last micro-batch's backward pass to enable overlapped sync.
 
         1. Zeros the buffer
         2. Resets bucket state
-        3. Pre-marks non-active parameters as ready (may dispatch some buckets immediately)
-        4. Enables the grad hooks
+        3. Sets total_params per bucket (only active params count)
+        4. Dispatches leading empty buckets (monotonically)
+        5. Enables the grad hooks
         """
         with self.roctx_range("bucketed_prepare_for_backward"):
             # Zero the buffer
@@ -613,7 +631,6 @@ class BucketedGradientSync:
             for bucket in self.buckets:
                 bucket['ready_count'] = 0
                 bucket['handle'] = None
-                # Reset total_params: count owned+active params per bucket
                 bucket['total_params'] = 0
 
             # Recount total_params per bucket: only count params that we own AND are active
@@ -625,16 +642,11 @@ class BucketedGradientSync:
                 if comp_name in active_component_names:
                     # This param will fire a grad hook → counts toward total_params
                     bucket['total_params'] += 1
-                else:
-                    # This param is owned but not active this step → zero gradient
-                    # Pre-mark it as ready (it already contributes zeros from buffer.zero_())
-                    pass  # Don't count it; don't increment ready_count
+                # else: inactive — zero gradient, already in buffer from zero_()
 
-            # Check if any bucket now has total_params == 0 (all its params are inactive)
-            # → dispatch immediately since the zeros are already there
-            for bucket in self.buckets:
-                if bucket['total_params'] == 0 and bucket['handle'] is None:
-                    self._dispatch_bucket(bucket)
+            # Reset the monotonic watermark and dispatch any leading empty buckets
+            self._next_bucket_to_dispatch = 0
+            self._try_dispatch_next_buckets()
 
             self._dispatch_enabled = True
 
@@ -643,15 +655,17 @@ class BucketedGradientSync:
         Called after the backward pass completes.
 
         1. Disables grad hooks
-        2. Dispatches any remaining partial buckets
+        2. Dispatches any remaining buckets (in monotonic order)
         3. Waits for all async allreduce handles
         4. Unpacks results back to param.grad
         """
         with self.roctx_range("bucketed_finalize"):
             self._dispatch_enabled = False
 
-            # Dispatch any remaining buckets that didn't fill completely
-            for bucket in self.buckets:
+            # Dispatch any remaining buckets that weren't dispatched during backward
+            # (in ascending order, continuing from the watermark)
+            for i in range(self._next_bucket_to_dispatch, len(self.buckets)):
+                bucket = self.buckets[i]
                 if bucket['handle'] is None:
                     self._dispatch_bucket(bucket)
 
@@ -663,11 +677,6 @@ class BucketedGradientSync:
 
             # Unpack: copy allreduced gradients back to param.grad
             with self.roctx_range("bucketed_unpack"):
-                # Build a quick lookup for gradient_norm per component
-                norm_by_component = {}
-                for gs in gradient_syncs:
-                    norm_by_component[gs.component.get_name()] = gs.gradient_norm
-
                 for gs in gradient_syncs:
                     component = gs.component
                     name = component.get_name()

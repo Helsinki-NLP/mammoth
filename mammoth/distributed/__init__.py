@@ -8,6 +8,7 @@ from .communication import (
     externally_managed_reduce_and_rescale_grads,
     ErrorHandler,
     WorldGroupGradientSync,
+    BucketedGradientSync,
     _reattach_batch_tensors,
 )
 from .contexts import (
@@ -30,6 +31,7 @@ __all__ = [
     "externally_managed_reduce_and_rescale_grads",
     "ErrorHandler",
     "WorldGroupGradientSync",
+    "BucketedGradientSync",
     "_reattach_batch_tensors",
     "DeviceContext",
     "WorldContext",

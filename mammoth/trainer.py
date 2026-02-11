@@ -64,6 +64,7 @@ def build_trainer(
     task_queue_manager,
     model_saver=None,
     world_group_sync=None,
+    bucketed_sync=None,
 ):
     """
     Simplify `Trainer` creation based on user `opts`s*
@@ -131,6 +132,7 @@ def build_trainer(
         beam_size=opts.beam_size,
         max_length=opts.max_length,
         world_group_sync=world_group_sync,
+        bucketed_sync=bucketed_sync,
     )
     return trainer
 
@@ -183,6 +185,7 @@ class Trainer(object):
         beam_size=1,
         max_length=100,
         world_group_sync=None,
+        bucketed_sync=None,
     ):
         # Basic attributes.
         self.model = model
@@ -212,6 +215,7 @@ class Trainer(object):
         self.beam_size = beam_size
         self.max_length = max_length
         self.world_group_sync = world_group_sync
+        self.bucketed_sync = bucketed_sync
 
         # Get ROCTx range function (markers always active, profiling controlled by rocprofv3)
         self.roctx_range = get_roctx_range()
@@ -328,7 +332,11 @@ class Trainer(object):
                 )
 
             with self.roctx_range(f"gradient_sync_step_{step}"):
-                if self.world_group_sync is not None:
+                if self.bucketed_sync is not None:
+                    # Bucketed overlapped gradient sync: async allreduce launched during backward,
+                    # finalize waits for remaining ops and unpacks results
+                    self.bucketed_sync.finalize(gradient_syncs)
+                elif self.world_group_sync is not None:
                     # World-group gradient sync: single allreduce on world group
                     # Replaces per-component allreduce to avoid NCCL deadlock at scale
                     self.world_group_sync.sync(self.model, gradient_syncs)
@@ -944,6 +952,12 @@ class Trainer(object):
                 if torch.isnan(loss):
                     raise NanLossException('Loss blowout')
                 # loss /= normalization
+
+                # Enable overlapped gradient sync before the last micro-batch's backward
+                is_last_microbatch = (k == len(batches_with_meta) - 1)
+                if is_last_microbatch and self.bucketed_sync is not None:
+                    self.bucketed_sync.prepare_for_backward(gradient_syncs)
+
                 with self.roctx_range(f"backward_pass_batch_{k}"):
                     self.optim.backward(loss)
 

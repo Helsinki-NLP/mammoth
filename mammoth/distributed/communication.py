@@ -407,6 +407,289 @@ class WorldGroupGradientSync:
                         pos += numel
 
 
+class BucketedGradientSync:
+    """
+    Overlapped gradient sync: breaks the flat buffer into fixed-size buckets (~25MB)
+    and launches async allreduce on each bucket as it fills during the backward pass.
+
+    By the time backward finishes, most allreduce ops are already done, overlapping
+    communication with computation. This is the same strategy used by Megatron-LM.
+
+    Uses the same globally-consistent buffer layout as WorldGroupGradientSync.
+    """
+
+    def __init__(self, all_components, model, global_rank, bucket_size_mb=25):
+        """
+        Build the global buffer layout (same as WorldGroupGradientSync) and overlay
+        a bucket structure on top.
+
+        Args:
+            all_components: list of all DistributedComponent objects (globally consistent order)
+            model: the NMTModel (already on GPU)
+            global_rank: this GPU's global rank
+            bucket_size_mb: size of each allreduce bucket in MB (default 25, matches Megatron)
+        """
+        self.global_rank = global_rank
+        self.roctx_range = get_roctx_range()
+        self.model = model
+
+        # ── Step 1: Build globally-consistent buffer layout (same as WorldGroupGradientSync) ──
+
+        my_param_counts = OrderedDict()
+        for component in all_components:
+            name = component.get_name()
+            if global_rank in component.global_ranks:
+                count = sum(p.numel() for _, p in component.named_parameters(model) if p.requires_grad)
+                my_param_counts[name] = count
+            else:
+                my_param_counts[name] = 0
+
+        enc_size = len(pickle.dumps(my_param_counts))
+        gather_max_size = max(enc_size * 2 + 2, 4096)
+        all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
+
+        global_param_counts = OrderedDict()
+        for name in sorted(my_param_counts.keys()):
+            sizes = [counts.get(name, 0) for counts in all_counts]
+            global_param_counts[name] = max(sizes)
+
+        self.component_layout = OrderedDict()
+        offset = 0
+        for name in sorted(global_param_counts.keys()):
+            size = global_param_counts[name]
+            if size > 0:
+                self.component_layout[name] = (offset, size)
+                offset += size
+
+        self.total_size = offset
+
+        # Allocate the flat buffer on GPU
+        dtype = torch.float32
+        for p in model.parameters():
+            dtype = p.dtype
+            break
+        self.dtype = dtype
+        device = torch.device(f'cuda:{torch.cuda.current_device()}')
+        self.buffer = torch.zeros(self.total_size, dtype=dtype, device=device)
+
+        # ── Step 2: Per-parameter mapping (param_id → buffer offset & numel) ──
+
+        # Maps id(param) → (offset_in_buffer, numel, component_name)
+        self._param_info = {}
+        # All parameters across all owned components, for hook registration
+        self._all_owned_params = []
+
+        for component in all_components:
+            name = component.get_name()
+            if name not in self.component_layout:
+                continue
+            if global_rank not in component.global_ranks:
+                continue
+            comp_offset, _ = self.component_layout[name]
+            pos = comp_offset
+            for pname, p in component.named_parameters(model):
+                if not p.requires_grad:
+                    continue
+                numel = p.numel()
+                self._param_info[id(p)] = (pos, numel, name)
+                self._all_owned_params.append(p)
+                pos += numel
+
+        # ── Step 3: Create buckets ──
+
+        element_size = self.buffer.element_size()  # bytes per element (e.g. 4 for fp32)
+        bucket_size_elements = int(bucket_size_mb * 1024 * 1024 / element_size)
+        # Ensure at least one bucket
+        bucket_size_elements = max(bucket_size_elements, 1)
+
+        self.buckets = []
+        start = 0
+        while start < self.total_size:
+            end = min(start + bucket_size_elements, self.total_size)
+            self.buckets.append({
+                'start': start,
+                'end': end,
+                'total_params': 0,  # will be filled below
+                'ready_count': 0,
+                'handle': None,
+            })
+            start = end
+
+        # ── Step 4: Map parameters to buckets ──
+
+        # For each param, determine which bucket it falls in based on its buffer offset
+        # A param belongs to the bucket containing its start offset
+        self._param_to_bucket_idx = {}
+        for param_id, (buf_offset, numel, comp_name) in self._param_info.items():
+            bucket_idx = buf_offset // bucket_size_elements
+            if bucket_idx >= len(self.buckets):
+                bucket_idx = len(self.buckets) - 1
+            self._param_to_bucket_idx[param_id] = bucket_idx
+            self.buckets[bucket_idx]['total_params'] += 1
+
+        # Count total params per bucket for non-owned / non-active components (filled in prepare_for_backward)
+        # Also track all component params per bucket for pre-marking
+        self._component_params_in_bucket = {}  # {component_name: {bucket_idx: count}}
+        for comp_name in self.component_layout:
+            self._component_params_in_bucket[comp_name] = {}
+        for param_id, (buf_offset, numel, comp_name) in self._param_info.items():
+            bucket_idx = self._param_to_bucket_idx[param_id]
+            bucket_params = self._component_params_in_bucket[comp_name]
+            bucket_params[bucket_idx] = bucket_params.get(bucket_idx, 0) + 1
+
+        # ── Step 5: Register grad hooks ──
+
+        self._dispatch_enabled = False
+        self._hooks = []
+        for p in self._all_owned_params:
+            hook = p.register_post_accumulate_grad_hook(self._make_hook(p))
+            self._hooks.append(hook)
+
+        # Track components not owned by this GPU (for bucket counting)
+        self._non_owned_components = set()
+        for component in all_components:
+            name = component.get_name()
+            if name not in self.component_layout:
+                continue
+            if global_rank not in component.global_ranks:
+                self._non_owned_components.add(name)
+
+        # Store all_components for prepare_for_backward
+        self._all_components = all_components
+
+        logger.info(
+            f"BucketedGradientSync: rank {global_rank}, buffer size {self.total_size} elements "
+            f"({self.total_size * element_size / 1024 / 1024:.1f} MB), "
+            f"{len(self.component_layout)} components, "
+            f"{len(self.buckets)} buckets ({bucket_size_mb} MB each)"
+        )
+
+    def _make_hook(self, param):
+        """Create a post-accumulate grad hook for a specific parameter."""
+        param_id = id(param)
+
+        def hook(p):
+            if not self._dispatch_enabled:
+                return
+            buf_offset, numel, _ = self._param_info[param_id]
+            # Copy gradient into the flat buffer
+            self.buffer[buf_offset:buf_offset + numel].copy_(p.grad.data.view(-1))
+            # Mark this param as ready in its bucket
+            bucket_idx = self._param_to_bucket_idx[param_id]
+            bucket = self.buckets[bucket_idx]
+            bucket['ready_count'] += 1
+            if bucket['ready_count'] >= bucket['total_params']:
+                self._dispatch_bucket(bucket)
+
+        return hook
+
+    def _dispatch_bucket(self, bucket):
+        """Launch async allreduce for a filled bucket."""
+        start, end = bucket['start'], bucket['end']
+        bucket['handle'] = torch.distributed.all_reduce(
+            self.buffer[start:end], async_op=True
+        )
+
+    def prepare_for_backward(self, gradient_syncs):
+        """
+        Called before the last micro-batch's backward pass to enable overlapped sync.
+
+        1. Zeros the buffer
+        2. Resets bucket state
+        3. Pre-marks non-active parameters as ready (may dispatch some buckets immediately)
+        4. Enables the grad hooks
+        """
+        with self.roctx_range("bucketed_prepare_for_backward"):
+            # Zero the buffer
+            self.buffer.zero_()
+
+            # Build set of active (trained-this-step) components
+            active_component_names = set()
+            for gs in gradient_syncs:
+                if gs.owns_component and gs.has_local_gradient:
+                    active_component_names.add(gs.component.get_name())
+
+            # Reset all buckets
+            for bucket in self.buckets:
+                bucket['ready_count'] = 0
+                bucket['handle'] = None
+                # Reset total_params: count owned+active params per bucket
+                bucket['total_params'] = 0
+
+            # Recount total_params per bucket: only count params that we own AND are active
+            # (non-owned params contribute zeros already in the zeroed buffer,
+            #  owned-but-not-active also contribute zeros)
+            for param_id, (buf_offset, numel, comp_name) in self._param_info.items():
+                bucket_idx = self._param_to_bucket_idx[param_id]
+                bucket = self.buckets[bucket_idx]
+                if comp_name in active_component_names:
+                    # This param will fire a grad hook → counts toward total_params
+                    bucket['total_params'] += 1
+                else:
+                    # This param is owned but not active this step → zero gradient
+                    # Pre-mark it as ready (it already contributes zeros from buffer.zero_())
+                    pass  # Don't count it; don't increment ready_count
+
+            # Check if any bucket now has total_params == 0 (all its params are inactive)
+            # → dispatch immediately since the zeros are already there
+            for bucket in self.buckets:
+                if bucket['total_params'] == 0 and bucket['handle'] is None:
+                    self._dispatch_bucket(bucket)
+
+            self._dispatch_enabled = True
+
+    def finalize(self, gradient_syncs):
+        """
+        Called after the backward pass completes.
+
+        1. Disables grad hooks
+        2. Dispatches any remaining partial buckets
+        3. Waits for all async allreduce handles
+        4. Unpacks results back to param.grad
+        """
+        with self.roctx_range("bucketed_finalize"):
+            self._dispatch_enabled = False
+
+            # Dispatch any remaining buckets that didn't fill completely
+            for bucket in self.buckets:
+                if bucket['handle'] is None:
+                    self._dispatch_bucket(bucket)
+
+            # Wait for all async ops to complete
+            with self.roctx_range("bucketed_wait_allreduce"):
+                for bucket in self.buckets:
+                    if bucket['handle'] is not None:
+                        bucket['handle'].wait()
+
+            # Unpack: copy allreduced gradients back to param.grad
+            with self.roctx_range("bucketed_unpack"):
+                # Build a quick lookup for gradient_norm per component
+                norm_by_component = {}
+                for gs in gradient_syncs:
+                    norm_by_component[gs.component.get_name()] = gs.gradient_norm
+
+                for gs in gradient_syncs:
+                    component = gs.component
+                    name = component.get_name()
+                    if name not in self.component_layout:
+                        continue
+                    if not gs.owns_component:
+                        continue
+
+                    offset, size = self.component_layout[name]
+                    pos = offset
+                    for _, p in component.named_parameters(self.model):
+                        if not p.requires_grad:
+                            continue
+                        numel = p.numel()
+                        if p.grad is None:
+                            p.grad = torch.zeros_like(p)
+                        p.grad.data.copy_(
+                            self.buffer[pos:pos + numel].view_as(p.grad.data) / gs.gradient_norm
+                        )
+                        pos += numel
+
+
 class ErrorHandler(object):
     """A class that listens for exceptions in children processes and propagates
     the tracebacks to the parent process."""

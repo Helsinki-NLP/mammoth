@@ -14,7 +14,7 @@ from mammoth.utils.parse import ArgumentParser
 import pickle
 from collections import OrderedDict
 
-from mammoth.distributed import _reattach_batch_tensors, WorldGroupGradientSync
+from mammoth.distributed import _reattach_batch_tensors, WorldGroupGradientSync, BucketedGradientSync
 from mammoth.distributed.communication import all_gather_list
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
@@ -224,14 +224,17 @@ def main(
 
     logger.info("{} - Init model".format(device_context.id))
     world_group_sync = None
+    bucketed_sync = None
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
-        # Create world-group gradient sync: replaces per-component allreduce
-        # with a single allreduce on the world group to avoid NCCL deadlock at scale
-        world_group_sync = WorldGroupGradientSync(
+        # Create bucketed overlapped gradient sync: launches async allreduce on
+        # ~25MB buckets during backward pass, overlapping communication with computation.
+        # Falls back to WorldGroupGradientSync if bucketed sync is disabled.
+        bucketed_sync = BucketedGradientSync(
             all_components=task_queue_manager.distributed_components,
             model=model,
             global_rank=task_queue_manager.global_rank,
+            bucket_size_mb=25,
         )
     enc, dec = model.count_parameters()
     logger.info("{} - total encoder parameters: {}".format(device_context.id, enc))
@@ -303,6 +306,7 @@ def main(
         task_queue_manager=task_queue_manager,
         model_saver=model_saver,
         world_group_sync=world_group_sync,
+        bucketed_sync=bucketed_sync,
     )
     logger.info("{} - Trainer built".format(device_context.id))
 

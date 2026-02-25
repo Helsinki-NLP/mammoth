@@ -9,6 +9,11 @@
 from mammoth.inputters.dataloader import build_dataloader, DynamicDatasetIter
 from mammoth.inputters.dataset import get_corpus, ParallelCorpus
 from mammoth.inputters.vocab import get_vocab, DEFAULT_SPECIALS
+from mammoth.inputters.language_tokens import (
+    extract_language_tokens_from_config,
+    add_language_tokens_to_tokenizer,
+    verify_language_tokens,
+)
 
 
 __all__ = [
@@ -17,5 +22,8 @@ __all__ = [
     'get_corpus',
     'get_vocab',
     'DEFAULT_SPECIALS',
-    'ParallelCorpus'
+    'ParallelCorpus',
+    'extract_language_tokens_from_config',
+    'add_language_tokens_to_tokenizer',
+    'verify_language_tokens',
 ]

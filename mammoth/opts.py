@@ -164,6 +164,22 @@ def _add_dynamic_vocabs_opts(parser):
         default=None,
         help="Maximum size of the target vocabulary; will silently truncate your vocab file if longer."
     )
+    group.add(
+        "-use_hf_tokenizer",
+        "--use_hf_tokenizer",
+        action="store_true",
+        help="Use HuggingFace tokenizers instead of traditional vocab files. "
+        "Vocab paths should point to .json tokenizer files."
+    )
+    group.add(
+        "-add_language_tokens",
+        "--add_language_tokens",
+        action="store_true",
+        default=True,
+        help="Automatically add language prefix tokens (src_prefix/tgt_prefix from tasks) "
+        "to HuggingFace tokenizers. Only applies when use_hf_tokenizer is True. "
+        "Default: True"
+    )
 
 
 def _add_dynamic_transform_opts(parser):
@@ -204,6 +220,17 @@ def model_opts(parser):
         "(Shaham et. al, 2021) https://aclanthology.org/2021.naacl-main.17/",
     )
 
+    group.add(
+        '--share_encoder_decoder_embeddings',
+        '-share_encoder_decoder_embeddings',
+        action='store_true',
+        help="Share token embeddings between encoder and decoder. "
+        "Only works when encoder and decoder use the same vocabulary "
+        "and have matching model dimensions. This is different from "
+        "'tie_embedding' in x_transformers_opts which ties input and "
+        "output embeddings within the decoder.",
+    )
+
     # Encoder-Decoder Options
     group = parser.add_argument_group('Model- Encoder-Decoder')
     group.add(
@@ -213,7 +240,7 @@ def model_opts(parser):
         choices=['text'],
         help="Type of source model to use. Allows the system to incorporate non-text inputs. Options are [text].",
     )
-    group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16'], help='Data type of the model.')
+    group.add('--model_dtype', '-model_dtype', default='fp32', choices=['fp32', 'fp16', 'bf16'], help='Data type of the model. For LUMI (MI250X based), bf16 is recommended. For Puhti (V100 based), fp32 is recommended.') 
 
     # group.add('--layers', '-layers', type=int, default=-1, help='Deprecated')
     group.add('--enc_layers', '-enc_layers', nargs='+', type=int, help='Number of layers in each encoder module')
@@ -225,7 +252,6 @@ def model_opts(parser):
         default=-1,
         help="Size of Transformer representations.",
     )
-
     group.add(
         '--pos_ffn_activation_fn',
         '-pos_ffn_activation_fn',
@@ -248,6 +274,80 @@ def model_opts(parser):
         type=str,
         default="scaled-dot",
         help='Self attention type in Transformer decoder layer -- currently "scaled-dot" or "average" ',
+    )
+
+    # Sliding window attention options (Flash Attention 2)
+    group.add(
+        '--enc_sliding_window',
+        '-enc_sliding_window',
+        type=int,
+        default=-1,
+        help='Sliding window size for encoder attention (total context, symmetric). '
+             '-1 = disabled (full attention). Requires Flash Attention 2. '
+             'Reduces memory for long sequences. Example: 128 = attend to ±64 tokens.'
+    )
+    group.add(
+        '--dec_sliding_window',
+        '-dec_sliding_window',
+        type=int,
+        default=-1,
+        help='Sliding window size for decoder attention (total context, symmetric). '
+             '-1 = disabled (full attention). Requires Flash Attention 2. '
+             'Causal masking is automatically applied. Example: 128 = attend to ±64 tokens.'
+    )
+    group.add(
+        '--enc_global_attn_every_n_layers',
+        '-enc_global_attn_every_n_layers',
+        type=int,
+        default=3,
+        help='Encoder: every Nth layer uses global attention (full context), others use sliding window. '
+             'Interleaved pattern from ModernBERT. Layer 0, N, 2N, ... get global attention. '
+             'Only applies if enc_sliding_window > 0. Default: 3'
+    )
+    group.add(
+        '--dec_global_attn_every_n_layers',
+        '-dec_global_attn_every_n_layers',
+        type=int,
+        default=3,
+        help='Decoder: every Nth layer uses global attention (full context), others use sliding window. '
+             'Interleaved pattern from ModernBERT. Layer 0, N, 2N, ... get global attention. '
+             'Only applies if dec_sliding_window > 0. Default: 3'
+    )
+    group.add(
+        '--enc_global_rope_theta',
+        '-enc_global_rope_theta',
+        type=float,
+        default=160000.0,
+        help='Encoder: RoPE theta for global attention layers (every Nth layer). '
+             'Higher values allow for longer context modeling. Default: 160000.0 (ModernBERT style). '
+             'Only applies if enc_sliding_window > 0 and rotary_pos_emb is enabled.'
+    )
+    group.add(
+        '--enc_local_rope_theta',
+        '-enc_local_rope_theta',
+        type=float,
+        default=10000.0,
+        help='Encoder: RoPE theta for local sliding window attention layers. '
+             'Standard value for most transformer models. Default: 10000.0. '
+             'Only applies if enc_sliding_window > 0 and rotary_pos_emb is enabled.'
+    )
+    group.add(
+        '--dec_global_rope_theta',
+        '-dec_global_rope_theta',
+        type=float,
+        default=160000.0,
+        help='Decoder: RoPE theta for global attention layers (every Nth layer). '
+             'Higher values allow for longer context modeling. Default: 160000.0 (ModernBERT style). '
+             'Only applies if dec_sliding_window > 0 and rotary_pos_emb is enabled.'
+    )
+    group.add(
+        '--dec_local_rope_theta',
+        '-dec_local_rope_theta',
+        type=float,
+        default=10000.0,
+        help='Decoder: RoPE theta for local sliding window attention layers. '
+             'Standard value for most transformer models. Default: 10000.0. '
+             'Only applies if dec_sliding_window > 0 and rotary_pos_emb is enabled.'
     )
 
     # TODO is this actually in use?
@@ -374,14 +474,54 @@ def _add_train_general_opts(parser):
         '-save_checkpoint_steps',
         type=int,
         default=5000,
-        help="""Save a checkpoint every X steps""",
+        help="Save a checkpoint every X steps. "
+        "Only used when save_strategy='steps'. "
+        "For metric-based strategies (best_*), checkpoints are saved at validation time (--valid_steps).",
     )
     group.add(
-        '--keep_checkpoint', '-keep_checkpoint', type=int, default=-1, help="Keep X checkpoints (negative: keep all)"
+        '--keep_checkpoint',
+        '-keep_checkpoint',
+        type=int,
+        default=-1,
+        help="Keep X checkpoints (negative: keep all). "
+        "Works with --save_strategy to determine rotation behavior: "
+        "FIFO for 'steps', metric-based for 'best_only'/'best_and_last'/'best_n'.",
+    )
+    group.add(
+        '--save_strategy',
+        '-save_strategy',
+        type=str,
+        default='steps',
+        choices=['steps', 'best_only', 'best_and_last', 'best_n'],
+        help="Checkpoint saving strategy:\n"
+        "  'steps': Save every save_checkpoint_steps (FIFO rotation)\n"
+        "  'best_only': Keep only the best checkpoint by metric (saves at validation time)\n"
+        "  'best_and_last': Keep best + keep_checkpoint most recent (saves at validation time)\n"
+        "  'best_n': Keep top keep_checkpoint checkpoints by metric (saves at validation time)\n"
+        "Note: Metric-based strategies (best_*) save at validation frequency (--valid_steps), "
+        "not --save_checkpoint_steps. Use --keep_checkpoint to control how many to keep.",
+    )
+    group.add(
+        '--metric_for_best_model',
+        '-metric_for_best_model',
+        type=str,
+        default='ppl',
+        help="Metric to use for determining best checkpoint. "
+        "Options: 'ppl' (perplexity), 'accuracy', 'bleu', or custom metric name",
+    )
+    group.add(
+        '--greater_is_better',
+        '-greater_is_better',
+        type=lambda x: x.lower() == 'true',
+        default=None,
+        help="Whether higher metric values are better. "
+        "If None, auto-inferred: False for ppl, True for accuracy/bleu",
     )
     group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
     group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
+    group.add('--valid_at_start', '-valid_at_start', action='store_true', help='Perform validation before training starts')
+    group.add('--valid_metrics', '-valid_metrics', nargs='*', default=[], help='List of names of additional validation metrics')
     group.add(
         '--early_stopping', '-early_stopping', type=int, default=0, help='Number of validation steps without improving.'
     )
@@ -453,11 +593,38 @@ def _add_train_general_opts(parser):
         help="If training from a checkpoint then this is the path to the pretrained model's state_dict.",
     )
     group.add(
+        '--override_checkpoint_vocab',
+        '-override_checkpoint_vocab',
+        action='store_true',
+        help="When training from checkpoint, override the checkpoint's vocabulary with the one specified in config. "
+             "This allows using different tokenizers than the ones baked into the checkpoint. "
+             "Default: False (use checkpoint vocabulary).",
+    )
+    group.add(
         '--reset_optim',
         '-reset_optim',
         default='none',
         choices=['none', 'all', 'states', 'keep_states'],
-        help="Optimization resetter when train_from.",
+        help="Controls which parts of optimizer to load from checkpoint when using --train_from. "
+             "This is a 2x2 matrix of [Optimizer State] × [Training Step]: "
+             "\n"
+             "'none': KEEP state + KEEP step → True resumption after interruption. "
+             "Loads optimizer state (momentum, variance buffers) and continues from checkpoint's training step. "
+             "CRITICAL: Your config's 'optim' must match the optimizer used to create the checkpoint. "
+             "\n"
+             "'keep_states': KEEP state + RESET step to 1 → Restart LR schedule with same optimizer. "
+             "Useful when you want to change learning rate schedule but preserve optimizer momentum. "
+             "\n"
+             "'states': RESET state + KEEP step → Switch optimizer mid-training. "
+             "Loads checkpoint's training step but builds fresh optimizer state. "
+             "Use when switching optimizer types (e.g., Adam → Adafactor). "
+             "\n"
+             "'all': RESET state + RESET step to 1 → Fine-tuning from scratch. "
+             "Only loads model weights, starts fresh training with new optimizer and step=1. "
+             "\n"
+             "IMPORTANT: Checkpoints do NOT save optimizer configuration (optim, learning_rate, etc). "
+             "The optimizer type is ALWAYS from your config file, regardless of reset_optim value. "
+             "Checkpoints only save: (1) model architecture, (2) model weights, (3) optimizer state buffers.",
     )
     group.add(
         '--yes_i_messed_with_the_checkpoint',
@@ -466,18 +633,62 @@ def _add_train_general_opts(parser):
         help="Only set this if you know what you are doing."
     )
 
-    # Freeze word vectors
+    # Granular parameter freezing
+    group = parser.add_argument_group('Fine-grained Parameter Freezing')
     group.add(
-        '--freeze_word_vecs_enc',
-        '-freeze_word_vecs_enc',
+        '--freeze_encoder',
+        '-freeze_encoder',
         action='store_true',
-        help="Freeze word embeddings on the encoder side.",
+        help="Freeze all encoder parameters (attention and feedforward layers). "
+             "Does not affect embeddings unless --freeze_encoder_embeddings is also set. "
+             "Adapters remain trainable if configured.",
     )
     group.add(
-        '--freeze_word_vecs_dec',
-        '-freeze_word_vecs_dec',
+        '--freeze_decoder',
+        '-freeze_decoder',
         action='store_true',
-        help="Freeze word embeddings on the decoder side.",
+        help="Freeze all decoder parameters (self-attention, cross-attention, and feedforward). "
+             "Does not affect embeddings unless --freeze_decoder_embeddings is also set. "
+             "Adapters remain trainable if configured. "
+             "Can be combined with --freeze_cross_attention=false to keep only cross-attention trainable.",
+    )
+    group.add(
+        '--freeze_encoder_embeddings',
+        '-freeze_encoder_embeddings',
+        action='store_true',
+        help="Freeze encoder token embeddings. Can be used independently or with --freeze_encoder.",
+    )
+    group.add(
+        '--freeze_decoder_embeddings',
+        '-freeze_decoder_embeddings',
+        action='store_true',
+        help="Freeze decoder token embeddings. Can be used independently or with --freeze_decoder.",
+    )
+    group.add(
+        '--freeze_cross_attention',
+        '-freeze_cross_attention',
+        action='store_true',
+        help="Freeze only cross-attention layers in the decoder. "
+             "Useful for adapting decoder to new encoder representations while preserving "
+             "the encoder-decoder alignment learned during pretraining. "
+             "Mutually exclusive with --freeze_decoder (decoder freeze takes precedence).",
+    )
+    group.add(
+        '--freeze_attention_bridge',
+        '-freeze_attention_bridge',
+        action='store_true',
+        help="Freeze the attention bridge between encoder and decoder if present. "
+             "Only applies when attention bridge is configured (ab_layers is not empty) "
+             "and encoder/decoder dimensions match. Has no effect if attention bridge does not exist.",
+    )
+    group.add(
+        '--freeze_decoder_except_cross_attention',
+        '-freeze_decoder_except_cross_attention',
+        action='store_true',
+        help="Freeze decoder self-attention and feedforward layers, but keep cross-attention trainable. "
+             "Useful for adapting how decoder attends to encoder representations while keeping "
+             "decoder's internal processing frozen. Adapters remain trainable if configured. "
+             "Mutually exclusive with --freeze_decoder and --freeze_cross_attention.",
     )
 
     # Optimization options
@@ -825,7 +1036,6 @@ def _add_decoding_opts(parser):
         "(or the identified source token does not exist in "
         "the table), then it will copy the source token.",
     )
-
 
 def translate_opts(parser, dynamic=False):
     """Translation / inference options"""

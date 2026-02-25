@@ -1,14 +1,20 @@
 """Module defining distributed communications utilities."""
-from mammoth.distributed.communication import (
+
+from .communication import (
     all_gather_list,
     batch_producer,
     consumer,
     broadcast_tensors,
     externally_managed_reduce_and_rescale_grads,
     ErrorHandler,
+    _reattach_batch_tensors,
 )
-from mammoth.distributed.contexts import DeviceContext, WorldContext, DeviceContextEnum
-from mammoth.distributed.tasks import (
+from .contexts import (
+    DeviceContext,
+    WorldContext,
+    DeviceContextEnum,
+)
+from .tasks import (
     TaskSpecs,
     TaskQueueManager,
     DatasetMetadata,
@@ -22,6 +28,7 @@ __all__ = [
     "consumer",
     "externally_managed_reduce_and_rescale_grads",
     "ErrorHandler",
+    "_reattach_batch_tensors",
     "DeviceContext",
     "WorldContext",
     "DeviceContextEnum",

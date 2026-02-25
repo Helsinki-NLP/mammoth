@@ -244,7 +244,7 @@ class DynamicDatasetIter(object):
         if opts.batch_size_multiple is not None:
             batch_size_multiple = opts.batch_size_multiple
         else:
-            batch_size_multiple = 8 if opts.model_dtype == "fp16" else 1
+            batch_size_multiple = 8 if opts.model_dtype in ["fp16", "bf16"] else 1
         return cls(
             task_queue_manager,
             opts,
@@ -324,6 +324,7 @@ class DynamicDatasetIter(object):
                 ordered_iter, metadata = self.dataset_iterators[my_task.corpus_id]
                 for _ in range(self.task_queue_manager.accum_count):
                     batch = next(ordered_iter)
+
                     if batch_task_sample.training_step == 0 and self.opts.verbose:
                         # De-numericalize a few sentences for debugging
                         # FIXME should be debug, not warn

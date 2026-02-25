@@ -28,7 +28,6 @@ def get_base_optimizer(opts):
     Returns:
       A callable that returns ``torch.optim.Optimizer`` instances.
     """
-    betas = [opts.adam_beta1, opts.adam_beta2]
     if opts.optim == 'sgd':
         base_optimizer = functools.partial(optim.SGD, lr=opts.learning_rate)
     elif opts.optim == 'adagrad':
@@ -48,6 +47,7 @@ def get_base_optimizer(opts):
             weight_decay=opts.weight_decay,
         )
     elif opts.optim == 'adam':
+        betas = [opts.adam_beta1, opts.adam_beta2]
         base_optimizer = functools.partial(
             optim.Adam,
             lr=opts.learning_rate,
@@ -56,6 +56,7 @@ def get_base_optimizer(opts):
             weight_decay=opts.weight_decay,
         )
     elif opts.optim == 'adamw':
+        betas = [opts.adam_beta1, opts.adam_beta2]
         base_optimizer = functools.partial(
             optim.AdamW,
             lr=opts.learning_rate,
@@ -274,14 +275,20 @@ class MultipleOptimizer(object):
             checkpoint_opts = frame_checkpoint['opts']
 
             if opts.reset_optim == 'none':
-                # Load everything from the checkpoint.
-                optim_opts = checkpoint_opts
+                # Load everything from the checkpoint, but merge with current opts
+                # to ensure all fields exist (handles checkpoints missing optimizer fields)
+                from argparse import Namespace
+                optim_opts = Namespace(**opts.__dict__)
+                optim_opts.__dict__.update(checkpoint_opts.__dict__)
             elif opts.reset_optim == 'all':
                 # Build everything from scratch.
                 pass
             elif opts.reset_optim == 'states':
-                # Reset optimizer, keep options.
-                optim_opts = checkpoint_opts
+                # Reset optimizer, keep options from checkpoint
+                # but merge with current opts to handle missing fields
+                from argparse import Namespace
+                optim_opts = Namespace(**opts.__dict__)
+                optim_opts.__dict__.update(checkpoint_opts.__dict__)
             elif opts.reset_optim == 'keep_states':
                 # Reset options, keep optimizer.
                 # Note that options are reset in load_parameters_from_checkpoint, not here

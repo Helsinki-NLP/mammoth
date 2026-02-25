@@ -28,17 +28,17 @@ class PositionwiseFeedForward(nn.Module):
             whether to apply normformer-style normalization
     """
 
-    def __init__(self, d_model, d_ff, dropout=0.1, activation_fn=ActivationFunction.relu, is_normformer=False):
+    def __init__(self, d_model, d_ff, dropout=0.1, activation_fn=ActivationFunction.gelu, is_normformer=False):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = nn.Linear(d_model, d_ff)
         self.w_2 = nn.Linear(d_ff, d_model)
-        self.layer_norm = nn.LayerNorm(d_model, eps=1e-6)
+        self.layer_norm = nn.LayerNorm(d_model, eps=1e-5)
         self.dropout_1 = nn.Dropout(dropout)
         self.activation = ACTIVATION_FUNCTIONS[activation_fn]
         self.dropout_2 = nn.Dropout(dropout)
         self.layer_norm2 = nn.Identity()
         if is_normformer:
-            self.layer_norm2 = nn.LayerNorm(d_ff, eps=1e-6)
+            self.layer_norm2 = nn.LayerNorm(d_ff, eps=1e-5)
 
     def forward(self, x):
         """Layer definition.
@@ -50,9 +50,15 @@ class PositionwiseFeedForward(nn.Module):
             (FloatTensor): Output ``(batch_size, input_len, model_dim)``.
         """
 
-        inter = self.dropout_1(self.activation(self.w_1(self.layer_norm(x))))
-        output = self.dropout_2(self.w_2(self.layer_norm2(inter)))
-        return output + x
+        # ff forward pass: feedforward, dropout, feedforward, dropout,residual, layernorm
+        inter = self.activation(self.w_1(x))
+        inter = self.dropout_1(inter)
+        inter = self.w_2(inter)
+        inter = self.dropout_2(inter)
+        inter = inter + x 
+        output = self.layer_norm(inter)
+
+        return output 
 
     def update_dropout(self, dropout):
         self.dropout_1.p = dropout

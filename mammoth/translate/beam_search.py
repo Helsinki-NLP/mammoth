@@ -74,6 +74,7 @@ class BeamSearchBase(DecodeStrategy):
         ratio,
         ban_unk_token,
         device,
+        dtype=torch.float,
     ):
         super(BeamSearchBase, self).__init__(
             pad=pad,
@@ -94,6 +95,7 @@ class BeamSearchBase(DecodeStrategy):
         self.beam_size = beam_size
         self.n_best = n_best
         self.ratio = ratio
+        self.dtype = dtype
 
         # beam state
         self.top_beam_finished = torch.zeros([batch_size], dtype=torch.uint8)
@@ -136,17 +138,17 @@ class BeamSearchBase(DecodeStrategy):
             src_mask=tiled_src_mask,
         )
 
-        self.best_scores = torch.full([self.batch_size], -1e10, dtype=torch.float, device=self.device)
+        self.best_scores = torch.full([self.batch_size], -1e10, dtype=self.dtype, device=self.device)
         self._beam_offset = torch.arange(
             0, self.batch_size * self.beam_size, step=self.beam_size, dtype=torch.long, device=self.device
         )
         self.topk_log_probs = (
-            torch.tensor([0.0] + [float("-inf")] * (self.beam_size - 1), device=self.device)
+            torch.tensor([0.0] + [float("-inf")] * (self.beam_size - 1), dtype=self.dtype, device=self.device)
             .repeat(self.batch_size)
             .reshape(self.batch_size, self.beam_size)
         )
         # buffers for the topk scores and 'backpointer'
-        self.topk_scores = torch.empty((self.batch_size, self.beam_size), dtype=torch.float, device=self.device)
+        self.topk_scores = torch.empty((self.batch_size, self.beam_size), dtype=self.dtype, device=self.device)
         self.topk_ids = torch.empty((self.batch_size, self.beam_size), dtype=torch.long, device=self.device)
         self._batch_index = torch.empty([self.batch_size, self.beam_size], dtype=torch.long, device=self.device)
 

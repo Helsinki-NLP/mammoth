@@ -7,7 +7,7 @@ import numpy as np
 import warnings
 from itertools import count, zip_longest
 from einops import rearrange
-
+from mammoth.constants import DefaultTokens
 import torch
 
 # from mammoth.inputters.text_dataset import InferenceDataIterator
@@ -195,6 +195,7 @@ class Inference(object):
         logger=None,
         seed=-1,
         task=None,
+        model_dtype="fp32",
     ):
         assert task is not None
         self.task = task
@@ -203,6 +204,14 @@ class Inference(object):
 
         self.model = model
         self.vocabs = vocabs
+        self.model_dtype = model_dtype
+        # Convert model_dtype string to torch dtype for beam search
+        if model_dtype == 'fp16':
+            self._torch_dtype = torch.float16
+        elif model_dtype == 'bf16':
+            self._torch_dtype = torch.bfloat16
+        else:
+            self._torch_dtype = torch.float32
         tgt_vocab = dict(self.vocabs)[("tgt", task.tgt_lang)]
         self._tgt_vocab = tgt_vocab
         self._tgt_eos_idx = self._tgt_vocab.stoi[DefaultTokens.EOS]
@@ -217,7 +226,6 @@ class Inference(object):
 
         self.n_best = n_best
         self.max_length = max_length
-
         self.beam_size = beam_size
         self.random_sampling_temp = random_sampling_temp
         self.sample_from_topk = random_sampling_topk
@@ -335,6 +343,7 @@ class Inference(object):
             logger=logger,
             seed=opts.seed,
             task=task,
+            model_dtype=getattr(model_opts, 'model_dtype', 'fp32'),
         )
 
     def _log(self, msg):
@@ -551,6 +560,14 @@ class Inference(object):
 
         for batch in batches:
             batch.to(corpus.device)
+
+            # DEBUG: Print source token IDs
+            src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1)  # Convert from [T, B, 1] to [B, T]
+            for i, src_seq in enumerate(src_ids):
+                # Remove padding (assuming 0 is pad token)
+                src_seq_no_pad = src_seq[src_seq != 0].tolist()
+                self._log(f"Source sentence {next(counter)} token IDs: {src_seq_no_pad}")
+
             batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
 
@@ -636,7 +653,7 @@ class Inference(object):
             )
         return all_scores, all_predictions
 
-    def _align_pad_prediction(self, predictions, bos, pad):
+    def _align_pad_prediction(self, predictions, bos, pad, eos):
         """
         Padding predictions in batch and add BOS.
 
@@ -646,6 +663,7 @@ class Inference(object):
                 eos id.
             bos (int): bos index to be used.
             pad (int): pad index to be used.
+            eos (int): eos index to be used.
 
         Return:
             batched_nbest_predict (torch.LongTensor): `(batch, n_best, tgt_l)`
@@ -667,7 +685,14 @@ class Inference(object):
             msg = "%s No words predicted" % (name,)
         else:
             avg_score = score_total / words_total
-            ppl = np.exp(-score_total.item() / words_total)
+            # Numerical stability: clamp extreme values to prevent overflow
+            neg_avg_score = -score_total.item() / words_total
+            if neg_avg_score > 700:  # exp(700) is close to float64 overflow limit
+                ppl = float('inf')
+            elif neg_avg_score < -700:  # exp(-700) underflows to 0
+                ppl = 0.0
+            else:
+                ppl = np.exp(neg_avg_score)
             msg = "%s AVG SCORE: %.4f, %s PPL: %.4f" % (
                 name,
                 avg_score,
@@ -787,6 +812,7 @@ class Translator(Inference):
                     ratio=self.ratio,
                     ban_unk_token=self.ban_unk_token,
                     device=self._device,
+                    dtype=self._torch_dtype,
                 )
             return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
 
@@ -799,10 +825,12 @@ class Translator(Inference):
             return_embeddings=True,
         )
 
-        encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
-        if self.model.attention_bridge.is_fixed_length:
-            # turn off masking in the transformer decoder
-            src_mask = None
+        # Apply attention bridge if it exists (matches model.py pattern)
+        if self.model.attention_bridge is not None:
+            encoder_output, alphas = self.model.attention_bridge(encoder_output, src_mask)
+            if self.model.attention_bridge.is_fixed_length:
+                # turn off masking in the transformer decoder
+                src_mask = None
 
         return encoder_output, src_mask
 
@@ -888,7 +916,11 @@ class Translator(Inference):
                 decode_strategy.update_finished()
                 if decode_strategy.done:
                     break
-
+        # Log final results
+        if self.logger:
+            # Log the final token IDs for each sequence
+            for i, pred_seq in enumerate(decode_strategy.predictions):
+                self.logger.info(f"Sequence {i} token IDs: {pred_seq}")
         return self.report_results(
             gold_score,
             batch,

@@ -1,0 +1,149 @@
+# Example Training Configuration for ModernBERT + Gemma3 Hybrid Model
+# This config shows how to train the converted hybrid model
+
+# Task definition
+tasks:
+  task_en_fi:
+    src_tgt: "en-fi"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    enc_sharing_group: ["en"]
+    dec_sharing_group: ["fi"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/fi_en_10m.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi_en_10m.tmx/train_fi.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fi_en_10m.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi_en_10m.tmx/val_fi.txt
+
+
+# ============================================================================
+# Vocabulary Configuration - HuggingFace Tokenizer
+# ============================================================================
+use_hf_tokenizer: true
+# override_checkpoint_vocab: true # only works when 'train_from' is used
+
+src_vocab:
+  en: /scratch/project_462000964/members/wangchao/training/181125/converted_model/src_tokenizer.json
+
+tgt_vocab:
+  fi: /scratch/project_462000964/members/wangchao/training/181125/converted_model/tgt_tokenizer.json
+
+# Data processing
+src_seq_length_max: 256
+tgt_seq_length_max: 256
+src_seq_length_min: 10
+tgt_seq_length_min: 10
+max_length: 256
+
+# Model architecture (MUST match converted model)
+enc_layers: [22]                     # ModernBERT-base layers
+dec_layers: [18]                     # Gemma3 layers (adjust based on model size)
+
+
+# Model dtype
+model_type: text
+
+# x-transformers configuration with enc_/dec_ prefixes
+x_transformers_opts:
+  # Flash attention (recommended for efficiency)
+  attn_flash: true
+
+  # ========== ENCODER: ModernBERT ==========
+  enc_heads: 12
+  enc_attn_dim_head: 64              # 768 / 12 = 64
+  enc_attn_dropout: 0.0
+  enc_ff_mult: 1.5                   # ModernBERT uses 1152 intermediate (1.5 * 768)
+  enc_ff_dropout: 0.0
+  enc_ff_glu: true                   # GeGLU activation
+  enc_ff_no_bias: true               # Bias-free architecture
+  enc_rotary_pos_emb: true           # RoPE positional embeddings
+  enc_rotary_pos_emb_base: 10000
+  enc_post_emb_norm: true            # Post-embedding normalization
+  enc_max_seq_len: 8192              # ModernBERT supports long contexts
+
+  # ========== DECODER: Gemma3 ==========
+  dec_heads: 4                       # Adjust based on Gemma3 model size
+  dec_attn_dim_head: 256              # Adjust based on Gemma3 head_dim
+  dec_attn_dropout: 0.0
+  dec_attn_qk_norm: true             # Q/K normalization (Gemma3 feature)
+  dec_attn_qk_norm_dim_scale: true   # Learnable QK norm scales
+  dec_attn_kv_heads: 1               # MQA (single key/value head)
+  dec_ff_mult: 4.0                   # Adjust based on Gemma3 intermediate_size
+  dec_ff_dropout: 0.0
+  dec_ff_glu: true                   # Gated MLP
+  dec_ff_no_bias: true               # Bias-free
+  dec_rotary_pos_emb: true           # RoPE
+  dec_rotary_pos_emb_base: 1000000   # Gemma3 global RoPE theta (1M)
+  dec_use_rmsnorm: true              # RMSNorm instead of LayerNorm
+  dec_sandwich_norm: true            # 4 norms per layer (Gemma3 specific)
+  dec_post_emb_norm: false           # Gemma3 has no post-emb norm
+  dec_max_seq_len: 8192              # Gemma3 max sequence length
+  dec_scaled_embeddings: true        # Gemma3 scales embeddings by sqrt(hidden_size)
+
+  # Position embeddings
+  use_abs_pos_emb: false             # No absolute positions (using RoPE)
+  tie_embedding: false               # Don't tie input/output embeddings
+  # ========== CROSS-ATTENTION BRIDGE ==========
+  # Tell decoder to expect encoder's dimension (768 from ModernBERT)
+  dec_cross_attn_dim_context: 768
+
+# Training parameters
+
+train_steps: 60000
+warmup_steps: 3000
+valid_steps: 3000
+valid_batch_size: 16
+valid_metrics: [bleu]   
+save_checkpoint_steps: 5000
+
+# Batch size and accumulation
+batch_size: 32
+accum_count: [2]
+
+# ============================================================================
+# Distributed Training (Single GPU)
+# ============================================================================
+world_size: 1
+gpu_ranks: [0]
+node_rank: 0
+
+# Optimization
+optim: adafactor                     # Memory-efficient optimizer
+learning_rate: 0.001
+adam_beta1: 0.9
+adam_beta2: 0.998
+weight_decay: 0.0
+max_grad_norm: 1.0
+
+# Learning rate schedule
+decay_method: noam
+learning_rate_decay: 1.0
+start_decay_steps: 45000
+
+# Regularization
+label_smoothing: 0.1
+
+reset_optim: none
+train_from: /scratch/project_462000964/members/wangchao/training/181125/model/30000/
+
+# Logging
+log_model_structure: false 
+report_every: 100
+report_training_accuracy: true 
+tensorboard: true
+tensorboard_log_dir: /scratch/project_462000964/members/wangchao/training/181125/runs/hybrid
+
+# Validation
+early_stopping: 5
+early_stopping_criteria: ppl         # Perplexity
+
+# Save options
+save_model: /scratch/project_462000964/members/wangchao/training/181125/model/
+keep_checkpoint: 5                  # Keep last 10 checkpoints
+
+# Seed for reproducibility
+seed: 42
+
+# Distributed training (adjust for multi-GPU)
+task_distribution_strategy: weighted_sampling

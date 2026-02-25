@@ -1,4 +1,5 @@
 """sub-module defining tasks, task specifications and task management objects."""
+
 from abc import ABC, abstractmethod
 from argparse import Namespace
 from collections import Counter, defaultdict, namedtuple
@@ -27,13 +28,13 @@ from mammoth.distributed.contexts import DeviceContext, WorldContext
 from mammoth.utils.logging import logger
 
 DatasetMetadata = namedtuple(
-    'DatasetMetadata',
-    'src_lang tgt_lang encoder_id decoder_id corpus_id encoder_adapter_ids decoder_adapter_ids'
+    "DatasetMetadata",
+    "src_lang tgt_lang encoder_id decoder_id corpus_id encoder_adapter_ids decoder_adapter_ids",
 )
 
 
 @dataclass
-class TaskSpecs():
+class TaskSpecs:
     node_rank: int
     local_rank: int
     src_lang: str
@@ -71,6 +72,7 @@ class BatchTaskSample:
     """
     A deterministicly random sample of one task per device, to be trained in a single batch.
     """
+
     # maps from global rank to Task
     tasks: Dict[int, TaskSpecs]
     training_step: int
@@ -80,11 +82,14 @@ class TaskDistributionStrategy(ABC):
     """
     An abstract task distribution strategy, controls which tasks will be scheduled next.
     """
+
     def __init__(self):
         self.training_step = 0
 
     @abstractmethod
-    def sample_corpus_ids(self, active_tasks: Dict[int, List[TaskSpecs]]) -> BatchTaskSample:
+    def sample_corpus_ids(
+        self, active_tasks: Dict[int, List[TaskSpecs]]
+    ) -> BatchTaskSample:
         """
         Select one task per device, to train on.
         active_tasks[global_rank] -> (task_id, weight)
@@ -107,7 +112,9 @@ class WeightedSamplingTaskDistributionStrategy(TaskDistributionStrategy):
         super().__init__()
         self.rng = np.random.default_rng(seed=seed)
 
-    def sample_corpus_ids(self, active_tasks: Dict[int, List[TaskSpecs]]) -> BatchTaskSample:
+    def sample_corpus_ids(
+        self, active_tasks: Dict[int, List[TaskSpecs]]
+    ) -> BatchTaskSample:
         result: Dict[int, str] = dict()
         for global_rank in sorted(active_tasks.keys()):
             tasks = active_tasks[global_rank]
@@ -133,7 +140,9 @@ class RoundRobinTaskDistributionStrategy(TaskDistributionStrategy):
     def __init__(self, seed: int):
         super().__init__()
 
-    def sample_corpus_ids(self, active_tasks: Dict[int, List[TaskSpecs]]) -> BatchTaskSample:
+    def sample_corpus_ids(
+        self, active_tasks: Dict[int, List[TaskSpecs]]
+    ) -> BatchTaskSample:
         result: Dict[int, str] = dict()
         for global_rank in sorted(active_tasks.keys()):
             tasks = active_tasks[global_rank]
@@ -145,21 +154,21 @@ class RoundRobinTaskDistributionStrategy(TaskDistributionStrategy):
 
 
 TASK_DISTRIBUTION_STRATEGIES = {
-    'weighted_sampling': WeightedSamplingTaskDistributionStrategy,
-    'roundrobin': RoundRobinTaskDistributionStrategy,
+    "weighted_sampling": WeightedSamplingTaskDistributionStrategy,
+    "roundrobin": RoundRobinTaskDistributionStrategy,
 }
 
 
 def get_adapter_ids(opts, corpus_opts, side):
-    if 'adapters' not in opts or 'adapters' not in corpus_opts:
+    if "adapters" not in opts or "adapters" not in corpus_opts:
         return []
     global_adapters_opt = opts.adapters.get(side, None)
-    corpus_adapter_opt = corpus_opts['adapters'].get(side, None)
+    corpus_adapter_opt = corpus_opts["adapters"].get(side, None)
     if not global_adapters_opt or not corpus_adapter_opt:
         return []
     result = []
     for adapter_group, sub_id in corpus_adapter_opt:
-        layer_stack_index = global_adapters_opt[adapter_group]['layer_stack_index']
+        layer_stack_index = global_adapters_opt[adapter_group]["layer_stack_index"]
         result.append((layer_stack_index, adapter_group, sub_id))
     return result
 
@@ -182,7 +191,9 @@ class TaskQueueManager:
         """
         self.tasks = tasks
         # TODO: no support for variable accumulation across training
-        self.accum_count = accum_count[0] if isinstance(accum_count, list) else accum_count
+        self.accum_count = (
+            accum_count[0] if isinstance(accum_count, list) else accum_count
+        )
         self.task_distribution_strategy_cls = task_distribution_strategy_cls
         self.world_context = world_context
         self.uses_adapters = uses_adapters
@@ -206,56 +217,71 @@ class TaskQueueManager:
         corpus_ids = sorted(opts.tasks.keys())
 
         if world_context.is_distributed():
-            if any(task.get('node_gpu', None) is not None for task in opts.tasks.values()):
+            if any(
+                task.get("node_gpu", None) is not None for task in opts.tasks.values()
+            ):
                 node_gpu = [
-                    tuple(int(y) for y in opts.tasks[corpus_id]['node_gpu'].split(':', 1))
-                    for corpus_id in corpus_ids]
+                    tuple(
+                        int(y) for y in opts.tasks[corpus_id]["node_gpu"].split(":", 1)
+                    )
+                    for corpus_id in corpus_ids
+                ]
             else:
                 # When --node_gpu is not set, assume an assigment that fills gpus in rank order
-                node_gpu = cls._default_node_gpu(n_tasks, world_context.n_nodes, world_context.gpus_per_node)
+                node_gpu = cls._default_node_gpu(
+                    n_tasks, world_context.n_nodes, world_context.gpus_per_node
+                )
         else:
             node_gpu = [(0, 0)] * n_tasks
 
         enc_sharing_group = [
-            opts.tasks[corpus_id].get('enc_sharing_group', None) for corpus_id in corpus_ids
+            opts.tasks[corpus_id].get("enc_sharing_group", None)
+            for corpus_id in corpus_ids
         ]
         dec_sharing_group = [
-            opts.tasks[corpus_id].get('dec_sharing_group', None) for corpus_id in corpus_ids
+            opts.tasks[corpus_id].get("dec_sharing_group", None)
+            for corpus_id in corpus_ids
         ]
         if any(x is not None for x in enc_sharing_group):
-            assert all(len(enc_ids) == len(opts.enc_layers) for enc_ids in enc_sharing_group)
+            assert all(
+                len(enc_ids) == len(opts.enc_layers) for enc_ids in enc_sharing_group
+            )
         else:
             # if no encoder sharing groups are defined,
             # it is assumed that there is only one encoder stack and it is language specific
             if not len(opts.enc_layers) == 1:
-                raise Exception('With more than one encoder stack, you must explictly define enc_sharing_group')
+                raise Exception(
+                    "With more than one encoder stack, you must explictly define enc_sharing_group"
+                )
         if any(x is not None for x in dec_sharing_group):
-            assert all(len(dec_ids) == len(opts.dec_layers) for dec_ids in dec_sharing_group)
+            assert all(
+                len(dec_ids) == len(opts.dec_layers) for dec_ids in dec_sharing_group
+            )
         else:
             # if no decoder sharing groups are defined,
             # it is assumed that there is only one decoder stack and it is language specific
             if not len(opts.dec_layers) == 1:
-                raise Exception('With more than one decoder stack, you must explictly define dec_sharing_group')
+                raise Exception(
+                    "With more than one decoder stack, you must explictly define dec_sharing_group"
+                )
 
-        task_distribution_strategy_cls = TASK_DISTRIBUTION_STRATEGIES[opts.task_distribution_strategy]
+        task_distribution_strategy_cls = TASK_DISTRIBUTION_STRATEGIES[
+            opts.task_distribution_strategy
+        ]
         tasks = []
         uses_adapters = False
-        for (
-            (node_rank, local_rank),
-            corpus_id
-        ) in zip(
-            node_gpu,
-            corpus_ids
-        ):
+        for (node_rank, local_rank), corpus_id in zip(node_gpu, corpus_ids):
             corpus_opts = opts.tasks[corpus_id]
-            src_lang, tgt_lang = corpus_opts['src_tgt'].split('-', 1)
-            encoder_id = corpus_opts.get('enc_sharing_group', [src_lang])
-            decoder_id = corpus_opts.get('dec_sharing_group', [tgt_lang])
-            weight = corpus_opts.get('weight', 1.0)
-            introduce_at_training_step = corpus_opts.get('introduce_at_training_step', 0)
-            if 'adapters' in corpus_opts:
-                encoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'encoder')
-                decoder_adapter_ids = get_adapter_ids(opts, corpus_opts, 'decoder')
+            src_lang, tgt_lang = corpus_opts["src_tgt"].split("-", 1)
+            encoder_id = corpus_opts.get("enc_sharing_group", [src_lang])
+            decoder_id = corpus_opts.get("dec_sharing_group", [tgt_lang])
+            weight = corpus_opts.get("weight", 1.0)
+            introduce_at_training_step = corpus_opts.get(
+                "introduce_at_training_step", 0
+            )
+            if "adapters" in corpus_opts:
+                encoder_adapter_ids = get_adapter_ids(opts, corpus_opts, "encoder")
+                decoder_adapter_ids = get_adapter_ids(opts, corpus_opts, "decoder")
                 uses_adapters = True
             else:
                 encoder_adapter_ids = None
@@ -290,7 +316,9 @@ class TaskQueueManager:
         assert local_rank is not None
         device_context = self.world_context.global_to_local(node_rank, local_rank)
         if self.task_distribution_strategy_cls is not None:
-            task_distribution_strategy = self.task_distribution_strategy_cls(seed=opts.seed)
+            task_distribution_strategy = self.task_distribution_strategy_cls(
+                seed=opts.seed
+            )
         else:
             task_distribution_strategy = None
         return LocalTaskQueueManager(
@@ -304,18 +332,22 @@ class TaskQueueManager:
         )
 
     def __repr__(self):
-        kwargs = ',\n '.join(
-            f'{key}={pformat(self.__getattribute__(key))}'
+        kwargs = ",\n ".join(
+            f"{key}={pformat(self.__getattribute__(key))}"
             for key in [
-                'tasks',
-                'world_context',
-                'uses_adapters',
+                "tasks",
+                "world_context",
+                "uses_adapters",
             ]
         )
-        return f'{self.__class__.__name__}(\n{kwargs}\n)'
+        return f"{self.__class__.__name__}(\n{kwargs}\n)"
 
     def _tasks_on_device(self, node_rank, local_rank):
-        return [task for task in self.tasks if (task.node_rank, task.local_rank) == (node_rank, local_rank)]
+        return [
+            task
+            for task in self.tasks
+            if (task.node_rank, task.local_rank) == (node_rank, local_rank)
+        ]
 
     def get_all_tasks(self):
         return self.tasks
@@ -325,7 +357,10 @@ class TaskQueueManager:
         for task in self.tasks:
             # TODO: DRY violation, this computation is implemented in many places
             global_rank = task.node_rank * self.gpus_per_node + task.local_rank
-            if task.introduce_at_training_step <= self.task_distribution_strategy.training_step:
+            if (
+                task.introduce_at_training_step
+                <= self.task_distribution_strategy.training_step
+            ):
                 result[global_rank].append(task)
         return result
 
@@ -409,7 +444,11 @@ class TaskQueueManager:
                     )
                 )
             if task.encoder_adapter_ids:
-                for layer_stack_index, adapter_group, sub_id in task.encoder_adapter_ids:
+                for (
+                    layer_stack_index,
+                    adapter_group,
+                    sub_id,
+                ) in task.encoder_adapter_ids:
                     builder.add(
                         DistributedAdapter(
                             global_ranks={global_rank},
@@ -422,7 +461,11 @@ class TaskQueueManager:
                         )
                     )
             if task.decoder_adapter_ids:
-                for layer_stack_index, adapter_group, sub_id in task.decoder_adapter_ids:
+                for (
+                    layer_stack_index,
+                    adapter_group,
+                    sub_id,
+                ) in task.decoder_adapter_ids:
                     builder.add(
                         DistributedAdapter(
                             global_ranks={global_rank},
@@ -439,7 +482,7 @@ class TaskQueueManager:
                     DistributedAttentionBridge(
                         global_ranks={global_rank},
                         task_ids={task.corpus_id},
-                        group=None
+                        group=None,
                     )
                 )
 
@@ -455,16 +498,16 @@ class TaskQueueManager:
                     # created in the same order in all processes.
                     component.group = new_group_func(sorted(component.global_ranks))
                 else:
-                    logger.info(f'{component.get_name()} is on a single device')
+                    logger.info(f"{component.get_name()} is on a single device")
 
         sorted_components = list(builder)
         self.distributed_components = sorted_components
         return sorted_components
 
     def get_langs(self, side):
-        if side == 'src':
+        if side == "src":
             return [task.src_lang for task in self.get_all_tasks()]
-        elif side == 'tgt':
+        elif side == "tgt":
             return [task.tgt_lang for task in self.get_all_tasks()]
         else:
             raise ValueError(f'side "{side}" not in {{src, tgt}}')
@@ -504,7 +547,9 @@ class LocalTaskQueueManager(TaskQueueManager):
         self.device_context = device_context
         self.task_distribution_strategy = task_distribution_strategy
 
-        logger.info(f'in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}')
+        logger.info(
+            f"in task_queue_manager: node_rank {self.node_rank} local_rank {self.local_rank}"
+        )
         self.device_context.validate(self.world_context)
         self._sanity_check_tasks()
 
@@ -512,18 +557,18 @@ class LocalTaskQueueManager(TaskQueueManager):
         self.my_distributed_components: Optional[List[DistributedComponent]] = None
 
     def __repr__(self):
-        kwargs = ',\n '.join(
-            f'{key}={pformat(self.__getattribute__(key))}'
+        kwargs = ",\n ".join(
+            f"{key}={pformat(self.__getattribute__(key))}"
             for key in [
-                'tasks',
-                'gpus_per_node',
-                'n_nodes',
-                'device_context',
-                'task_distribution_strategy',
-                'uses_adapters',
+                "tasks",
+                "gpus_per_node",
+                "n_nodes",
+                "device_context",
+                "task_distribution_strategy",
+                "uses_adapters",
             ]
         )
-        return f'{self.__class__.__name__}(\n{kwargs}\n)'
+        return f"{self.__class__.__name__}(\n{kwargs}\n)"
 
     def _sanity_check_tasks(self):
         my_corpus_ids = [task.corpus_id for task in self.get_my_tasks()]
@@ -535,13 +580,20 @@ class LocalTaskQueueManager(TaskQueueManager):
         assert len(my_corpus_ids) == len(my_weights)
         assert len(my_corpus_ids) == len(my_introduce_at_training_step)
         if len(my_corpus_ids) == 0:
-            raise ValueError('No corpora on device')
+            raise ValueError("No corpora on device")
         if sum(my_weights) <= 0:
             raise ValueError('Can not set "weight" of all corpora on a device to zero')
         if all(x > 0 for x in my_introduce_at_training_step):
-            raise ValueError('Can not set "introduce_at_training_step" of all corpora on a device to nonzero')
-        if all(weight == 0 or start > 0 for (weight, start) in zip(my_weights, my_introduce_at_training_step)):
-            raise ValueError('Invalid curriculum: no corpus is ready to start in the first step')
+            raise ValueError(
+                'Can not set "introduce_at_training_step" of all corpora on a device to nonzero'
+            )
+        if all(
+            weight == 0 or start > 0
+            for (weight, start) in zip(my_weights, my_introduce_at_training_step)
+        ):
+            raise ValueError(
+                "Invalid curriculum: no corpus is ready to start in the first step"
+            )
 
     @property
     def node_rank(self):
@@ -557,7 +609,7 @@ class LocalTaskQueueManager(TaskQueueManager):
 
     def get_my_distributed_components(self) -> List[DistributedComponent]:
         if self.distributed_components is None:
-            raise Exception('Call create_all_distributed_components first')
+            raise Exception("Call create_all_distributed_components first")
         if not self.my_distributed_components:
             my_global_rank = self.global_rank
             self.my_distributed_components = [
@@ -569,7 +621,9 @@ class LocalTaskQueueManager(TaskQueueManager):
 
     def sample_corpus_ids(self) -> BatchTaskSample:
         active_tasks: Dict[int, List[TaskSpecs]] = self.get_active_tasks()
-        batch_task_sample = self.task_distribution_strategy.sample_corpus_ids(active_tasks)
+        batch_task_sample = self.task_distribution_strategy.sample_corpus_ids(
+            active_tasks
+        )
         if self.global_rank is None or self.global_rank == 0:
             # Only track sampled_task_counts on the master device.
             # Every TQM (both data loader and trainer for every device) has access to the global info
@@ -597,7 +651,9 @@ class LocalTaskQueueManager(TaskQueueManager):
             # Determine whether we trained this component in this step
             has_local_gradient = my_task_id in component.task_ids
             # Determine how many in total trained this component
-            total_gradients = sum(task_id in component.task_ids for task_id in everyones_task_ids)
+            total_gradients = sum(
+                task_id in component.task_ids for task_id in everyones_task_ids
+            )
             if total_gradients == 0:
                 # Omit component if nobody trained it
                 # logger.warning(f'Omitting (nobody trained) {component.get_name()}')   # DEBUG
@@ -606,19 +662,25 @@ class LocalTaskQueueManager(TaskQueueManager):
             # Note that this normalization can not be token-based,
             # as we don't have access to the other device's batches, and we don't want to communicate the size.
             # However, each device can apply token-based normalization before sending the gradient.
-            result.append(DistributedComponentGradientSync(
-                component=component,
-                has_local_gradient=has_local_gradient,
-                gradient_norm=total_gradients,
-            ))
+            result.append(
+                DistributedComponentGradientSync(
+                    component=component,
+                    has_local_gradient=has_local_gradient,
+                    gradient_norm=total_gradients,
+                )
+            )
         return result
 
     def get_my_encoders(self, layer_stack_index: int):
-        my_encoder_ids = [task.encoder_id[layer_stack_index] for task in self.get_my_tasks()]
+        my_encoder_ids = [
+            task.encoder_id[layer_stack_index] for task in self.get_my_tasks()
+        ]
         return my_encoder_ids
 
     def get_my_decoders(self, layer_stack_index: int):
-        my_decoder_ids = [task.decoder_id[layer_stack_index] for task in self.get_my_tasks()]
+        my_decoder_ids = [
+            task.decoder_id[layer_stack_index] for task in self.get_my_tasks()
+        ]
         return my_decoder_ids
 
     def get_my_src_langs(self):
@@ -639,9 +701,9 @@ class LocalTaskQueueManager(TaskQueueManager):
         """
         seen = set()
         result = []
-        component_id = None     # for hysterical raisins
+        component_id = None  # for hysterical raisins
         for task in self.get_my_tasks():
-            if side == 'src':
+            if side == "src":
                 lang = task.src_lang
             else:
                 lang = task.tgt_lang

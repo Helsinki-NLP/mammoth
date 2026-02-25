@@ -118,6 +118,11 @@ class DistributedTransformerWrapper(DistributedComponent, ABC):
     def state_dict(self, model: NMTModel, prefix='', keep_vars=False) -> Dict[str, Any]:
         module = self.get_module(model)
         destination: Dict[str, Any] = OrderedDict()
+        # Save direct parameters (e.g., final_logits_bias)
+        for name, param in module._parameters.items():
+            if param is not None:
+                destination[prefix + name] = param if keep_vars else param.detach()
+        # Save submodules
         for name, sub_module in module._modules.items():
             if name in {'attn_layers', 'token_emb'}:
                 # stored separately

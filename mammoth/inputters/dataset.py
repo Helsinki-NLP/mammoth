@@ -43,6 +43,7 @@ def read_examples_from_files(
     transforms_fn=lambda x: x,
     stride=None,
     offset=None,
+    is_train=False,
 ):
     """Helper function to read examples"""
 
@@ -56,11 +57,23 @@ def read_examples_from_files(
     def _make_example_dict(packed):
         """Helper function to convert lines to dicts"""
         src_str, tgt_str = packed
+        line_idx = next(line_idx_generator)
+
+        # Log first 5 lines of this training session for dataset continuation testing
+        # Only log during training, not validation (validation always resets to line 1)
+        start_line = offset if offset is not None else 0
+        if is_train and line_idx < start_line + 5:
+            logger.info(
+                f"[DataLoader] Line {line_idx + 1}: "
+                f"SRC={src_str.strip()[:100]} "
+                f"TGT={tgt_str.strip()[:100] if tgt_str else 'None'}"
+            )
+
         return {
             'src': tokenize_fn(src_str, side='src'),
             'tgt': tokenize_fn(tgt_str, side='tgt') if tgt_str is not None else None,
             # 'align': None,
-            'line_idx': next(line_idx_generator)
+            'line_idx': line_idx,
         }
 
     if isinstance(src_path, IOBase):
@@ -82,6 +95,9 @@ def read_examples_from_files(
     if stride is not None and offset is not None:
         # Start by skipping offset examples. After that return every stride:th example.
         examples = itertools.islice(examples, offset, None, stride)
+    elif offset is not None:
+        # No stride, but we need to skip to the offset position for dataset continuation
+        examples = itertools.islice(examples, offset, None)
     examples = map(_make_example_dict, examples)
     examples = map(transforms_fn, examples)
     examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
@@ -109,6 +125,7 @@ class ParallelCorpus(IterableDataset):
         task=None,
         max_length=None,
         line_idx_restore=None,
+        model_max_seq_len=None,
     ):
         self.src_file = src_file
         self.tgt_file = tgt_file
@@ -122,13 +139,26 @@ class ParallelCorpus(IterableDataset):
         self.offset = offset
         self.is_train = is_train
         self.corpus_id = task.corpus_id
-        self.max_length = max_length
+        self.max_length = max_length # for padding
+        self.model_max_seq_len = model_max_seq_len
         self._line_idx_restore = line_idx_restore
 
-    # FIXME: most likely redundant with mammoth.transforms.tokenize
     def _tokenize(self, string, side='src'):
-        """Split string, accompanied by a drumroll"""
-        return string.split()
+        """
+        Split string into tokens.
+
+        If using HFTokenizerVocab, applies subword tokenization directly.
+        Otherwise, performs simple whitespace splitting for word-level tokens.
+        """
+        vocab = self.vocabs[side]
+        from mammoth.inputters.vocab import HFTokenizerVocab
+
+        if isinstance(vocab, HFTokenizerVocab):
+            # Use HF tokenizer to get subword tokens
+            return vocab.tokenize(string, is_train=self.is_train)
+        else:
+            # Traditional word-level tokenization (whitespace split)
+            return string.split()
 
     def _maybe_numericalize(self, key, value):
         """Convert list of strings into list of indices"""
@@ -139,11 +169,89 @@ class ParallelCorpus(IterableDataset):
         bos = vocab[DefaultTokens.BOS]
         eos = vocab[DefaultTokens.EOS]
         unk = vocab[DefaultTokens.UNK]
-        indices = torch.tensor([
-            bos,
-            *(vocab.stoi.get(token, unk) for token in tokens),
-            eos,
-        ], device='cpu')
+
+        # Check if using HuggingFace tokenizer
+        from mammoth.inputters.vocab import HFTokenizerVocab
+        if isinstance(vocab, HFTokenizerVocab):
+            # For HF tokenizers, tokens are already tokenized subwords (e.g., ['▁Hello', '▁world'])
+            # Look up each token's ID directly instead of re-encoding
+            # (Re-encoding would treat '▁' as literal text and produce wrong tokenization)
+            token_ids = []
+            for token in tokens:
+                token_id = vocab.tokenizer.token_to_id(token)
+                if token_id is None:
+                    # Token not in vocabulary, use UNK
+                    token_ids.append(unk)
+                else:
+                    token_ids.append(token_id)
+
+            # Strip HF-added special tokens that conflict with MAMMOTH's BOS/EOS
+            # Different HF models use different special tokens:
+            # - BERT/ModernBERT: [CLS], [SEP]
+            # We strip common ones to avoid double-wrapping
+            special_tokens_to_strip = set()
+
+            # Collect special token IDs (if they exist in tokenizer)
+            for token_str in ['[CLS]', '[SEP]', '<s>', '</s>', '<bos>', '<eos>']:
+                token_id = vocab.tokenizer.token_to_id(token_str)
+                if token_id is not None:
+                    special_tokens_to_strip.add(token_id)
+
+            # Track which tokens were actually stripped
+            actually_stripped = []
+
+            # Strip from beginning
+            while token_ids and token_ids[0] in special_tokens_to_strip:
+                actually_stripped.append(token_ids[0])
+                token_ids = token_ids[1:]
+
+            # Strip from end
+            while token_ids and token_ids[-1] in special_tokens_to_strip:
+                actually_stripped.append(token_ids[-1])
+                token_ids = token_ids[:-1]
+
+            # Log a few examples for debugging
+            import random
+            if random.random() < 0.0001:  # Log ~0.1% of examples
+                logger.info(f'HF Tokenizer {side} direct lookup example:')
+                logger.info(f'  Input tokens: {tokens[:10]}...')
+                logger.info(f'  Token IDs: {token_ids[:10]}...')
+                if actually_stripped:
+                    logger.info(f'  Stripped special tokens: {actually_stripped}')
+
+            # BART-specific: decoder sequences start with </s> (EOS) then <s> (BOS)
+            # For BART decoder: [</s>, <s>, tokens..., </s>]
+            # For others: [<s>, tokens..., </s>]
+            if side == 'tgt' and hasattr(vocab, 'decoder_start_with_eos') and vocab.decoder_start_with_eos:
+                indices = torch.tensor([eos, bos, *token_ids, eos], device='cpu')
+            else:
+                indices = torch.tensor([bos, *token_ids, eos], device='cpu')
+
+            # Debug: Catch sequences that will exceed positional embedding limit
+            final_length = len(indices)
+            if self.model_max_seq_len is not None:
+                if final_length > self.model_max_seq_len:
+                    logger.error(
+                        f"❌ SEQUENCE TOO LONG AFTER NUMERICALIZATION! {side.upper()}\n"
+                        f"   Token count: {len(tokens)}\n"
+                        f"   Token IDs: {len(token_ids)}\n"
+                        f"   Final tensor length (with special tokens): {final_length}\n"
+                        f"   Exceeds limit by: {final_length - self.model_max_seq_len} tokens\n"
+                        f"   First 30 tokens: {tokens[:30]}\n"
+                        f"   Last 30 tokens: {tokens[-30:]}\n"
+                    )
+                elif final_length > self.model_max_seq_len - 5:
+                    logger.warning(
+                        f"⚠️  Sequence near limit after numericalization. {side}: "
+                        f"tokens={len(tokens)} → token_ids={len(token_ids)} → final={final_length}"
+                    )
+        else:
+            # Traditional vocab: lookup tokens individually
+            indices = torch.tensor([
+                bos,
+                *(vocab.stoi.get(token, unk) for token in tokens),
+                eos,
+            ], device='cpu')
         return indices
 
     def _pad_sequence(self, tensors: list, padding_value: int = 0):
@@ -199,6 +307,7 @@ class ParallelCorpus(IterableDataset):
             ),
             stride=self.stride,
             offset=offset,
+            is_train=self.is_train,
         )
         examples = map(_cast, examples)
         yield from examples
@@ -249,6 +358,7 @@ def get_corpus(
     transforms_to_apply = [transforms_cls[trf_name] for trf_name in transforms_to_apply]
 
     max_length = None
+    model_max_seq_len = opts.max_length
     if opts.pad_to_max_length:
         assert opts.max_length is not None and opts.max_length > 0, 'Please provide a --max_length'
         max_length = opts.max_length
@@ -265,6 +375,7 @@ def get_corpus(
         task=task,
         max_length=max_length,
         line_idx_restore=line_idx_restore,
+        model_max_seq_len=model_max_seq_len,
     )
     return dataset
 

@@ -1,0 +1,67 @@
+# Inference configuration template
+# Disclaimer: Model training settings, parameters and values are only for testing purpose. 
+
+# Task Configuration
+task_id: task_en_fi # A standalone task_id is required for inferencing
+
+tasks:
+  task_en_fi:
+    src_tgt: "en-fi"
+    node_gpu: 0:0
+    enc_sharing_group: ["en"]
+    dec_sharing_group: ["fi"]
+
+# ============================================================================
+# Vocabulary Configuration - HuggingFace Tokenizer
+# ============================================================================
+use_hf_tokenizer: true
+
+src_vocab:
+  en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+
+tgt_vocab:
+  fi: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
+
+src_seq_length_max: 256
+src_seq_length_min: 10
+tgt_seq_length_max: 256
+tgt_seq_length_min: 10
+max_length: 256
+
+# ============================================================================
+# Model Arcfitecture  (must match training)
+# ============================================================================
+enc_layers: [22]
+dec_layers: [6]
+
+model_dim: 768
+model_dtype: bf16
+dropout: [0.0]
+
+
+# ============================================================================
+# Inference Configuration
+# ============================================================================
+# Model checkpoint to load
+model: 
+
+# Input/output files
+src: 
+output: 
+
+# Decoding parameters
+beam_size: 5
+batch_size: 32
+batch_type: sents
+
+# GPU settings
+gpu: 0
+world_size: 1
+gpu_ranks: [0]
+
+# Report settings
+report_time: true
+# verbose: true # currently not supported in inference, need to modify code to enable it
+
+# Random seed
+seed: 42

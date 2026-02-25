@@ -1,0 +1,102 @@
+# Training configuration for single GPU 
+# Disclaimer: Model training settings, parameters and values are only for testing purpose. 
+
+# Task Configuration
+tasks:
+  task_en_fi:
+    src_tgt: "en-fi"  # Source-target language pair
+    weight: 1.0       # Task weight for sampling
+    introduce_at_training_step: 0 # Mammoth natively supports curriculum learning
+    node_gpu: 0:0   # Single GPU configuration
+    enc_sharing_group: ["en"]
+    dec_sharing_group: ["fi"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt
+    
+
+src_seq_length_max: 256
+tgt_seq_length_max: 256
+src_seq_length_min: 10
+tgt_seq_length_min: 10
+max_length: 256 
+
+# Data Configuration
+
+use_hf_tokenizer: true
+# override_checkpoint_vocab: true # only works when 'train_from' is used
+
+src_vocab:
+  en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+
+tgt_vocab:
+  fi: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
+
+
+# Model Architecture Options
+enc_layers: [6]                   # Encoder layers
+dec_layers: [6]                   # Decoder layers
+model_dim: 768
+model_dim: 768                # Hidden dimension
+model_dtype: bf16             # BFloat16 for better training stability
+dropout: [0.0]                # ModernBERT uses no dropout during training
+
+
+# x-transformers specific options
+x_transformers_opts:
+  attn_flash: true                # Enable Flash Attention for ModernBERT-style unpadding
+
+
+# Training Configuration
+
+# Training specifics
+train_steps: 25000
+accum_count: [1]                  # gradient accumulation
+batch_size: 8192
+batch_type: tokens                    # adjust based on GPU memory
+valid_batch_size: 4096          # validation batch size
+normalization: tokens
+valid_steps: 5000               # validation frequency    
+valid_metrics: [bleu]              # Mammoth only supports `bleu` for in-training-validation as of Dec 2025
+save_checkpoint_steps: 5000       # checkpoint saving frequency
+keep_checkpoint: 5               # number of checkpoints to keep
+
+# Optimizer settings (from create_opts)
+optim: adamw
+learning_rate: 0.00001
+adam_beta1: 0.9
+adam_beta2: 0.999
+weight_decay: 0.0
+max_grad_norm: 1.0
+
+# Learning rate scheduling
+warmup_steps: 2000
+decay_method: linear_warmup
+learning_rate_decay: 0
+start_decay_steps: 0
+
+# Distributed training (single GPU setup)
+world_size: 1
+gpu_ranks: [0]
+task_distribution_strategy: weighted_sampling
+node_rank: 0
+
+
+
+# Logging and Monitoring
+
+log_model_structure: false         # log model structure
+tensorboard: true                # enable tensorboard logging
+# tensorboard_log_dir: ./run     # tensorboard log directory, use tensorboard app on LUMI dashboard for visualization
+report_every: 100
+report_training_accuracy: true     # reporting accuracy
+
+# Miscellaneous
+seed: 42                            # random seed
+# train_from: /scratch/project_462000964/members/wangchao/training/converted_models/en_es/   # path to pretrained model (null for from scratch)
+reset_optim: all               # reset optimizer state
+
+# Model saving
+save_model: /scratch/project_462000964/members/wangchao/training/081225/models/  # model save path

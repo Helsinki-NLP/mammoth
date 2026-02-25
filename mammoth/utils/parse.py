@@ -32,6 +32,30 @@ class DataOptsCheckerMixin(object):
             raise IOError(f"Please check path of your {info} file! {file_path}")
 
     @classmethod
+    def _validate_save_model_path(cls, opts):
+        """Validate save_model path early to catch directory issues before training starts."""
+        save_model_path = os.path.abspath(opts.save_model)
+        save_dir = os.path.dirname(save_model_path)
+        
+        # Check if the directory exists or can be created
+        try:
+            os.makedirs(save_dir, exist_ok=True)
+        except (OSError, PermissionError) as e:
+            raise IOError(
+                f"Cannot create directory for save_model path '{save_model_path}'. "
+                f"Please check the path and permissions. Error: {e}"
+            )
+        
+        # Check if the directory is writable
+        if not os.access(save_dir, os.W_OK):
+            raise IOError(
+                f"Directory '{save_dir}' is not writable. "
+                f"Please check permissions for save_model path '{save_model_path}'"
+            )
+        
+        logger.info(f"Validated save_model path: {save_model_path}")
+
+    @classmethod
     def _validate_adapters(cls, opts):
         """Parse corpora specified in data field of YAML file."""
         if not opts.adapters:
@@ -256,18 +280,38 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             model_opts.model_dim = model_opts.model_dim
             model_opts.model_dim = model_opts.model_dim
 
-        # Backward compatibility with "fix_word_vecs_*" opts
-        if hasattr(model_opts, 'fix_word_vecs_enc'):
-            model_opts.freeze_word_vecs_enc = model_opts.fix_word_vecs_enc
-        if hasattr(model_opts, 'fix_word_vecs_dec'):
-            model_opts.freeze_word_vecs_dec = model_opts.fix_word_vecs_dec
-
     @classmethod
     def validate_x_transformers_opts(cls, opts):
         if not opts.x_transformers_opts:
             opts.x_transformers_opts = dict()
-            return
-        opts_dict = yaml_or_dict(opts.x_transformers_opts, name="opts.x_transformers_opts")
+        else:
+            opts.x_transformers_opts = yaml_or_dict(opts.x_transformers_opts, name="opts.x_transformers_opts")
+
+        opts_dict = opts.x_transformers_opts
+
+        # Transfer sliding window CLI options to x_transformers_opts
+        # These options support enc_/dec_ prefixes for side-specific configuration
+        if hasattr(opts, 'enc_sliding_window') and opts.enc_sliding_window is not None:
+            opts_dict['enc_sliding_window'] = opts.enc_sliding_window
+        if hasattr(opts, 'dec_sliding_window') and opts.dec_sliding_window is not None:
+            opts_dict['dec_sliding_window'] = opts.dec_sliding_window
+        if hasattr(opts, 'enc_global_attn_every_n_layers') and opts.enc_global_attn_every_n_layers is not None:
+            opts_dict['enc_global_attn_every_n_layers'] = opts.enc_global_attn_every_n_layers
+        if hasattr(opts, 'dec_global_attn_every_n_layers') and opts.dec_global_attn_every_n_layers is not None:
+            opts_dict['dec_global_attn_every_n_layers'] = opts.dec_global_attn_every_n_layers
+
+        # Transfer RoPE theta options for layer-specific sliding window attention
+        # These options support enc_/dec_ prefixes for side-specific configuration
+        if hasattr(opts, 'enc_global_rope_theta') and opts.enc_global_rope_theta is not None:
+            opts_dict['enc_global_rope_theta'] = opts.enc_global_rope_theta
+        if hasattr(opts, 'enc_local_rope_theta') and opts.enc_local_rope_theta is not None:
+            opts_dict['enc_local_rope_theta'] = opts.enc_local_rope_theta
+        if hasattr(opts, 'dec_global_rope_theta') and opts.dec_global_rope_theta is not None:
+            opts_dict['dec_global_rope_theta'] = opts.dec_global_rope_theta
+        if hasattr(opts, 'dec_local_rope_theta') and opts.dec_local_rope_theta is not None:
+            opts_dict['dec_local_rope_theta'] = opts.dec_local_rope_theta
+
+        opts.x_transformers_opts = opts_dict
         for overwritten_key in (
             'dim',
             'depth',
@@ -291,11 +335,11 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         # Mammoth has a different default value than x-transformers,
         # but you can set these explicitly
         if 'use_simple_rmsnorm' not in opts_dict:
-            opts_dict['use_simple_rmsnorm'] = True
+            opts_dict['use_simple_rmsnorm'] = False
         if 'attn_flash' not in opts_dict:
             opts_dict['attn_flash'] = True
-        if 'ff_glu' not in opts_dict:
-            opts_dict['ff_glu'] = True
+        if 'ff_glu' not in opts_dict and 'enc_ff_glu' not in opts_dict and 'dec_ff_glu' not in opts_dict:
+            opts_dict['ff_glu'] = False
 
         opts.x_transformers_opts = opts_dict
 
@@ -325,6 +369,9 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
     def validate_train_opts(cls, opts):
         if opts.epochs:
             raise AssertionError("-epochs is deprecated please use -train_steps.")
+
+        # Validate save_model path early to catch directory issues before training starts
+        cls._validate_save_model_path(opts)
 
         if torch.cuda.is_available() and not opts.gpu_ranks:
             logger.warn("You have a CUDA device, should run with -gpu_ranks")

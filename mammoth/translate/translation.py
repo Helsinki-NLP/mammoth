@@ -31,14 +31,38 @@ class TranslationBuilder(object):
         vocab = self.vocabs['tgt']
         tokens = []
 
-        for tok in pred:
-            if tok < len(vocab):
-                tokens.append(vocab.itos[tok.item()])
-            else:
-                tokens.append(src_vocab.itos[tok.item() - len(vocab)])
-            if tokens[-1] == DefaultTokens.EOS:
-                tokens = tokens[:-1]
-                break
+        # Check if using HuggingFace tokenizer
+        from mammoth.inputters.vocab import HFTokenizerVocab
+        is_hf_tokenizer = isinstance(vocab, HFTokenizerVocab)
+
+        if is_hf_tokenizer:
+            # For HF tokenizers, collect all token IDs first, then decode as a sequence
+            token_ids = []
+            for tok in pred:
+                tok_id = tok.item()
+                # Stop at EOS token (don't include it in the token_ids list)
+                if tok_id == vocab.specials.get(DefaultTokens.EOS):
+                    break
+                token_ids.append(tok_id)
+
+            # Use tokenizer's decode method to properly handle BPE merging
+            decoded_text = vocab.decode_tokens(token_ids, skip_special_tokens=True)
+            # Replace embedded newlines with spaces (model may generate newlines from training data)
+            # and normalize multiple spaces to single space
+            decoded_text = ' '.join(decoded_text.split())
+            # Return as single-element list containing the fully decoded text
+            # This prevents re-splitting subword tokens
+            tokens = [decoded_text] if decoded_text else []
+        else:
+            # Original logic for traditional vocab
+            for tok in pred:
+                if tok < len(vocab):
+                    tokens.append(vocab.itos[tok.item()])
+                else:
+                    tokens.append(src_vocab.itos[tok.item() - len(vocab)])
+                if tokens[-1] == DefaultTokens.EOS:
+                    break
+
         return tokens
 
     def from_batch(self, translation_batch):
@@ -117,17 +141,19 @@ class Translation(object):
         pred_scores (List[List[float]]): Log-probs of n-best translations.
         gold_sent (List[str]): Words from gold translation.
         gold_score (List[float]): Log-prob of gold translation.
+        word_aligns (List[List]): Word alignment info.
     """
 
-    __slots__ = ["src", "src_raw", "pred_sents", "pred_scores", "gold_sent", "gold_score"]
+    __slots__ = ["src", "src_raw", "pred_sents", "pred_scores", "gold_sent", "gold_score", "word_aligns"]
 
-    def __init__(self, src, src_raw, pred_sents, pred_scores, tgt_sent, gold_score):
+    def __init__(self, src, src_raw, pred_sents, pred_scores, tgt_sent, gold_score, word_aligns=None):
         self.src = src
         self.src_raw = src_raw
         self.pred_sents = pred_sents
         self.pred_scores = pred_scores
         self.gold_sent = tgt_sent
         self.gold_score = gold_score
+        self.word_aligns = word_aligns
 
     def log(self, sent_number):
         """

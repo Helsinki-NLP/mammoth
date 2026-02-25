@@ -34,6 +34,9 @@ class Statistics(object):
         self.magnitude_denom = 0
         self.param_magnitudes = Counter()
         self.grad_magnitudes = Counter()
+        
+        # validation metrics
+        self.validation_metrics = {}
 
     @classmethod
     def from_loss_logits_target(cls, loss: float, logits, target, padding_idx):
@@ -113,6 +116,15 @@ class Statistics(object):
 
         if update_n_src_words:
             self.n_src_words += stat.n_src_words
+            
+        # Update validation metrics
+        for metric_name, metric_value in stat.validation_metrics.items():
+            if metric_name in self.validation_metrics:
+                # For metrics like BLEU, we may want to average or accumulate differently
+                # For now, we'll take the latest value (could be enhanced later)
+                self.validation_metrics[metric_name] = metric_value
+            else:
+                self.validation_metrics[metric_name] = metric_value
 
     def update_task_loss(self, loss, metadata):
         if not loss:

@@ -24,6 +24,10 @@ from mammoth.inputters import DynamicDatasetIter
 from mammoth.utils.parse import ArgumentParser
 from mammoth.opts import train_opts
 from mammoth.inputters import get_vocab, DEFAULT_SPECIALS
+from mammoth.inputters.language_tokens import (
+    extract_language_tokens_from_config,
+    add_language_tokens_to_tokenizer,
+)
 from mammoth.transforms import get_transforms_cls
 from collections import OrderedDict
 from mammoth.constants import ModelTask
@@ -92,14 +96,150 @@ def train(opts):
     checkpoint_path = None
     if opts.train_from:
         frame_checkpoint, checkpoint_path = load_frame_checkpoint(checkpoint_path=opts.train_from)
-        vocabs_dict = frame_checkpoint.get('vocab')
+
+        # Check if we should override checkpoint vocab with config vocab
+        override_checkpoint_vocab = getattr(opts, 'override_checkpoint_vocab', False)
+        use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False)
+
+        if override_checkpoint_vocab and use_hf_tokenizer:
+            logger.info("Overriding checkpoint vocabulary with config HuggingFace tokenizers (override_checkpoint_vocab=True)")
+
+            # Get all languages from tasks
+            src_langs = global_task_queue_manager.get_langs('src')
+            tgt_langs = global_task_queue_manager.get_langs('tgt')
+
+            # Build tokenizer paths from config
+            src_tokenizer_paths = {}
+            tgt_tokenizer_paths = {}
+
+            for lang in src_langs:
+                src_tokenizer_paths[lang] = opts.src_vocab[lang]
+
+            for lang in tgt_langs:
+                tgt_tokenizer_paths[lang] = opts.tgt_vocab[lang]
+
+            # Use the vocab module function to build vocabs_dict
+            try:
+                from mammoth.inputters.vocab import create_vocabs_dict_from_hf_tokenizer
+
+                # Handle multiple source languages (use first one as primary)
+                primary_src_lang = src_langs[0]
+                primary_src_tokenizer = src_tokenizer_paths[primary_src_lang]
+
+                # Check if all target languages use the same tokenizer as source
+                all_tgt_same_as_src = all(
+                    tgt_tokenizer_paths[lang] == primary_src_tokenizer for lang in tgt_langs
+                )
+
+                if all_tgt_same_as_src:
+                    # Shared tokenizer mode
+                    logger.info(f"Using shared tokenizer for all languages: {primary_src_tokenizer}")
+                    vocabs_dict = create_vocabs_dict_from_hf_tokenizer(
+                        src_tokenizer_path=primary_src_tokenizer,
+                        tgt_tokenizer_paths=None,  # Use shared tokenizer
+                        src_lang=primary_src_lang,
+                        tgt_langs=tgt_langs
+                    )
+                else:
+                    # Separate tokenizers mode
+                    logger.info("Using separate tokenizers for different languages")
+                    vocabs_dict = create_vocabs_dict_from_hf_tokenizer(
+                        src_tokenizer_path=primary_src_tokenizer,
+                        tgt_tokenizer_paths=tgt_tokenizer_paths,
+                        src_lang=primary_src_lang,
+                        tgt_langs=tgt_langs
+                    )
+
+                # Add additional source languages if needed
+                for lang in src_langs[1:]:
+                    if src_tokenizer_paths[lang] == primary_src_tokenizer:
+                        # Shared tokenizer - reuse existing vocab type with different tag
+                        from mammoth.inputters.vocab import HFTokenizerVocab
+                        src_vocab = HFTokenizerVocab(
+                            tokenizer_path=src_tokenizer_paths[lang],
+                            tag=f"src_{lang}",
+                        )
+                        vocabs_dict[("src", lang)] = src_vocab
+                    else:
+                        # Separate tokenizer - create separate vocabs dict and merge
+                        additional_src_vocabs = create_vocabs_dict_from_hf_tokenizer(
+                            src_tokenizer_path=src_tokenizer_paths[lang],
+                            tgt_tokenizer_paths=None,  # No target langs for this call
+                            src_lang=lang,
+                            tgt_langs=[]  # No target languages
+                        )
+                        vocabs_dict.update(additional_src_vocabs)
+
+                logger.info(f"Built vocabulary from config tokenizers: {len(vocabs_dict)} vocabularies")
+
+                # Log vocabulary sizes for comparison
+                checkpoint_vocab_sizes = {k: len(v) for k, v in frame_checkpoint.get('vocab', {}).items()}
+                config_vocab_sizes = {k: len(v) for k, v in vocabs_dict.items()}
+                logger.info(f"Checkpoint vocab sizes: {checkpoint_vocab_sizes}")
+                logger.info(f"Config vocab sizes: {config_vocab_sizes}")
+
+            except ImportError as e:
+                logger.error(f"Failed to import create_vocabs_dict_from_hf_tokenizer: {e}")
+                logger.error("Falling back to checkpoint vocabulary")
+                vocabs_dict = frame_checkpoint.get('vocab')
+            except Exception as e:
+                logger.error(f"Failed to build vocabulary from config tokenizers: {e}")
+                logger.error("Falling back to checkpoint vocabulary")
+                vocabs_dict = frame_checkpoint.get('vocab')
+
+        else:
+            if override_checkpoint_vocab and not use_hf_tokenizer:
+                logger.warning("override_checkpoint_vocab=True but use_hf_tokenizer=False. "
+                             "This option only works with HuggingFace tokenizers. "
+                             "Falling back to checkpoint vocabulary.")
+            logger.info("Using checkpoint vocabulary (override_checkpoint_vocab=False or not applicable)")
+            vocabs_dict = frame_checkpoint.get('vocab')
     else:
         vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
+        use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False)
+
+        # Extract and add language tokens to HF tokenizers if enabled
+        if use_hf_tokenizer and getattr(opts, 'add_language_tokens', True):
+            # Reuse the language tokens already collected by transforms (if any)
+            # These are the same tokens from src_prefix/tgt_prefix in task configs
+            language_tokens = set()
+            if transforms_cls and 'prefix' in transforms_cls:
+                from mammoth.transforms.misc import PrefixTransform
+                src_prefix_tokens, tgt_prefix_tokens = PrefixTransform.get_specials(opts)
+                language_tokens = src_prefix_tokens | tgt_prefix_tokens
+                logger.info(f"Extracted {len(language_tokens)} language tokens from PrefixTransform")
+            else:
+                # Fallback: extract directly from config if prefix transform not used
+                language_tokens = extract_language_tokens_from_config(opts)
+                logger.info(f"Extracted {len(language_tokens)} language tokens directly from config")
+
+            if language_tokens:
+                # Track which tokenizer files we've already modified to avoid duplicate work
+                processed_tokenizer_paths = set()
+
+                for side in ('src', 'tgt'):
+                    for lang in global_task_queue_manager.get_langs(side):
+                        vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
+
+                        # Only process each unique tokenizer file once
+                        if vocab_path not in processed_tokenizer_paths and vocab_path.endswith('.json'):
+                            try:
+                                add_language_tokens_to_tokenizer(vocab_path, language_tokens, inplace=True)
+                                processed_tokenizer_paths.add(vocab_path)
+                            except Exception as e:
+                                logger.warning(f"Failed to add language tokens to {vocab_path}: {e}")
+
         for side in ('src', 'tgt'):
             for lang in global_task_queue_manager.get_langs(side):
                 vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
+                # BART-specific: decoder sequences start with </s> (EOS) then <s> (BOS)
+                decoder_start_with_eos = getattr(opts, 'decoder_start_with_eos', False) and side == 'tgt'
                 # FIXME: for now, all specials are passed to all vocabs, this could be finer-grained
-                vocabs_dict[(side, lang)] = get_vocab(vocab_path, lang, vocab_size[side], specials=all_specials)
+                vocabs_dict[(side, lang)] = get_vocab(
+                    vocab_path, lang, vocab_size[side],
+                    specials=all_specials, use_hf_tokenizer=use_hf_tokenizer,
+                    decoder_start_with_eos=decoder_start_with_eos
+                )
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
@@ -211,9 +351,26 @@ def train(opts):
     for p in procs:
         logger.info("DD logger")
         p.join()
-    # Once training is done, we can terminate the producers
+
+    # Gracefully shutdown producers by sending termination signal
+    logger.info("Training complete, shutting down producers...")
     for p in producers:
         p.terminate()
+
+    # Wait for producers to finish cleanup (with timeout)
+    for i, p in enumerate(producers):
+        p.join(timeout=5)
+        if p.is_alive():
+            logger.warning(f"Producer {i} did not terminate gracefully, force killing...")
+            p.kill()
+
+    # Clean up queues and semaphores to prevent resource leaks
+    logger.info("Cleaning up queues and semaphores...")
+    for q in queues:
+        q.close()
+        q.join_thread()
+
+    logger.info("Shutdown complete")
 
 
 def _get_parser():

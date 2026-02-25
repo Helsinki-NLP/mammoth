@@ -117,3 +117,8 @@ sftp.config*.json
 #vim
 *.swp
 *.swo
+*.ipynb
+
+# claude
+CLAUDE.md
+.claude/*

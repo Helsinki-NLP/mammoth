@@ -1,0 +1,6 @@
+# Ignore everything at repo root
+/*
+
+# But keep these:
+!/.gitignore
+!/README.md

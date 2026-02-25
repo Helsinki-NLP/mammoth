@@ -1,0 +1,226 @@
+# save_model:       # do not use, use CLI arg --save_model instead
+# save_data:        # do not use, use CLI arg --save_data  instead
+# save_config:      # do not use, sbatch copies this to logs
+# log_file:         # do not use, use --output and --error of sbatch
+# structured_log_file:  #
+
+# ============================================================================
+# Distributed Training Configuration (7-node, 7 GPU setup)
+# This is not a good practice but run once in order to analyze the comms 
+# ============================================================================
+n_nodes: 4          # Number of physical nodes (nnodes) = SLURM_NNODES
+
+world_size: 4       # PyTorch's global world size: # of GPUs across all nodes
+                    # n_nodes * gpus_per_node
+
+gpu_ranks: [0]  # the set {0...world_soze-1}, partitioned per node
+
+# List of global ranks that actually host a model replica on this node
+# For multi-node, each node gets a different slice, e.g. node 0: [0..7], node 1: [8..15], etc.
+
+src_vocab:
+  eng: /scratch/project_462000964/shared/nemotron/10k/vocabs/eng/tokenizer.json
+  fin: /scratch/project_462000964/shared/nemotron/10k/vocabs/fin/tokenizer.json
+#  swe: /scratch/project_462000964/shared/nemotron/10k/vocabs/swe/tokenizer.json
+#  deu: /scratch/project_462000964/shared/nemotron/10k/vocabs/deu/tokenizer.json
+tgt_vocab:
+  eng: /scratch/project_462000964/shared/nemotron/10k/vocabs/eng/tokenizer.json
+  fin: /scratch/project_462000964/shared/nemotron/10k/vocabs/fin/tokenizer.json
+#  swe: /scratch/project_462000964/shared/nemotron/10k/vocabs/swe/tokenizer.json
+#  deu: /scratch/project_462000964/shared/nemotron/10k/vocabs/deu/tokenizer.json
+
+tasks:
+  eng-fin:
+    src_tgt: eng-fin
+    path_src: /scratch/project_462000964/shared/nemotron/10k/eng-train-00.txt
+    path_tgt: /scratch/project_462000964/shared/nemotron/10k/fin-train-00.txt
+    path_valid_src: /scratch/project_462000964/shared/nemotron/10k/eng-valid-00.txt
+    path_valid_tgt: /scratch/project_462000964/shared/nemotron/10k/fin-valid-00.txt
+    node_gpu: "0:0"
+    weight: 1.0
+    transforms: [prefix, denoising, filtertoolong]
+    introduce_at_training_step: 0
+    enc_sharing_group: ["shared"]
+    dec_sharing_group: ["fin"]
+    src_prefix: "<to_fin>"
+    tgt_prefix: "<fin>"
+  eng-eng:
+    src_tgt: eng-eng
+    path_src: /scratch/project_462000964/shared/nemotron/10k/eng-train-00.txt
+    path_tgt: /scratch/project_462000964/shared/nemotron/10k/eng-train-00.txt
+    node_gpu: "1:0"
+    weight: 1.0
+    transforms: [prefix, denoising, filtertoolong]
+    introduce_at_training_step: 0
+    enc_sharing_group: ["shared"]
+    dec_sharing_group: ["eng"]
+    src_prefix: "<to_eng>"
+    tgt_prefix: "<eng>"
+  fin-fin:
+    src_tgt: eng-eng
+    path_src: /scratch/project_462000964/shared/nemotron/10k/fin-train-00.txt
+    path_tgt: /scratch/project_462000964/shared/nemotron/10k/fin-train-00.txt
+    node_gpu: "2:0"
+    weight: 1.0
+    transforms: [prefix, denoising, filtertoolong]
+    introduce_at_training_step: 0
+    enc_sharing_group: ["shared"]
+    dec_sharing_group: ["fin"]
+    src_prefix: "<to_fin>"
+    tgt_prefix: "<fin>"
+  fin-eng:
+    src_tgt: fin-eng
+    path_src: /scratch/project_462000964/shared/nemotron/10k/fin-train-00.txt
+    path_tgt: /scratch/project_462000964/shared/nemotron/10k/eng-train-00.txt
+    path_valid_src: /scratch/project_462000964/shared/nemotron/10k/fin-valid-00.txt
+    path_valid_tgt: /scratch/project_462000964/shared/nemotron/10k/eng-valid-00.txt
+    node_gpu: "3:0"
+    weight: 1.0
+    transforms: [prefix, denoising, filtertoolong]
+    introduce_at_training_step: 0
+    enc_sharing_group: ["shared"]
+    dec_sharing_group: ["eng"]
+    src_prefix: "<to_eng>"
+    tgt_prefix: "<eng>"
+
+task_distribution_strategy: weighted_sampling
+
+# ============================================================================
+# Denoising Transform Parameters
+# ============================================================================
+denoising_objective: bart
+mask_ratio: 0.2              # Fraction of tokens to mask [mask_ratio: 0.2]
+mask_length: span-poisson    # Options: 'subword', 'word', 'span-poisson'
+poisson_lambda: 3.0          # Lambda for span length distribution
+replace_length: 1            # -1: keep N tokens, 0: remove all, 1: single mask per span [replace_length: 1]
+
+# ============================================================================
+# Model Architecture - Shared Encoder + Language-Specific Decoders
+# ============================================================================
+# Encoder: Single stack [22] = 22 layers total
+#   All 22 layers shared across all 16 GPUs (synchronized via All-Reduce)
+enc_layers: [22]             # [enc_layers: [6] !!!
+
+# Decoder: Single stack [6] = 6 layers total
+#   All 6 layers are language-specific (16 separate decoders, no sharing)
+dec_layers: [6]              # [dec_layers: [6]
+
+model_dim: 768               # Transformer model dimension [model_dim: 512]
+dropout: 0.1                 # Dropout rate                [dropout: 0.1]
+model_dtype: bf16            # Use bfloat16 precision      
+model_type: text
+
+# [skip_empty_level: silent]          # silently ignore empty lines in the data
+
+src_seq_length_min: 10          # [src_seq_length: 200]
+tgt_seq_length_min: 10          # [tgt_seq_length: 200]
+src_seq_length_max: 256         
+tgt_seq_length_max: 256         
+max_length: 256
+
+# ============================================================================
+# Training Configuration
+# ============================================================================
+train_steps: 62500
+accum_count: [1]                  # Gradient accumulation steps       
+batch_size: 16                    # Per-GPU batch size (in sentences) 
+valid_batch_size: 16              # Validation batch size             
+batch_type: sents                 # Batch by sentences                
+normalization: tokens             # Normalize gradients by token count
+                                  # [max_generator_batches: 2]
+valid_steps: 10000                # Validation frequency              [valid_steps: 10000]
+valid_metrics: [bleu]             # Validation metrics
+# valid_at_start: true            # Run validation before training
+
+# ============================================================================
+# Optimizer Settings
+# ============================================================================
+optim: adafactor
+learning_rate: 0.001              # [learning_rate: 3.0] !!!
+# adam_beta1: 0.9
+# adam_beta2: 0.999
+weight_decay: 0.0
+max_grad_norm: 1.0                # Gradient clipping per component [max_grad_norm: 0.0]
+
+# Learning rate scheduling
+warmup_steps: 5000                # [warmup_steps: 10000]
+decay_method: linear_warmup       # [decay_method: none]
+learning_rate_decay: 0
+start_decay_steps: 0
+
+# [early_stopping: 5]
+# [early_stopping_criteria: accuracy]
+
+# ============================================================================
+# Logging and Monitoring
+# ============================================================================
+log_model_structure: false        # Log model structure at startup
+report_every: 100                 # Report training stats every N steps
+report_training_accuracy: true    # Report training accuracy
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+seed: 42                          # Random seed for reproducibility [seed: 3435]              
+label_smoothing: 0.1              # Label smoothing for better generalization     
+
+# ============================================================================
+# Checkpoints
+# ============================================================================
+
+# [save_all_gpus: false]
+
+save_checkpoint_steps: 5000       # Checkpoint saving frequency   [50000] [5000000]
+keep_checkpoint: 5                # Number of checkpoints to keep [keep_checkpoint: -1]
+
+reset_optim: all                  # Reset optimizer state when loading checkpoint
+
+# ============================================================================
+# x-transformers Specific Options
+# ============================================================================
+# [encoder_type: transformer]        # deprecated
+# [decoder_type: transformer]        # deprecated
+# [transformer_ff: 2048]             # deprecated
+
+x_transformers_opts:
+
+  # Attention configuration
+  heads: 12                          # Number of attention heads [heads: 8] !!!
+  attn_flash: true                   # Flash attention 2.0
+  attn_dropout: 0.0                  # No attention dropout
+#  attn_use_unpadding: true           # ModernBERT-style unpadding for efficiency
+#  attn_fused_qkv: true              # Use fused QKV optimizations
+
+  # Sliding window attention (ModernBERT feature)
+#  sliding_window: 128                # Local attention window (±64 tokens) (Encoder only)
+#  global_attn_every_n_layers: 3      # Global attention every 3 layers (Encoder only)
+
+  # RoPE (Rotary Position Embeddings)
+#  rotary_pos_emb: true               # Use RoPE instead of absolute positions
+#  global_rope_theta: 160000.0        # RoPE base for global attention layers (Encoder only)
+#  local_rope_theta: 10000.0          # RoPE base for local attention layers (Encoder only)
+
+  # Feed-forward network (GLU with bias-free architecture)
+  ff_mult: 1.5                       # FFN dimension = 1.5 * model_dim = 1152
+  ff_glu: true                       # Use GeGLU activation
+  ff_dropout: 0.0                    # No FFN dropout
+  ff_no_bias: true                   # Bias-free architecture
+
+  # Normalization
+  pre_norm: true                     # Pre-Layer Normalization (ModernBERT style)
+  post_emb_norm: true                # Normalize after embeddings
+  # post_emb_norm_bias: false          # Bias-free normalization
+  # layernorm_bias: false              # Bias-free LayerNorm
+
+  # Position embeddings
+  use_abs_pos_emb: false             # No absolute positions (using RoPE)
+  tie_embedding: false               # Don't tie input/output embeddings
+                                     # [position_encoding: true]
+
+# [src_subword_type: sentencepiece]   # deprecated
+# [tgt_subword_type: sentencepiece]   # deprecated
+# [src_vocab_size: 100000]            # deprecated
+# [tgt_vocab_size: 100000]            # deprecated
+# [param_init: 0.0]                   
+# [param_init_glorot: true]           
+

@@ -8,8 +8,8 @@ from collections import defaultdict, OrderedDict
 from functools import partial
 from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
-from x_transformers import TransformerWrapper
-from x_transformers.x_transformers import TokenEmbedding
+from mammoth.x_transformers import TransformerWrapper
+from mammoth.x_transformers.x_transformers import TokenEmbedding, AbsolutePositionalEmbedding
 
 from mammoth.distributed.components import (
     DistributedAdapter,
@@ -33,10 +33,15 @@ from mammoth.utils.misc import use_gpu
 
 TRANSFORMER_WRAPPER_OPTS = {
     'post_emb_norm',
+    'post_emb_norm_bias',
     'tie_embedding',
+    'final_logits_bias',  # BART-style final logits bias
     'use_abs_pos_emb',
     'scaled_sinu_pos_emb',
+    'scaled_embeddings',  # Gemma3-style scaled embeddings (scaling in forward pass)
     'emb_frac_gradient',
+    'max_seq_len',
+    'emb_dropout',
 }
 
 
@@ -58,7 +63,13 @@ def get_attention_layers_kwargs(
     xcoder_id,
     model_opts,
 ):
-    """Return arguments for x_transformers.AttentionLayers"""
+    """Return arguments for x_transformers.AttentionLayers
+
+    Supports encoder/decoder-specific options via enc_/dec_ prefixes:
+    - Options with 'enc_' prefix apply only to encoder
+    - Options with 'dec_' prefix apply only to decoder
+    - Options without prefix apply to both
+    """
     assert side in {Side.encoder, Side.decoder}, f'Invalid side "{side}"'
     depths = model_opts.enc_layers if side == Side.encoder else model_opts.dec_layers
     depth = depths[layer_stack_index]
@@ -66,10 +77,65 @@ def get_attention_layers_kwargs(
     cross_attend = side == Side.decoder
     is_last = layer_stack_index == len(depths) - 1
     pre_norm_has_final_norm = is_last
-    kwargs = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
-    kwargs = {key: val for key, val in kwargs.items() if key not in TRANSFORMER_WRAPPER_OPTS}
+
+    # Start with base options (excluding TRANSFORMER_WRAPPER_OPTS)
+    all_opts = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
+
+    # Filter side-specific options
+    kwargs = {}
+    prefix = 'enc_' if side == Side.encoder else 'dec_'
+    other_prefix = 'dec_' if side == Side.encoder else 'enc_'
+
+    for key, val in all_opts.items():
+        # Skip options for the other side
+        if key.startswith(other_prefix):
+            continue
+
+        # Determine the unprefixed key name
+        if key.startswith(prefix):
+            unprefixed_key = key[len(prefix):]
+        else:
+            unprefixed_key = key
+
+        # Skip TRANSFORMER_WRAPPER_OPTS (they go to TransformerWrapper instead)
+        if unprefixed_key in TRANSFORMER_WRAPPER_OPTS:
+            continue
+
+        # Include side-specific options (strip prefix) or shared options
+        if key.startswith(prefix):
+            kwargs[unprefixed_key] = val  # Strip 'enc_' or 'dec_' prefix
+        else:
+            kwargs[key] = val
+
+    # Handle model_dim with side-specific support
+    # Priority: enc_model_dim/dec_model_dim > model_dim
+    if side == Side.encoder and hasattr(model_opts, 'enc_model_dim'):
+        dim = model_opts.enc_model_dim
+    elif side == Side.decoder and hasattr(model_opts, 'dec_model_dim'):
+        dim = model_opts.dec_model_dim
+    else:
+        dim = model_opts.model_dim
+
+    # Handle sliding window attention parameters (top-level model_opts attributes)
+    # These are not in x_transformers_opts but are needed for AttentionLayers
+    sliding_window_attrs = [
+        'sliding_window',
+        'global_attn_every_n_layers',
+        'global_rope_theta',
+        'local_rope_theta',
+    ]
+
+    for attr in sliding_window_attrs:
+        # Check for side-specific attribute first (e.g., enc_sliding_window)
+        side_specific_attr = f"{prefix}{attr}"
+        if hasattr(model_opts, side_specific_attr):
+            kwargs[attr] = getattr(model_opts, side_specific_attr)
+        # Fall back to generic attribute if it exists
+        elif hasattr(model_opts, attr):
+            kwargs[attr] = getattr(model_opts, attr)
+
     kwargs.update({
-        'dim': model_opts.model_dim,
+        'dim': dim,
         'depth': depth,
         'causal': causal,
         'cross_attend': cross_attend,
@@ -82,16 +148,58 @@ def get_transformer_wrapper_kwargs(
     side: Side,
     model_opts,
 ):
-    """Return arguments for x_transformers.TransformerWrapper"""
+    """Return arguments for x_transformers.TransformerWrapper
+
+    Supports encoder/decoder-specific options via enc_/dec_ prefixes:
+    - Options with 'enc_' prefix apply only to encoder
+    - Options with 'dec_' prefix apply only to decoder
+    - Options without prefix apply to both
+    """
     assert side in {Side.encoder, Side.decoder}, f'Invalid side "{side}"'
-    kwargs = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
-    kwargs = {key: val for key, val in kwargs.items() if key in TRANSFORMER_WRAPPER_OPTS}
-    max_seq_len = 0 if model_opts.max_length is None else model_opts.max_length
+    all_opts = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
+
+    # Filter side-specific options
+    kwargs = {}
+    prefix = 'enc_' if side == Side.encoder else 'dec_'
+    other_prefix = 'dec_' if side == Side.encoder else 'enc_'
+
+    for key, val in all_opts.items():
+        # Only include TRANSFORMER_WRAPPER_OPTS
+        if key not in TRANSFORMER_WRAPPER_OPTS and not key.startswith(prefix):
+            continue
+        # Skip options for the other side
+        if key.startswith(other_prefix):
+            continue
+        # Include side-specific options (strip prefix) or shared options
+        if key.startswith(prefix):
+            unprefixed_key = key[len(prefix):]
+            if unprefixed_key in TRANSFORMER_WRAPPER_OPTS:
+                kwargs[unprefixed_key] = val
+        elif key in TRANSFORMER_WRAPPER_OPTS:
+            kwargs[key] = val
+
+    # Handle max_seq_len with side-specific support
+    # Priority: enc_max_seq_len/dec_max_seq_len > max_seq_len from x_transformers_opts > model_opts.max_length
+    max_seq_len_key = f'{prefix}max_seq_len'
+    if max_seq_len_key in all_opts:
+        max_seq_len = all_opts[max_seq_len_key]
+    elif 'max_seq_len' in all_opts:
+        max_seq_len = all_opts['max_seq_len']
+    elif model_opts.max_length is not None:
+        max_seq_len = model_opts.max_length
+    else:
+        max_seq_len = 0
+
     kwargs.update({
         'max_seq_len': max_seq_len,
     })
     if side == Side.encoder:
         kwargs['return_only_embed'] = True
+
+    # Debug: Log if final_logits_bias is being passed
+    if 'final_logits_bias' in kwargs:
+        logger.info(f"get_transformer_wrapper_kwargs: final_logits_bias present for {side.name} (shape: {kwargs['final_logits_bias'].shape})")
+
     return kwargs
 
 
@@ -255,13 +363,22 @@ def build_xcoder(
     else:
         all_langs = sorted(set(task_queue_manager.get_my_tgt_langs()))
     side_alt_str = 'src' if side == Side.encoder else 'tgt'
+
+    # Get side-specific model_dim
+    if side == Side.encoder and hasattr(model_opts, 'enc_model_dim'):
+        emb_dim = model_opts.enc_model_dim
+    elif side == Side.decoder and hasattr(model_opts, 'dec_model_dim'):
+        emb_dim = model_opts.dec_model_dim
+    else:
+        emb_dim = model_opts.model_dim
+
     if token_embs is None:
         token_embs = dict()
     for lang in all_langs:
         if lang not in token_embs:
             vocab = vocabs_dict[(side_alt_str, lang)]
             token_embs[lang] = TokenEmbedding(
-                dim=model_opts.model_dim,
+                dim=emb_dim,
                 num_tokens=len(vocab),
                 l2norm_embed=l2norm_embed
             )
@@ -293,8 +410,9 @@ def build_xcoder(
         transformer_wrapper = TransformerWrapper(
             num_tokens=len(vocab),
             attn_layers=adapted_attention_layers_stack,
-            emb_dim=model_opts.model_dim,
+            emb_dim=emb_dim,  # Use side-specific dimension
             token_emb=token_embs[lang],
+            
             **transformer_wrapper_kwargs,
         )
         transformer_wrappers[task.corpus_id] = transformer_wrapper
@@ -352,6 +470,21 @@ def build_model(
         device = torch.device("cpu")
     logger.info(device)
 
+    # Determine dtype for model initialization
+    dtype = torch.float32
+    if hasattr(model_opts, 'model_dtype'):
+        if model_opts.model_dtype == 'fp16':
+            dtype = torch.float16
+            logger.info('Initializing model in fp16 precision')
+        elif model_opts.model_dtype == 'bf16':
+            dtype = torch.bfloat16
+            logger.info('Initializing model in bf16 precision')
+        else:
+            logger.info('Initializing model in fp32 precision')
+
+    # Set default dtype for model initialization
+    torch.set_default_dtype(dtype)
+
     enc_adapters_by_name: Optional[Dict[str, Adapter]] = build_adapters(
         side=Side.encoder,
         model_opts=model_opts,
@@ -367,8 +500,101 @@ def build_model(
         single_task=single_task,
         adapters_by_name=enc_adapters_by_name,
     )
-    # TODO: to tie embeddings between encoder and decoder,
-    # take the token_embs from the encoder and pass them in the next build_xcoder call
+
+    # Optionally share embeddings between encoder and decoder
+    dec_token_embs = None
+    share_embeddings = getattr(model_opts, 'share_encoder_decoder_embeddings', False)
+
+    if share_embeddings:
+        # Get dimensions
+        enc_dim = model_opts.enc_model_dim if hasattr(model_opts, 'enc_model_dim') else model_opts.model_dim
+        dec_dim = model_opts.dec_model_dim if hasattr(model_opts, 'dec_model_dim') else model_opts.model_dim
+
+        if enc_dim != dec_dim:
+            logger.warning(
+                f'Cannot share encoder-decoder embeddings: encoder dim ({enc_dim}) != decoder dim ({dec_dim}). '
+                'Embeddings will not be shared.'
+            )
+        else:
+            # Check if encoder and decoder share vocabularies for any language pairs
+            encoder_langs = set(task_queue_manager.get_my_src_langs())
+            decoder_langs = set(task_queue_manager.get_my_tgt_langs())
+            shared_langs = encoder_langs & decoder_langs
+
+            if shared_langs:
+                # Use encoder embeddings for decoder where languages overlap
+                # First, validate that vocabularies match for shared languages
+                dec_token_embs = {}
+                successfully_shared = []
+                for lang in shared_langs:
+                    src_vocab = vocabs_dict[('src', lang)]
+                    tgt_vocab = vocabs_dict[('tgt', lang)]
+
+                    # Check if vocabularies match
+                    if len(src_vocab) != len(tgt_vocab):
+                        logger.warning(
+                            f'Cannot share embeddings for language "{lang}": '
+                            f'vocab sizes differ (src: {len(src_vocab)}, tgt: {len(tgt_vocab)})'
+                        )
+                        continue
+
+                    # For now, we assume matching vocab sizes means matching vocabularies
+                    # A more thorough check would compare vocab tokens, but that's expensive
+                    dec_token_embs[lang] = encoder.token_embs[lang]
+                    successfully_shared.append(lang)
+
+                if successfully_shared:
+                    logger.info(
+                        f'Sharing encoder-decoder embeddings for languages: {sorted(successfully_shared)}'
+                    )
+                else:
+                    logger.warning(
+                        'Could not share embeddings for any language due to vocabulary mismatches'
+                    )
+                    dec_token_embs = None
+            else:
+                # No overlapping language labels, but check if vocabularies are identical
+                # This handles bilingual models like BART with shared vocab but different language labels
+                # (e.g., es→en translation with same tokenizer for both sides)
+
+                # Check if this is a simple bilingual case (one encoder lang, one decoder lang)
+                # or if all encoder-decoder vocab pairs are identical
+                all_vocabs_match = True
+                dec_token_embs = {}
+                cross_lingual_pairs = []
+
+                for enc_lang in encoder_langs:
+                    for dec_lang in decoder_langs:
+                        src_vocab = vocabs_dict.get(('src', enc_lang))
+                        tgt_vocab = vocabs_dict.get(('tgt', dec_lang))
+
+                        if src_vocab is None or tgt_vocab is None:
+                            all_vocabs_match = False
+                            break
+
+                        if len(src_vocab) != len(tgt_vocab):
+                            all_vocabs_match = False
+                            break
+
+                        # Vocabularies match - map decoder lang to encoder embeddings
+                        dec_token_embs[dec_lang] = encoder.token_embs[enc_lang]
+                        cross_lingual_pairs.append(f'{enc_lang}→{dec_lang}')
+
+                    if not all_vocabs_match:
+                        break
+
+                if all_vocabs_match and cross_lingual_pairs:
+                    logger.info(
+                        f'Sharing encoder-decoder embeddings across language pairs: {", ".join(cross_lingual_pairs)} '
+                        f'(vocabularies have matching sizes)'
+                    )
+                else:
+                    logger.warning(
+                        'Cannot share encoder-decoder embeddings: no overlapping languages and vocabularies do not match. '
+                        f'Encoder languages: {sorted(encoder_langs)}, Decoder languages: {sorted(decoder_langs)}'
+                    )
+                    dec_token_embs = None
+
     dec_adapters_by_name: Optional[Dict[str, Adapter]] = build_adapters(
         side=Side.decoder,
         model_opts=model_opts,
@@ -382,17 +608,31 @@ def build_model(
         device=device,
         task_queue_manager=task_queue_manager,
         single_task=single_task,
+        token_embs=dec_token_embs,
         adapters_by_name=dec_adapters_by_name,
     )
-    attention_bridge = build_attention_bridge(model_opts)
+
+    # Check if encoder and decoder have different dimensions
+    # If so, skip attention bridge (it requires matching dimensions)
+    enc_dim = model_opts.enc_model_dim if hasattr(model_opts, 'enc_model_dim') else model_opts.model_dim
+    dec_dim = model_opts.dec_model_dim if hasattr(model_opts, 'dec_model_dim') else model_opts.model_dim
+
+    if enc_dim != dec_dim:
+        logger.info(f'Encoder dim ({enc_dim}) != Decoder dim ({dec_dim}): Skipping attention bridge')
+        attention_bridge = None
+    else:
+        attention_bridge = build_attention_bridge(model_opts)
+
     model = NMTModel(
         encoder=encoder,
         decoder=decoder,
         attention_bridge=attention_bridge
     )
 
+
     model.to(device)
-    if opts.log_model_structure:
+
+    if opts.log_model_structure and task_queue_manager.global_rank == 0:
         logger.info(model)
         for component in task_queue_manager.get_my_distributed_components():
             logger.info(component)
@@ -400,6 +640,221 @@ def build_model(
             logger.info(f'{p.requires_grad} {name}')
     logger.info('Building model - done!')
     return model
+
+
+def freeze_model_components(model, opts, task_queue_manager):
+    """
+    Freeze model components based on configuration options.
+    Must be called after model initialization but before optimizer creation.
+
+    This function implements granular freezing for parameter-efficient fine-tuning,
+    allowing independent control over encoder, decoder, cross-attention, embeddings,
+    and attention bridge freezing.
+
+    Args:
+        model: The NMTModel instance
+        opts: Configuration options containing freeze flags
+        task_queue_manager: TaskQueueManager for distributed component access
+
+    Notes:
+        - Adapters are never frozen, even when base model is frozen
+        - Frozen parameters are excluded from optimizer automatically
+        - Freezing happens before distributed initialization to ensure consistency
+    """
+    from mammoth.utils.logging import logger
+
+    frozen_params_count = 0
+    total_params_count = sum(p.numel() for p in model.parameters())
+
+    # Freeze encoder
+    if getattr(opts, 'freeze_encoder', False):
+        logger.info("Freezing encoder attention and feedforward layers")
+        frozen_count = _freeze_encoder_layers(model)
+        frozen_params_count += frozen_count
+        logger.info(f"Frozen {frozen_count:,} encoder parameters")
+
+    # Freeze decoder (three mutually exclusive options)
+    if getattr(opts, 'freeze_decoder', False):
+        logger.info("Freezing decoder attention and feedforward layers (including cross-attention)")
+        frozen_count = _freeze_decoder_layers(model, freeze_cross_attn=True)
+        frozen_params_count += frozen_count
+        logger.info(f"Frozen {frozen_count:,} decoder parameters")
+
+    # Freeze decoder except cross-attention (if decoder not already frozen)
+    elif getattr(opts, 'freeze_decoder_except_cross_attention', False):
+        logger.info("Freezing decoder self-attention and feedforward, keeping cross-attention trainable")
+        frozen_count = _freeze_decoder_layers(model, freeze_cross_attn=False)
+        frozen_params_count += frozen_count
+        logger.info(f"Frozen {frozen_count:,} decoder parameters (cross-attention remains trainable)")
+
+    # Freeze cross-attention only (if decoder not already frozen)
+    elif getattr(opts, 'freeze_cross_attention', False):
+        logger.info("Freezing decoder cross-attention layers only")
+        frozen_count = _freeze_cross_attention_only(model)
+        frozen_params_count += frozen_count
+        logger.info(f"Frozen {frozen_count:,} cross-attention parameters")
+
+    # Freeze encoder embeddings
+    if getattr(opts, 'freeze_encoder_embeddings', False):
+        logger.info("Freezing encoder embeddings")
+        frozen_count = _freeze_embeddings(model.encoder)
+        frozen_params_count += frozen_count
+        logger.info(f"Frozen {frozen_count:,} encoder embedding parameters")
+
+    # Freeze decoder embeddings
+    if getattr(opts, 'freeze_decoder_embeddings', False):
+        logger.info("Freezing decoder embeddings")
+        frozen_count = _freeze_embeddings(model.decoder)
+        frozen_params_count += frozen_count
+        logger.info(f"Frozen {frozen_count:,} decoder embedding parameters")
+
+    # Freeze attention bridge
+    if getattr(opts, 'freeze_attention_bridge', False):
+        if model.attention_bridge is not None:
+            logger.info("Freezing attention bridge")
+            frozen_count = 0
+            for param in model.attention_bridge.parameters():
+                param.requires_grad = False
+                frozen_count += param.numel()
+            frozen_params_count += frozen_count
+            logger.info(f"Frozen {frozen_count:,} attention bridge parameters")
+        else:
+            logger.warning(
+                "Cannot freeze attention bridge: model has no attention bridge. "
+                "Attention bridge is only present when ab_layers is configured and "
+                "encoder/decoder dimensions match."
+            )
+
+    # Report freezing summary
+    if frozen_params_count > 0:
+        frozen_percentage = (frozen_params_count / total_params_count) * 100
+        trainable_params = total_params_count - frozen_params_count
+        logger.info(
+            f"Freezing summary: {frozen_params_count:,} / {total_params_count:,} parameters frozen "
+            f"({frozen_percentage:.2f}%). {trainable_params:,} parameters remain trainable."
+        )
+    else:
+        logger.info("No parameters frozen - all parameters are trainable")
+
+    return frozen_params_count
+
+
+def _freeze_encoder_layers(model):
+    """
+    Freeze all encoder attention and feedforward layers, excluding adapters.
+
+    Args:
+        model: NMTModel instance
+
+    Returns:
+        Number of frozen parameters
+    """
+    frozen_count = 0
+
+    # Iterate through all encoder layer stacks and language-specific components
+    for layer_stack_index in model.encoder.attention_layers_by_xcoder_id.keys():
+        for xcoder_id, attention_layers in model.encoder.attention_layers_by_xcoder_id[layer_stack_index].items():
+            # Freeze base layers (not adapters)
+            for name, param in attention_layers.named_parameters():
+                # Skip adapter parameters - they should remain trainable
+                if not name.startswith('adapters.'):
+                    param.requires_grad = False
+                    frozen_count += param.numel()
+
+    return frozen_count
+
+
+def _freeze_decoder_layers(model, freeze_cross_attn=True):
+    """
+    Freeze decoder layers, with optional control over cross-attention freezing.
+
+    Args:
+        model: NMTModel instance
+        freeze_cross_attn: Whether to freeze cross-attention layers (default: True)
+
+    Returns:
+        Number of frozen parameters
+    """
+    frozen_count = 0
+
+    # Iterate through all decoder layer stacks and language-specific components
+    for layer_stack_index in model.decoder.attention_layers_by_xcoder_id.keys():
+        for xcoder_id, attention_layers in model.decoder.attention_layers_by_xcoder_id[layer_stack_index].items():
+            # Get layer types and structures
+            layer_types = attention_layers.layer_types
+            layers = attention_layers.layers
+
+            # Freeze based on layer type
+            for layer_type, layer_struct in zip(layer_types, layers):
+                should_freeze = False
+
+                if layer_type == 'a':  # Self-attention - always freeze
+                    should_freeze = True
+                elif layer_type == 'c':  # Cross-attention - conditional
+                    should_freeze = freeze_cross_attn
+                elif layer_type == 'f':  # Feedforward - always freeze
+                    should_freeze = True
+
+                if should_freeze:
+                    # layer_struct is a ModuleList: typically [norms, block, residual]
+                    for module in layer_struct:
+                        for name, param in module.named_parameters():
+                            # Skip adapter parameters
+                            if not name.startswith('adapters.'):
+                                param.requires_grad = False
+                                frozen_count += param.numel()
+
+    return frozen_count
+
+
+def _freeze_cross_attention_only(model):
+    """
+    Freeze only cross-attention layers in decoder, leave all other layers trainable.
+
+    Args:
+        model: NMTModel instance
+
+    Returns:
+        Number of frozen parameters
+    """
+    frozen_count = 0
+
+    # Iterate through all decoder components
+    for layer_stack_index in model.decoder.attention_layers_by_xcoder_id.keys():
+        for xcoder_id, attention_layers in model.decoder.attention_layers_by_xcoder_id[layer_stack_index].items():
+            layer_types = attention_layers.layer_types
+            layers = attention_layers.layers
+
+            # Freeze only where layer_type == 'c' (cross-attention)
+            for layer_type, layer_struct in zip(layer_types, layers):
+                if layer_type == 'c':
+                    for module in layer_struct:
+                        for param in module.parameters():
+                            param.requires_grad = False
+                            frozen_count += param.numel()
+
+    return frozen_count
+
+
+def _freeze_embeddings(xcoder):
+    """
+    Freeze all token embeddings in an encoder or decoder.
+
+    Args:
+        xcoder: Encoder or Decoder instance (StackXcoder)
+
+    Returns:
+        Number of frozen parameters
+    """
+    frozen_count = 0
+
+    # Freeze all language-specific token embeddings
+    for lang, token_emb in xcoder.token_embs.items():
+        for param in token_emb.parameters():
+            param.requires_grad = False
+            frozen_count += param.numel()
+
+    return frozen_count
 
 
 def validate_optimizer_coverage(model, optimizer):

@@ -1,7 +1,7 @@
 from torch import nn
 from typing import List, Sequence, Optional, Tuple, Dict
-from x_transformers import TransformerWrapper
-from x_transformers.x_transformers import LayerIntermediates, TokenEmbedding
+from mammoth.x_transformers import TransformerWrapper
+from mammoth.x_transformers.x_transformers import LayerIntermediates, TokenEmbedding
 
 from mammoth.modules.adapters import AdaptedAttentionLayers, Adapter
 
@@ -52,9 +52,25 @@ class AdaptedAttentionLayersStack(nn.Module):
         return self.attention_layers_stack[0].dim
 
     @property
+    def depth(self):
+        return len(self.attention_layers_stack)
+
+    @property
+    def can_cache_kv(self):
+        # A stack can cache KV if all its constituent layers can.
+        # This is a simplification; a more complex logic might check if specific layers support it.
+        # For now, we assume if one layer in the stack can't cache, the whole stack can't.
+        if not self.attention_layers_stack:
+            return False
+        return all(attn_layers.can_cache_kv for attn_layers in self.attention_layers_stack)
+
+    @property
     def disable_abs_pos_emb(self):
         return self.attention_layers_stack[0].disable_abs_pos_emb
 
+    @property
+    def causal(self):
+        return self.attention_layers_stack[0].causal
 
 class StackXcoder(nn.ModuleDict):
     """

@@ -6,12 +6,12 @@ import time
 from mammoth.model_builder import build_model, validate_optimizer_coverage
 from mammoth.utils.optimizers import MultipleOptimizer
 from mammoth.utils.misc import set_random_seed
-from mammoth.trainer import build_trainer
+from mammoth.trainer import build_trainer, iter_on_device
 from mammoth.utils.model_saver import build_model_saver, load_parameters_from_checkpoint
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.parse import ArgumentParser
 
-from mammoth.distributed import broadcast_tensors
+from mammoth.distributed import broadcast_tensors, _reattach_batch_tensors
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
@@ -29,11 +29,11 @@ def _get_model_opts(opts, frame_checkpoint=None):
         model_opts = ArgumentParser.checkpoint_model_opts(frame_checkpoint["opts"])
         ArgumentParser.update_model_opts(model_opts)
         ArgumentParser.validate_model_opts(model_opts)
-        if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
-                hasattr(model_opts, 'tensorboard_log_dir_dated'):
+        # if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
+                # hasattr(model_opts, 'tensorboard_log_dir_dated'):
             # ensure tensorboard output is written in the directory
             # of previous checkpoints
-            opts.tensorboard_log_dir_dated = model_opts.tensorboard_log_dir_dated
+            # opts.tensorboard_log_dir_dated = model_opts.tensorboard_log_dir_dated
         # Override checkpoint's update_embeddings as it defaults to false
         # model_opts.update_vocab = opts.update_vocab
     else:
@@ -116,6 +116,11 @@ def main(
     # Build model.
     model = build_model(model_opts, opts, vocabs_dict, task_queue_manager)
 
+    # Apply parameter freezing based on configuration
+    if device_context.is_master():
+        from mammoth.model_builder import freeze_model_components
+        freeze_model_components(model, opts, task_queue_manager)
+
     logger.info("{} - Init model".format(device_context.id))
     if device_context.is_distributed():
         init_distributed(model, task_queue_manager)
@@ -139,14 +144,35 @@ def main(
 
     # Load parameters from checkpoint
     if opts.train_from:
+        # Determine whether to load optimizer state based on reset_optim
+        # 'none' and 'keep_states' → load state
+        # 'all' and 'states' → reset state
+        should_reset_optimizer_state = opts.reset_optim in {'all', 'states'}
+
         load_parameters_from_checkpoint(
             frame_checkpoint_path=frame_checkpoint_path,
             model=model,
             optim=optim,
             task_queue_manager=task_queue_manager,
-            reset_optim=opts.reset_optim in {'all', 'states'},
+            reset_optim=should_reset_optimizer_state,
         )
-        optim.global_training_step = frame_checkpoint['global_training_step']
+
+        # Determine whether to load training step based on reset_optim
+        # 'none' and 'states' → keep training step
+        # 'all' and 'keep_states' → reset training step to 1
+        if opts.reset_optim in {'none', 'states'}:
+            optim.global_training_step = frame_checkpoint['global_training_step']
+            logger.info(
+                f"Loaded global_training_step={optim.global_training_step} from checkpoint "
+                f"(reset_optim={opts.reset_optim})"
+            )
+        else:
+            # Reset to step 1 (reset_optim in {'all', 'keep_states'})
+            optim.global_training_step = 1
+            logger.info(
+                f"Reset global_training_step to 1 (reset_optim={opts.reset_optim}, "
+                f"checkpoint was at step {frame_checkpoint['global_training_step']})"
+            )
 
     # Build model saver
     model_saver = build_model_saver(
@@ -177,6 +203,9 @@ def main(
     def _train_iter():
         while True:
             batch, metadata, communication_batch_id = batch_queue.get()
+            # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
+            batch = _reattach_batch_tensors(batch)
+            metadata = _reattach_batch_tensors(metadata)
             semaphore.release()
             # TODO: confirm that batch-providing corpus has already been to'd to the correct place
             yield batch, metadata, communication_batch_id
@@ -184,6 +213,26 @@ def main(
     train_iter = _train_iter()
     # train_iter = iter_on_device(train_iter, device_context)
     valid_iter = _build_valid_iter(opts, vocabs_dict, transforms_cls, task_queue_manager)
+
+    # Perform validation before training starts if requested
+    if opts.valid_at_start and valid_iter is not None and device_context.is_master():
+        logger.info("{} - Performing validation before training starts".format(device_context.id))
+        valid_stats = trainer.validate(iter_on_device(valid_iter, device_context))
+
+        # Display BLEU validation results
+        if valid_stats is not None:
+            # Check for BLEU score in validation metrics
+            if hasattr(valid_stats, 'validation_metrics') and valid_stats.validation_metrics:
+                if 'bleu' in valid_stats.validation_metrics:
+                    bleu_score = valid_stats.validation_metrics['bleu']
+                    logger.info("{} - Pre-training validation BLEU: {:.2f}".format(
+                        device_context.id, bleu_score))
+                else:
+                    logger.info("{} - Pre-training validation completed, but no BLEU score computed (check if sacrebleu is available)".format(device_context.id))
+            else:
+                logger.info("{} - Pre-training validation completed, but no BLEU metrics available".format(device_context.id))
+        else:
+            logger.info("{} - Pre-training validation returned no statistics".format(device_context.id))
 
     if len(opts.gpu_ranks):
         if device_context.is_master():
@@ -203,3 +252,9 @@ def main(
 
     if trainer.report_manager.tensorboard_writer is not None:
         trainer.report_manager.tensorboard_writer.close()
+
+    # Properly cleanup PyTorch distributed resources before exit
+    if device_context.is_distributed():
+        logger.info("{} - Cleaning up distributed process group".format(device_context.id))
+        torch.distributed.destroy_process_group()
+        logger.info("{} - Distributed cleanup complete".format(device_context.id))

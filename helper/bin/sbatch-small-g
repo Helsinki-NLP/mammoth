@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Written by Anssi Yli-Jyrä for MAMMOTH framework @ lumi.csc.fi, (c) 2025, MIT License
+
+set -euo pipefail
+
+PARTITION="small-g"   # or standard-g, etc.
+
+# This command behaves like 'sbatch' but saves the batch file name to
+# variable JOB_SBAT_SCRIPT
+
+# This runs the batch script "$1" and sets partition to dev-g,
+# overriding #SBATCH --partition=__MUST_USE_WRAPPER__ used in the
+# batch file.  This makes it impossible to use sbatch directly on a
+# batch file that has #SBATCH --partition=__MUST_USE_WRAPPER__.
+
+# This checks that job name is specified and we are in a directory
+# called by it.
+job_name="${JOB_NAME:-}"   # optional env override
+
+args=("$@")
+i=0
+while [ $i -lt ${#args[@]} ]; do
+  arg=${args[$i]}
+  case "$arg" in
+    -J)
+      # sbatch -J JOBNAME
+      if [ $((i+1)) -ge ${#args[@]} ]; then
+        echo "❌ -J requires an argument" >&2
+        exit 1
+      fi
+      job_name=${args[$((i+1))]}
+      i=$((i+2))
+      continue
+      ;;
+    -J*)
+      # sbatch -JJOBNAME
+      job_name=${arg#-J}
+      i=$((i+1))
+      continue
+      ;;
+    --job-name=*)
+      # sbatch --job-name=JOBNAME
+      job_name=${arg#--job-name=}
+      i=$((i+1))
+      continue
+      ;;
+    --job-name)
+      # sbatch --job-name JOBNAME
+      if [ $((i+1)) -ge ${#args[@]} ]; then
+        echo "❌ --job-name requires an argument" >&2
+        exit 1
+      fi
+      job_name=${args[$((i+1))]}
+      i=$((i+2))
+      continue
+      ;;
+    *)
+      i=$((i+1))
+      ;;
+  esac
+done
+
+cwd_base=$(basename "$PWD")
+if [ -z "${job_name:-}" ]; then
+  echo "❌ Could not determine job name. Please set it with -J/--job-name or JOB_NAME." >&2
+  echo "   Based on the working directory, you probably want the option:" >&2
+  echo "          -J ${cwd_base}" >&2
+  echo "   If this is not where you want the output, please change directory too."
+  exit 1
+fi
+
+# Variant A: require current directory == job name
+if [ "$cwd_base" != "$job_name" ]; then
+  echo "❌ Sanity check failed:" >&2
+  echo "   Current directory basename is '$cwd_base'," >&2
+  echo "   but job name is           '$job_name'." >&2
+  echo "   Expected to run from a dir named '$job_name'." >&2
+  echo "   (e.g. /path/to/$job_name)" >&2
+  exit 1
+else
+  echo "✅ The current directory '../{$job_name}' matches the job-name"
+fi
+
+if [ -s config.yaml ]; then
+  echo "✅ Config file './config.yaml' found ($PWD) and it is non-empty."
+else
+  echo "❌ config.yaml is missing or empty in the current directory.  Are you in the right directory?"
+  exit 1
+fi
+
+script="$1"
+shift
+if [ ! -f "$script" ]; then
+  echo "❌ sbatch script '$script' not found.  The script name should be the first CL argument." >&2
+  exit 1
+fi
+
+# Create a temporary copy of the script to make sure that the filename is specific to each sbatch launch.
+cp -p -n -- "$(readlink -f "$script")" "job_sbat_script.$$.waiting"  # make a copy for documentation purposes
+export JOB_SBAT_SCRIPT_TEMP="job_sbat_script.$$.waiting"
+export JOB_SBAT_SCRIPT_NAME=$(basename "$(readlink -f "$script")")
+
+echo The sbatch script will be copied temporarily to "job_sbat_script.$$"
+
+THIS="${BASH_SOURCE[0]}"   # THIS is the wrapper file path (argv0 label to show in ps/top).
+BASENAME=$(basename "$0")  # BASENAME becomes the name you invoked the wrapper as (e.g. python, pip).
+THISDIR=$(cd -P -- "$(dirname -- "$THIS")" && pwd) || { echo "cannot resolve THISDIR" >&2; return 1 2>/dev/null || exit 1; }
+BASEDIR=$(cd -P -- "$THISDIR/.." && pwd)           || { echo "cannot resolve BASEDIR" >&2; return 1 2>/dev/null || exit 1; }
+
+echo running...  sbatch --test-only     -p "$PARTITION" "$@" "$script" 
+  sbatch --test-only                    -p "$PARTITION" "$@" "$script" 
+echo "✅ Sbatch --test-only run on ../{$job_name}/${script} successfully"
+
+echo running...  sbatch-dry-run         -p "$PARTITION" "$@" "$script" 
+  $THISDIR/sbatch-dry-run               -p "$PARTITION" "$@" "$script" 
+echo "✅ Done with the dry-run of ../{$job_name}/${script}"
+
+echo running...  sbatch                -p "$PARTITION" "$@" "$script" 
+  sbatch                               -p "$PARTITION" "$@" "$script" 
+
+echo The job should occur in the queue:
+squeue --me
+

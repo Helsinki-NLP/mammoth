@@ -1,0 +1,136 @@
+# Task Configuration - Single language pair
+tasks:
+  task_en_fi:
+    src_tgt: "en-fi"
+    weight: 1.0
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    enc_sharing_group: ["en"]
+    dec_sharing_group: ["fi"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt
+    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt
+    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt
+    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt
+
+# ============================================================================
+# Vocabulary Configuration - HuggingFace Tokenizer
+# ============================================================================
+use_hf_tokenizer: true
+# override_checkpoint_vocab: true # only works when 'train_from' is used
+
+src_vocab:
+  en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+
+tgt_vocab:
+  fi: /scratch/project_462000964/members/wangchao/training/151125/converted_model/tgt_fi_tokenizer.json
+
+src_seq_length: 256
+tgt_seq_length: 256
+max_length: 256  # Mammoth adds bos and eos token to training data.
+
+# ============================================================================
+# Denoising Transform Parameters (BART-style)
+# ============================================================================
+# denoising_objective: bart
+# mask_ratio: 0.15              # Fraction of tokens to mask
+# mask_length: span-poisson     # Span masking with Poisson distribution
+# poisson_lambda: 3.0           # Average span length
+# replace_length: 1             # Replace span with single mask token
+
+# ============================================================================
+# Model Architecture - ModernBERT Features
+# ============================================================================
+enc_layers: [6]
+dec_layers: [18]
+
+# ============================================================================
+# x-transformers Options - ModernBERT Configuration
+# ============================================================================
+x_transformers_opts:
+  # Attention configuration
+  enc_heads: 8                       # Number of attention heads
+  
+
+  # RoPE (Rotary Position Embeddings)
+  rotary_pos_emb: true               # Use RoPE instead of absolute positions
+  dec_rotary_pos_emb_base: 1000000
+  # global_rope_theta: 160000.0      # RoPE base for global attention layers (Encoder only)
+  # local_rope_theta: 10000.0        # RoPE base for local attention layers (Encoder only)
+
+  # Feed-forward network (GLU with bias-free architecture)
+  dec_ff_mult: 3.2                      
+  dec_ff_glu: true                       # Use GeGLU activation
+  dec_ff_no_bias: true                   # Bias-free architecture
+
+  # Encoder uses standard feedforward (NOT GLU)
+  enc_ff_mult: 4.0                       # Standard 4x expansion
+  enc_ff_glu: false                      # Standard feedforward (NO GLU)
+  enc_ff_no_bias: true                   # Bias-free architecture
+
+  # Normalization
+  # post_emb_norm_bias: false          # Bias-free normalization
+  # layernorm_bias: false              # Bias-free LayerNorm
+
+  # Position embeddings
+  use_abs_pos_emb: false             # No absolute positions (using RoPE)
+  tie_embedding: false               # Don't tie input/output embeddings
+# ============================================================================
+# Training Configuration
+# ============================================================================
+train_steps: 60000
+accum_count: [2]                     # Gradient accumulation (effective batch = 4 * 32 = 128)
+batch_size: 32                      # Per-GPU batch size
+batch_type: sents                    # Batch by sentences
+queue_size: 32
+# normalization: tokens                # Normalize gradients by token count
+valid_batch_size: 16                 # Validation batch size
+valid_steps: 12000                    # Validation frequency
+valid_metrics: [bleu]                # Validation metrics
+save_checkpoint_steps: 12000          # Checkpoint frequency
+keep_checkpoint: 5                   # Keep last 5 checkpoints
+
+# ============================================================================
+# Optimizer Settings - AdamW with warmup
+# ============================================================================
+optim: adamw
+learning_rate: 8e-4              # Peak learning rate
+adam_beta1: 0.9
+adam_beta2: 0.999
+weight_decay: 0.01                   # Weight decay for regularization
+max_grad_norm: 1.0                   # Gradient clipping
+
+# Learning rate scheduling
+warmup_steps: 6000                   
+decay_method: linear_warmup          # Linear warmup + cosine decay
+learning_rate_decay: 1.0             # Full decay after warmup
+start_decay_steps: 30000              # Start decay after warmup
+
+# ============================================================================
+# Distributed Training (Single GPU)
+# ============================================================================
+world_size: 1
+gpu_ranks: [0]
+node_rank: 0
+task_distribution_strategy: weighted_sampling
+
+# ============================================================================
+# Logging and Monitoring
+# ============================================================================
+log_model_structure: false           # Log model structure at startup
+report_every: 100                    # Report every 100 steps
+report_training_accuracy: true       # Report training accuracy
+tensorboard: true
+tensorboard_log_dir: ./tensorboard_logs
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+seed: 42                             # Random seed
+reset_optim: all                     # Continue training steps and the optimizer state
+label_smoothing: 0.1                 # Label smoothing
+
+
+# Model saving
+train_from: /scratch/project_462000964/members/wangchao/training/151125/converted_model/
+save_model: /scratch/project_462000964/members/wangchao/training/151125/model/

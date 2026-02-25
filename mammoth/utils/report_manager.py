@@ -160,16 +160,25 @@ class ReportMgr(ReportMgrBase):
         n_correct = None if report_stats.n_correct is None else 0
         report_stats = mammoth.utils.Statistics(n_correct=n_correct)
 
-        total = sum(sampled_task_counts.values())
-        logger.info(f'Task sampling distribution: (total {total})')
-        for task, count in sampled_task_counts.most_common():
-            logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
+        if sampled_task_counts is not None:
+            total = sum(sampled_task_counts.values())
+            logger.info(f'Task sampling distribution: (total {total})')
+            for task, count in sampled_task_counts.most_common():
+                logger.info(f'Task: {task}\tcount: {count}\t{100 * count / total} %')
 
         return report_stats
 
-    def _report_step(self, lr, patience, step, train_stats=None, valid_stats=None):
+    def _report_step(self, lr, patience, step, train_stats=None, valid_stats=None, model_saver=None):
         """
         See base class method `ReportMgrBase.report_step`.
+
+        Args:
+            lr: Learning rate
+            patience: Current patience for early stopping
+            step: Current training step
+            train_stats: Training statistics (optional)
+            valid_stats: Validation statistics (optional)
+            model_saver: ModelSaver instance for best checkpoint info (optional)
         """
         if train_stats is not None:
             self.log('Train perplexity: %g' % train_stats.ppl())
@@ -182,14 +191,41 @@ class ReportMgr(ReportMgrBase):
             acc = valid_stats.accuracy()
             self.log('Validation perplexity: %g', ppl)
             self.log('Validation accuracy: %g', acc)
-            structured_logging({
+
+            # Log additional validation metrics
+            if hasattr(valid_stats, 'validation_metrics') and valid_stats.validation_metrics:
+                for metric_name, metric_value in valid_stats.validation_metrics.items():
+                    self.log('Validation %s: %g', metric_name.upper(), metric_value)
+
+            # Log best checkpoint info if model_saver is provided
+            if model_saver and model_saver.best_checkpoint_step is not None:
+                self.log(
+                    'Best checkpoint so far: step %d (%s=%.4f)',
+                    model_saver.best_checkpoint_step,
+                    model_saver.metric_for_best_model,
+                    model_saver.best_metric_value
+                )
+
+            log_data = {
                 'type': 'validation',
                 'step': step,
                 # 'learning_rate': lr,
                 'perplexity': ppl,
                 'accuracy': acc,
                 'crossentropy': valid_stats.xent(),
-            })
+            }
+
+            # Add validation metrics to structured logging
+            if hasattr(valid_stats, 'validation_metrics') and valid_stats.validation_metrics:
+                log_data.update(valid_stats.validation_metrics)
+
+            # Add best checkpoint info to structured logging
+            if model_saver and model_saver.best_checkpoint_step is not None:
+                log_data['best_checkpoint_step'] = model_saver.best_checkpoint_step
+                log_data['best_checkpoint_metric'] = model_saver.metric_for_best_model
+                log_data['best_checkpoint_value'] = float(model_saver.best_metric_value)
+
+            structured_logging(log_data)
             self.maybe_log_tensorboard(valid_stats, "valid", lr, patience, step)
 
     def _report_end(self, step):

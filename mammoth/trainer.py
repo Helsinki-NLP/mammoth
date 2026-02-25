@@ -20,6 +20,13 @@ import mammoth.distributed
 from mammoth.utils.logging import logger
 from mammoth.utils.loss import build_loss_function
 from mammoth.utils.statistics import Statistics
+from mammoth.inputters.vocab import HFTokenizerVocab
+
+try:
+    import sacrebleu
+    SACREBLEU_AVAILABLE = True
+except ImportError:
+    SACREBLEU_AVAILABLE = False
 
 
 class NanLossException(Exception):
@@ -105,6 +112,8 @@ def build_trainer(
         task_queue_manager=task_queue_manager,
         report_stats_from_parameters=opts.report_stats_from_parameters,
         report_training_accuracy=opts.report_training_accuracy,
+        valid_metrics=opts.valid_metrics,
+        vocabs_dict=vocabs_dict,
     )
     return trainer
 
@@ -152,6 +161,8 @@ class Trainer(object):
         task_queue_manager=None,
         report_stats_from_parameters=False,
         report_training_accuracy=False,
+        valid_metrics=None,
+        vocabs_dict=None,
     ):
         # Basic attributes.
         self.model = model
@@ -176,6 +187,8 @@ class Trainer(object):
         self.dropout_steps = dropout_steps
 
         self.task_queue_manager = task_queue_manager
+        self.valid_metrics = valid_metrics or []
+        self.vocabs_dict = vocabs_dict or {}
 
         self._data_state = {}
 
@@ -237,6 +250,20 @@ class Trainer(object):
             logger.info('Start training loop without validation...')
         else:
             logger.info('Start training loop and validate every %d steps...', valid_steps)
+
+        # Validate configuration for metric-based checkpoint strategies
+        if self.model_saver is not None:
+            save_strategy = getattr(self.model_saver, 'save_strategy', 'steps')
+            if save_strategy in ['best_only', 'best_and_last', 'best_n']:
+                if valid_iter is None:
+                    raise ValueError(
+                        f"save_strategy='{save_strategy}' requires validation, but no validation data provided. "
+                        f"Either provide validation data or use save_strategy='steps'."
+                    )
+                if valid_steps <= 0:
+                    raise ValueError(
+                        f"save_strategy='{save_strategy}' requires valid_steps > 0, but got {valid_steps}"
+                    )
 
         n_correct = 0 if self.report_training_accuracy else None
         total_stats = mammoth.utils.Statistics(n_correct=n_correct)
@@ -321,42 +348,93 @@ class Trainer(object):
             )
 
             if step % valid_steps == 0 and valid_iter is not None:
-                if self.gpu_verbose_level > 0:
-                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
-                valid_stats = self.validate(
-                    iter_on_device(valid_iter, device_context),
-                    moving_average=self.moving_average,
-                )
-                if self.gpu_verbose_level > 0:
-                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} gather valid stat step {step}')
-                valid_stats = self._maybe_gather_stats(valid_stats)
-                if self.gpu_verbose_level > 0:
-                    logger.info(f'{device_context.node_rank}:{device_context.local_rank} report stat step {step}')
+                # Only run validation on master rank to avoid NCCL timeout issues
                 if device_context.is_master():
+                    if self.gpu_verbose_level > 0:
+                        logger.info(f'{device_context.node_rank}:{device_context.local_rank} validate step {step}')
+                    valid_stats = self.validate(
+                        iter_on_device(valid_iter, device_context),
+                        moving_average=self.moving_average,
+                    )
+                    # Store last validation stats for use at end of training
+                    self._last_valid_stats = valid_stats
+
+                    if self.gpu_verbose_level > 0:
+                        logger.info(f'{device_context.node_rank}:{device_context.local_rank} report valid stat step {step}')
                     self._report_step(
                         None,
                         step,
                         valid_stats=valid_stats,
                     )
 
-                # Run patience mechanism
-                if self.earlystopper is not None:
-                    self.earlystopper(valid_stats, step)
-                    # If the patience has reached the limit, stop training
-                    if self.earlystopper.has_stopped():
-                        break
+                    # Save checkpoint with metric tracking after validation
+                    if self.model_saver is not None:
+                        self.model_saver.save_with_metric(
+                            step, self._data_state, valid_stats, moving_average=self.moving_average
+                        )
 
+                    # Run patience mechanism only on master rank
+                    if self.earlystopper is not None:
+                        self.earlystopper(valid_stats, step)
+                        # If the patience has reached the limit, stop training
+                        if self.earlystopper.has_stopped():
+                            logger.info(f"Early stopping triggered at step {step}")
+                            if self.earlystopper.current_step_best is not None:
+                                logger.info(f"Best checkpoint was at step {self.earlystopper.current_step_best}")
+                            break
+
+            # Regular checkpoint saving (for save_strategy='steps' or when no validation has run yet)
+            # This is skipped when using metric-based strategies after validation
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
+                # Only use regular save if not already saved via save_with_metric in validation
+                if not (step % valid_steps == 0 and valid_iter is not None and device_context.is_master()):
+                    self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
                 break
 
-        if self.model_saver is not None:
-            self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
+        # Final checkpoint save
+        if self.model_saver is not None and device_context.is_master():
+            # Use save_with_metric if we have validation stats, otherwise use regular save
+            if hasattr(self, '_last_valid_stats') and self._last_valid_stats is not None:
+                self.model_saver.save_with_metric(
+                    step, self._data_state, self._last_valid_stats, moving_average=self.moving_average
+                )
+            else:
+                # Fallback to regular save if no validation has been run
+                self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
+
+            # Log final best checkpoint info
+            if self.model_saver.best_checkpoint_step is not None:
+                logger.info("=" * 80)
+                logger.info("Training completed!")
+                logger.info(f"Best checkpoint: step {self.model_saver.best_checkpoint_step}")
+                logger.info(
+                    f"Best {self.model_saver.metric_for_best_model}: "
+                    f"{self.model_saver.best_metric_value:.4f}"
+                )
+                logger.info("=" * 80)
+
         if device_context.is_master() and self.report_manager is not None:
             self.report_manager.report_end(step)
         return total_stats
+
+    def _compute_validation_metrics(self, predictions, references, valid_metrics):
+        """Compute additional validation metrics like BLEU."""
+        metrics = {}
+        
+        if not SACREBLEU_AVAILABLE and 'bleu' in valid_metrics:
+            logger.warning("sacrebleu not available, skipping BLEU computation")
+            return metrics
+            
+        if 'bleu' in valid_metrics and SACREBLEU_AVAILABLE:
+            try:
+                bleu_score = sacrebleu.corpus_bleu(predictions, [references])
+                metrics['bleu'] = bleu_score.score
+            except Exception as e:
+                logger.warning(f"Error computing BLEU: {e}")
+                
+        return metrics
 
     def validate(self, valid_iter, moving_average=None, task=None):
         """Validate model.
@@ -365,6 +443,11 @@ class Trainer(object):
             :obj:`nmt.Statistics`: validation loss statistics
         """
         valid_model = self.model
+        
+        # Initialize collections for BLEU computation if needed
+        predictions = []
+        references = []
+        compute_metrics = bool(self.valid_metrics)
         if moving_average:
             # swap model params w/ moving average
             # (and keep the original parameters)
@@ -397,7 +480,10 @@ class Trainer(object):
                 # else:
                 #     normalization = batch.batch_size
 
-                with torch.cuda.amp.autocast(enabled=self.optim.amp):
+                # Determine device and dtype for mixed precision training
+                device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
+                dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
+                with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                     # F-prop through the model.
                     logits, decoder_output = valid_model(
                         rearrange(src, 't b 1 -> b t'),
@@ -423,6 +509,70 @@ class Trainer(object):
                     target,
                     padding_idx,
                 )
+                
+                # Collect predictions and references for additional metrics
+                if compute_metrics:
+                    # Get predicted tokens (argmax from logits)
+                    pred_tokens = logits.argmax(dim=-1)  # Shape: [seq_len, batch_size]
+                    
+                    # Get target vocab for decoding using the stored vocabs_dict
+                    tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))
+                    
+                    if tgt_vocab is not None:
+                        # Use HF tokenizer's decode if available, otherwise fall back to manual decoding
+                        if isinstance(tgt_vocab, HFTokenizerVocab):
+                            # Decode using HF tokenizer's built-in decoder
+                            # This properly handles BPE merging, subword markers, and special token removal
+                            for b in range(pred_tokens.size(1)):  # batch dimension
+                                pred_seq = pred_tokens[:, b].tolist()
+                                ref_seq = target[:, b, 0].tolist()
+
+                                # Filter out padding tokens before decoding
+                                # (HF tokenizer handles special token removal via skip_special_tokens)
+                                pred_seq = [t for t in pred_seq if t != padding_idx]
+                                ref_seq = [t for t in ref_seq if t != padding_idx]
+
+                                if pred_seq and ref_seq:
+                                    # Use tokenizer's decode method - handles BPE merging, subword markers, etc.
+                                    pred_text = tgt_vocab.decode_tokens(pred_seq, skip_special_tokens=True).strip()
+                                    ref_text = tgt_vocab.decode_tokens(ref_seq, skip_special_tokens=True).strip()
+
+                                    if pred_text and ref_text:
+                                        predictions.append(pred_text)
+                                        references.append(ref_text)
+                        else:
+                            # Fallback for traditional Vocab (backward compatibility)
+                            for b in range(pred_tokens.size(1)):  # batch dimension
+                                pred_seq = pred_tokens[:, b].tolist()
+                                ref_seq = target[:, b, 0].tolist()
+
+                                # Convert tokens to words, filtering out padding and special tokens
+                                pred_words = []
+                                ref_words = []
+
+                                for token in pred_seq:
+                                    if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                        word = tgt_vocab.itos[token]
+                                        # Skip special tokens like <s>, </s>, <pad>, <unk>
+                                        if not word.startswith('<') or not word.endswith('>'):
+                                            pred_words.append(word)
+
+                                for token in ref_seq:
+                                    if token != padding_idx and hasattr(tgt_vocab, 'itos') and token < len(tgt_vocab.itos):
+                                        word = tgt_vocab.itos[token]
+                                        # Skip special tokens like <s>, </s>, <pad>, <unk>
+                                        if not word.startswith('<') or not word.endswith('>'):
+                                            ref_words.append(word)
+
+                                # Join words to create sentences, only if we have content
+                                if pred_words and ref_words:
+                                    pred_text = ' '.join(pred_words)
+                                    ref_text = ' '.join(ref_words)
+                                    predictions.append(pred_text)
+                                    references.append(ref_text)
+                    else:
+                        logger.warning(f"Could not find vocabulary for target language '{metadata.tgt_lang}', skipping BLEU computation for this batch")
+                
                 stats.update(batch_stats)
         if moving_average:
             for param_data, param in zip(model_params_data, self.model.parameters()):
@@ -430,6 +580,12 @@ class Trainer(object):
 
         # Set model back to training mode.
         valid_model.train()
+        
+        # Compute additional validation metrics
+        if compute_metrics and predictions and references:
+            metrics = self._compute_validation_metrics(predictions, references, self.valid_metrics)
+            if stats is not None:
+                stats.validation_metrics.update(metrics)
 
         return stats
 
@@ -444,6 +600,11 @@ class Trainer(object):
         normalization = 0
         seen_comm_batches = set()
         expected_metadata = my_task.get_serializable_metadata()
+
+        # Determine device and dtype for mixed precision training (once per accumulation)
+        device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
+        dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
+
         for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
             if metadata != expected_metadata:
                 raise Exception(
@@ -473,7 +634,7 @@ class Trainer(object):
 
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
-            with torch.cuda.amp.autocast(enabled=self.optim.amp):
+            with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                 logits, decoder_output = self.model(
                     src=rearrange(src, 't b 1 -> b t'),
                     decoder_input=rearrange(decoder_input, 't b 1 -> b t'),

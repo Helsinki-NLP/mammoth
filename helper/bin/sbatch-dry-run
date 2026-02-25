@@ -1,0 +1,366 @@
+#!/usr/bin/env bash
+# Written by Anssi Yli-Jyrä for MAMMOTH framework @ lumi.csc.fi, (c) 2025, MIT License
+#
+# The idea: enable running the batch script until launching the srun
+
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 [sbatch-options] -- <sbatch-script> [script-args]" >&2
+  exit 1
+fi
+
+echo "Now doing a test-fly of the sbatch without really doing Slurm allocation or srun..."
+echo "Simple syntaxtic errors in the script may be caught at this step."
+echo "The SLURM_JOB_ID is shown as -1 (= a fake one) for this test."
+
+# Defaults you care about
+SLURM_JOB_ID="-1"
+SLURM_SUBMIT_DIR="$PWD"
+SLURM_JOB_ACCOUNT=""
+SLURM_JOB_PARTITION=""
+SLURM_JOB_NUM_NODES=""
+SLURM_NTASKS=""
+SLURM_NTASKS_PER_NODE=""
+SLURM_CPUS_PER_TASK=""
+SLURM_CPUS_PER_GPU=""
+SLURM_CPUS_ON_NODE=""
+SLURM_MEM_PER_GPU=""
+SLURM_MEM_PER_CPU=""
+SLURM_MEM_PER_NODE=""
+SLURM_GPUS_PER_NODE=""
+SLURM_JOB_NAME=""
+
+# --------- 1) Parse sbatch-like CLI options (before the script) --------------
+
+while [ $# -gt 0 ]; do
+  # echo parsing the commandline option "$1"    
+  case "$1" in
+    -A|--account)
+      SLURM_JOB_ACCOUNT="$2"
+      shift 2
+      continue
+      ;;
+    -J|--job-name)
+      SLURM_JOB_NAME="$2"
+      shift 2
+      continue
+      ;;
+    -p|--partition)
+      SLURM_JOB_PARTITION="$2"
+      shift 2
+      continue
+      ;;
+    --mail-user)
+      MAIL_USER="$2"
+      shift 2
+      continue
+      ;;
+    --export=*)
+      # Example: --export=ALL,JOB_SBAT_SCRIPT=/path/to/script
+      export_arg=${1#--export=}
+      # Very minimal parser: look for JOB_SBAT_SCRIPT=...
+      case "$export_arg" in
+        *JOB_SBAT_SCRIPT=*)
+          JOB_SBAT_SCRIPT=$(printf '%s\n' "$export_arg" \
+                            | sed -n 's/.*JOB_SBAT_SCRIPT=\([^,]*\).*/\1/p')
+          ;;
+      esac
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "❌ sbatch-dry-run: unknown/unsupported option '$1'" >&2
+      exit 1
+      ;;
+    *)
+      # First non-option → assume this is the script
+      break
+      ;;
+  esac
+done
+
+if [ $# -lt 1 ]; then
+  echo "❌ sbatch-dry-run: no sbatch script given." >&2
+  exit 1
+fi
+
+script="$1"
+shift
+script_args=("$@")
+
+if [ ! -f "$script" ]; then
+  echo "❌ sbatch script '$script' not found." >&2
+  exit 1
+fi
+
+# If JOB_SBAT_SCRIPT not set via --export, fill a default
+JOB_SBAT_SCRIPT=${JOB_SBAT_SCRIPT:-"$(readlink -f "$script")"}
+
+# --------- 2) Parse #SBATCH lines inside the script (strict / as before) -----
+# (You can keep the strict parsing we wrote earlier: reject unknown directives)
+# For brevity, I'll just indicate it here as a placeholder:
+#   - parse --nodes, --ntasks, --ntasks-per-node, --cpus-per-task, --mem-*, --gres, etc.
+#   - if you see an unknown #SBATCH option, exit with an error
+#
+# ... your #SBATCH parsing code goes here ...
+
+while IFS= read -r line; do
+  case "$line" in
+    \#SBATCH*)
+      # Strip "#SBATCH" and leading spaces
+      words=${line#\#SBATCH}
+      words=${words#" "}
+      [ -z "$words" ] && continue
+
+      # break into tokens: $1 is the option, the rest is value (if separate)
+      set -- $words
+      option="$1"
+      shift
+      value=""
+      # Support --opt=value form
+      case "$option" in
+        --*=*)
+          value=${option#*=}
+          option=${option%%=*}
+          ;;
+      esac
+      # If no "=value" in option, take next token as value where appropriate
+      [ -z "$value" ] && [ $# -gt 0 ] && value="$1"
+
+      known=1
+      case "$option" in
+        -A|--account)
+	    if [ -z "${SLURM_JOB_ACCOUNT:-}" ]; then
+		SLURM_JOB_ACCOUNT="$value"
+	    fi
+          ;;
+        -J|--jon-name)
+	    if [ -z "${SLURM_JOB_NAME:-}" ]; then
+		SLURM_JOB_NAME="$value"
+	    fi
+          ;;
+        -p|--partition)
+	    if [ -z "${SLURM_JOB_PARTITION:-}" ]; then
+		SLURM_JOB_PARTITION="$value"
+	    fi
+          ;;
+        -N|--nodes)
+	    if [ -z "${SLURM_JOB_NUM_NODES:-}" ]; then
+		SLURM_JOB_NUM_NODES="$value"
+	    fi
+          ;;
+        -n|--ntasks)
+          SLURM_NTASKS="$value"
+          ;;
+        --hint)
+          SLURM_HINT="$value"
+          ;;
+        --ntasks-per-node)
+          SLURM_NTASKS_PER_NODE="$value"
+          ;;
+        --cpus-per-task)
+          SLURM_CPUS_PER_TASK="$value"
+          ;;
+        --cpus-per-gpu)
+          SLURM_CPUS_PER_GPU="$value"
+          ;;
+        --mem-per-gpu)
+          SLURM_MEM_PER_GPU="$value"
+          ;;
+        --mem-per-cpu)
+          SLURM_MEM_PER_CPU="$value"
+          ;;
+        --mem)
+          SLURM_MEM_PER_NODE="$value"
+          ;;
+        --gpus-per-node)
+          SLURM_GPUS_PER_NODE="$value"
+          ;;
+        --gres)
+          gres="$value"
+          if echo "$gres" | grep -q 'gpu'; then
+            g=$(echo "$gres" | sed -n 's/.*gpu:[^:]*:\([0-9][0-9]*\).*/\1/p')
+            [ -n "$g" ] && SLURM_GPUS_PER_NODE="$g"
+          fi
+          ;;
+        -J|--job-name)
+          SLURM_JOB_NAME="$value"
+          ;;
+        -o|--output)
+	  SBATCH_OUTPUT="$value"
+          ;;
+        -e|--error)
+	  SBATCH_ERROR="$value"
+          ;;
+        -t|--time)
+          # we don't parse time here, but we recognise it as valid
+          ;;
+        --mail-user|--mail-type)
+          # accept mail settings, ignore value
+          ;;
+        *)
+          known=0
+          ;;
+      esac
+
+      if [ "$known" -eq 0 ]; then
+        echo "❌ Unknown or unsupported #SBATCH directive:" >&2
+        echo "   $line" >&2
+        echo "   Option '$option' is not handled by sbatch-dryrun." >&2
+        echo "   (Add support for it here, or fix a typo in the sbatch script.)" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done < "$script"
+
+
+
+# Fallbacks / derivations
+SLURM_JOB_PARTITION=${SLURM_JOB_PARTITION:-dev-g}
+SLURM_JOB_NUM_NODES=${SLURM_JOB_NUM_NODES:-1}
+SLURM_NTASKS=${SLURM_NTASKS:-${SLURM_NTASKS_PER_NODE:-1}}
+SLURM_NTASKS_PER_NODE=${SLURM_NTASKS_PER_NODE:-$SLURM_NTASKS}
+SLURM_CPUS_PER_TASK=${SLURM_CPUS_PER_TASK:-}
+SLURM_CPUS_PER_GPU=${SLURM_CPUS_PER_GPU:-}
+SLURM_GPUS_PER_NODE=${SLURM_GPUS_PER_NODE:-8}
+SLURM_STEP_ID="batch"   # pretend we are in the batch step
+
+if [ "$SLURM_JOB_NUM_NODES" -eq 1 ] 2>/dev/null; then
+    SLURM_JOB_NODELIST="drynid0001"
+else
+    # e.g. drynid[0001-0004] for 4 nodes
+    last=$(printf '%04d' "$SLURM_JOB_NUM_NODES")
+    SLURM_JOB_NODELIST="drynid[0001-${last}]"
+fi
+
+# -------- expand SBATCH_OUTPUT / SBATCH_ERROR to OUT_PATH / ERR_PATH --------
+
+OUT_PATH=""
+ERR_PATH=""
+
+# Expand patterns: %j (job id), %x (job name), %u (user)
+if [ -n "${SBATCH_OUTPUT:-}" ]; then
+  OUT_PATH="$SBATCH_OUTPUT"
+  OUT_PATH=${OUT_PATH//%j/$SLURM_JOB_ID}
+  OUT_PATH=${OUT_PATH//%x/$SLURM_JOB_NAME}
+  OUT_PATH=${OUT_PATH//%u/$USER}
+  if [ "$OUT_PATH" = "-" ]; then 
+    OUT_PATH=""    # "-" means: do not redirect stdout
+  fi
+  # If any '%' left, something is wrong
+  case "$OUT_PATH" in
+    *%*)
+      echo "ERROR: Unexpanded % in --output path: '$OUT_PATH'" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+if [ -n "${SBATCH_ERROR:-}" ]; then
+  ERR_PATH="$SBATCH_ERROR"
+  ERR_PATH=${ERR_PATH//%j/$SLURM_JOB_ID}
+  ERR_PATH=${ERR_PATH//%x/$SLURM_JOB_NAME}
+  ERR_PATH=${ERR_PATH//%u/$USER}
+  if [ "$ERR_PATH" = "-" ]; then
+    ERR_PATH=""     # "-" means: do not redirect stderr
+  fi
+  case "$ERR_PATH" in
+    *%*)
+      echo "ERROR: Unexpanded % in --error path: '$ERR_PATH'" >&2
+      exit 1
+      ;;
+  esac
+fi
+
+echo "=== DRY-RUN ENV (sbatch-dryrun) ==="
+echo "SLURM_JOB_NAME        = ${SLURM_JOB_NAME:-<unset>}"
+echo "SLURM_JOB_ID          = $SLURM_JOB_ID"
+echo "SLURM_JOB_ACCOUNT     = $SLURM_JOB_ACCOUNT"
+echo "SLURM_JOB_PARTITION   = $SLURM_JOB_PARTITION"
+echo "SLURM_JOB_NUM_NODES   = $SLURM_JOB_NUM_NODES"
+echo "SLURM_NTASKS          = $SLURM_NTASKS"
+echo "SLURM_NTASKS_PER_NODE = $SLURM_NTASKS_PER_NODE"
+echo "SLURM_CPUS_PER_TASK   = $SLURM_CPUS_PER_TASK"
+echo "SLURM_CPUS_PER_GPU    = $SLURM_CPUS_PER_GPU"
+echo "SLURM_GPUS_PER_NODE   = $SLURM_GPUS_PER_NODE"
+echo "SLURM_MEM_PER_GPU     = $SLURM_MEM_PER_GPU"
+echo "SLURM_MEM_PER_CPU     = $SLURM_MEM_PER_CPU"
+echo "SLURM_MEM_PER_NODE    = $SLURM_MEM_PER_NODE"
+echo "SLURM_JOB_NODELIST    = $SLURM_JOB_NODELIST"
+echo "SBATCH_OUTPUT         = $SBATCH_OUTPUT"
+echo "  => OUT_PATH         = $OUT_PATH"
+echo "SBATCH_ERROR          = $SBATCH_ERROR"
+echo "  => ERR_PATH         = $ERR_PATH"
+echo "MAIL_USER             = $MAIL_USER"
+echo "==================================="
+
+# Export into environment (so your helper scripts see a Slurm-like context)
+export SLURM_JOB_ID SLURM_SUBMIT_DIR SLURM_JOB_ACCOUNT SLURM_JOB_PARTITION
+export SLURM_JOB_NUM_NODES SLURM_NTASKS SLURM_NTASKS_PER_NODE SLURM_CPUS_PER_TASK
+export SLURM_CPUS_PER_GPU SLURM_MEM_PER_GPU SLURM_MEM_PER_CPU SLURM_MEM_PER_NODE 
+export SLURM_GPUS_PER_NODE SLURM_STEP_ID SLURM_JOB_NAME JOB_SBAT_SCRIPT
+export SLURM_JOB_NODELIST MAIL_USER
+
+
+# -------- single exec with the right redirections --------
+
+export DRY_RUN=1   # Make sbatch-tail skip the real srun
+
+# Refuse to overwrite an existing file
+if [ -n "$OUT_PATH" ] && [ -e "$OUT_PATH" ]; then
+    echo "WARNING: Overwriting existing file: '$OUT_PATH'" >&2
+    # echo "ERROR: Refusing to overwrite existing file: '$OUT_PATH'" >&2
+    # exit 1
+else
+    mkdir -p -- "$(dirname "$OUT_PATH")"
+fi
+if [ -n "$ERR_PATH" ] && [ -e "$ERR_PATH" ]; then
+    echo "WARNING: Overwriting existing file: '$ERR_PATH'" >&2
+    # echo "ERROR: Refusing to overwrite existing file: '$ERR_PATH'" >&2
+    # exit 1
+else
+    mkdir -p -- "$(dirname "$ERR_PATH")"
+fi
+
+set +e # Temporarily disable 'set -e' so a failing script does not kill the wrapper
+if [ -n "$OUT_PATH" ] && [ -n "$ERR_PATH" ]; then
+    if [ "$OUT_PATH" = "$ERR_PATH" ]; then
+        echo "Executing:  $script ${script_args[@]} 1>\"$OUT_PATH\" 2>&1"
+        ( bash "$script" "${script_args[@]}" ) >"$OUT_PATH" 2>&1
+	status=$?   # exit code of the script (via the subshell)
+    else
+        echo "Executing:  $script ${script_args[@]} 1>\"$OUT_PATH\" 2>\"$ERR_PATH\""
+        ( bash "$script" "${script_args[@]}" ) >"$OUT_PATH" 2>"$ERR_PATH"
+	status=$?   # exit code of the script (via the subshell)
+    fi
+elif [ -n "$OUT_PATH" ]; then
+    echo "Executing:  $script ${script_args[@]} 1>\"$OUT_PATH\""
+    ( bash "$script" "${script_args[@]}" ) >"$OUT_PATH"        
+    status=$?   # exit code of the script (via the subshell)
+elif [ -n "$ERR_PATH" ]; then
+    echo "Executing:  $script ${script_args[@]} 2>\"$ERR_PATH\"" 
+    ( bash "$script" "${script_args[@]}" ) 2>"$ERR_PATH"
+    status=$?   # exit code of the script (via the subshell)
+else
+    echo "Executing:  $script ${script_args[@]}" >&3
+    echo "The out and err shown are indicative as the script is not running as a real Slurm job." >&3
+    echo "---------------------------------------------------------------------------------------" >&3
+    ( bash "$script" "${script_args[@]}")
+    status=$?   # exit code of the script (via the subshell)
+    echo "---------------------------------------------------------------------------------------" >&3
+fi
+if [ "$status" -ne 0 ]; then
+    echo "❌ The script seems to have an execution problem (exit code $status)." >&2
+    echo "---------------------------------------------------------------------"
+    tail "$ERR_PATH"
+    echo "---------------------------------------------------------------------"
+    echo "Please fix it and I can continue to submit it." >&2
+else
+    echo "✅ Dry-run of your sbatch script completed successfully."
+fi
+exit $status

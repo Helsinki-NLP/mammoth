@@ -127,6 +127,9 @@ def build_trainer(
         report_stats_from_parameters=opts.report_stats_from_parameters,
         report_training_accuracy=opts.report_training_accuracy,
         valid_metrics=opts.valid_metrics,
+        valid_max_length=opts.valid_max_length,
+        valid_max_batches=opts.valid_max_batches,
+        valid_timeout=opts.valid_timeout,
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,
@@ -179,6 +182,10 @@ class Trainer(object):
         report_stats_from_parameters=False,
         report_training_accuracy=False,
         valid_metrics=None,
+        valid_max_length=None,
+        valid_max_batches=None,
+        valid_timeout=None,
+        valid_start=0,
         vocabs_dict=None,
         beam_size=1,
         max_length=100,
@@ -208,6 +215,10 @@ class Trainer(object):
 
         self.task_queue_manager = task_queue_manager
         self.valid_metrics = valid_metrics or []
+        self.valid_max_length = valid_max_length
+        self.valid_max_batches = valid_max_batches
+        self.valid_timeout = valid_timeout
+        self.valid_start = valid_start
         self.vocabs_dict = vocabs_dict or {}
         self.beam_size = beam_size
         self.max_length = max_length
@@ -388,7 +399,7 @@ class Trainer(object):
             )
 
             # Validation step - each device validates its own tasks with validation data
-            if step % valid_steps == 0:
+            if (step % valid_steps == 0) and (step >= self.valid_start):
                 valid_stats = None
 
                 # Only validate if this device has tasks with validation data
@@ -595,7 +606,8 @@ class Trainer(object):
 
         # Get beam size and max_length from trainer attributes
         beam_size = self.beam_size
-        max_length = self.max_length
+        max_length = self.valid_max_length if self.valid_max_length else self.max_length
+        
 
         # Create global scorer with default parameters
         global_scorer = GNMTGlobalScorer(
@@ -736,13 +748,27 @@ class Trainer(object):
             stats = None  # mammoth.utils.Statistics()
 
             import random
+            import time
 
             # Log samples from only a few batches instead of every batch
             max_batches_to_log = 3  # Only log samples from first 3 batches
             batch_count = 0
+            valid_start_time = time.monotonic()
+            valid_max_time = self.valid_timeout
+            valid_max_batches = self.valid_max_batches
 
             for batch, metadata, _ in valid_iter:
                 batch_count += 1
+                
+                elapsed_time = time.monotonic() - valid_start_time
+                if valid_max_time and elapsed_time > valid_max_time:
+                    logger.info(f"[VALIDATION TIMEOUT] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, time={elapsed_time}")
+                    break
+                if valid_max_batches and batch_count > valid_max_batches:
+                    logger.info(f"[VALIDATION MAX BATCHES] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, batch-count={batch_count}")
+                    break
+                
+
                 # Only set logged_sample_idx for the first few batches
                 logged_sample_idx = random.randint(0, batch.batch_size - 1) if batch_count <= max_batches_to_log else -1
                 if stats is None:

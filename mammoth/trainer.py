@@ -536,7 +536,7 @@ class Trainer(object):
 
         return metrics
 
-    def _generate_predictions_autoregressive(self, batch, metadata, valid_model):
+    def _generate_predictions_autoregressive(self, batch, metadata, valid_model, decode_timeout=None):
         """Generate predictions using autoregressive decoding (like inference).
 
         Args:
@@ -549,8 +549,10 @@ class Trainer(object):
         """
         from mammoth.translate.greedy_search import GreedySearch
         from mammoth.translate.beam_search import BeamSearch, GNMTGlobalScorer
+        import time
 
         batch_size = batch.batch_size
+        decode_start = time.monotonic()
 
         # Activate the correct components
         active_encoder = valid_model.encoder.activate(
@@ -700,6 +702,13 @@ class Trainer(object):
                 if decode_strategy.done:
                     break
 
+            # Check for timeout
+            if decode_timeout:
+                elapsed = time.monotonic() - decode_start
+                if elapsed > decode_timeout:
+                    logger.info(f"[DECODING TIMEOUT] time={elapsed}")
+                    break
+
         # Extract predictions (take first from n_best for each batch item)
         predictions = []
         for batch_idx in range(batch_size):
@@ -820,7 +829,7 @@ class Trainer(object):
                 # Collect predictions and references for additional metrics using AUTOREGRESSIVE GENERATION
                 if compute_metrics:
                     # Generate predictions autoregressively (like real inference)
-                    pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model)
+                    pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model, valid_max_time)
 
                     # Get target vocab for decoding
                     tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))

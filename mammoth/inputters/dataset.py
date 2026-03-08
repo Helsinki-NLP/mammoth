@@ -564,6 +564,17 @@ def get_corpus(
     device_rank: int = 0,
 ):
     """build an iterable Dataset object"""
+    # Auto-add task_prefix_token to target vocab if configured but missing
+    if task.task_prefix_token is not None:
+        from mammoth.inputters.vocab import HFTokenizerVocab
+        if isinstance(tgt_vocab, HFTokenizerVocab):
+            tgt_vocab.add_special_token(task.task_prefix_token)
+        elif task.task_prefix_token not in tgt_vocab.stoi:
+            tgt_vocab.add_token(task.task_prefix_token, is_special=True)
+            logger.info(
+                f"Added special token '{task.task_prefix_token}' to tgt vocab for task '{task.corpus_id}'"
+            )
+
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}

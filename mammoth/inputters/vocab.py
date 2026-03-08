@@ -221,6 +221,31 @@ class HFTokenizerVocab:
         else:
             return 'none'
 
+    def add_special_token(self, token_str: str) -> int:
+        """Add a special token to the tokenizer if not already present.
+
+        Updates stoi and itos mappings to reflect the new token.
+
+        Args:
+            token_str: The token string to add (e.g. '<task:summarize>')
+
+        Returns:
+            The token ID (whether pre-existing or newly added)
+        """
+        existing_id = self.tokenizer.token_to_id(token_str)
+        if existing_id is not None:
+            return existing_id
+
+        from tokenizers import AddedToken
+        self.tokenizer.add_special_tokens([AddedToken(token_str, special=True)])
+
+        # Sync stoi / itos with the updated tokenizer vocab
+        new_id = self.tokenizer.token_to_id(token_str)
+        self.stoi[token_str] = new_id
+        self.itos[new_id] = token_str
+        logger.info(f"Added special token '{token_str}' to {self.tag} tokenizer (id={new_id})")
+        return new_id
+
     def tokenize(self, text, is_train=False):
         """
         Tokenize text using the HuggingFace tokenizer.

@@ -564,16 +564,33 @@ def get_corpus(
     device_rank: int = 0,
 ):
     """build an iterable Dataset object"""
-    # Auto-add task_prefix_token to target vocab if configured but missing
+    # Auto-add task_prefix_token to target vocab if configured but missing.
+    # Rank 0 is responsible for writing the updated vocab back to disk so that
+    # inference (which loads from disk) sees the same tokens the model was trained with.
+    # Other ranks only update their in-memory copy; they will read the correct vocab
+    # from disk on the next run once rank 0 has saved it.
     if task.task_prefix_token is not None:
         from mammoth.inputters.vocab import HFTokenizerVocab
         if isinstance(tgt_vocab, HFTokenizerVocab):
-            tgt_vocab.add_special_token(task.task_prefix_token)
+            new_id = tgt_vocab.add_special_token(task.task_prefix_token)
+            if device_rank == 0 and tgt_vocab.path is not None:
+                tgt_vocab.tokenizer.save(tgt_vocab.path)
+                logger.info(
+                    f"Saved updated tokenizer with '{task.task_prefix_token}' (id={new_id}) "
+                    f"to {tgt_vocab.path}"
+                )
         elif task.task_prefix_token not in tgt_vocab.stoi:
             tgt_vocab.add_token(task.task_prefix_token, is_special=True)
             logger.info(
                 f"Added special token '{task.task_prefix_token}' to tgt vocab for task '{task.corpus_id}'"
             )
+            if device_rank == 0 and tgt_vocab.path is not None:
+                import codecs
+                with codecs.open(tgt_vocab.path, 'a', 'utf-8') as f:
+                    f.write(f'\n{task.task_prefix_token}')
+                logger.info(
+                    f"Appended '{task.task_prefix_token}' to vocab file {tgt_vocab.path}"
+                )
 
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary

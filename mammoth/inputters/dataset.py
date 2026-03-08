@@ -554,6 +554,78 @@ def _run_pretokenization(opts, task, text_path, output_prefix, is_src):
         raise RuntimeError(f"Pretokenization failed for {text_path}")
 
 
+def ensure_task_prefix_tokens(opts, vocabs_dict):
+    """
+    Add task_prefix_token to target vocabs for all tasks that define one.
+
+    This should be called once by the main process before training workers are
+    spawned.  All tasks are visited in one loop so every token is guaranteed to
+    be persisted, regardless of which GPU rank is assigned to which task.
+
+    For HF tokenizers the full tokenizer JSON is rewritten after all tokens for
+    that vocab have been added (one save per distinct vocab file).  For
+    traditional text vocabs the new token is appended to the .txt file.
+    """
+    from mammoth.inputters.vocab import HFTokenizerVocab
+
+    # Track which HF tokenizer paths have already been saved this call so we
+    # don't write the file multiple times when several tasks share one vocab.
+    hf_vocabs_to_save = {}  # path -> HFTokenizerVocab object
+
+    for corpus_id, corpus_opts in opts.tasks.items():
+        token = corpus_opts.get('task_prefix_token', None)
+        if token is None:
+            continue
+
+        # Resolve the target language for this task so we can look up the vocab
+        tgt_lang = corpus_opts.get('tgt_lang', None)
+        if tgt_lang is None:
+            logger.warning(
+                f"Task '{corpus_id}' has task_prefix_token='{token}' but no tgt_lang; "
+                "cannot resolve target vocab — skipping."
+            )
+            continue
+
+        tgt_vocab = vocabs_dict.get(('tgt', tgt_lang), None)
+        if tgt_vocab is None:
+            logger.warning(
+                f"Task '{corpus_id}': target vocab for lang '{tgt_lang}' not found in "
+                "vocabs_dict — skipping task_prefix_token insertion."
+            )
+            continue
+
+        if isinstance(tgt_vocab, HFTokenizerVocab):
+            new_id = tgt_vocab.add_special_token(token)
+            logger.info(
+                f"Task '{corpus_id}': ensured '{token}' in HF tgt vocab "
+                f"(id={new_id}, lang={tgt_lang})"
+            )
+            if tgt_vocab.path is not None:
+                hf_vocabs_to_save[tgt_vocab.path] = tgt_vocab
+        else:
+            if token not in tgt_vocab.stoi:
+                tgt_vocab.add_token(token, is_special=True)
+                logger.info(
+                    f"Task '{corpus_id}': added '{token}' to tgt vocab (lang={tgt_lang})"
+                )
+                if tgt_vocab.path is not None:
+                    import codecs
+                    with codecs.open(tgt_vocab.path, 'a', 'utf-8') as f:
+                        f.write(f'\n{token}')
+                    logger.info(
+                        f"Appended '{token}' to vocab file {tgt_vocab.path}"
+                    )
+            else:
+                logger.debug(
+                    f"Task '{corpus_id}': '{token}' already in tgt vocab (lang={tgt_lang}), skipping"
+                )
+
+    # Save each HF tokenizer once (after all tokens for that file have been added)
+    for path, vocab in hf_vocabs_to_save.items():
+        vocab.tokenizer.save(path)
+        logger.info(f"Saved updated HF tokenizer to {path}")
+
+
 def get_corpus(
     opts,
     task,
@@ -564,34 +636,6 @@ def get_corpus(
     device_rank: int = 0,
 ):
     """build an iterable Dataset object"""
-    # Auto-add task_prefix_token to target vocab if configured but missing.
-    # Rank 0 is responsible for writing the updated vocab back to disk so that
-    # inference (which loads from disk) sees the same tokens the model was trained with.
-    # Other ranks only update their in-memory copy; they will read the correct vocab
-    # from disk on the next run once rank 0 has saved it.
-    if task.task_prefix_token is not None:
-        from mammoth.inputters.vocab import HFTokenizerVocab
-        if isinstance(tgt_vocab, HFTokenizerVocab):
-            new_id = tgt_vocab.add_special_token(task.task_prefix_token)
-            if device_rank == 0 and tgt_vocab.path is not None:
-                tgt_vocab.tokenizer.save(tgt_vocab.path)
-                logger.info(
-                    f"Saved updated tokenizer with '{task.task_prefix_token}' (id={new_id}) "
-                    f"to {tgt_vocab.path}"
-                )
-        elif task.task_prefix_token not in tgt_vocab.stoi:
-            tgt_vocab.add_token(task.task_prefix_token, is_special=True)
-            logger.info(
-                f"Added special token '{task.task_prefix_token}' to tgt vocab for task '{task.corpus_id}'"
-            )
-            if device_rank == 0 and tgt_vocab.path is not None:
-                import codecs
-                with codecs.open(tgt_vocab.path, 'a', 'utf-8') as f:
-                    f.write(f'\n{task.task_prefix_token}')
-                logger.info(
-                    f"Appended '{task.task_prefix_token}' to vocab file {tgt_vocab.path}"
-                )
-
     # get transform classes to infer special tokens
     # FIXME ensure TQM properly initializes transform with global if necessary
     vocabs = {'src': src_vocab, 'tgt': tgt_vocab}

@@ -243,6 +243,12 @@ def train(opts):
     # for key, val in fields_dict:
     #     print(f'{key}:\t{val}')
 
+    # Ensure all task_prefix_tokens are present in their respective target
+    # vocabs and persisted to disk before any worker processes are spawned.
+    # This runs once in the main process, covering every task in one pass.
+    from mammoth.inputters.dataset import ensure_task_prefix_tokens
+    ensure_task_prefix_tokens(opts, vocabs_dict)
+
     train_process = partial(single_main, vocabs_dict=vocabs_dict)
 
     logger.debug(f"[{os.getpid()}] Initializing process group with: {current_env}")

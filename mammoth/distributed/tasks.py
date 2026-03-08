@@ -48,6 +48,7 @@ class TaskSpecs:
     tgt_vocab: Any
     encoder_adapter_ids: Optional[List[Tuple[int, str, str]]]
     decoder_adapter_ids: Optional[List[Tuple[int, str, str]]]
+    task_prefix_token: Optional[str] = None
 
     def get_serializable_metadata(self):
         """
@@ -300,6 +301,7 @@ class TaskQueueManager:
                 tgt_vocab=None,
                 encoder_adapter_ids=encoder_adapter_ids,
                 decoder_adapter_ids=decoder_adapter_ids,
+                task_prefix_token=corpus_opts.get('task_prefix_token', None),
             )
             tasks.append(task)
         return cls(

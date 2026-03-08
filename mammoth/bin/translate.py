@@ -58,6 +58,7 @@ def translate(opts):
         tgt_vocab=None,
         encoder_adapter_ids=encoder_adapter_ids,
         decoder_adapter_ids=decoder_adapter_ids,
+        task_prefix_token=corpus_opts.get('task_prefix_token', None),
     )
 
     world_context = WorldContext(

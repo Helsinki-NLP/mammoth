@@ -876,10 +876,25 @@ class Translator(Inference):
         )
 
         # (4) prep decode_strategy
-        # TODO: produce an optional target prefix
-        # file contents or empty string -> transforms -> numericalize -> *left* pad (align right edge)
-        # unfortunately AttentionLayers takes a seq_start_pos and constructs the mask, instead of taking a mask
+        # If the task has a task_prefix_token (e.g. '<task:summarize>'), force it as
+        # the first decoder output token so the model knows which task to perform.
         target_prefix = None
+        if self.task.task_prefix_token is not None:
+            token_id = self._tgt_vocab.stoi.get(self.task.task_prefix_token, None)
+            if token_id is None:
+                if self.logger:
+                    self.logger.warning(
+                        f"task_prefix_token '{self.task.task_prefix_token}' not found in tgt vocabulary. "
+                        "Falling back to unconditioned decoding."
+                    )
+            else:
+                # shape: (1, batch_size) — one forced token per sequence
+                target_prefix = torch.full(
+                    (1, batch.batch_size),
+                    token_id,
+                    dtype=torch.long,
+                    device=self._device,
+                )
         seq_start_pos = None
         decode_strategy.initialize(
             target_prefix=target_prefix,

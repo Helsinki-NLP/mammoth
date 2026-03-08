@@ -176,6 +176,7 @@ class ParallelCorpus(IterableDataset):
         self.offset = offset
         self.is_train = is_train
         self.corpus_id = task.corpus_id
+        self.task_prefix_token = task.task_prefix_token if task is not None else None
         self.max_length = max_length # for padding
         self.model_max_seq_len = model_max_seq_len
         self._line_idx_restore = line_idx_restore
@@ -258,13 +259,25 @@ class ParallelCorpus(IterableDataset):
             #     if actually_stripped:
             #         logger.info(f'  Stripped special tokens: {actually_stripped}')
 
+            # Resolve task prefix token ID for tgt side
+            task_prefix_ids = []
+            if side == 'tgt' and self.task_prefix_token is not None:
+                task_token_id = vocab.tokenizer.token_to_id(self.task_prefix_token)
+                if task_token_id is None:
+                    logger.warning(
+                        f"task_prefix_token '{self.task_prefix_token}' not found in tgt vocabulary. "
+                        "Task conditioning will not work. Add it as a special token."
+                    )
+                else:
+                    task_prefix_ids = [task_token_id]
+
             # BART-specific: decoder sequences start with </s> (EOS) then <s> (BOS)
             # For BART decoder: [</s>, <s>, tokens..., </s>]
             # For others: [<s>, tokens..., </s>]
             if side == 'tgt' and hasattr(vocab, 'decoder_start_with_eos') and vocab.decoder_start_with_eos:
-                indices = torch.tensor([eos, bos, *token_ids, eos], device='cpu')
+                indices = torch.tensor([eos, bos, *task_prefix_ids, *token_ids, eos], device='cpu')
             else:
-                indices = torch.tensor([bos, *token_ids, eos], device='cpu')
+                indices = torch.tensor([bos, *task_prefix_ids, *token_ids, eos], device='cpu')
 
             # Debug: Catch sequences that will exceed positional embedding limit
             # final_length = len(indices)
@@ -286,8 +299,19 @@ class ParallelCorpus(IterableDataset):
             #         )
         else:
             # Traditional vocab: lookup tokens individually
+            task_prefix_ids = []
+            if side == 'tgt' and self.task_prefix_token is not None:
+                task_token_id = vocab.stoi.get(self.task_prefix_token, None)
+                if task_token_id is None:
+                    logger.warning(
+                        f"task_prefix_token '{self.task_prefix_token}' not found in tgt vocabulary. "
+                        "Task conditioning will not work. Add it as a special token."
+                    )
+                else:
+                    task_prefix_ids = [task_token_id]
             indices = torch.tensor([
                 bos,
+                *task_prefix_ids,
                 *(vocab.stoi.get(token, unk) for token in tokens),
                 eos,
             ], device='cpu')

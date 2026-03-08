@@ -11,6 +11,15 @@ class DefaultTokens(object):
     SENT_FULL_STOPS = [".", "?", "!"]
     PHRASE_TABLE_SEPARATOR = '|||'
     ALIGNMENT_SEPARATOR = ' ||| '
+    TASK_TOKEN_PREFIX = '<task:'
+
+    @staticmethod
+    def task_token(task_name: str) -> str:
+        """Build a task-conditioning token string.
+
+        E.g. task_token('summarize') -> '<task:summarize>'
+        """
+        return f'<task:{task_name}>'
 
 
 class CorpusName(object):

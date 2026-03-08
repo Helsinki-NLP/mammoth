@@ -73,6 +73,7 @@ class IndexedCorpus(IterableDataset):
         self.offset = offset
         self.is_train = is_train
         self.corpus_id = task.corpus_id
+        self.task_prefix_token = task.task_prefix_token if task is not None else None
         self.max_length = max_length
         self.model_max_seq_len = model_max_seq_len
         self._line_idx_restore = line_idx_restore
@@ -134,6 +135,17 @@ class IndexedCorpus(IterableDataset):
                 torch.tensor(tokens_to_add, dtype=torch.long),
                 token_ids
             ])
+
+        # Insert task prefix token right after BOS for target sequences
+        if side == 'tgt' and self.task_prefix_token is not None:
+            task_token_id = vocab.stoi.get(self.task_prefix_token, None)
+            if task_token_id is not None:
+                # token_ids currently: [BOS, content...] — insert task token at position 1
+                token_ids = torch.cat([
+                    token_ids[:1],
+                    torch.tensor([task_token_id], dtype=torch.long),
+                    token_ids[1:],
+                ])
 
         if not has_eos and eos is not None:
             # Add EOS at end

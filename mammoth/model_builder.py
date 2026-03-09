@@ -9,7 +9,13 @@ from functools import partial
 from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
 from mammoth.x_transformers import TransformerWrapper
-from mammoth.x_transformers.x_transformers import TokenEmbedding, AbsolutePositionalEmbedding
+from mammoth.x_transformers.x_transformers import (
+    TokenEmbedding,
+    AbsolutePositionalEmbedding,
+    ScaledSinusoidalEmbedding,
+    LayerNorm,
+    LinearNoBias,
+)
 
 from mammoth.distributed.components import (
     DistributedAdapter,
@@ -391,11 +397,73 @@ def build_xcoder(
         side=side,
         model_opts=model_opts,
     )
+
+    # Get the model hidden dimension (may differ from emb_dim)
+    dim = model_opts.model_dim
+
+    # Create per-component shared wrapper modules.
+    # These modules are shared across all tasks that use the same component (xcoder_id),
+    # rather than duplicated per-task. This is critical for zero-shot inference:
+    # at inference time you pick a component, not a task.
+    # Key is a tuple of xcoder_ids (one per layer stack), e.g. ("is",) for single-stack.
+    per_component_post_emb_norms = dict()
+    per_component_pos_embs = dict()
+    per_component_project_embs = dict()
+    per_component_to_logits = dict()
+
+    post_emb_norm_flag = transformer_wrapper_kwargs.get('post_emb_norm', False)
+    post_emb_norm_bias = transformer_wrapper_kwargs.get('post_emb_norm_bias', False)
+    use_abs_pos_emb = transformer_wrapper_kwargs.get('use_abs_pos_emb', True)
+    scaled_sinu_pos_emb = transformer_wrapper_kwargs.get('scaled_sinu_pos_emb', False)
+    max_seq_len = transformer_wrapper_kwargs.get('max_seq_len', 0)
+    l2norm_embed = False
+    return_only_embed = transformer_wrapper_kwargs.get('return_only_embed', False)
+    tie_embedding = transformer_wrapper_kwargs.get('tie_embedding', False)
+
+    # Collect unique component keys and their vocab sizes
+    component_vocab_sizes = dict()
+    for task in tasks:
+        xcoder_ids = task.encoder_id if side == Side.encoder else task.decoder_id
+        component_key = tuple(xcoder_ids)
+        if component_key not in component_vocab_sizes:
+            lang = task.src_lang if side == Side.encoder else task.tgt_lang
+            vocab = vocabs_dict[(side_alt_str, lang)]
+            component_vocab_sizes[component_key] = len(vocab)
+
+    for component_key, vocab_size in component_vocab_sizes.items():
+        # post_emb_norm: shared per component
+        if post_emb_norm_flag:
+            per_component_post_emb_norms[component_key] = LayerNorm(emb_dim, layernorm_bias=post_emb_norm_bias)
+        else:
+            per_component_post_emb_norms[component_key] = nn.Identity()
+
+        # pos_emb: shared per component
+        no_abs_pos_emb = max_seq_len == 0 or not use_abs_pos_emb
+        if no_abs_pos_emb:
+            per_component_pos_embs[component_key] = None  # TransformerWrapper will use always(0)
+        elif scaled_sinu_pos_emb:
+            per_component_pos_embs[component_key] = ScaledSinusoidalEmbedding(emb_dim)
+        else:
+            per_component_pos_embs[component_key] = AbsolutePositionalEmbedding(
+                emb_dim, max_seq_len, l2norm_embed=l2norm_embed
+            )
+
+        # project_emb: shared per component
+        if emb_dim != dim:
+            per_component_project_embs[component_key] = nn.Linear(emb_dim, dim)
+        else:
+            per_component_project_embs[component_key] = nn.Identity()
+
+        # to_logits: decoder only, shared per component
+        if not return_only_embed and not tie_embedding:
+            per_component_to_logits[component_key] = LinearNoBias(dim, vocab_size)
+
     for task in tasks:
         if side == Side.encoder:
             xcoder_ids = task.encoder_id
         else:
             xcoder_ids = task.decoder_id
+        component_key = tuple(xcoder_ids)
         attention_layers_stack = [
             attention_layer_blocks[layer_stack_index][xcoder_id]
             for layer_stack_index, xcoder_id in enumerate(xcoder_ids)
@@ -406,13 +474,16 @@ def build_xcoder(
 
         lang = task.src_lang if side == Side.encoder else task.tgt_lang
         vocab = vocabs_dict[(side_alt_str, lang)]
-        # Using custom extended TransformerWrapper to allow passing in an embedding
+        # Pass shared per-component modules into TransformerWrapper
         transformer_wrapper = TransformerWrapper(
             num_tokens=len(vocab),
             attn_layers=adapted_attention_layers_stack,
-            emb_dim=emb_dim,  # Use side-specific dimension
+            emb_dim=emb_dim,
             token_emb=token_embs[lang],
-            
+            post_emb_norm_module=per_component_post_emb_norms[component_key],
+            pos_emb_module=per_component_pos_embs.get(component_key),
+            project_emb_module=per_component_project_embs[component_key],
+            to_logits=per_component_to_logits.get(component_key),
             **transformer_wrapper_kwargs,
         )
         transformer_wrappers[task.corpus_id] = transformer_wrapper
@@ -423,6 +494,10 @@ def build_xcoder(
         attention_layer_blocks=attention_layer_blocks,
         token_embs=token_embs,
         adapters=adapters_by_name,
+        per_component_post_emb_norms=per_component_post_emb_norms,
+        per_component_pos_embs=per_component_pos_embs,
+        per_component_project_embs=per_component_project_embs,
+        per_component_to_logits=per_component_to_logits,
     )
     return stack_xcoder
 

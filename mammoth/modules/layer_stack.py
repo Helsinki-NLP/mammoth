@@ -82,12 +82,20 @@ class StackXcoder(nn.ModuleDict):
         attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]],
         token_embs: Dict[str, TokenEmbedding],
         adapters: Optional[Dict[str, Adapter]],
+        per_component_post_emb_norms: Optional[Dict[tuple, nn.Module]] = None,
+        per_component_pos_embs: Optional[Dict[tuple, nn.Module]] = None,
+        per_component_project_embs: Optional[Dict[tuple, nn.Module]] = None,
+        per_component_to_logits: Optional[Dict[tuple, nn.Module]] = None,
     ):
         super().__init__(transformer_wrappers)
         self.attention_layers_by_xcoder_id: Dict[int, Dict[str, AdaptedAttentionLayers]] = attention_layer_blocks
         self.token_embs: Dict[str, TokenEmbedding] = token_embs
         self.active_task: Optional[str] = None
         self.adapters = adapters
+        self.per_component_post_emb_norms = per_component_post_emb_norms or {}
+        self.per_component_pos_embs = per_component_pos_embs or {}
+        self.per_component_project_embs = per_component_project_embs or {}
+        self.per_component_to_logits = per_component_to_logits or {}
 
     # TransformerWrapper wraps an AttentionLayers in embeddings and some other functionality.
     # We use one TransformerWrapper per task.
@@ -116,5 +124,17 @@ class StackXcoder(nn.ModuleDict):
 
     def get_adapter(self, adapter_name):
         return self.adapters[adapter_name]
+
+    def get_post_emb_norm_by_component(self, component_key: tuple):
+        return self.per_component_post_emb_norms[component_key]
+
+    def get_pos_emb_by_component(self, component_key: tuple):
+        return self.per_component_pos_embs.get(component_key)
+
+    def get_project_emb_by_component(self, component_key: tuple):
+        return self.per_component_project_embs[component_key]
+
+    def get_to_logits_by_component(self, component_key: tuple):
+        return self.per_component_to_logits.get(component_key)
 
     # Lack of forward is intentional: call forward on the return value of activate

@@ -6,6 +6,7 @@ from collections import OrderedDict, deque
 from glob import glob
 from typing import Dict, Any, Tuple
 
+from mammoth.distributed.components import DistributedWrapperModules
 from mammoth.distributed.tasks import LocalTaskQueueManager
 from mammoth.model_builder import build_model
 from mammoth.models import NMTModel
@@ -97,6 +98,51 @@ def explode_model(
     return state_dicts, optim_state_dicts
 
 
+def _migrate_wrapper_modules_from_old_checkpoint(
+    checkpoint_prefix, component, model
+):
+    """Backward compatibility: load wrapper modules from old-format task checkpoints.
+
+    Old checkpoints stored to_logits, post_emb_norm, pos_emb, project_emb inside
+    the per-task TransformerWrapper file (e.g. decoder_task_en_is.pt).
+    New checkpoints store them in a separate per-component file (e.g. decoder_wrapper_is.pt).
+
+    This function finds any old task checkpoint that contains the relevant keys
+    and loads them into the per-component module.
+    """
+    side_str = 'encoder' if component.side.name == 'encoder' else 'decoder'
+    # Look for old-format task checkpoint files matching this component's side
+    old_pattern = f"{checkpoint_prefix}_{side_str}_task_*.pt"
+    old_files = glob(old_pattern)
+    if not old_files:
+        return False
+
+    # The wrapper module names we're looking for in the old checkpoint
+    wrapper_prefixes = ('post_emb_norm.', 'to_logits.', 'pos_emb.', 'project_emb.', 'final_logits_bias')
+
+    for old_file in old_files:
+        old_state_dict = torch.load(
+            old_file,
+            map_location=lambda storage, loc: storage,
+            weights_only=False,
+        )
+        # Extract wrapper-related keys
+        wrapper_state_dict = {}
+        for key, value in old_state_dict.items():
+            if any(key.startswith(p) or key == p for p in wrapper_prefixes):
+                wrapper_state_dict[key] = value
+
+        if wrapper_state_dict:
+            logger.info(
+                f"Migrating wrapper modules from old checkpoint {old_file} "
+                f"into {component.get_name()} (keys: {list(wrapper_state_dict.keys())})"
+            )
+            component.load_state_dict(model=model, state_dict=wrapper_state_dict)
+            return True
+
+    return False
+
+
 def load_parameters_from_checkpoint(
     frame_checkpoint_path,
     model,
@@ -136,6 +182,19 @@ def load_parameters_from_checkpoint(
                     missing_keys_summary.extend([f"{name}.{key}" for key in incompatible_keys.missing_keys])
                 if incompatible_keys.unexpected_keys:
                     unexpected_keys_summary.extend([f"{name}.{key}" for key in incompatible_keys.unexpected_keys])
+                all_ok = False
+        elif isinstance(component, DistributedWrapperModules):
+            # Backward compatibility: try to extract wrapper modules from old-format
+            # task checkpoint files, where to_logits/post_emb_norm/etc. were stored
+            # inside the per-task TransformerWrapper checkpoint.
+            migrated = _migrate_wrapper_modules_from_old_checkpoint(
+                checkpoint_prefix, component, model
+            )
+            if not migrated:
+                logger.warning(
+                    f"Could not find or migrate checkpoint for {name}. Affected parameters are reinitialized."
+                )
+                missing_keys_summary.append(f"{checkpoint_path} (entire file missing)")
                 all_ok = False
         else:
             logger.warning(

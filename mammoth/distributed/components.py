@@ -91,62 +91,6 @@ class DistributedComponent(ABC):
 
 
 @dataclass  # type: ignore
-class DistributedTransformerWrapper(DistributedComponent, ABC):
-    """Represents a distributed TransformerWrapper object from x-transformers"""
-    task_id: str
-    side: Side
-
-    def get_name(self) -> str:
-        return f'{self.side.name}_{self.task_id}'
-
-    def get_module(self, model: NMTModel) -> nn.Module:
-        parent = model.encoder if self.side == Side.encoder else model.decoder
-        transformer_wrapper = parent[self.task_id]
-        return transformer_wrapper
-
-    # Submodules that are stored as separate DistributedComponents
-    _EXCLUDED_SUBMODULES = {'attn_layers', 'token_emb', 'post_emb_norm', 'to_logits', 'pos_emb', 'project_emb'}
-    # Parameter prefixes that belong to excluded submodules
-    _EXCLUDED_PREFIXES = tuple(f'{name}.' for name in _EXCLUDED_SUBMODULES)
-    # Direct parameters that belong to per-component modules (e.g. final_logits_bias)
-    _EXCLUDED_PARAMS = {'final_logits_bias'}
-
-    def named_parameters(self, model: NMTModel):
-        module = self.get_module(model)
-        for name, p in module.named_parameters():
-            # TransformerWrapper contains the AttentionLayers, embs, and per-component modules.
-            # We want to treat these as distinct DistributedComponents.
-            if name.startswith(self._EXCLUDED_PREFIXES):
-                continue
-            if name in self._EXCLUDED_PARAMS:
-                continue
-            yield name, p
-
-    def state_dict(self, model: NMTModel, prefix='', keep_vars=False) -> Dict[str, Any]:
-        module = self.get_module(model)
-        destination: Dict[str, Any] = OrderedDict()
-        # Save direct parameters, excluding those belonging to per-component modules
-        for name, param in module._parameters.items():
-            if param is not None and name not in self._EXCLUDED_PARAMS:
-                destination[prefix + name] = param if keep_vars else param.detach()
-        # Save submodules, excluding per-component ones
-        for name, sub_module in module._modules.items():
-            if name in self._EXCLUDED_SUBMODULES:
-                continue
-            sub_module.state_dict(destination=destination, prefix=prefix + name + '.', keep_vars=keep_vars)
-        return destination
-
-    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
-        module = self.get_module(model)
-        mismatch = module.load_state_dict(state_dict, strict=False)
-        missing_keys = [
-            name for name in mismatch.missing_keys
-            if not name.startswith(self._EXCLUDED_PREFIXES) and name not in self._EXCLUDED_PARAMS
-        ]
-        return mismatch._replace(missing_keys=missing_keys)
-
-
-@dataclass  # type: ignore
 class DistributedAttentionLayersBlock(DistributedComponent, ABC):
     """Represents a distributed AdaptedAttentionLayers object"""
     layer_stack_index: int

@@ -20,7 +20,6 @@ from mammoth.distributed.components import (
     DistributedDecoderAttentionLayersBlock,
     DistributedEmbedding,
     DistributedEncoderAttentionLayersBlock,
-    DistributedTransformerWrapper,
     DistributedWrapperModules,
     Side,
 )
@@ -403,24 +402,6 @@ class TaskQueueManager:
                     group=None,
                     side=Side.decoder,
                     lang=task.tgt_lang,
-                )
-            )
-            builder.add(
-                DistributedTransformerWrapper(
-                    global_ranks={global_rank},
-                    task_ids={task.corpus_id},
-                    group=None,
-                    side=Side.encoder,
-                    task_id=task.corpus_id,
-                )
-            )
-            builder.add(
-                DistributedTransformerWrapper(
-                    global_ranks={global_rank},
-                    task_ids={task.corpus_id},
-                    group=None,
-                    side=Side.decoder,
-                    task_id=task.corpus_id,
                 )
             )
             # Per-component wrapper modules (to_logits, post_emb_norm, pos_emb, project_emb).

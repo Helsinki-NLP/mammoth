@@ -130,6 +130,7 @@ def build_trainer(
         valid_max_length=opts.valid_max_length,
         valid_max_batches=opts.valid_max_batches,
         valid_timeout=opts.valid_timeout,
+        valid_decode_timeout=opts.valid_decode_timeout,
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,
@@ -185,6 +186,7 @@ class Trainer(object):
         valid_max_length=None,
         valid_max_batches=None,
         valid_timeout=None,
+        valid_decode_timeout=None,
         valid_start=0,
         vocabs_dict=None,
         beam_size=1,
@@ -218,6 +220,7 @@ class Trainer(object):
         self.valid_max_length = valid_max_length
         self.valid_max_batches = valid_max_batches
         self.valid_timeout = valid_timeout
+        self.valid_decode_timeout = valid_decode_timeout
         self.valid_start = valid_start
         self.vocabs_dict = vocabs_dict or {}
         self.beam_size = beam_size
@@ -764,11 +767,14 @@ class Trainer(object):
             batch_count = 0
             valid_start_time = time.monotonic()
             valid_max_time = self.valid_timeout
+            valid_max_decode_time = self.valid_decode_timeout
             valid_max_batches = self.valid_max_batches
 
             for batch, metadata, _ in valid_iter:
                 batch_count += 1
-                
+
+                ## TODO: we should introduce 2 different variables (instead of using one for both)
+                ##       one for the validation max time and one for max time of decoding one batch in validation
                 elapsed_time = time.monotonic() - valid_start_time
                 if valid_max_time and elapsed_time > valid_max_time:
                     logger.info(f"[VALIDATION TIMEOUT] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, time={elapsed_time}")
@@ -829,7 +835,7 @@ class Trainer(object):
                 # Collect predictions and references for additional metrics using AUTOREGRESSIVE GENERATION
                 if compute_metrics:
                     # Generate predictions autoregressively (like real inference)
-                    pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model, valid_max_time)
+                    pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model, valid_max_decode_time)
 
                     # Get target vocab for decoding
                     tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))

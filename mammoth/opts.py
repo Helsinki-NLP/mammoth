@@ -529,6 +529,7 @@ def _add_train_general_opts(parser):
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
     group.add('--valid_start', '-valid_start', type=int, default=10000, help='Start regular validation at X steps')
     group.add('--valid_timeout', '-valid_timeout', type=int, default=None, help='Timeout for validation runs in seconds')
+    group.add('--valid_decode_timeout', '-valid_decode_timeout', type=int, default=None, help='Timeout for decoding onebatch during validation runs (in seconds)')
     group.add('--valid_max_length', '-valid_max_length', type=int, default=None, help='Maximum sequence length during validation.')
     group.add('--valid_at_start', '-valid_at_start', action='store_true', help='Perform validation before training starts')
     group.add('--valid_max_batches', '-valid_max_batches', type=int, default=None, help='Maximum number of batches used for validation.')

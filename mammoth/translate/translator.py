@@ -561,12 +561,12 @@ class Inference(object):
         for batch in batches:
             batch.to(corpus.device)
 
-            # DEBUG: Print source token IDs
-            src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1)  # Convert from [T, B, 1] to [B, T]
+            # DEBUG: Print source tokens to verify transforms (e.g. prefix) were applied
+            src_vocab = corpus.vocabs['src']
+            src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1)  # [T, B, 1] -> [B, T]
             for i, src_seq in enumerate(src_ids):
-                # Remove padding (assuming 0 is pad token)
-                src_seq_no_pad = src_seq[src_seq != 0].tolist()
-                self._log(f"Source sentence {next(counter)} token IDs: {src_seq_no_pad}")
+                src_tokens = [src_vocab.itos[tok_id.item()] for tok_id in src_seq if tok_id.item() != 0]
+                self._log(f"[DEBUG] transforms={transforms} | src tokens: {src_tokens}")
 
             batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)

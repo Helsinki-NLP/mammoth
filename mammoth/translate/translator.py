@@ -892,7 +892,8 @@ class Translator(Inference):
                 .expand(-1, batch_size)
                 .contiguous()
             )
-            self._log(f"[DEBUG] Forcing tgt_prefix '{tgt_prefix_str}' → ids {prefix_ids}")
+            tgt_prefix_token_strs = [self._tgt_vocab.itos[i] for i in prefix_ids]
+            self._log(f"[DEBUG] Forcing tgt_prefix tokens: {tgt_prefix_token_strs}")
         seq_start_pos = None
         decode_strategy.initialize(
             target_prefix=target_prefix,

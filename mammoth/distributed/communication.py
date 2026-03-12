@@ -303,10 +303,11 @@ class WorldGroupGradientSync:
                 my_param_counts[name] = 0
 
         # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size
-        # Use larger max_size because with many components the serialized dict can exceed the 4096 default
-        enc_size = len(pickle.dumps(my_param_counts))
-        gather_max_size = max(enc_size * 2 + 2, 4096)
-        all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
+        # Use all_gather_object instead of all_gather_list: at large scale (many adapters per
+        # language pair), the serialized dict can exceed the ~65 KB hard limit of all_gather_list.
+        # all_gather_object has no size limit.
+        all_counts = [None] * torch.distributed.get_world_size()
+        torch.distributed.all_gather_object(all_counts, my_param_counts)
 
         # Step 3: Compute global buffer layout
         # For each component, take the max param count across all GPUs that own it

@@ -24,25 +24,44 @@ from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_fro
 from mammoth.utils.parse import ArgumentParser
 
 
-def build_translator(opts, task_queue_manager, task, report_score=True, logger=None, out_file=None):
+def build_translator(
+    opts,
+    task_queue_manager,
+    task,
+    report_score=True,
+    logger=None,
+    out_file=None,
+    preloaded=None,
+    src_path=None,
+    tgt_path=None,
+):
+    """Build a Translator for a single task.
+
+    Args:
+        preloaded: optional (vocabs_dict, model, model_opts) tuple from a prior
+            call to load_model_for_translation.  When provided the model is not
+            loaded again — useful when looping over multiple tasks.
+        src_path: override the source file path (used in multi-task mode).
+        tgt_path: override the reference target file path (optional).
+    """
     if out_file is None:
-        outdir = os.path.dirname(opts.output)
+        output_path = task.corpus_opts.get('path_tgt', opts.output)
+        outdir = os.path.dirname(output_path)
         if outdir and not os.path.isdir(outdir):
             warnings.warn(f'output file directory "{outdir}" does not exist... creating it.')
-            os.makedirs(os.path.dirname(opts.output), exist_ok=True)
-        out_file = codecs.open(opts.output, "w+", "utf-8")
+            os.makedirs(outdir, exist_ok=True)
+        out_file = codecs.open(output_path, "w+", "utf-8")
 
-    # TODO: reimplement ensemble decoding
-    load_model_for_translation_func = load_model_for_translation
-    if logger:
-        logger.info(str(task))
-    model_path = None
-    vocabs, model, model_opts = load_model_for_translation_func(
-        opts=opts,
-        task_queue_manager=task_queue_manager,
-        task=task,
-        model_path=model_path,
-    )
+    if preloaded is not None:
+        vocabs, model, model_opts = preloaded
+    else:
+        if logger:
+            logger.info(str(task))
+        vocabs, model, model_opts = load_model_for_translation(
+            opts=opts,
+            task_queue_manager=task_queue_manager,
+            tasks=[task],
+        )
 
     scorer = GNMTGlobalScorer.from_opts(opts)
 
@@ -57,36 +76,44 @@ def build_translator(opts, task_queue_manager, task, report_score=True, logger=N
         report_score=report_score,
         logger=logger,
         task=task,
+        src_path=src_path,
+        tgt_path=tgt_path,
     )
     return translator
 
 
-def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):
-    if task is None:
-        raise ValueError('Must set task')
+def load_model_for_translation(opts, task_queue_manager, tasks, model_path=None):
+    """Load model and vocabs for all given tasks.
+
+    Args:
+        tasks: list of TaskSpecs (one or more tasks).
+    """
+    if not tasks:
+        raise ValueError('Must provide at least one task')
     if model_path is None:
         model_path = opts.models[0]
 
     # Load only the frame
     frame, frame_checkpoint_path = load_frame_checkpoint(checkpoint_path=model_path)
 
-    vocabs_dict = {
-        ('src', task.src_lang): frame["vocab"].get(('src', task.src_lang)),
-        ('tgt', task.tgt_lang): frame["vocab"].get(('tgt', task.tgt_lang)),
-        'src': frame["vocab"].get(('src', task.src_lang)),
-        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
-    }
-    print(f'vocabs_dict {vocabs_dict}')
-    print(f'my compontents {task_queue_manager.get_my_distributed_components()}')
+    # Collect vocabs for every lang pair across all tasks
+    vocabs_dict = {}
+    for task in tasks:
+        vocabs_dict[('src', task.src_lang)] = frame["vocab"].get(('src', task.src_lang))
+        vocabs_dict[('tgt', task.tgt_lang)] = frame["vocab"].get(('tgt', task.tgt_lang))
+
+    print(f'vocabs_dict keys: {list(vocabs_dict.keys())}')
+    print(f'my components: {task_queue_manager.get_my_distributed_components()}')
 
     model_opts = ArgumentParser.checkpoint_model_opts(frame['opts'])
 
+    # single_task=None builds all components (needed for multi-task inference)
     model = build_model(
         model_opts,
         opts,
         vocabs_dict,
         task_queue_manager,
-        single_task=task.corpus_id,
+        single_task=None,
     )
 
     load_parameters_from_checkpoint(
@@ -289,6 +316,8 @@ class Inference(object):
         report_score=True,
         logger=None,
         task=None,
+        src_path=None,
+        tgt_path=None,
     ):
         """Alternate constructor.
 
@@ -306,16 +335,21 @@ class Inference(object):
             report_align (bool) : See :func:`__init__()`.
             report_score (bool) : See :func:`__init__()`.
             logger (logging.Logger or NoneType): See :func:`__init__()`.
+            src_path: override source file path (multi-task mode).
+            tgt_path: override reference target file path (multi-task mode).
         """
         assert task is not None
         # TODO: maybe add dynamic part
         # cls.validate_task(model_opts.model_task)
 
+        resolved_src = src_path if src_path is not None else getattr(opts, 'src', None)
+        resolved_tgt = tgt_path if tgt_path is not None else getattr(opts, 'tgt', None)
+
         return cls(
             model,
             vocabs,
-            opts.src,
-            tgt_file_path=opts.tgt,
+            resolved_src,
+            tgt_file_path=resolved_tgt,
             gpu=opts.gpu_rank,
             n_best=opts.n_best,
             min_length=opts.min_length,

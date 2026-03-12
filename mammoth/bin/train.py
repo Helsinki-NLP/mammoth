@@ -196,7 +196,11 @@ def train(opts):
             vocabs_dict = frame_checkpoint.get('vocab')
     else:
         vocab_size = {'src': opts.src_vocab_size or None, 'tgt': opts.tgt_vocab_size or None}
-        use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False)
+        use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False) or any(
+            opts.__getattribute__(f'{side}_vocab')[lang].endswith('.json')
+            for side in ('src', 'tgt')
+            for lang in global_task_queue_manager.get_langs(side)
+        )
 
         # Extract and add language tokens to HF tokenizers if enabled
         if use_hf_tokenizer and getattr(opts, 'add_language_tokens', True):

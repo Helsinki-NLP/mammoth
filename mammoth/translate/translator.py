@@ -876,10 +876,23 @@ class Translator(Inference):
         )
 
         # (4) prep decode_strategy
-        # TODO: produce an optional target prefix
-        # file contents or empty string -> transforms -> numericalize -> *left* pad (align right edge)
-        # unfortunately AttentionLayers takes a seq_start_pos and constructs the mask, instead of taking a mask
+        # Build target prefix from tgt_prefix in task config.
+        # Both BeamSearch and GreedySearch accept shape [seq_len, batch_size] and tile for parallel paths themselves.
+        tgt_prefix_str = self.task.corpus_opts.get('tgt_prefix', '')
         target_prefix = None
+        if tgt_prefix_str and tgt_prefix_str.strip():
+            prefix_tokens = tgt_prefix_str.split()
+            prefix_ids = [self._tgt_bos_idx] + [
+                self._tgt_vocab.stoi.get(t, self._tgt_unk_idx) for t in prefix_tokens
+            ]
+            # shape: [seq_len, batch_size]
+            target_prefix = (
+                torch.tensor(prefix_ids, dtype=torch.long, device=self._device)
+                .unsqueeze(1)
+                .expand(-1, batch_size)
+                .contiguous()
+            )
+            self._log(f"[DEBUG] Forcing tgt_prefix '{tgt_prefix_str}' → ids {prefix_ids}")
         seq_start_pos = None
         decode_strategy.initialize(
             target_prefix=target_prefix,

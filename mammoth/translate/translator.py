@@ -561,12 +561,12 @@ class Inference(object):
         for batch in batches:
             batch.to(corpus.device)
 
-            # DEBUG: Print source token IDs
-            src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1)  # Convert from [T, B, 1] to [B, T]
+            # DEBUG: Print source tokens to verify transforms (e.g. prefix) were applied
+            src_vocab = corpus.vocabs['src']
+            src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1)  # [T, B, 1] -> [B, T]
             for i, src_seq in enumerate(src_ids):
-                # Remove padding (assuming 0 is pad token)
-                src_seq_no_pad = src_seq[src_seq != 0].tolist()
-                self._log(f"Source sentence {next(counter)} token IDs: {src_seq_no_pad}")
+                src_tokens = [src_vocab.itos[tok_id.item()] for tok_id in src_seq if tok_id.item() != 0]
+                self._log(f"[DEBUG] transforms={transforms} | src tokens: {src_tokens}")
 
             batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
@@ -579,6 +579,7 @@ class Inference(object):
                     gold_score_total += trans.gold_score
                     gold_words_total += len(trans.gold_sent) + 1
 
+                self._log(f"[DEBUG] tgt output tokens: {trans.pred_sents[0]}")
                 n_best_preds = [" ".join(pred) for pred in trans.pred_sents[: self.n_best]]
                 if self.report_align:
                     align_pharaohs = [build_align_pharaoh(align) for align in trans.word_aligns[: self.n_best]]
@@ -876,10 +877,24 @@ class Translator(Inference):
         )
 
         # (4) prep decode_strategy
-        # TODO: produce an optional target prefix
-        # file contents or empty string -> transforms -> numericalize -> *left* pad (align right edge)
-        # unfortunately AttentionLayers takes a seq_start_pos and constructs the mask, instead of taking a mask
+        # Build target prefix from tgt_prefix in task config.
+        # Both BeamSearch and GreedySearch accept shape [seq_len, batch_size] and tile for parallel paths themselves.
+        tgt_prefix_str = self.task.corpus_opts.get('tgt_prefix', '')
         target_prefix = None
+        if tgt_prefix_str and tgt_prefix_str.strip():
+            prefix_tokens = tgt_prefix_str.split()
+            prefix_ids = [self._tgt_bos_idx] + [
+                self._tgt_vocab.stoi.get(t, self._tgt_unk_idx) for t in prefix_tokens
+            ]
+            # shape: [seq_len, batch_size]
+            target_prefix = (
+                torch.tensor(prefix_ids, dtype=torch.long, device=self._device)
+                .unsqueeze(1)
+                .expand(-1, batch_size)
+                .contiguous()
+            )
+            tgt_prefix_token_strs = [self._tgt_vocab.itos[i] for i in prefix_ids]
+            self._log(f"[DEBUG] Forcing tgt_prefix tokens: {tgt_prefix_token_strs}")
         seq_start_pos = None
         decode_strategy.initialize(
             target_prefix=target_prefix,

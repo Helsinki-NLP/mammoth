@@ -93,13 +93,17 @@ def translate(opts):
         features_names.append(feat_name)
     shard_pairs = zip(src_shards, tgt_shards, *features_shards)
 
-    # Build transforms
-    transforms_cls = get_transforms_cls(opts._all_transform)
+    # Build transforms: use the task-level transforms list (not just global opts.transforms,
+    # which may be empty when transforms are declared only under the task in the YAML).
+    task_transforms = corpus_opts.get('transforms', [])
+    all_transform_names = set(opts.transforms) | set(task_transforms)
+    transforms_cls = get_transforms_cls(all_transform_names)
     transforms = make_transforms(opts, transforms_cls, translator.vocabs, task=task)
     data_transform = [
-        transforms[name] for name in opts.transforms if name in transforms
+        transforms[name] for name in task_transforms if name in transforms
     ]
     transform = TransformPipe.build_from(data_transform)
+    logger.info(f"Inference transforms for task '{corpus_id}': {transform}")
 
     for i, (src_shard, tgt_shard, *feats_shard) in enumerate(shard_pairs):
         logger.info("Translating shard %d." % i)

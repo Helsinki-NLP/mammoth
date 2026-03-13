@@ -527,7 +527,12 @@ def _add_train_general_opts(parser):
     group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
     group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')
     group.add('--valid_steps', '-valid_steps', type=int, default=10000, help='Perfom validation every X steps')
+    group.add('--valid_start', '-valid_start', type=int, default=10000, help='Start regular validation at X steps')
+    group.add('--valid_timeout', '-valid_timeout', type=int, default=None, help='Timeout for validation runs in seconds')
+    group.add('--valid_decode_timeout', '-valid_decode_timeout', type=int, default=None, help='Timeout for decoding onebatch during validation runs (in seconds)')
+    group.add('--valid_max_length', '-valid_max_length', type=int, default=None, help='Maximum sequence length during validation.')
     group.add('--valid_at_start', '-valid_at_start', action='store_true', help='Perform validation before training starts')
+    group.add('--valid_max_batches', '-valid_max_batches', type=int, default=None, help='Maximum number of batches used for validation.')
     group.add('--valid_metrics', '-valid_metrics', nargs='*', default=[], help='List of names of additional validation metrics')
     group.add(
         '--early_stopping', '-early_stopping', type=int, default=0, help='Number of validation steps without improving.'
@@ -729,7 +734,19 @@ def _add_train_general_opts(parser):
         help='Pad all minibatches to max_length instead of to the length of the longest sequence in the minibatch. '
         'Using this together with batch_type=sents results in tensors of a fixed shape.'
     )
-    group.add('--max_length', '-max_length', type=int, default=None, help='Maximum sequence length.')
+    group.add(
+        '--max_length',
+        '-max_length',
+        type=int,
+        default=256,
+        required=True,
+        help=(
+            'Maximum sequence length. This parameter serves three purposes: '
+            '(1) sets the positional embedding size when RoPE is not used; '
+            '(2) controls the maximum number of tokens generated during inference.'
+            '(3) sets the padded batch length when --pad_to_max_length is enabled; '       
+        ),
+    )
     group.add(
         '--task_distribution_strategy',
         '-task_distribution_strategy',
@@ -1005,7 +1022,19 @@ def _add_decoding_opts(parser, include_reproducibility=True):
     group.add('--min_length', '-min_length', type=int, default=0, help='Minimum prediction length')
     # Only add max_length if not already added (training opts already has it)
     if include_reproducibility:
-        group.add('--max_length', '-max_length', type=int, default=100, help='Maximum prediction length.')
+        group.add(
+            '--max_length',
+            '-max_length',
+            type=int,
+            default=256,
+            required=True,
+            help=(
+                'Maximum sequence length. This parameter serves three purposes: '
+                '(1) sets the positional embedding size when RoPE is not used; '
+                '(2) controls the maximum number of tokens generated during inference; '
+                '(3) sets the padded batch length when --pad_to_max_length is enabled.'
+            ),
+        )
     group.add(
         '--max_sent_length', '-max_sent_length', action=DeprecateAction, help="Deprecated, use `-max_length` instead"
     )

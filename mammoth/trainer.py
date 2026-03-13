@@ -127,6 +127,11 @@ def build_trainer(
         report_stats_from_parameters=opts.report_stats_from_parameters,
         report_training_accuracy=opts.report_training_accuracy,
         valid_metrics=opts.valid_metrics,
+        valid_max_length=opts.valid_max_length,
+        valid_max_batches=opts.valid_max_batches,
+        valid_timeout=opts.valid_timeout,
+        valid_decode_timeout=opts.valid_decode_timeout,
+        valid_start=opts.valid_start,
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,
@@ -179,6 +184,11 @@ class Trainer(object):
         report_stats_from_parameters=False,
         report_training_accuracy=False,
         valid_metrics=None,
+        valid_max_length=None,
+        valid_max_batches=None,
+        valid_timeout=None,
+        valid_decode_timeout=None,
+        valid_start=0,
         vocabs_dict=None,
         beam_size=1,
         max_length=100,
@@ -208,6 +218,11 @@ class Trainer(object):
 
         self.task_queue_manager = task_queue_manager
         self.valid_metrics = valid_metrics or []
+        self.valid_max_length = valid_max_length
+        self.valid_max_batches = valid_max_batches
+        self.valid_timeout = valid_timeout
+        self.valid_decode_timeout = valid_decode_timeout
+        self.valid_start = valid_start
         self.vocabs_dict = vocabs_dict or {}
         self.beam_size = beam_size
         self.max_length = max_length
@@ -388,7 +403,7 @@ class Trainer(object):
             )
 
             # Validation step - each device validates its own tasks with validation data
-            if step % valid_steps == 0:
+            if (step % valid_steps == 0) and (step >= self.valid_start):
                 valid_stats = None
 
                 # Only validate if this device has tasks with validation data
@@ -525,7 +540,7 @@ class Trainer(object):
 
         return metrics
 
-    def _generate_predictions_autoregressive(self, batch, metadata, valid_model):
+    def _generate_predictions_autoregressive(self, batch, metadata, valid_model, decode_timeout=None):
         """Generate predictions using autoregressive decoding (like inference).
 
         Args:
@@ -538,8 +553,10 @@ class Trainer(object):
         """
         from mammoth.translate.greedy_search import GreedySearch
         from mammoth.translate.beam_search import BeamSearch, GNMTGlobalScorer
+        import time
 
         batch_size = batch.batch_size
+        decode_start = time.monotonic()
 
         # Activate the correct components
         active_encoder = valid_model.encoder.activate(
@@ -595,7 +612,8 @@ class Trainer(object):
 
         # Get beam size and max_length from trainer attributes
         beam_size = self.beam_size
-        max_length = self.max_length
+        max_length = self.valid_max_length if self.valid_max_length else self.max_length
+        
 
         # Create global scorer with default parameters
         global_scorer = GNMTGlobalScorer(
@@ -688,6 +706,13 @@ class Trainer(object):
                 if decode_strategy.done:
                     break
 
+            # Check for timeout
+            if decode_timeout:
+                elapsed = time.monotonic() - decode_start
+                if elapsed > decode_timeout:
+                    logger.info(f"[DECODING TIMEOUT] time={elapsed}")
+                    break
+
         # Extract predictions (take first from n_best for each batch item)
         predictions = []
         for batch_idx in range(batch_size):
@@ -736,13 +761,30 @@ class Trainer(object):
             stats = None  # mammoth.utils.Statistics()
 
             import random
+            import time
 
             # Log samples from only a few batches instead of every batch
             max_batches_to_log = 3  # Only log samples from first 3 batches
             batch_count = 0
+            valid_start_time = time.monotonic()
+            valid_max_time = self.valid_timeout
+            valid_max_decode_time = self.valid_decode_timeout
+            valid_max_batches = self.valid_max_batches
 
             for batch, metadata, _ in valid_iter:
+                ## TODO: we should introduce 2 different variables (instead of using one for both)
+                ##       one for the validation max time and one for max time of decoding one batch in validation
+                elapsed_time = time.monotonic() - valid_start_time
+                if valid_max_time and elapsed_time > valid_max_time:
+                    logger.info(f"[VALIDATION TIMEOUT] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, time={elapsed_time:.1f}s after {batch_count} batches")
+                    break
+                if valid_max_batches and batch_count >= valid_max_batches:
+                    logger.info(f"[VALIDATION MAX BATCHES] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, batch-count={batch_count}")
+                    break
+
                 batch_count += 1
+                
+
                 # Only set logged_sample_idx for the first few batches
                 logged_sample_idx = random.randint(0, batch.batch_size - 1) if batch_count <= max_batches_to_log else -1
                 if stats is None:
@@ -794,7 +836,7 @@ class Trainer(object):
                 # Collect predictions and references for additional metrics using AUTOREGRESSIVE GENERATION
                 if compute_metrics:
                     # Generate predictions autoregressively (like real inference)
-                    pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model)
+                    pred_token_seqs = self._generate_predictions_autoregressive(batch, metadata, valid_model, valid_max_decode_time)
 
                     # Get target vocab for decoding
                     tgt_vocab = self.vocabs_dict.get(('tgt', metadata.tgt_lang))

@@ -772,17 +772,17 @@ class Trainer(object):
             valid_max_batches = self.valid_max_batches
 
             for batch, metadata, _ in valid_iter:
-                batch_count += 1
-
                 ## TODO: we should introduce 2 different variables (instead of using one for both)
                 ##       one for the validation max time and one for max time of decoding one batch in validation
                 elapsed_time = time.monotonic() - valid_start_time
                 if valid_max_time and elapsed_time > valid_max_time:
-                    logger.info(f"[VALIDATION TIMEOUT] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, time={elapsed_time}")
+                    logger.info(f"[VALIDATION TIMEOUT] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, time={elapsed_time:.1f}s after {batch_count} batches")
                     break
-                if valid_max_batches and batch_count > valid_max_batches:
+                if valid_max_batches and batch_count >= valid_max_batches:
                     logger.info(f"[VALIDATION MAX BATCHES] corpus_id={metadata.corpus_id}, direction={metadata.src_lang}->{metadata.tgt_lang}, batch-count={batch_count}")
                     break
+
+                batch_count += 1
                 
 
                 # Only set logged_sample_idx for the first few batches

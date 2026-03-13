@@ -131,6 +131,7 @@ def build_trainer(
         valid_max_batches=opts.valid_max_batches,
         valid_timeout=opts.valid_timeout,
         valid_decode_timeout=opts.valid_decode_timeout,
+        valid_start=opts.valid_start,
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,

@@ -734,7 +734,19 @@ def _add_train_general_opts(parser):
         help='Pad all minibatches to max_length instead of to the length of the longest sequence in the minibatch. '
         'Using this together with batch_type=sents results in tensors of a fixed shape.'
     )
-    group.add('--max_length', '-max_length', type=int, default=None, help='Maximum sequence length.')
+    group.add(
+        '--max_length',
+        '-max_length',
+        type=int,
+        default=256,
+        required=True,
+        help=(
+            'Maximum sequence length. This parameter serves three purposes: '
+            '(1) sets the positional embedding size when RoPE is not used; '
+            '(2) controls the maximum number of tokens generated during inference.'
+            '(3) sets the padded batch length when --pad_to_max_length is enabled; '       
+        ),
+    )
     group.add(
         '--task_distribution_strategy',
         '-task_distribution_strategy',
@@ -1010,7 +1022,19 @@ def _add_decoding_opts(parser, include_reproducibility=True):
     group.add('--min_length', '-min_length', type=int, default=0, help='Minimum prediction length')
     # Only add max_length if not already added (training opts already has it)
     if include_reproducibility:
-        group.add('--max_length', '-max_length', type=int, default=100, help='Maximum prediction length.')
+        group.add(
+            '--max_length',
+            '-max_length',
+            type=int,
+            default=256,
+            required=True,
+            help=(
+                'Maximum sequence length. This parameter serves three purposes: '
+                '(1) sets the positional embedding size when RoPE is not used; '
+                '(2) controls the maximum number of tokens generated during inference; '
+                '(3) sets the padded batch length when --pad_to_max_length is enabled.'
+            ),
+        )
     group.add(
         '--max_sent_length', '-max_sent_length', action=DeprecateAction, help="Deprecated, use `-max_length` instead"
     )

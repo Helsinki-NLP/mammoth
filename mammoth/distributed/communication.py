@@ -302,109 +302,139 @@ class WorldGroupGradientSync:
             else:
                 my_param_counts[name] = 0
 
-        # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size
-        # Use larger max_size because with many components the serialized dict can exceed the 4096 default
-        enc_size = len(pickle.dumps(my_param_counts))
-        gather_max_size = max(enc_size * 2 + 2, 4096)
-        all_counts = all_gather_list(my_param_counts, max_size=gather_max_size)
+        # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size.
+        # All ranks build my_param_counts from the same all_components list, so the keys and their
+        # order are identical everywhere. We only need to exchange the integer values — no pickle.
+        # Gathering a flat int64 tensor avoids both the 65 KB limit of all_gather_list and the
+        # max_size * world_size GPU allocation of all_gather_object.
+        name_order = sorted(my_param_counts.keys())
+        my_counts_tensor = torch.tensor(
+            [my_param_counts[n] for n in name_order],
+            dtype=torch.long, device='cuda',
+        )
+        gathered = [torch.zeros_like(my_counts_tensor) for _ in range(torch.distributed.get_world_size())]
+        torch.distributed.all_gather(gathered, my_counts_tensor)
+        all_counts = [
+            {name: counts[i].item() for i, name in enumerate(name_order)}
+            for counts in gathered
+        ]
 
-        # Step 3: Compute global buffer layout
+        # Step 3: Compute global param counts per component.
         # For each component, take the max param count across all GPUs that own it
-        # (they should all agree, but max is safe)
+        # (they should all agree, but max is safe).
         global_param_counts = OrderedDict()
         for name in sorted(my_param_counts.keys()):
             sizes = [counts.get(name, 0) for counts in all_counts]
             global_param_counts[name] = max(sizes)
 
-        # Compute offsets in sorted name order
-        self.component_layout = OrderedDict()  # {name: (offset, size)}
-        offset = 0
+        # Step 4: Build component layout (sorted name → size, skip empty components)
+        self.component_layout = OrderedDict()  # {name: size}
         for name in sorted(global_param_counts.keys()):
             size = global_param_counts[name]
             if size > 0:
-                self.component_layout[name] = (offset, size)
-                offset += size
+                self.component_layout[name] = size
 
-        self.total_size = offset
-
-        # Step 4: Pre-allocate the flat buffer (on GPU, matching model dtype)
-        # Find the dtype from any model parameter
+        # Step 5: Pre-allocate a fixed-size bucket buffer instead of one giant flat buffer.
+        # The bucket buffer holds a subset of components at a time; we do multiple allreduces
+        # (one per bucket) instead of one huge allreduce. This bounds memory to BUCKET_MB
+        # regardless of total model size.
         dtype = torch.float32
         for p in model.parameters():
             dtype = p.dtype
             break
         device = torch.device(f'cuda:{torch.cuda.current_device()}')
-        self.buffer = torch.zeros(self.total_size, dtype=dtype, device=device)
+        element_size = torch.tensor([], dtype=dtype).element_size()
 
+        BUCKET_MB = 200
+        bucket_elements = BUCKET_MB * 1024 * 1024 // element_size
+
+        # Greedily pack components into buckets of at most bucket_elements each.
+        # A component larger than the bucket size gets its own bucket.
+        self.buckets = []
+        current_bucket = []
+        current_size = 0
+        for name, size in self.component_layout.items():
+            if current_size + size > bucket_elements and current_bucket:
+                self.buckets.append(current_bucket)
+                current_bucket = []
+                current_size = 0
+            current_bucket.append((name, size))
+            current_size += size
+        if current_bucket:
+            self.buckets.append(current_bucket)
+
+        max_bucket_size = max(sum(s for _, s in b) for b in self.buckets)
+        self.buffer = torch.zeros(max_bucket_size, dtype=dtype, device=device)
+
+        total_elements = sum(self.component_layout.values())
         logger.info(
-            f"WorldGroupGradientSync: rank {global_rank}, buffer size {self.total_size} elements "
-            f"({self.total_size * self.buffer.element_size() / 1024 / 1024:.1f} MB), "
-            f"{len(self.component_layout)} components"
+            f"WorldGroupGradientSync: rank {global_rank}, "
+            f"{len(self.component_layout)} components, "
+            f"total {total_elements * element_size / 1024 / 1024:.1f} MB across "
+            f"{len(self.buckets)} buckets, "
+            f"bucket buffer {max_bucket_size * element_size / 1024 / 1024:.1f} MB"
         )
 
     def sync(self, model, all_gradient_syncs):
         """
-        Perform a single world-group allreduce for all component gradients.
+        Perform bucketed world-group allreduces for all component gradients.
+
+        Components are grouped into fixed-size buckets; each bucket is allreduced
+        independently, bounding peak GPU memory to one bucket buffer regardless of
+        total model size.
 
         Args:
             model: the NMTModel
             all_gradient_syncs: list of DistributedComponentGradientSync (for ALL components,
                 including those this GPU doesn't own)
         """
+        # Build a name → gradient_sync lookup for O(1) access inside bucket loops
+        sync_by_name = {gs.component.get_name(): gs for gs in all_gradient_syncs}
+
         with self.roctx_range("world_group_sync"):
-            # Step 1: Zero the buffer
-            self.buffer.zero_()
+            for bucket in self.buckets:
+                bucket_size = sum(size for _, size in bucket)
+                buf = self.buffer[:bucket_size]
+                buf.zero_()
 
-            # Step 2: Pack gradients from owned components into the buffer
-            with self.roctx_range("world_group_sync_pack"):
-                for gradient_sync in all_gradient_syncs:
-                    component = gradient_sync.component
-                    name = component.get_name()
-                    if name not in self.component_layout:
-                        continue
-                    if not gradient_sync.owns_component:
-                        # This GPU doesn't own this component — contributes zeros (already zeroed)
-                        continue
-                    if not gradient_sync.has_local_gradient:
-                        # This GPU owns the component but didn't train it this step — contributes zeros
-                        continue
+                # Pack: each rank fills slices for components it owns and trained this step
+                with self.roctx_range("world_group_sync_pack"):
+                    pos = 0
+                    for name, size in bucket:
+                        gs = sync_by_name.get(name)
+                        if gs and gs.owns_component and gs.has_local_gradient:
+                            for _, p in gs.component.named_parameters(model):
+                                if not p.requires_grad:
+                                    continue
+                                numel = p.numel()
+                                if p.grad is not None:
+                                    buf[pos:pos + numel].copy_(p.grad.data.view(-1))
+                                pos += numel
+                        else:
+                            pos += size  # leave zeros for unowned / untrained components
 
-                    offset, size = self.component_layout[name]
-                    pos = offset
-                    for _, p in component.named_parameters(model):
-                        if not p.requires_grad:
-                            continue
-                        numel = p.numel()
-                        if p.grad is not None:
-                            self.buffer[pos:pos + numel].copy_(p.grad.data.view(-1))
-                        pos += numel
+                # Allreduce this bucket on the world group
+                with self.roctx_range("world_group_sync_allreduce"):
+                    torch.distributed.all_reduce(buf)
 
-            # Step 3: Single allreduce on world group
-            with self.roctx_range("world_group_sync_allreduce"):
-                torch.distributed.all_reduce(self.buffer)
-
-            # Step 4: Unpack from buffer back to gradients (only for owned components)
-            with self.roctx_range("world_group_sync_unpack"):
-                for gradient_sync in all_gradient_syncs:
-                    component = gradient_sync.component
-                    name = component.get_name()
-                    if name not in self.component_layout:
-                        continue
-                    if not gradient_sync.owns_component:
-                        continue
-
-                    offset, size = self.component_layout[name]
-                    pos = offset
-                    for _, p in component.named_parameters(model):
-                        if not p.requires_grad:
-                            continue
-                        numel = p.numel()
-                        if p.grad is None:
-                            p.grad = torch.zeros_like(p)
-                        p.grad.data.copy_(
-                            self.buffer[pos:pos + numel].view_as(p.grad.data) / gradient_sync.gradient_norm
-                        )
-                        pos += numel
+                # Unpack: write reduced gradients back to owned components
+                with self.roctx_range("world_group_sync_unpack"):
+                    pos = 0
+                    for name, size in bucket:
+                        gs = sync_by_name.get(name)
+                        if gs and gs.owns_component:
+                            for _, p in gs.component.named_parameters(model):
+                                if not p.requires_grad:
+                                    continue
+                                numel = p.numel()
+                                if p.grad is None:
+                                    p.grad = torch.zeros_like(p)
+                                p.grad.data.copy_(
+                                    buf[pos:pos + numel].view_as(p.grad.data) / gs.gradient_norm
+                                )
+                                pos += numel
+                        else:
+                            pos += size
 
 
 class ErrorHandler(object):

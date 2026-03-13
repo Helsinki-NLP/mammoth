@@ -302,12 +302,22 @@ class WorldGroupGradientSync:
             else:
                 my_param_counts[name] = 0
 
-        # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size
-        # Use all_gather_object instead of all_gather_list: at large scale (many adapters per
-        # language pair), the serialized dict can exceed the ~65 KB hard limit of all_gather_list.
-        # all_gather_object has no size limit.
-        all_counts = [None] * torch.distributed.get_world_size()
-        torch.distributed.all_gather_object(all_counts, my_param_counts)
+        # Step 2: All-gather param counts across all GPUs so every GPU knows every component's size.
+        # All ranks build my_param_counts from the same all_components list, so the keys and their
+        # order are identical everywhere. We only need to exchange the integer values — no pickle.
+        # Gathering a flat int64 tensor avoids both the 65 KB limit of all_gather_list and the
+        # max_size * world_size GPU allocation of all_gather_object.
+        name_order = sorted(my_param_counts.keys())
+        my_counts_tensor = torch.tensor(
+            [my_param_counts[n] for n in name_order],
+            dtype=torch.long, device='cuda',
+        )
+        gathered = [torch.zeros_like(my_counts_tensor) for _ in range(torch.distributed.get_world_size())]
+        torch.distributed.all_gather(gathered, my_counts_tensor)
+        all_counts = [
+            {name: counts[i].item() for i, name in enumerate(name_order)}
+            for counts in gathered
+        ]
 
         # Step 3: Compute global buffer layout
         # For each component, take the max param count across all GPUs that own it

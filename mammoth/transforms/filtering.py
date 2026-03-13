@@ -100,17 +100,17 @@ class FilterTooLongTransform(Transform):
             return None
         else:
             # Debug: Log sequences near the threshold that pass through
-            threshold_margin = 5
-            if src_len > self.src_seq_length_max - threshold_margin or tgt_len > self.tgt_seq_length_max - threshold_margin:
-                logger.warning(
-                    f"FilterTooLong: Sequence near threshold PASSED. "
-                    f"src_len={src_len} (threshold={self.src_seq_length_max}), "
-                    f"tgt_len={tgt_len} (threshold={self.tgt_seq_length_max}), "
-                    f"ratio={tgt_len/src_len:.2f}. "
-                    f"After numericalization will add ~3 special tokens."
-                )
-                logger.warning(f"  SRC tokens: {example['src'][:20]} ...")
-                logger.warning(f"  TGT tokens: {example['tgt'][:20]} ...")
+            # threshold_margin = 5
+            # if src_len > self.src_seq_length_max - threshold_margin or tgt_len > self.tgt_seq_length_max - threshold_margin:
+            #     logger.warning(
+            #         f"FilterTooLong: Sequence near threshold PASSED. "
+            #         f"src_len={src_len} (threshold={self.src_seq_length_max}), "
+            #         f"tgt_len={tgt_len} (threshold={self.tgt_seq_length_max}), "
+            #         f"ratio={tgt_len/src_len:.2f}. "
+            #         f"After numericalization will add ~3 special tokens."
+            #     )
+            #     logger.warning(f"  SRC tokens: {example['src'][:20]} ...")
+            #     logger.warning(f"  TGT tokens: {example['tgt'][:20]} ...")
             return example
 
     def _repr_args(self):

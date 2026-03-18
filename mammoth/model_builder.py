@@ -11,6 +11,7 @@ from typing import Optional, List, Dict, Tuple
 from mammoth.x_transformers import TransformerWrapper
 from mammoth.x_transformers.x_transformers import (
     TokenEmbedding,
+    ScaledTokenEmbedding,
     AbsolutePositionalEmbedding,
     ScaledSinusoidalEmbedding,
     LayerNorm,
@@ -378,16 +379,28 @@ def build_xcoder(
     else:
         emb_dim = model_opts.model_dim
 
+    # Determine whether to use scaled embeddings (e.g. Gemma3-style sqrt(dim) scaling)
+    all_xt_opts = model_opts.x_transformers_opts if model_opts.x_transformers_opts else dict()
+    prefix = 'enc_' if side == Side.encoder else 'dec_'
+    use_scaled_emb = all_xt_opts.get(f'{prefix}scaled_embeddings', all_xt_opts.get('scaled_embeddings', False))
+
     if token_embs is None:
         token_embs = dict()
     for lang in all_langs:
         if lang not in token_embs:
             vocab = vocabs_dict[(side_alt_str, lang)]
-            token_embs[lang] = TokenEmbedding(
-                dim=emb_dim,
-                num_tokens=len(vocab),
-                l2norm_embed=l2norm_embed
-            )
+            if use_scaled_emb:
+                token_embs[lang] = ScaledTokenEmbedding(
+                    dim=emb_dim,
+                    num_tokens=len(vocab),
+                    l2norm_embed=l2norm_embed,
+                )
+            else:
+                token_embs[lang] = TokenEmbedding(
+                    dim=emb_dim,
+                    num_tokens=len(vocab),
+                    l2norm_embed=l2norm_embed,
+                )
     # Create AdaptedAttentionLayersStack objects and TransformerWrapper objects
     tasks = task_queue_manager.get_my_tasks()
     if single_task:

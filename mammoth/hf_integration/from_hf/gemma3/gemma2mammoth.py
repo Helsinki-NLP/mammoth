@@ -501,10 +501,9 @@ def load_hf_weights_to_xtransformer(hf_model_path, xt_model):
         if len(mapping_errors) > 5:
             print(f"  ... and {len(mapping_errors) - 5} more")
 
-    # Important note about embedding scaling
-    print(f"\n  ⚠ Note: Gemma3 uses scaled embeddings (multiply by sqrt({config.hidden_size}))")
-    print(f"    This scaling is NOT applied during weight loading.")
-    print(f"    MAMMOTH model will need custom embedding scaling in forward pass.")
+    # Embedding weights are stored unscaled; sqrt(dim) scaling is applied at forward-pass
+    # time via ScaledTokenEmbedding (instantiated by model_builder when dec_scaled_embeddings=True).
+    print(f"\n  ✓ Embedding weights stored unscaled (sqrt({config.hidden_size}) applied at runtime via ScaledTokenEmbedding)")
 
     return xt_model
 

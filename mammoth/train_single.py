@@ -23,10 +23,37 @@ from mammoth.transforms import get_transforms_cls
 from mammoth.utils.profiling import get_roctx_range
 
 
+def set_cpu_affinity(local_rank):
+    """Bind this process to the CPU cores nearest to its GPU (GCD) on LUMI-G.
+    Each MI250X GCD is wired to a specific NUMA node; binding avoids
+    cross-NUMA memory traffic that slows down data loading and kernel launches.
+    Silently skips if not on LUMI or psutil is unavailable."""
+    LUMI_GPU_CPU_map = {
+        0: [49, 50, 51, 52, 53, 54, 55],
+        1: [57, 58, 59, 60, 61, 62, 63],
+        2: [17, 18, 19, 20, 21, 22, 23],
+        3: [25, 26, 27, 28, 29, 30, 31],
+        4: [1, 2, 3, 4, 5, 6, 7],
+        5: [9, 10, 11, 12, 13, 14, 15],
+        6: [33, 34, 35, 36, 37, 38, 39],
+        7: [41, 42, 43, 44, 45, 46, 47],
+    }
+    if local_rank not in LUMI_GPU_CPU_map:
+        return
+    try:
+        import psutil
+        cpu_list = LUMI_GPU_CPU_map[local_rank]
+        psutil.Process().cpu_affinity(cpu_list)
+        logger.info(f"Bound local_rank {local_rank} to CPUs {cpu_list}")
+    except (ImportError, AttributeError, OSError) as e:
+        logger.info(f"CPU affinity binding skipped for local_rank {local_rank}: {e}")
+
+
 def configure_process(opts, device_id):
     logger.info("logger set device {} ".format(device_id))
     if device_id >= 0:
         torch.cuda.set_device(device_id)
+        set_cpu_affinity(device_id)
     set_random_seed(opts.seed, device_id >= 0)
 
 

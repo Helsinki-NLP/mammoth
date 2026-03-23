@@ -28,6 +28,7 @@ class Statistics(object):
         self.start_time = time.time()
         self.n_sents = 0
         self.cumulative_sents = 0  # Cumulative sentence count since training began
+        self.flops_per_step = 0  # Total FLOPs for this reporting interval
 
         # losses per task
         self.loss_per_task = Counter()
@@ -119,6 +120,8 @@ class Statistics(object):
         if update_n_src_words:
             self.n_src_words += stat.n_src_words
 
+        self.flops_per_step += stat.flops_per_step
+
         # Update sentence counts
         if stat.n_sents:
             self.n_sents += stat.n_sents
@@ -177,6 +180,12 @@ class Statistics(object):
         """compute elapsed time"""
         return time.time() - self.start_time
 
+    def tflops(self):
+        """compute TFLOPs/s (teraFLOPs per second)"""
+        if self.flops_per_step == 0:
+            return 0.0
+        return self.flops_per_step / (self.elapsed_time() + 1e-5) / 1e12
+
     def output(self, step, num_steps, learning_rate, start, metadata=None):
         """Write out statistics to stdout.
 
@@ -197,14 +206,17 @@ class Statistics(object):
         acc_str = f'{acc:6.2f}' if acc is not None else '--'
         ppl = self.ppl()
         ppl_str = f'{ppl:5.2f}' if ppl is not None else '--'
+        tflops = self.tflops()
+        tflops_str = f'{tflops:6.2f} TFLOP/s; ' if tflops > 0 else ''
         logger.info(
-            ("%s: Step %s; acc: %s; ppl: %s; xent: %4.2f; %3.0f/%3.0f tok/s; %6.0f sents; %6.0f sec;")
+            ("%s: Step %s; acc: %s; ppl: %s; xent: %4.2f; %s%3.0f/%3.0f tok/s; %6.0f sents; %6.0f sec;")
             % (
                 meta_str,
                 step_fmt,
                 acc_str,
                 ppl_str,
                 self.xent(),
+                tflops_str,
                 # learning_rate,    # was "lr: %7.5f;"
                 self.n_src_words / (t + 1e-5),
                 self.n_words / (t + 1e-5),
@@ -228,6 +240,9 @@ class Statistics(object):
         if acc is not None:
             writer.add_scalar(prefix + "/accuracy", acc, step)
         writer.add_scalar(prefix + "/tgtper", self.n_words / t, step)
+        tflops = self.tflops()
+        if tflops > 0:
+            writer.add_scalar(prefix + "/tflops", tflops, step)
         # writer.add_scalar(prefix + "/lr", learning_rate, step)
         if patience is not None:
             writer.add_scalar(prefix + "/patience", patience, step)

@@ -20,6 +20,7 @@ import mammoth.distributed
 from mammoth.utils.logging import logger
 from mammoth.utils.loss import build_loss_function
 from mammoth.utils.statistics import Statistics
+from mammoth.utils.flops import compute_transformer_flops
 from mammoth.inputters.vocab import HFTokenizerVocab
 
 try:
@@ -105,6 +106,17 @@ def build_trainer(
         else None
     )
 
+    # Extract model config for FLOP counting
+    x_opts = opts.x_transformers_opts if opts.x_transformers_opts else {}
+    flops_config = {
+        'model_dim': opts.model_dim,
+        'enc_layers': sum(opts.enc_layers) if opts.enc_layers else 6,
+        'dec_layers': sum(opts.dec_layers) if opts.dec_layers else 6,
+        'vocab_size': opts.tgt_vocab_size or 0,
+        'ff_mult': x_opts.get('ff_mult', x_opts.get('dec_ff_mult', 4.0)),
+        'use_glu': x_opts.get('ff_glu', x_opts.get('dec_ff_glu', False)),
+    }
+
     report_manager = mammoth.utils.build_report_manager(opts, device_context.node_rank, device_context.local_rank)
     trainer = mammoth.Trainer(
         model,
@@ -136,6 +148,8 @@ def build_trainer(
         beam_size=opts.beam_size,
         max_length=opts.max_length,
         world_group_sync=world_group_sync,
+        flops_config=flops_config,
+        log_throughput=getattr(opts, 'log_throughput', True),
     )
     return trainer
 
@@ -193,6 +207,8 @@ class Trainer(object):
         beam_size=1,
         max_length=100,
         world_group_sync=None,
+        flops_config=None,
+        log_throughput=True,
     ):
         # Basic attributes.
         self.model = model
@@ -217,6 +233,8 @@ class Trainer(object):
         self.dropout_steps = dropout_steps
 
         self.task_queue_manager = task_queue_manager
+        self.flops_config = flops_config or {}
+        self.log_throughput = log_throughput
         self.valid_metrics = valid_metrics or []
         self.valid_max_length = valid_max_length
         self.valid_max_batches = valid_max_batches
@@ -1008,6 +1026,22 @@ class Trainer(object):
 
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')
+
+        # Compute FLOPs for this step and record in report_stats
+        if self.log_throughput and self.flops_config.get('model_dim', 0) > 0:
+            n_src = report_stats.n_src_words
+            n_tgt = report_stats.n_words
+            # Use batch sequence lengths as approximation
+            batch_size = report_stats.n_sents if report_stats.n_sents > 0 else 1
+            src_seq_len = n_src // batch_size if batch_size > 0 else 0
+            tgt_seq_len = n_tgt // batch_size if batch_size > 0 else 0
+            report_stats.flops_per_step = compute_transformer_flops(
+                n_src_tokens=n_src,
+                n_tgt_tokens=n_tgt,
+                src_seq_len=src_seq_len,
+                tgt_seq_len=tgt_seq_len,
+                **self.flops_config,
+            )
 
     def _start_report_manager(self, start_time=None):
         """

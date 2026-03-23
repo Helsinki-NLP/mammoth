@@ -91,6 +91,14 @@ def _add_logging_opts(parser, is_train=True):
             help="Report accuracy for training batches. "
             "This has an impact on performance: only use for debugging, or if no validation set exists.",
         )
+        group.add(
+            '--log_throughput',
+            '-log_throughput',
+            action="store_true",
+            default=True,
+            help="Report TFLOPs/GPU throughput during training. "
+            "Uses analytical FLOP counting (Megatron-LM style). Enabled by default.",
+        )
 
     else:
         # Options only during inference

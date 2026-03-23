@@ -263,13 +263,4 @@ This is standard practice. The matrix multiplies dominate (>99% of FLOPs), so co
 
 ---
 
-## How to Interpret the Numbers
-
-| TFLOP/s Range (MI250X) | What It Means |
-|------------------------|---------------|
-| < 10 | Something is bottlenecked (data loading, communication, small batch) |
-| 10-30 | Reasonable for encoder-decoder with communication overhead |
-| 30-50 | Good utilization |
-| > 50 | Excellent (theoretical peak ~383 TFLOP/s FP16 per GCD) |
-
-**Key insight:** TFLOP/s is most useful as a **relative** metric. If you change batch size, sequence length, or number of GPUs and TFLOP/s drops, something became less efficient. The absolute number depends heavily on model size, precision, and hardware.
+**Key insight:** TFLOP/s is most useful as a **relative** metric. The absolute number depends heavily on model size, precision, and hardware.

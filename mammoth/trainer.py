@@ -149,7 +149,7 @@ def build_trainer(
         max_length=opts.max_length,
         world_group_sync=world_group_sync,
         flops_config=flops_config,
-        report_tflops=getattr(opts, 'report_TFLOPs', True),
+        report_tflops=getattr(opts, 'report_tflops', True),
     )
     return trainer
 

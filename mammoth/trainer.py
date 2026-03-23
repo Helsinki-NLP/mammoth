@@ -149,7 +149,7 @@ def build_trainer(
         max_length=opts.max_length,
         world_group_sync=world_group_sync,
         flops_config=flops_config,
-        log_throughput=getattr(opts, 'log_throughput', True),
+        report_tflops=getattr(opts, 'report_TFLOPs', True),
     )
     return trainer
 
@@ -208,7 +208,7 @@ class Trainer(object):
         max_length=100,
         world_group_sync=None,
         flops_config=None,
-        log_throughput=True,
+        report_tflops=True,
     ):
         # Basic attributes.
         self.model = model
@@ -234,7 +234,7 @@ class Trainer(object):
 
         self.task_queue_manager = task_queue_manager
         self.flops_config = flops_config or {}
-        self.log_throughput = log_throughput
+        self.report_tflops = report_tflops
         self.valid_metrics = valid_metrics or []
         self.valid_max_length = valid_max_length
         self.valid_max_batches = valid_max_batches
@@ -1028,7 +1028,7 @@ class Trainer(object):
             logger.warning('Communication batches out of synch with batch accumulation')
 
         # Compute FLOPs for this step and record in report_stats
-        if self.log_throughput and self.flops_config.get('model_dim', 0) > 0:
+        if self.report_tflops and self.flops_config.get('model_dim', 0) > 0:
             n_src = report_stats.n_src_words
             n_tgt = report_stats.n_words
             # Use batch sequence lengths as approximation

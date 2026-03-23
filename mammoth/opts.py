@@ -92,8 +92,8 @@ def _add_logging_opts(parser, is_train=True):
             "This has an impact on performance: only use for debugging, or if no validation set exists.",
         )
         group.add(
-            '--log_throughput',
-            '-log_throughput',
+            '--report_TFLOPs',
+            '-report_TFLOPs',
             action="store_true",
             default=True,
             help="Report TFLOPs/GPU throughput during training. "

@@ -63,7 +63,9 @@ def load_frame_checkpoint(checkpoint_path):
                 else:
                     raise FileNotFoundError(
                         f"No checkpoint found at {checkpoint_path}. "
-                        f"Looked for both *_best_frame.pt and *_step_*_frame.pt patterns."
+                        f"Looked for both *_best_frame.pt and *_step_*_frame.pt patterns. "
+                        f"Tip: Passing a checkpoint directory path (e.g. 'models/') is strongly recommended "
+                        f"and the best or latest checkpoint will be loaded automatically."
                     )
 
         logger.info("Loading frame checkpoint from %s" % checkpoint_path)

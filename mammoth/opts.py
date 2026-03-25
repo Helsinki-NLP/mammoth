@@ -1104,7 +1104,11 @@ def translate_opts(parser, dynamic=False):
         type=str,
         default=[],
         required=True,
-        help="Path to model .pt file(s). Multiple models can be specified, for ensemble decoding.",
+        help="Path to the checkpoint directory or model .pt file(s). "
+             "Passing a directory is recommended: the best checkpoint "
+             "(*_best_frame.pt) is loaded automatically, or the latest "
+             "step checkpoint if no best checkpoint exists. "
+             "Multiple models can be specified for ensemble decoding.",
     )
     group.add(
         '--fp32',

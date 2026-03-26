@@ -572,7 +572,13 @@ class LocalTaskQueueManager(TaskQueueManager):
         assert len(my_corpus_ids) == len(my_weights)
         assert len(my_corpus_ids) == len(my_introduce_at_training_step)
         if len(my_corpus_ids) == 0:
-            raise ValueError("No corpora on device")
+            raise ValueError(
+                f"No corpora on device: node_rank={self.node_rank}, local_rank={self.local_rank}, "
+                f"global_rank={self.global_rank}. "
+                f"Check that your task config assigns corpora to this device via 'node_gpu' "
+                f"See if the task name is duplicated,"
+                f"or reduce the number of GPUs to match the number of tasks."
+            )
         if sum(my_weights) <= 0:
             raise ValueError('Can not set "weight" of all corpora on a device to zero')
         if all(x > 0 for x in my_introduce_at_training_step):

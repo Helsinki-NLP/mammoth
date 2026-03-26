@@ -1,30 +1,60 @@
 #!/bin/bash
-# This script sets up the Python virtual environment 
-# and installs necessary packages on the LUMI supercomputer.
+#SBATCH -A project_462000964
+#SBATCH -J setup_venv
+#SBATCH -o ./logs/setup_venv_%j.out
+#SBATCH -e ./logs/setup_venv_%j.err
+#SBATCH --partition=dev-g
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=4
+#SBATCH --mem=8G
+#SBATCH --gres=gpu:1
+#SBATCH --time=00:20:00
 
-# Create virtual environment in your project space
+set -e  # stop on any error
+
+echo "Starting setup at $(date)"
+
+# ==== CONFIG ====
+PROJECT_PATH=/scratch/project_462000964/shared/mammoth-shared # your project path on HPC
+VENV_PATH=$PROJECT_PATH/.venv
+REQ_FILE=/scratch/project_462000964/shared/mammoth-shared/mammoth-dev/mammoth/csc_env/lumi/requirements_lumi.txt # path to the dependencies
+
+CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif # path to the container
+
+# ==== DEBUG INFO ====
+echo "Project path: $PROJECT_PATH"
+echo "Venv path: $VENV_PATH"
+echo "Requirements: $REQ_FILE"
+
+# ==== RUN INSIDE CONTAINER ====
 singularity exec \
-    -B $your_path_in_lumi:$your_path_in_lumi:rw \
-    /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
-    python -m venv $your_path_in_lumi/.venv --system-site-packages
+    -B /scratch/project_462000964:/scratch/project_462000964:rw \
+    $CONTAINER \
+    bash -c "
 
-# Install packages (this preserves PyTorch from container)
-singularity exec \
-    -B $your_path_in_lumi:$your_path_in_lumi:rw \
-    /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
-    $your_path_in_lumi/.venv/bin/pip install -r $path_to_mammoth/lumi/requirements_lumi.txt
+    set -e
 
+    echo 'Inside container:'
+    which python
 
-# Example usage:
+    # Create venv only if it doesn't exist
+    if [ ! -d \"$VENV_PATH\" ]; then
+        echo 'Creating virtual environment...'
+        python -m venv $VENV_PATH --system-site-packages
+    else
+        echo 'Venv already exists, skipping creation.'
+    fi
 
-# Create virtual environment in your project space
-# singularity exec \
-#     -B /scratch/project_462000964/members/wangchao:/scratch/project_462000964/members/wangchao:rw \
-#     /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
-#     python -m venv /scratch/project_462000964/members/wangchao/.venv --system-site-packages
+    echo 'Upgrading pip...'
+    $VENV_PATH/bin/pip install --upgrade pip
 
-# Install packages (this preserves PyTorch from container)
-# singularity exec \
-#    -B /scratch/project_462000964/members/wangchao:/scratch/project_462000964/members/wangchao:rw \
-#     /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
-#     /scratch/project_462000964/members/wangchao/.venv/bin/pip install -r /scratch/project_462000964/members/wangchao/mammoth/lumi/requirements_lumi.txt
+    echo 'Installing requirements...'
+    $VENV_PATH/bin/pip install -r $REQ_FILE
+
+    echo 'Verifying installation...'
+    $VENV_PATH/bin/python -c \"import torch; print('Torch version:', torch.__version__)\"
+
+    echo 'Done inside container.'
+"
+
+echo "Finished at $(date)"

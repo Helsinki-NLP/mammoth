@@ -20,7 +20,7 @@ from mammoth.distributed.components import (
     DistributedDecoderAttentionLayersBlock,
     DistributedEmbedding,
     DistributedEncoderAttentionLayersBlock,
-    DistributedTransformerWrapper,
+    DistributedWrapperModules,
     Side,
 )
 from mammoth.distributed.contexts import DeviceContext, WorldContext
@@ -404,22 +404,24 @@ class TaskQueueManager:
                     lang=task.tgt_lang,
                 )
             )
+            # Per-component wrapper modules (to_logits, post_emb_norm, pos_emb, project_emb).
+            # Shared across all tasks that use the same component (xcoder_id combination).
             builder.add(
-                DistributedTransformerWrapper(
+                DistributedWrapperModules(
                     global_ranks={global_rank},
                     task_ids={task.corpus_id},
                     group=None,
                     side=Side.encoder,
-                    task_id=task.corpus_id,
+                    component_key=tuple(task.encoder_id),
                 )
             )
             builder.add(
-                DistributedTransformerWrapper(
+                DistributedWrapperModules(
                     global_ranks={global_rank},
                     task_ids={task.corpus_id},
                     group=None,
                     side=Side.decoder,
-                    task_id=task.corpus_id,
+                    component_key=tuple(task.decoder_id),
                 )
             )
             for layer_stack_index, encoder_id in enumerate(task.encoder_id):

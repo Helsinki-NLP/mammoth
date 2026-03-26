@@ -3261,6 +3261,9 @@ class TransformerWrapper(Module):
         dim_pooled_tokens = None,
         squeeze_out_last_dim = False,
         token_emb: TokenEmbedding | None = None,
+        post_emb_norm_module: Module | None = None,
+        pos_emb_module: Module | None = None,
+        project_emb_module: Module | None = None,
         mixture_of_softmax = False,
         mixture_of_softmax_k = 4,
         sigsoftmax_logits = False,
@@ -3295,7 +3298,9 @@ class TransformerWrapper(Module):
 
         no_abs_pos_emb = max_seq_len == 0 or not (use_abs_pos_emb and not attn_layers.disable_abs_pos_emb)
 
-        if no_abs_pos_emb:
+        if exists(pos_emb_module):
+            self.pos_emb = pos_emb_module
+        elif no_abs_pos_emb:
             self.pos_emb = always(0)
         elif scaled_sinu_pos_emb:
             self.pos_emb = ScaledSinusoidalEmbedding(emb_dim)
@@ -3323,10 +3328,16 @@ class TransformerWrapper(Module):
 
         self.emb_frac_gradient = emb_frac_gradient
 
-        self.post_emb_norm = LayerNorm(emb_dim, layernorm_bias=post_emb_norm_bias) if post_emb_norm else nn.Identity()
+        if exists(post_emb_norm_module):
+            self.post_emb_norm = post_emb_norm_module
+        else:
+            self.post_emb_norm = LayerNorm(emb_dim, layernorm_bias=post_emb_norm_bias) if post_emb_norm else nn.Identity()
         self.emb_dropout = nn.Dropout(emb_dropout)
 
-        self.project_emb = nn.Linear(emb_dim, dim) if emb_dim != dim else nn.Identity()
+        if exists(project_emb_module):
+            self.project_emb = project_emb_module
+        else:
+            self.project_emb = nn.Linear(emb_dim, dim) if emb_dim != dim else nn.Identity()
         self.attn_layers = attn_layers
 
         self.init_()

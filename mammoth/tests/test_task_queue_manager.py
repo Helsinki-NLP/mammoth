@@ -7,11 +7,7 @@ from mammoth.distributed.components import (
     DistributedDecoderAttentionLayersBlock,
     DistributedEmbedding,
     DistributedEncoderAttentionLayersBlock,
-    DistributedTransformerWrapper,
-    # DistributedAdapter,
-    # DistributedAttentionBridge,
-    # DistributedComponentAction,
-    # DistributedComponentActionWithGradient,
+    DistributedWrapperModules,
 )
 
 
@@ -150,45 +146,31 @@ def test_create_all_distributed_components():
     assert all_components == [
         DistributedDecoderAttentionLayersBlock(
             global_ranks={0, 2},
-            task_ids={'train_3_e-b', 'train_0_a-b'},
+            task_ids={'train_0_a-b', 'train_3_e-b'},
             group=None,
             layer_stack_index=0,
             xcoder_id="y",
         ),
         DistributedDecoderAttentionLayersBlock(
             global_ranks={1},
-            task_ids={"train_2_a-d", "train_1_c-d"},
+            task_ids={"train_1_c-d", "train_2_a-d"},
             group=None,
             layer_stack_index=0,
             xcoder_id="yy",
         ),
-        DistributedTransformerWrapper(
-            global_ranks={0},
-            task_ids={'train_0_a-b'},
+        DistributedWrapperModules(
+            global_ranks={0, 2},
+            task_ids={'train_0_a-b', 'train_3_e-b'},
             group=None,
-            task_id='train_0_a-b',
             side=Side.decoder,
+            component_key=('y',),
         ),
-        DistributedTransformerWrapper(
+        DistributedWrapperModules(
             global_ranks={1},
-            task_ids={'train_1_c-d'},
+            task_ids={'train_1_c-d', 'train_2_a-d'},
             group=None,
-            task_id='train_1_c-d',
             side=Side.decoder,
-        ),
-        DistributedTransformerWrapper(
-            global_ranks={1},
-            task_ids={'train_2_a-d'},
-            group=None,
-            task_id='train_2_a-d',
-            side=Side.decoder,
-        ),
-        DistributedTransformerWrapper(
-            global_ranks={2},
-            task_ids={'train_3_e-b'},
-            group=None,
-            task_id='train_3_e-b',
-            side=Side.decoder,
+            component_key=('yy',),
         ),
         DistributedEncoderAttentionLayersBlock(
             global_ranks={0, 1},
@@ -211,37 +193,30 @@ def test_create_all_distributed_components():
             layer_stack_index=0,
             xcoder_id="xxx",
         ),
-        DistributedTransformerWrapper(
-            global_ranks={0},
-            task_ids={'train_0_a-b'},
+        DistributedWrapperModules(
+            global_ranks={0, 1},
+            task_ids={'train_2_a-d', 'train_0_a-b'},
             group=None,
-            task_id='train_0_a-b',
             side=Side.encoder,
+            component_key=('x',),
         ),
-        DistributedTransformerWrapper(
+        DistributedWrapperModules(
             global_ranks={1},
             task_ids={'train_1_c-d'},
             group=None,
-            task_id='train_1_c-d',
             side=Side.encoder,
+            component_key=('xx',),
         ),
-        DistributedTransformerWrapper(
-            global_ranks={1},
-            task_ids={'train_2_a-d'},
-            group=None,
-            task_id='train_2_a-d',
-            side=Side.encoder,
-        ),
-        DistributedTransformerWrapper(
+        DistributedWrapperModules(
             global_ranks={2},
             task_ids={'train_3_e-b'},
             group=None,
-            task_id='train_3_e-b',
             side=Side.encoder,
+            component_key=('xxx',),
         ),
         DistributedEmbedding(
             global_ranks={0, 1},
-            task_ids={"train_0_a-b", "train_2_a-d"},
+            task_ids={"train_2_a-d", "train_0_a-b"},
             group=None,
             side=Side.encoder,
             lang="a",
@@ -254,22 +229,23 @@ def test_create_all_distributed_components():
         ),
         DistributedEmbedding(
             global_ranks={0, 2},
-            task_ids={'train_3_e-b', 'train_0_a-b'},
+            task_ids={'train_0_a-b', 'train_3_e-b'},
             group=None,
             side=Side.decoder,
             lang="b",
         ),
         DistributedEmbedding(
             global_ranks={1},
-            task_ids={"train_2_a-d", "train_1_c-d"},
+            task_ids={"train_1_c-d", "train_2_a-d"},
             group=None,
             side=Side.decoder,
             lang="d",
         ),
     ]
     # Verify needs_communication is based on global_ranks, not group
+    # Shared: y(0,2), x(0,1), a(0,1), b(0,2), decoder_wrapper_y(0,2), encoder_wrapper_x(0,1)
     shared = [c for c in all_components if c.needs_communication()]
-    assert len(shared) == 4  # y(0,2), x(0,1), a(0,1), b(0,2)
+    assert len(shared) == 6
 
 
 def test_get_my_distributed_components():
@@ -289,24 +265,17 @@ def test_get_my_distributed_components():
     assert my_components == [
         DistributedDecoderAttentionLayersBlock(
             global_ranks={1},
-            task_ids={"train_2_a-d", "train_1_c-d"},
+            task_ids={"train_1_c-d", "train_2_a-d"},
             group=None,
             layer_stack_index=0,
             xcoder_id="yy",
         ),
-        DistributedTransformerWrapper(
+        DistributedWrapperModules(
             global_ranks={1},
-            task_ids={'train_1_c-d'},
+            task_ids={'train_1_c-d', 'train_2_a-d'},
             group=None,
-            task_id='train_1_c-d',
             side=Side.decoder,
-        ),
-        DistributedTransformerWrapper(
-            global_ranks={1},
-            task_ids={'train_2_a-d'},
-            group=None,
-            task_id='train_2_a-d',
-            side=Side.decoder,
+            component_key=('yy',),
         ),
         DistributedEncoderAttentionLayersBlock(
             global_ranks={0, 1},
@@ -322,23 +291,23 @@ def test_get_my_distributed_components():
             layer_stack_index=0,
             xcoder_id="xx",
         ),
-        DistributedTransformerWrapper(
+        DistributedWrapperModules(
+            global_ranks={0, 1},
+            task_ids={'train_2_a-d', 'train_0_a-b'},
+            group=None,
+            side=Side.encoder,
+            component_key=('x',),
+        ),
+        DistributedWrapperModules(
             global_ranks={1},
             task_ids={'train_1_c-d'},
             group=None,
-            task_id='train_1_c-d',
             side=Side.encoder,
-        ),
-        DistributedTransformerWrapper(
-            global_ranks={1},
-            task_ids={'train_2_a-d'},
-            group=None,
-            task_id='train_2_a-d',
-            side=Side.encoder,
+            component_key=('xx',),
         ),
         DistributedEmbedding(
             global_ranks={0, 1},
-            task_ids={"train_0_a-b", "train_2_a-d"},
+            task_ids={"train_2_a-d", "train_0_a-b"},
             group=None,
             side=Side.encoder,
             lang="a",
@@ -352,7 +321,7 @@ def test_get_my_distributed_components():
         ),
         DistributedEmbedding(
             global_ranks={1},
-            task_ids={"train_2_a-d", "train_1_c-d"},
+            task_ids={"train_1_c-d", "train_2_a-d"},
             group=None,
             side=Side.decoder,
             lang="d",

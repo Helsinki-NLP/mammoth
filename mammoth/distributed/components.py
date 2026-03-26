@@ -91,56 +91,6 @@ class DistributedComponent(ABC):
 
 
 @dataclass  # type: ignore
-class DistributedTransformerWrapper(DistributedComponent, ABC):
-    """Represents a distributed TransformerWrapper object from x-transformers"""
-    task_id: str
-    side: Side
-
-    def get_name(self) -> str:
-        return f'{self.side.name}_{self.task_id}'
-
-    def get_module(self, model: NMTModel) -> nn.Module:
-        parent = model.encoder if self.side == Side.encoder else model.decoder
-        transformer_wrapper = parent[self.task_id]
-        return transformer_wrapper
-
-    def named_parameters(self, model: NMTModel):
-        module = self.get_module(model)
-        for name, p in module.named_parameters():
-            # TransformerWrapper contains the AttentionLayers and the embs.
-            # however, we want to treat these as distinct DistributedComponents
-            if name.startswith('attn_layers.'):
-                continue
-            if name.startswith('token_emb.'):
-                continue
-            yield name, p
-
-    def state_dict(self, model: NMTModel, prefix='', keep_vars=False) -> Dict[str, Any]:
-        module = self.get_module(model)
-        destination: Dict[str, Any] = OrderedDict()
-        # Save direct parameters (e.g., final_logits_bias)
-        for name, param in module._parameters.items():
-            if param is not None:
-                destination[prefix + name] = param if keep_vars else param.detach()
-        # Save submodules
-        for name, sub_module in module._modules.items():
-            if name in {'attn_layers', 'token_emb'}:
-                # stored separately
-                continue
-            sub_module.state_dict(destination=destination, prefix=prefix + name + '.', keep_vars=keep_vars)
-        return destination
-
-    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
-        module = self.get_module(model)
-        mismatch = module.load_state_dict(state_dict, strict=False)
-        missing_keys = [
-            name for name in mismatch.missing_keys
-            if not any(name.startswith(prefix) for prefix in ('attn_layers.', 'token_emb.'))
-        ]
-        return mismatch._replace(missing_keys=missing_keys)
-
-
-@dataclass  # type: ignore
 class DistributedAttentionLayersBlock(DistributedComponent, ABC):
     """Represents a distributed AdaptedAttentionLayers object"""
     layer_stack_index: int
@@ -228,6 +178,43 @@ class DistributedEmbedding(DistributedComponent):
             return model.encoder.get_embedding_by_lang(self.lang)
         else:
             return model.decoder.get_embedding_by_lang(self.lang)
+
+
+@dataclass
+class DistributedWrapperModules(DistributedComponent):
+    """Represents per-component wrapper modules (to_logits, post_emb_norm, pos_emb, project_emb).
+
+    These modules belong to the TransformerWrapper but are shared across all tasks
+    that use the same component (xcoder_id combination). This is critical for zero-shot
+    inference: at inference time you pick a component, not a task.
+
+    The component_key is a tuple of xcoder_ids (one per layer stack), e.g. ("is",).
+    """
+    side: Side
+    component_key: tuple  # tuple of xcoder_ids, e.g. ("is",)
+
+    def get_name(self) -> str:
+        side_str = 'encoder' if self.side == Side.encoder else 'decoder'
+        key_str = '_'.join(self.component_key)
+        return f'{side_str}_wrapper_{key_str}'
+
+    def get_module(self, model: NMTModel) -> nn.Module:
+        """Returns a virtual ModuleDict of the per-component wrapper modules."""
+        parent = model.encoder if self.side == Side.encoder else model.decoder
+        modules = nn.ModuleDict()
+        post_emb_norm = parent.get_post_emb_norm_by_component(self.component_key)
+        if post_emb_norm is not None and not isinstance(post_emb_norm, nn.Identity):
+            modules['post_emb_norm'] = post_emb_norm
+        pos_emb = parent.get_pos_emb_by_component(self.component_key)
+        if pos_emb is not None and isinstance(pos_emb, nn.Module):
+            modules['pos_emb'] = pos_emb
+        project_emb = parent.get_project_emb_by_component(self.component_key)
+        if project_emb is not None and not isinstance(project_emb, nn.Identity):
+            modules['project_emb'] = project_emb
+        to_logits = parent.get_to_logits_by_component(self.component_key)
+        if to_logits is not None:
+            modules['to_logits'] = to_logits
+        return modules
 
 
 @dataclass

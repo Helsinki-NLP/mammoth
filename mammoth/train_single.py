@@ -53,7 +53,14 @@ def configure_process(opts, device_id):
     logger.info("logger set device {} ".format(device_id))
     if device_id >= 0:
         torch.cuda.set_device(device_id)
-        set_cpu_affinity(device_id)
+        # CPU affinity mapping is only valid when all 8 GCDs on a LUMI-G node are in use.
+        # With fewer GPUs, the hardcoded GPU→NUMA mapping may not match actual device assignment.
+        if sorted(opts.gpu_ranks) == list(range(8)):
+            set_cpu_affinity(device_id)
+        else:
+            logger.info(
+                f"CPU affinity binding skipped: gpu_ranks {opts.gpu_ranks} does not use all 8 GCDs"
+            )
     set_random_seed(opts.seed, device_id >= 0)
 
 

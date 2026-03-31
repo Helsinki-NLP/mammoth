@@ -499,6 +499,9 @@ def build_xcoder(
         per_component_project_embs=per_component_project_embs,
         per_component_to_logits=per_component_to_logits,
     )
+    # Store kwargs for dynamic TransformerWrapper construction in activate_by_components
+    stack_xcoder.transformer_wrapper_kwargs = transformer_wrapper_kwargs
+    stack_xcoder.emb_dim = emb_dim
     return stack_xcoder
 
 

@@ -96,6 +96,11 @@ class StackXcoder(nn.ModuleDict):
         self.per_component_pos_embs = per_component_pos_embs or {}
         self.per_component_project_embs = per_component_project_embs or {}
         self.per_component_to_logits = per_component_to_logits or {}
+        # Cache for TransformerWrappers created by activate_by_components
+        self._component_wrapper_cache: Dict[tuple, TransformerWrapper] = {}
+        # Wrapper kwargs stored by build_xcoder for dynamic TW construction
+        self.transformer_wrapper_kwargs: dict = {}
+        self.emb_dim: Optional[int] = None
 
     # TransformerWrapper wraps an AttentionLayers in embeddings and some other functionality.
     # We use one TransformerWrapper per task.
@@ -108,6 +113,64 @@ class StackXcoder(nn.ModuleDict):
             for layer_stack_index, adapter_group, sub_id in adapter_ids:
                 attention_layers_stack.activate_adapter(layer_stack_index, adapter_group, sub_id)
         return transformer_wrapper
+
+    def activate_by_components(
+        self,
+        xcoder_ids: List[str],
+        lang: str,
+        adapter_ids: Optional[List[Tuple[int, str, str]]] = None,
+    ) -> TransformerWrapper:
+        """Activate by component IDs and language, enabling zero-shot inference.
+
+        Instead of looking up a pre-built TransformerWrapper by task_id,
+        this assembles one from the shared component pieces:
+        - attention layers by (layer_stack_index, xcoder_id)
+        - token embedding by lang
+        - wrapper modules (pos_emb, post_emb_norm, etc.) by component_key
+        """
+        component_key = tuple(xcoder_ids)
+        cache_key = (component_key, lang)
+
+        if cache_key in self._component_wrapper_cache:
+            tw = self._component_wrapper_cache[cache_key]
+        else:
+            # Look up attention layers — raises KeyError if xcoder_id was never trained
+            attention_layers_list = [
+                self.attention_layers_by_xcoder_id[i][xcoder_id]
+                for i, xcoder_id in enumerate(xcoder_ids)
+            ]
+            attn_layers_stack = AdaptedAttentionLayersStack(attention_layers_list)
+
+            # Look up token embedding — raises KeyError if lang was never trained
+            token_emb = self.token_embs[lang]
+
+            # Look up per-component wrapper modules
+            post_emb_norm = self.per_component_post_emb_norms.get(component_key)
+            pos_emb = self.per_component_pos_embs.get(component_key)
+            project_emb = self.per_component_project_embs.get(component_key)
+            to_logits = self.per_component_to_logits.get(component_key)
+
+            tw = TransformerWrapper(
+                num_tokens=token_emb.emb.num_embeddings,
+                attn_layers=attn_layers_stack,
+                emb_dim=self.emb_dim or attn_layers_stack.dim,
+                token_emb=token_emb,
+                post_emb_norm_module=post_emb_norm,
+                pos_emb_module=pos_emb,
+                project_emb_module=project_emb,
+                to_logits=to_logits,
+                _skip_init=True,
+                **self.transformer_wrapper_kwargs,
+            )
+            self._component_wrapper_cache[cache_key] = tw
+
+        if adapter_ids:
+            attn_stack = tw.attn_layers
+            attn_stack.deactivate_adapters()
+            for layer_stack_index, adapter_group, sub_id in adapter_ids:
+                attn_stack.activate_adapter(layer_stack_index, adapter_group, sub_id)
+
+        return tw
 
     def get_attention_layers_by_task_id(self, task_id: str, layer_stack_index: int) -> AdaptedAttentionLayers:
         return self[task_id].attn_layers.attention_layers_stack[layer_stack_index]

@@ -1128,7 +1128,15 @@ def translate_opts(parser, dynamic=False):
         "Necessary for models whose output layers can assign "
         "zero probability.",
     )
-    group.add('--task_id', '-task_id', help="Task id to determine components to load for translation", required=True)
+    group.add('--task_id', '-task_id', help="Task id to determine components to load for translation", required=False, default=None)
+    group.add('--encoder_id', nargs='+', default=None,
+              help="Encoder component IDs for zero-shot inference (one per layer stack, e.g. 'de' or 'de shared')")
+    group.add('--decoder_id', nargs='+', default=None,
+              help="Decoder component IDs for zero-shot inference (one per layer stack, e.g. 'en' or 'en shared')")
+    group.add('--src_lang', default=None,
+              help="Source language for zero-shot inference (determines source embedding)")
+    group.add('--tgt_lang', default=None,
+              help="Target language for zero-shot inference (determines target embedding and generator)")
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text", help="Type of the source input. Options: [text].")

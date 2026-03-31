@@ -24,7 +24,7 @@ from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_fro
 from mammoth.utils.parse import ArgumentParser
 
 
-def build_translator(opts, task_queue_manager, task, report_score=True, logger=None, out_file=None):
+def build_translator(opts, task_queue_manager, task, report_score=True, logger=None, out_file=None, single_task=None):
     if out_file is None:
         outdir = os.path.dirname(opts.output)
         if outdir and not os.path.isdir(outdir):
@@ -42,6 +42,7 @@ def build_translator(opts, task_queue_manager, task, report_score=True, logger=N
         task_queue_manager=task_queue_manager,
         task=task,
         model_path=model_path,
+        single_task=single_task,
     )
 
     scorer = GNMTGlobalScorer.from_opts(opts)
@@ -61,7 +62,7 @@ def build_translator(opts, task_queue_manager, task, report_score=True, logger=N
     return translator
 
 
-def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):
+def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None, single_task=None):
     if task is None:
         raise ValueError('Must set task')
     if model_path is None:
@@ -70,12 +71,22 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
     # Load only the frame
     frame, frame_checkpoint_path = load_frame_checkpoint(checkpoint_path=model_path)
 
-    vocabs_dict = {
-        ('src', task.src_lang): frame["vocab"].get(('src', task.src_lang)),
-        ('tgt', task.tgt_lang): frame["vocab"].get(('tgt', task.tgt_lang)),
-        'src': frame["vocab"].get(('src', task.src_lang)),
-        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
-    }
+    if single_task is not None:
+        # Task-based inference: load vocabs for just this task's languages
+        vocabs_dict = {
+            ('src', task.src_lang): frame["vocab"].get(('src', task.src_lang)),
+            ('tgt', task.tgt_lang): frame["vocab"].get(('tgt', task.tgt_lang)),
+            'src': frame["vocab"].get(('src', task.src_lang)),
+            'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
+        }
+    else:
+        # Zero-shot inference: load vocabs for all languages in the checkpoint
+        vocabs_dict = {}
+        for key, vocab in frame["vocab"].items():
+            vocabs_dict[key] = vocab
+        # Also set the 'src' and 'tgt' convenience keys for the inference task
+        vocabs_dict['src'] = frame["vocab"].get(('src', task.src_lang))
+        vocabs_dict['tgt'] = frame["vocab"].get(('tgt', task.tgt_lang))
     print(f'vocabs_dict {vocabs_dict}')
     print(f'my compontents {task_queue_manager.get_my_distributed_components()}')
 
@@ -86,7 +97,7 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
         opts,
         vocabs_dict,
         task_queue_manager,
-        single_task=task.corpus_id,
+        single_task=single_task,
     )
 
     load_parameters_from_checkpoint(
@@ -852,14 +863,26 @@ class Translator(Inference):
 
         # (1) Activate the correct pluggable embeddings and modules
         metadata = self.task.get_serializable_metadata()
-        active_encoder = self.model.encoder.activate(
-            task_id=metadata.corpus_id,
-            adapter_ids=metadata.encoder_adapter_ids,
-        )
-        active_decoder = self.model.decoder.activate(
-            task_id=metadata.corpus_id,
-            adapter_ids=metadata.decoder_adapter_ids,
-        )
+        if metadata.corpus_id == '__zero_shot__':
+            active_encoder = self.model.encoder.activate_by_components(
+                xcoder_ids=metadata.encoder_id,
+                lang=metadata.src_lang,
+                adapter_ids=metadata.encoder_adapter_ids,
+            )
+            active_decoder = self.model.decoder.activate_by_components(
+                xcoder_ids=metadata.decoder_id,
+                lang=metadata.tgt_lang,
+                adapter_ids=metadata.decoder_adapter_ids,
+            )
+        else:
+            active_encoder = self.model.encoder.activate(
+                task_id=metadata.corpus_id,
+                adapter_ids=metadata.encoder_adapter_ids,
+            )
+            active_decoder = self.model.decoder.activate(
+                task_id=metadata.corpus_id,
+                adapter_ids=metadata.decoder_adapter_ids,
+            )
         active_encoder.to(self._device)
         active_decoder.to(self._device)
 

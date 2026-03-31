@@ -3269,7 +3269,8 @@ class TransformerWrapper(Module):
         sigsoftmax_logits = False,
         ff_deep_embed = False,
         to_logits: Module | None = None,
-        add_continuous_pred_head = False
+        add_continuous_pred_head = False,
+        _skip_init = False,
     ):
         super().__init__()
 
@@ -3340,7 +3341,8 @@ class TransformerWrapper(Module):
             self.project_emb = nn.Linear(emb_dim, dim) if emb_dim != dim else nn.Identity()
         self.attn_layers = attn_layers
 
-        self.init_()
+        if not _skip_init:
+            self.init_()
 
         assert num_output_heads > 0
 

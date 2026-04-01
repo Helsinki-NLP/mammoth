@@ -101,11 +101,12 @@ def is_roctx_available():
 
 
 def detect_profiler_backend():
-    """Auto-detect which profiler backend to use (result is cached).
+    """Detect which profiler backend to use (result is cached).
 
-    Detection priority:
-    1. NVTX (NVIDIA GPUs) - most common in deep learning
-    2. ROCTx (AMD GPUs) - for LUMI and other AMD systems
+    Checks MAMMOTH_PROFILER_BACKEND env var first (values: "nvtx", "roctx", "none").
+    Falls back to library auto-detection:
+    1. ROCTx (AMD GPUs) - for LUMI and other AMD systems
+    2. NVTX (NVIDIA GPUs)
     3. None - graceful fallback with no-op markers
 
     Returns:
@@ -113,12 +114,23 @@ def detect_profiler_backend():
     """
     global _profiler_backend
     if _profiler_backend is None:
-        if is_nvtx_available():
+        import os
+        forced = os.environ.get("MAMMOTH_PROFILER_BACKEND", "").lower()
+        if forced == "roctx":
+            _profiler_backend = "roctx"
+            logger.info("ROCTx markers ACTIVE (MAMMOTH_PROFILER_BACKEND=roctx) - traces collected via rocprofv3")
+        elif forced == "nvtx":
             _profiler_backend = "nvtx"
-            logger.info("NVTX markers ACTIVE - traces collected via nsys/nvprof")
+            logger.info("NVTX markers ACTIVE (MAMMOTH_PROFILER_BACKEND=nvtx) - traces collected via nsys/nvprof")
+        elif forced == "none":
+            _profiler_backend = None
+            logger.info("Profiler markers disabled (MAMMOTH_PROFILER_BACKEND=none)")
         elif is_roctx_available():
             _profiler_backend = "roctx"
             logger.info("ROCTx markers ACTIVE - traces collected via rocprofv3")
+        elif is_nvtx_available():
+            _profiler_backend = "nvtx"
+            logger.info("NVTX markers ACTIVE - traces collected via nsys/nvprof")
         else:
             _profiler_backend = None
             logger.debug("No profiler available - markers will be no-ops")

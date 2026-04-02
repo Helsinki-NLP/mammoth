@@ -29,10 +29,7 @@ try:
 except ImportError:
     SACREBLEU_AVAILABLE = False
 
-# ROCTx profiler support for AMD GPU profiling on LUMI
-# Markers are always active; profiling controlled by rocprofv3 wrapper
-
-from mammoth.utils.profiling import get_profiler_range as get_roctx_range
+from mammoth.utils.profiling import get_profiler_range
 
 
 class NanLossException(Exception):
@@ -46,10 +43,10 @@ def iter_on_device(iterator, device_context):
     else:
         device = torch.device('cpu')
 
-    roctx_range = get_roctx_range()
+    profiler_range = get_profiler_range()
 
     for batch, meta, comm_batch_id in iterator:
-        with roctx_range("data_transfer_to_device"):
+        with profiler_range("data_transfer_to_device"):
             # Use non_blocking=True for async transfer (requires pinned memory)
             # Pinned memory is enabled in train_single.py (_reattach_batch_tensors)
             batch_on_device = batch.to(device, non_blocking=True)
@@ -247,7 +244,7 @@ class Trainer(object):
         self.world_group_sync = world_group_sync
 
         # Get ROCTx range function (markers always active, profiling controlled by rocprofv3)
-        self.roctx_range = get_roctx_range()
+        self.profiler_range = get_profiler_range()
 
         self._data_state = {}
 
@@ -341,7 +338,7 @@ class Trainer(object):
             self.accum_count = self._accum_count(self.optim.training_step)
             self.task_queue_manager.accum_count = self.accum_count
 
-            with self.roctx_range(f"data_preparation_step_{step}"):
+            with self.profiler_range(f"data_preparation_step_{step}"):
                 batches_with_meta = islice(train_iter, self.accum_count)
                 # Convert to list to materialize all batches and measure data loading time
                 batches_with_meta = list(batches_with_meta)
@@ -351,7 +348,7 @@ class Trainer(object):
 
             gradient_syncs = self.task_queue_manager.distributed_component_gradient_sync(batch_task_sample)
 
-            with self.roctx_range(f"gradient_accumulation_step_{step}"):
+            with self.profiler_range(f"gradient_accumulation_step_{step}"):
                 self._gradient_accumulation(
                     batches_with_meta,
                     total_stats,
@@ -360,7 +357,7 @@ class Trainer(object):
                     gradient_syncs,
                 )
 
-            with self.roctx_range(f"gradient_sync_step_{step}"):
+            with self.profiler_range(f"gradient_sync_step_{step}"):
                 if self.world_group_sync is not None:
                     # World-group gradient sync: single allreduce on world group
                     # Replaces per-component allreduce to avoid NCCL deadlock at scale
@@ -374,7 +371,7 @@ class Trainer(object):
 
                         component_name = component.get_name() if hasattr(component, 'get_name') else f"component_{idx}"
 
-                        with self.roctx_range(f"allreduce_{component_name}"):
+                        with self.profiler_range(f"allreduce_{component_name}"):
                             params = component.named_parameters(self.model)
                             mammoth.distributed.externally_managed_reduce_and_rescale_grads(
                                 named_parameters=params,
@@ -387,7 +384,7 @@ class Trainer(object):
 
             # Filter to owned components only: the optimizer should only step components this GPU owns
             owned_gradient_syncs = [gs for gs in gradient_syncs if gs.owns_component]
-            with self.roctx_range(f"optimizer_step_{step}"):
+            with self.profiler_range(f"optimizer_step_{step}"):
                 self.optim.externally_managed_step(owned_gradient_syncs)
                 self.optim.zero_grad()
 
@@ -454,7 +451,7 @@ class Trainer(object):
                 # Synchronize all devices after validation to avoid timeouts
                 # This barrier ensures all devices (with or without validation data) stay in sync
                 if device_context.is_distributed():
-                    with self.roctx_range("barrier_post_validation"):
+                    with self.profiler_range("barrier_post_validation"):
                         torch.distributed.barrier()
 
                 # Clean up GPU memory after validation to free any remaining tensors
@@ -821,7 +818,7 @@ class Trainer(object):
                 device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
                 dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
 
-                with self.roctx_range("validation_forward_pass"):
+                with self.profiler_range("validation_forward_pass"):
                     with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                         # F-prop through the model.
                         logits, decoder_output = valid_model(
@@ -978,7 +975,7 @@ class Trainer(object):
 
             # shapes are: (t b i)   i.e.   (time, batch, vocab_index)
 
-            with self.roctx_range(f"forward_pass_batch_{k}"):
+            with self.profiler_range(f"forward_pass_batch_{k}"):
                 with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                     logits, decoder_output = self.model(
                         src=rearrange(src, 't b 1 -> b t'),
@@ -989,7 +986,7 @@ class Trainer(object):
                     logits = rearrange(logits, 'b t i -> t b i')
                     decoder_output = rearrange(decoder_output, 'b t d -> t b d')
 
-            with self.roctx_range(f"loss_computation_batch_{k}"):
+            with self.profiler_range(f"loss_computation_batch_{k}"):
                 with torch.autocast(device_type=device_type, dtype=dtype, enabled=self.optim.amp):
                     # 3. Compute loss.
                     loss = self.loss_functions[metadata.tgt_lang](
@@ -1002,7 +999,7 @@ class Trainer(object):
                 if torch.isnan(loss):
                     raise NanLossException('Loss blowout')
                 # loss /= normalization
-                with self.roctx_range(f"backward_pass_batch_{k}"):
+                with self.profiler_range(f"backward_pass_batch_{k}"):
                     self.optim.backward(loss)
 
             if self.report_training_accuracy:

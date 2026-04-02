@@ -19,8 +19,7 @@ from mammoth.distributed.communication import all_gather_list
 from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
-# ROCTx profiler imports for AMD GPU profiling
-from mammoth.utils.profiling import get_roctx_range
+from mammoth.utils.profiling import get_profiler_range
 
 
 def set_cpu_affinity(local_rank):
@@ -345,15 +344,15 @@ def main(
     assert semaphore is not None
 
     def _train_iter():
-        roctx_range = get_roctx_range()
+        profiler_range = get_profiler_range()
 
         while True:
-            with roctx_range("batch_queue_get"):
+            with profiler_range("batch_queue_get"):
                 batch, metadata, communication_batch_id = batch_queue.get()
 
             # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
             # Pin memory for faster async GPU transfers
-            with roctx_range("batch_tensor_reattach_from_cpu"):
+            with profiler_range("batch_tensor_reattach_from_cpu"):
                 batch = _reattach_batch_tensors(batch, pin_memory=True)
                 metadata = _reattach_batch_tensors(metadata, pin_memory=True)
             semaphore.release()

@@ -12,7 +12,7 @@ import torch.distributed
 from mammoth.distributed.contexts import DeviceContextEnum
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
-from mammoth.utils.profiling import get_roctx_range
+from mammoth.utils.profiling import get_profiler_range
 
 
 def _detach_batch_tensors(obj):
@@ -290,7 +290,7 @@ class WorldGroupGradientSync:
             global_rank: this GPU's global rank
         """
         self.global_rank = global_rank
-        self.roctx_range = get_roctx_range()
+        self.profiler_range = get_profiler_range()
 
         # Step 1: For each component this GPU owns, compute param count
         my_param_counts = OrderedDict()
@@ -391,14 +391,14 @@ class WorldGroupGradientSync:
         # Build a name → gradient_sync lookup for O(1) access inside bucket loops
         sync_by_name = {gs.component.get_name(): gs for gs in all_gradient_syncs}
 
-        with self.roctx_range("world_group_sync"):
+        with self.profiler_range("world_group_sync"):
             for bucket in self.buckets:
                 bucket_size = sum(size for _, size in bucket)
                 buf = self.buffer[:bucket_size]
                 buf.zero_()
 
                 # Pack: each rank fills slices for components it owns and trained this step
-                with self.roctx_range("world_group_sync_pack"):
+                with self.profiler_range("world_group_sync_pack"):
                     pos = 0
                     for name, size in bucket:
                         gs = sync_by_name.get(name)
@@ -414,11 +414,11 @@ class WorldGroupGradientSync:
                             pos += size  # leave zeros for unowned / untrained components
 
                 # Allreduce this bucket on the world group
-                with self.roctx_range("world_group_sync_allreduce"):
+                with self.profiler_range("world_group_sync_allreduce"):
                     torch.distributed.all_reduce(buf)
 
                 # Unpack: write reduced gradients back to owned components
-                with self.roctx_range("world_group_sync_unpack"):
+                with self.profiler_range("world_group_sync_unpack"):
                     pos = 0
                     for name, size in bucket:
                         gs = sync_by_name.get(name)
@@ -490,7 +490,7 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
     logger.info(generator_to_serve)
 
     # Initialize ROCTx profiling markers (always active, controlled by rocprofv3 wrapper)
-    roctx_range = get_roctx_range()
+    profiler_range = get_profiler_range()
 
     # Get prefetch buffer size
     prefetch_buffer_size = getattr(opts, 'prefetch_buffer_size', 16)
@@ -498,12 +498,12 @@ def batch_producer(generator_to_serve, queue, semaphore, opts, device_id):
 
     _batch_producer_with_prefetch(
         generator_to_serve, queue, semaphore, opts, device_id,
-        prefetch_buffer_size, roctx_range
+        prefetch_buffer_size, profiler_range
     )
 
 
 def _batch_producer_with_prefetch(generator_to_serve, queue, semaphore, opts, device_id,
-                                   prefetch_buffer_size, roctx_range):
+                                   prefetch_buffer_size, profiler_range):
     """
     Batch producer with background thread prefetching.
 
@@ -538,7 +538,7 @@ def _batch_producer_with_prefetch(generator_to_serve, queue, semaphore, opts, de
                     break
 
                 # Do expensive work (disk I/O, tensor detach) in background thread
-                with roctx_range("batch_prefetch_read"):
+                with profiler_range("batch_prefetch_read"):
                     batch_detached = _detach_batch_tensors(batch)
                     metadata_detached = _detach_batch_tensors(metadata)
 
@@ -570,7 +570,7 @@ def _batch_producer_with_prefetch(generator_to_serve, queue, semaphore, opts, de
 
             # Get batch from prefetch buffer (blocks if buffer is empty)
             # This should rarely block since prefetch thread is continuously filling it
-            with roctx_range("batch_queue_get"):
+            with profiler_range("batch_queue_get"):
                 item = prefetch_buffer.get()
 
             if item is None:

@@ -465,7 +465,12 @@ class Trainer(object):
             # Regular checkpoint saving (for save_strategy='steps' or when no validation has run yet)
             # This is skipped when using metric-based strategies after validation
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                # Only use regular save if not already saved via save_with_metric in validation
+                # This guard is a best-effort optimization to skip calling save() when
+                # save_with_metric() already ran in the validation block above. It does NOT
+                # cover all combinations of rank / valid_iter (e.g. rank 0 may have no
+                # validation set while other ranks do). The real protection against a
+                # double-save is inside save() itself: it checks `step == last_saved_step`
+                # and returns immediately if the step was already saved by save_with_metric().
                 if not (step % valid_steps == 0 and valid_iter is not None and device_context.is_master()):
                     self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 

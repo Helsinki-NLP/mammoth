@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """Training on a single process."""
 import torch
-import time
 
 from mammoth.model_builder import build_model, validate_optimizer_coverage
 from mammoth.utils.optimizers import MultipleOptimizer
@@ -233,9 +232,6 @@ def main(
 
     init_logger(opts.log_file, gpu_id=device_context.id)
     if device_context.is_distributed():
-        sleep_s = device_context.local_rank * 3
-        logger.warning(f'sleeping {sleep_s}s to alleviate ROCm deadlock')
-        time.sleep(sleep_s)
         configure_process(opts, device_context.local_rank)
         gpu_rank_t = torch.distributed.get_rank()
         logger.info("RANK GPU FROM TORCH %s", str(gpu_rank_t))

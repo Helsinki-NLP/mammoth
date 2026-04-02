@@ -465,17 +465,25 @@ class Trainer(object):
                         step, self._data_state, valid_stats, device_context, moving_average=self.moving_average
                     )
 
-                # Only master device handles early stopping
+                # Early stopping: master evaluates, then broadcasts decision to all ranks
+                # All ranks must break together to avoid NCCL deadlock from asymmetric exits
+                should_stop = False
                 if device_context.is_master():
-                    # Run patience mechanism only on master rank (only if master has validation stats)
                     if self.earlystopper is not None and valid_stats is not None:
                         self.earlystopper(valid_stats, step)
-                        # If the patience has reached the limit, stop training
                         if self.earlystopper.has_stopped():
                             logger.info(f"Early stopping triggered at step {step}")
                             if self.earlystopper.current_step_best is not None:
                                 logger.info(f"Best checkpoint was at step {self.earlystopper.current_step_best}")
-                            break
+                            should_stop = True
+
+                if device_context.is_distributed():
+                    stop_tensor = torch.tensor([1 if should_stop else 0], device='cuda')
+                    torch.distributed.broadcast(stop_tensor, src=0)
+                    should_stop = stop_tensor.item() == 1
+
+                if should_stop:
+                    break
 
             # Regular checkpoint saving (for save_strategy='steps' or when no validation has run yet)
             # This is skipped when using metric-based strategies after validation
@@ -487,19 +495,18 @@ class Trainer(object):
             if train_steps > 0 and step >= train_steps:
                 break
 
-        # Final checkpoint save
-        if self.model_saver is not None and device_context.is_master():
-            # Use save_with_metric if we have validation stats, otherwise use regular save
+        # Final checkpoint save — all ranks must participate because _save() contains
+        # collective ops (all_gather_object for data state). Only master writes files.
+        if self.model_saver is not None:
             if hasattr(self, '_last_valid_stats') and self._last_valid_stats is not None:
                 self.model_saver.save_with_metric(
                     step, self._data_state, self._last_valid_stats, device_context, moving_average=self.moving_average
                 )
             else:
-                # Fallback to regular save if no validation has been run
                 self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 
-            # Log final best checkpoint info
-            if self.model_saver.best_checkpoint_step is not None:
+            # Log final best checkpoint info (master only)
+            if device_context.is_master() and self.model_saver.best_checkpoint_step is not None:
                 logger.info("=" * 80)
                 logger.info("Training completed!")
                 logger.info(f"Best checkpoint: step {self.model_saver.best_checkpoint_step}")

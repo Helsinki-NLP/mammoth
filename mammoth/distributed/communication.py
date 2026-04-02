@@ -12,7 +12,7 @@ import torch.distributed
 from mammoth.distributed.contexts import DeviceContextEnum
 from mammoth.utils.logging import init_logger, logger
 from mammoth.utils.misc import set_random_seed
-from mammoth.utils.profiling import get_roctx_range
+from mammoth.utils.profiling import get_profiler_range as get_roctx_range
 
 
 def _detach_batch_tensors(obj):

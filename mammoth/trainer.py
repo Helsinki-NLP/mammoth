@@ -32,7 +32,7 @@ except ImportError:
 # ROCTx profiler support for AMD GPU profiling on LUMI
 # Markers are always active; profiling controlled by rocprofv3 wrapper
 
-from mammoth.utils.profiling import get_roctx_range
+from mammoth.utils.profiling import get_profiler_range as get_roctx_range
 
 
 class NanLossException(Exception):

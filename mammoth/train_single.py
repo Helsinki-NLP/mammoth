@@ -20,7 +20,7 @@ from mammoth.inputters import DynamicDatasetIter
 from mammoth.transforms import get_transforms_cls
 
 # ROCTx profiler imports for AMD GPU profiling
-from mammoth.utils.profiling import get_roctx_range
+from mammoth.utils.profiling import get_profiler_range as get_roctx_range
 
 
 def set_cpu_affinity(local_rank):

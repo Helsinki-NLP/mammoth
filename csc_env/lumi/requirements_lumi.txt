@@ -3,3 +3,4 @@ einx==0.3.0
 frozendict==2.4.6
 loguru==0.7.3
 sacrebleu
+tabulate

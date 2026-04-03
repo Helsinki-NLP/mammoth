@@ -709,18 +709,71 @@ class ModelSaver(ModelSaverBase):
                 self._rm_checkpoint_by_step(step)
                 del self.checkpoint_metadata[step]
 
+    def track_metric(self, step, valid_stats, device_context):
+        """Track validation metrics without saving a checkpoint.
+
+        Performs collective ops (metric aggregation across devices) and updates
+        best-metric tracking, but does NOT write checkpoint files to disk.
+        Use this after validation when save_strategy='steps', so that metric
+        tracking stays up-to-date while actual saving is controlled solely by
+        save_checkpoint_steps.
+
+        All ranks must call this method together because it contains
+        all_gather_object for metric aggregation.
+
+        Args:
+            step: Current training step
+            valid_stats: Statistics object with validation metrics (None if no validation on this device)
+            device_context: Distributed training device context
+
+        Returns:
+            bool: True if this is a new best metric
+        """
+        # Extract metric value from valid_stats (None if this device has no validation data)
+        metric_value = None
+        if valid_stats is not None:
+            try:
+                metric_value = self._extract_metric_value(valid_stats)
+            except ValueError as e:
+                logger.warning(f"Could not extract metric: {e}. Skipping metric tracking.")
+                return False
+
+        # Aggregate metrics across all devices in distributed training
+        aggregated_metric = self._aggregate_metrics_across_devices(metric_value, device_context)
+
+        # Store metadata (only on master device)
+        if device_context.is_master() and valid_stats is not None:
+            self.checkpoint_metadata[step] = self._get_all_metrics(valid_stats)
+            self.checkpoint_metadata[step]['aggregated_' + self.metric_for_best_model] = aggregated_metric
+
+        # Update best checkpoint tracking (no file ops, just bookkeeping)
+        is_new_best = self._is_better_metric(aggregated_metric, self.best_metric_value)
+        if is_new_best:
+            self.best_metric_value = aggregated_metric
+            self.best_checkpoint_step = step
+            logger.info(
+                f"New best metric at step {step} with "
+                f"aggregated {self.metric_for_best_model}={aggregated_metric:.4f}"
+            )
+
+        # Write metadata file so users can inspect metric history
+        if device_context.is_master():
+            self._write_checkpoint_metadata()
+
+        return is_new_best
+
     def save_with_metric(self, step, data_state, valid_stats, device_context, moving_average=None):
         """Save checkpoint with validation metric tracking.
 
-        This is the main entry point that replaces the regular save() method
-        when using metric-based checkpoint management. It:
-        1. Extracts the metric value from validation stats
-        2. Aggregates metrics across all devices (for multi-task training)
-        3. Saves the checkpoint (via _save)
-        4. Determines if this is a new best
-        5. Updates best checkpoint tracking
-        6. Rotates old checkpoints based on the strategy
-        7. Writes metadata file
+        This is the entry point for metric-based checkpoint strategies
+        (best_only, best_and_last, best_n). It:
+        1. Tracks metrics via track_metric() (includes collective ops)
+        2. Saves the checkpoint (via _save)
+        3. Applies explicit naming for best checkpoints
+        4. Rotates old checkpoints based on the strategy
+
+        For save_strategy='steps', use track_metric() instead — actual saving
+        is handled by the step-based save logic in the trainer.
 
         Args:
             step: Current training step
@@ -796,7 +849,7 @@ class ModelSaver(ModelSaverBase):
 
             # Apply explicit naming when save_strategy is metric-based
             # Only the master device should rename files to avoid race conditions
-            if self.save_strategy != 'steps' and device_context.is_master():
+            if device_context.is_master():
                 # Revert old best checkpoint to step-based naming (if exists)
                 if old_best_step is not None:
                     self._revert_best_checkpoint_naming(old_best_step)
@@ -807,13 +860,7 @@ class ModelSaver(ModelSaverBase):
         # Handle checkpoint rotation based on strategy
         # Only the master device should manage checkpoint files (rotation and metadata)
         if device_context.is_master():
-            if self.save_strategy != 'steps':  # Metric-based strategies
-                self._rotate_checkpoints_by_metric()
-            elif self.keep_checkpoint > 0:  # Original FIFO behavior
-                if len(self.checkpoint_queue) == self.checkpoint_queue.maxlen:
-                    todel = self.checkpoint_queue.popleft()
-                    self._rm_checkpoint(todel)
-                self.checkpoint_queue.append(checkpoint_files)
+            self._rotate_checkpoints_by_metric()
 
             # Write checkpoint metadata file
             self._write_checkpoint_metadata()

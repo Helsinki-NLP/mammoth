@@ -458,12 +458,18 @@ class Trainer(object):
                 if device_context.is_gpu():
                     torch.cuda.empty_cache()
 
-                # All ranks must call save_with_metric to participate in collective operations
-                # (metric aggregation and data state gathering), but only master actually saves files
+                # All ranks must participate in collective operations (metric aggregation).
+                # For save_strategy='steps': only track metrics, don't save (saving is
+                # controlled by save_checkpoint_steps in the block below).
+                # For metric-based strategies: save checkpoint based on metric comparison.
                 if self.model_saver is not None:
-                    self.model_saver.save_with_metric(
-                        step, self._data_state, valid_stats, device_context, moving_average=self.moving_average
-                    )
+                    save_strategy = getattr(self.model_saver, 'save_strategy', 'steps')
+                    if save_strategy == 'steps':
+                        self.model_saver.track_metric(step, valid_stats, device_context)
+                    else:
+                        self.model_saver.save_with_metric(
+                            step, self._data_state, valid_stats, device_context, moving_average=self.moving_average
+                        )
 
                 # Early stopping: master evaluates, then broadcasts decision to all ranks
                 # All ranks must break together to avoid NCCL deadlock from asymmetric exits
@@ -485,16 +491,11 @@ class Trainer(object):
                 if should_stop:
                     break
 
-            # Regular checkpoint saving (for save_strategy='steps' or when no validation has run yet)
-            # This is skipped when using metric-based strategies after validation
+            # Step-based checkpoint saving (only for save_strategy='steps')
+            # For metric-based strategies, saving is handled in the validation block above.
             if self.model_saver is not None and (save_checkpoint_steps != 0 and step % save_checkpoint_steps == 0):
-                # This guard is a best-effort optimization to skip calling save() when
-                # save_with_metric() already ran in the validation block above. It does NOT
-                # cover all combinations of rank / valid_iter (e.g. rank 0 may have no
-                # validation set while other ranks do). The real protection against a
-                # double-save is inside save() itself: it checks `step == last_saved_step`
-                # and returns immediately if the step was already saved by save_with_metric().
-                if not (step % valid_steps == 0 and valid_iter is not None and device_context.is_master()):
+                save_strategy = getattr(self.model_saver, 'save_strategy', 'steps')
+                if save_strategy == 'steps':
                     self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 
             if train_steps > 0 and step >= train_steps:
@@ -503,11 +504,14 @@ class Trainer(object):
         # Final checkpoint save — all ranks must participate because _save() contains
         # collective ops (all_gather_object for data state). Only master writes files.
         if self.model_saver is not None:
-            if hasattr(self, '_last_valid_stats') and self._last_valid_stats is not None:
+            save_strategy = getattr(self.model_saver, 'save_strategy', 'steps')
+            if save_strategy != 'steps' and hasattr(self, '_last_valid_stats') and self._last_valid_stats is not None:
+                # Metric-based strategies: save with metric tracking
                 self.model_saver.save_with_metric(
                     step, self._data_state, self._last_valid_stats, device_context, moving_average=self.moving_average
                 )
             else:
+                # Step-based strategy or no validation stats: regular save
                 self.model_saver.save(step, self._data_state, moving_average=self.moving_average)
 
             # Log final best checkpoint info (master only)

@@ -480,10 +480,10 @@ def _add_train_general_opts(parser):
         '--save_checkpoint_steps',
         '-save_checkpoint_steps',
         type=int,
-        default=5000,
+        default=0,
         help="Save a checkpoint every X steps. "
-        "Only used when save_strategy='steps'. "
-        "For metric-based strategies (best_*), checkpoints are saved at validation time (--valid_steps).",
+        "Required when save_strategy='steps'. "
+        "Ignored for metric-based strategies (best_*), which save at validation time (--valid_steps).",
     )
     group.add(
         '--keep_checkpoint',

@@ -388,6 +388,14 @@ def main(
         if device_context.is_distributed():
             torch.distributed.barrier()
 
+    # Validate save_strategy / save_checkpoint_steps combination
+    if opts.save_strategy == 'steps' and opts.save_checkpoint_steps == 0:
+        raise ValueError(
+            "save_checkpoint_steps must be set to a positive value when save_strategy='steps'. "
+            "For metric-based strategies (best_only, best_and_last, best_n), "
+            "checkpoints are saved at validation time (--valid_steps) instead."
+        )
+
     if len(opts.gpu_ranks):
         if device_context.is_master():
             logger.info('Starting training on GPU: %s' % opts.gpu_ranks)

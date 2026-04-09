@@ -4,7 +4,7 @@ import torch
 
 import mammoth
 import mammoth.opts
-from mammoth.model_builder import build_model, build_xcoder
+from mammoth.model_builder import build_model, build_xcoder, add_zeroshot_task
 from mammoth.inputters.vocab import Vocab, DEFAULT_SPECIALS
 from mammoth.utils.parse import ArgumentParser
 from mammoth.distributed.components import Side
@@ -15,13 +15,19 @@ parser = ArgumentParser(description='train.py')
 mammoth.opts.model_opts(parser)
 mammoth.opts._add_train_general_opts(parser)
 
-DEFAULT_ARGS = '-tasks dummy -node_rank 0 -model_dim 500 -seed 1'
+DEFAULT_ARGS = '-tasks dummy -node_rank 0 -model_dim 500 -seed 1 --max_length 200'
 
 VOCABS = {
     ('src', 'a'): Vocab(None, items=['a'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
     ('src', 'b'): Vocab(None, items=['b', 'bb'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
     ('tgt', 'a'): Vocab(None, items=['_a'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
     ('tgt', 'b'): Vocab(None, items=['_b', '_bb', '_bbb'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
+    # Zero-shot scenario: spa-eng, por-eng, eng-cat. cat exists only as a target.
+    ('src', 'spa'): Vocab(None, items=['hola', 'mundo'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
+    ('src', 'por'): Vocab(None, items=['ola', 'mundo'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
+    ('src', 'eng'): Vocab(None, items=['hello', 'world'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
+    ('tgt', 'eng'): Vocab(None, items=['hello', 'world'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
+    ('tgt', 'cat'): Vocab(None, items=['hola', 'mon'], tag='dummy', specials=list(DEFAULT_SPECIALS)),
 }
 
 TASK_SPECS = {
@@ -38,6 +44,57 @@ TASK_SPECS = {
         corpus_opts=dict(),
         src_vocab=VOCABS[('src', 'a')],
         tgt_vocab=VOCABS[('tgt', 'b')],
+        encoder_adapter_ids=None,
+        decoder_adapter_ids=None,
+    ),
+    # Zero-shot scenario: two tasks share 'shared' encoder + 'eng' decoder,
+    # third task trains an 'eng' encoder + 'cat' decoder. The cat embedding
+    # is trained only as a target embedding.
+    'spa-eng': TaskSpecs(
+        node_rank=0,
+        local_rank=0,
+        src_lang='spa',
+        tgt_lang='eng',
+        encoder_id=['shared'],
+        decoder_id=['eng'],
+        corpus_id='spa-eng',
+        weight=1,
+        introduce_at_training_step=0,
+        corpus_opts=dict(),
+        src_vocab=VOCABS[('src', 'spa')],
+        tgt_vocab=VOCABS[('tgt', 'eng')],
+        encoder_adapter_ids=None,
+        decoder_adapter_ids=None,
+    ),
+    'por-eng': TaskSpecs(
+        node_rank=0,
+        local_rank=0,
+        src_lang='por',
+        tgt_lang='eng',
+        encoder_id=['shared'],
+        decoder_id=['eng'],
+        corpus_id='por-eng',
+        weight=1,
+        introduce_at_training_step=0,
+        corpus_opts=dict(),
+        src_vocab=VOCABS[('src', 'por')],
+        tgt_vocab=VOCABS[('tgt', 'eng')],
+        encoder_adapter_ids=None,
+        decoder_adapter_ids=None,
+    ),
+    'eng-cat': TaskSpecs(
+        node_rank=0,
+        local_rank=0,
+        src_lang='eng',
+        tgt_lang='cat',
+        encoder_id=['eng'],
+        decoder_id=['cat'],
+        corpus_id='eng-cat',
+        weight=1,
+        introduce_at_training_step=0,
+        corpus_opts=dict(),
+        src_vocab=VOCABS[('src', 'eng')],
+        tgt_vocab=VOCABS[('tgt', 'cat')],
         encoder_adapter_ids=None,
         decoder_adapter_ids=None,
     ),
@@ -206,3 +263,78 @@ def test_nmtmodel(args, tasks, source_l, bsize):
     tm = TestModel(args, tasks)
     tm.nmtmodel_forward(source_l=source_l, bsize=bsize)
     tm.encoder_forward(source_l=source_l, bsize=bsize)
+
+
+def test_add_zeroshot_task():
+    """
+    Zero-shot scenario: spa-eng, por-eng, eng-cat were trained.
+    At inference, register a zero-shot 'cat-eng' task that reuses
+    the trained 'cat' target embedding as a source embedding and
+    routes through the shared encoder + eng decoder.
+    """
+    tm = TestModel(
+        '--enc_layers 2 --dec_layers 2',
+        ['spa-eng', 'por-eng', 'eng-cat'],
+    )
+    model = build_model(
+        tm.opts,
+        tm.opts,
+        tm.vocabs_dict,
+        task_queue_manager=tm.tqm,
+        single_task=None,
+    )
+
+    # Precondition: cat embedding exists only on the decoder side; not on encoder.
+    assert 'cat' in model.decoder.token_embs
+    assert 'cat' not in model.encoder.token_embs
+    trained_cat_emb = model.decoder.token_embs['cat']
+
+    # Register a zero-shot cat->eng task reusing the shared encoder (from spa-eng)
+    # and the eng decoder (from spa-eng).
+    add_zeroshot_task(
+        model,
+        zero_shot_task_id='zs_cat-eng',
+        src_lang='cat',
+        template_task_id='spa-eng',
+    )
+
+    # The encoder now exposes the new task_id and the cat embedding is the
+    # SAME object (parameter reuse, not a copy).
+    assert 'zs_cat-eng' in model.encoder
+    assert 'cat' in model.encoder.token_embs
+    assert model.encoder.token_embs['cat'] is trained_cat_emb
+    assert model.encoder['zs_cat-eng'].token_emb is trained_cat_emb
+
+    # The shared encoder attention layers should be reused (same underlying
+    # AdaptedAttentionLayers, though the AdaptedAttentionLayersStack wrapper
+    # is a new instance, matching how build_xcoder constructs one wrapper
+    # per task while sharing the layers themselves).
+    zs_layers = model.encoder['zs_cat-eng'].attn_layers.attention_layers_stack
+    tpl_layers = model.encoder['spa-eng'].attn_layers.attention_layers_stack
+    assert len(zs_layers) == len(tpl_layers)
+    for zs_l, tpl_l in zip(zs_layers, tpl_layers):
+        assert zs_l is tpl_l
+
+    # The decoder side should alias the template task's decoder wrapper.
+    assert 'zs_cat-eng' in model.decoder
+    assert model.decoder['zs_cat-eng'] is model.decoder['spa-eng']
+
+    # Forward pass: tokens must be in range of the cat (source) vocab now.
+    bsize, source_l = 2, 4
+    cat_vocab_size = len(tm.vocabs_dict[('tgt', 'cat')])
+    eng_vocab_size = len(tm.vocabs_dict[('tgt', 'eng')])
+    test_src = torch.randint(0, cat_vocab_size, (bsize, source_l)).long()
+    test_tgt = torch.randint(0, eng_vocab_size, (bsize, source_l)).long()
+    test_mask = torch.ones(bsize, source_l).bool()
+
+    # Build metadata for the new zero-shot task. We build it from the template
+    # task's metadata since the shapes of encoder_adapter_ids, etc. match.
+    template_task = next(t for t in tm.tasks if t.corpus_id == 'spa-eng')
+    metadata = template_task.get_serializable_metadata()
+    metadata = metadata._replace(corpus_id='zs_cat-eng')
+
+    decoder_input = test_tgt[:, :-1]
+    logits, decoder_output = model(test_src, decoder_input, test_mask, metadata=metadata)
+
+    assert logits.shape == (bsize, source_l - 1, eng_vocab_size)
+    assert decoder_output.shape == (bsize, source_l - 1, tm.opts.model_dim)

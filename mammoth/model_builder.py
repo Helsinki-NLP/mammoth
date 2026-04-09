@@ -953,3 +953,134 @@ def validate_optimizer_coverage(model, optimizer):
         raise Exception(f'Missing optimizer for params: {sorted(missing_params)}')
     else:
         logger.info('All non-frozen parameters have an optimizer')
+
+
+def add_zeroshot_task(
+    model: NMTModel,
+    zero_shot_task_id: str,
+    src_lang: str,
+    template_task_id: str,
+) -> None:
+    """
+    Register a new zero-shot inference task on a trained multi-task model by
+    reusing a token embedding that was trained on the decoder (target) side
+    as a source-side embedding for the encoder.
+
+    Motivation
+    ----------
+    Suppose training used these tasks::
+
+        a: spa-eng  (enc: "shared", dec: "eng")
+        b: por-eng  (enc: "shared", dec: "eng")
+        c: eng-cat  (enc: "eng",    dec: "cat")
+
+    The "cat" token embedding is trained, but only lives on the decoder side
+    (as a target embedding of task c). For zero-shot cat-eng inference, we
+    want to reuse that trained embedding as the *source* embedding, routed
+    through the "shared" encoder and the "eng" decoder of task a.
+
+    This function wires such a route into the model in place. Tokenization
+    for the new source language must use the same vocabulary as the
+    corresponding target side (i.e., the cat target vocab is reused as the
+    cat source vocab), which is the invariant that makes embedding reuse
+    meaningful in the first place.
+
+    Args:
+        model: a loaded NMTModel (with checkpoint weights already applied).
+        zero_shot_task_id: new task_id to register (e.g. "zs_cat-eng").
+        src_lang: the language whose trained embedding lives in
+            ``model.decoder.token_embs`` and should now act as a source
+            embedding (e.g. "cat").
+        template_task_id: an existing task whose encoder (shared layers,
+            positional/norm modules) and decoder (target embedding, output
+            projection) should be reused. For the example above, passing
+            ``template_task_id="spa-eng"`` gives the shared encoder stack
+            plus the eng decoder.
+
+    Raises:
+        KeyError: if ``src_lang`` is not present on the decoder side or the
+            template task is not registered.
+        ValueError: if the embedding dimensions of the borrowed embedding
+            and the template encoder do not match, or if the zero-shot
+            task_id already exists.
+    """
+    if zero_shot_task_id in model.encoder or zero_shot_task_id in model.decoder:
+        raise ValueError(
+            f'Task id "{zero_shot_task_id}" already registered in the model.'
+        )
+    if src_lang not in model.decoder.token_embs:
+        raise KeyError(
+            f'Source language "{src_lang}" has no trained embedding on the '
+            f'decoder side. Available: {sorted(model.decoder.token_embs.keys())}'
+        )
+    if template_task_id not in model.encoder:
+        raise KeyError(
+            f'Template task "{template_task_id}" not found on encoder. '
+            f'Available: {list(model.encoder.keys())}'
+        )
+
+    trained_src_emb = model.decoder.token_embs[src_lang]
+    template_enc_wrapper = model.encoder[template_task_id]
+
+    # Validate embedding dim match between borrowed emb and encoder input dim.
+    borrowed_emb_dim = trained_src_emb.emb.weight.shape[1]
+    template_emb_dim = template_enc_wrapper.emb_dim
+    if borrowed_emb_dim != template_emb_dim:
+        raise ValueError(
+            f'Cannot reuse "{src_lang}" embedding as source: embedding dim '
+            f'{borrowed_emb_dim} does not match template encoder emb_dim '
+            f'{template_emb_dim}. Zero-shot embedding reuse requires equal '
+            f'encoder and decoder embedding dimensions.'
+        )
+
+    vocab_size = trained_src_emb.emb.weight.shape[0]
+
+    # Build a fresh AdaptedAttentionLayersStack that wraps the same underlying
+    # shared AdaptedAttentionLayers as the template. This mirrors how
+    # build_xcoder constructs one stack per task while sharing the layers
+    # themselves across tasks.
+    new_attn_stack = AdaptedAttentionLayersStack(
+        attention_layers_stack=list(
+            template_enc_wrapper.attn_layers.attention_layers_stack
+        )
+    )
+
+    # Construct the new encoder TransformerWrapper. We intentionally pass a
+    # throwaway TokenEmbedding, because TransformerWrapper.__init__ calls
+    # init_() which would re-initialize whatever embedding we handed it.
+    # Immediately after construction we swap the attribute to point at the
+    # trained embedding; the dummy goes out of scope.
+    dummy_token_emb = TokenEmbedding(template_emb_dim, vocab_size)
+    zero_shot_enc_wrapper = TransformerWrapper(
+        num_tokens=vocab_size,
+        max_seq_len=template_enc_wrapper.max_seq_len,
+        attn_layers=new_attn_stack,
+        emb_dim=template_emb_dim,
+        token_emb=dummy_token_emb,
+        post_emb_norm_module=template_enc_wrapper.post_emb_norm,
+        pos_emb_module=template_enc_wrapper.pos_emb,
+        project_emb_module=template_enc_wrapper.project_emb,
+        return_only_embed=True,
+    )
+    zero_shot_enc_wrapper.token_emb = trained_src_emb
+    zero_shot_enc_wrapper.num_tokens = vocab_size
+
+    # Register the trained embedding on the encoder side so callers that
+    # look up by language (e.g. StackXcoder.get_embedding_by_lang) also see
+    # it. This adds a reference, not a copy.
+    model.encoder.token_embs[src_lang] = trained_src_emb
+
+    # Register the new encoder wrapper under the zero-shot task_id.
+    model.encoder[zero_shot_task_id] = zero_shot_enc_wrapper
+
+    # For the decoder side, alias the template task's decoder wrapper. The
+    # template already has the correct target embedding + output projection
+    # (e.g. eng) that we want for zero-shot cat-eng.
+    model.decoder[zero_shot_task_id] = model.decoder[template_task_id]
+
+    logger.info(
+        f'Registered zero-shot task "{zero_shot_task_id}": '
+        f'reusing "{src_lang}" embedding (trained as target in decoder) as '
+        f'source embedding, with encoder + decoder stacks from template task '
+        f'"{template_task_id}".'
+    )

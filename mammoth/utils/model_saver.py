@@ -428,7 +428,7 @@ class ModelSaver(ModelSaverBase):
         if self.greater_is_better is None:
             if self.metric_for_best_model in ['ppl', 'perplexity', 'loss']:
                 self.greater_is_better = False
-            elif self.metric_for_best_model in ['accuracy', 'bleu']:
+            elif self.metric_for_best_model in ['accuracy', 'bleu', 'chrf']:
                 self.greater_is_better = True
             else:
                 logger.warning(
@@ -548,6 +548,8 @@ class ModelSaver(ModelSaverBase):
             return valid_stats.accuracy()
         elif metric_name == 'bleu' and hasattr(valid_stats, 'validation_metrics') and 'bleu' in valid_stats.validation_metrics:
             return valid_stats.validation_metrics['bleu']
+        elif metric_name == 'chrf' and hasattr(valid_stats, 'validation_metrics') and 'chrf' in valid_stats.validation_metrics:
+            return valid_stats.validation_metrics['chrf']
         elif hasattr(valid_stats, 'validation_metrics') and metric_name in valid_stats.validation_metrics:
             return valid_stats.validation_metrics[metric_name]
         else:

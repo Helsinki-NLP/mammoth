@@ -514,7 +514,7 @@ def _add_train_general_opts(parser):
         type=str,
         default='ppl',
         help="Metric to use for determining best checkpoint. "
-        "Options: 'ppl' (perplexity), 'accuracy', 'bleu', or custom metric name",
+        "Options: 'ppl' (perplexity), 'accuracy', 'bleu', 'chrf', or custom metric name",
     )
     group.add(
         '--greater_is_better',

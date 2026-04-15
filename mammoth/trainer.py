@@ -511,32 +511,40 @@ class Trainer(object):
         """
         metrics = {}
 
-        if not SACREBLEU_AVAILABLE and 'bleu' in valid_metrics:
-            logger.warning("sacrebleu not available, skipping BLEU computation")
+        if not SACREBLEU_AVAILABLE and any(m in valid_metrics for m in ('bleu', 'chrf')):
+            logger.warning("sacrebleu not available, skipping BLEU/chrF computation")
             return metrics
 
-        if 'bleu' in valid_metrics and SACREBLEU_AVAILABLE:
-            bleu_scores = []
+        metric_fns = {
+            'bleu': sacrebleu.corpus_bleu,
+            'chrf': sacrebleu.corpus_chrf,
+        } if SACREBLEU_AVAILABLE else {}
 
-            # Compute BLEU for each translation direction separately
+        for name, fn in metric_fns.items():
+            if name not in valid_metrics:
+                continue
+
+            per_direction_scores = []
             for (src_lang, tgt_lang), preds in predictions_by_direction.items():
                 refs = references_by_direction.get((src_lang, tgt_lang), [])
 
                 if not preds or not refs:
-                    logger.warning(f"Skipping BLEU for {src_lang}→{tgt_lang}: empty predictions or references")
+                    logger.warning(
+                        f"Skipping {name} for {src_lang}→{tgt_lang}: empty predictions or references"
+                    )
                     continue
 
                 try:
-                    bleu = sacrebleu.corpus_bleu(preds, [refs])
-                    metric_name = f'bleu/{src_lang}-{tgt_lang}'
-                    metrics[metric_name] = bleu.score
-                    bleu_scores.append(bleu.score)
+                    score = fn(preds, [refs]).score
+                    metrics[f'{name}/{src_lang}-{tgt_lang}'] = score
+                    per_direction_scores.append(score)
                 except Exception as e:
-                    logger.warning(f"Error computing BLEU for {src_lang}→{tgt_lang}: {e}")
+                    logger.warning(f"Error computing {name} for {src_lang}→{tgt_lang}: {e}")
 
-            # Compute average BLEU across all directions
-            # if bleu_scores:
-            #     metrics['bleu/avg'] = sum(bleu_scores) / len(bleu_scores)
+            # Aggregate across directions so `metric_for_best_model='<name>'` resolves.
+            # Mean is the conventional summary for multilingual eval.
+            if per_direction_scores:
+                metrics[name] = sum(per_direction_scores) / len(per_direction_scores)
 
         return metrics
 

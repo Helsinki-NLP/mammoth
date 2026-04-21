@@ -93,7 +93,7 @@ def create_xtransformer_model(model_path):
 
     # Extract sliding window and dual RoPE parameters
     dec_sliding_window = getattr(config, 'sliding_window', -1)
-    dec_global_attn_every_n_layers = getattr(config, 'global_attn_every_n_layers', 3)
+    dec_global_attn_every_n_layers = getattr(config, '_sliding_window_pattern', 6)
     dec_global_rope_theta = getattr(config, 'rope_theta', 1000000.0)  # Global theta (default 1M)
     dec_local_rope_theta = getattr(config, 'rope_local_base_freq', 10000.0)  # Local theta (default 10K)
 

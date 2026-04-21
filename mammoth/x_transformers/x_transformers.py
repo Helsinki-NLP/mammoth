@@ -1705,7 +1705,8 @@ class Attention(Module):
             return (half_window, half_window)
 
         # Check if this is a global attention layer (every Nth layer)
-        if self.layer_id % self.global_attn_every_n_layers == 0:
+        # HF Gemma3 convention: (layer_id + 1) % N == 0 → full attention
+        if (self.layer_id + 1) % self.global_attn_every_n_layers == 0:
             return (-1, -1)  # Global: full attention
 
         # Local layer: use sliding window
@@ -2963,7 +2964,8 @@ class AttentionLayers(Module):
                     self_attn_layers_before = sum(1 for lt in self.layer_types[:ind] if lt == 'a')
 
                     # Check if this is a global attention layer (every Nth layer)
-                    if self.sliding_window > 0 and self_attn_layers_before % self.global_attn_every_n_layers == 0:
+                    # HF Gemma3 convention: (layer_id + 1) % N == 0 → global
+                    if self.sliding_window > 0 and (self_attn_layers_before + 1) % self.global_attn_every_n_layers == 0:
                         # Global attention layer - use global RoPE theta
                         if exists(pos):
                             layer_rotary_pos_emb = self.global_rotary_pos_emb(pos)

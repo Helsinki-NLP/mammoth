@@ -412,7 +412,12 @@ def build_xcoder(
     )
 
     # Get the model hidden dimension (may differ from emb_dim)
-    dim = model_opts.model_dim
+    if side == Side.encoder and hasattr(model_opts, 'enc_model_dim') and model_opts.enc_model_dim is not None:
+        dim = model_opts.enc_model_dim
+    elif side == Side.decoder and hasattr(model_opts, 'dec_model_dim') and model_opts.dec_model_dim is not None:
+        dim = model_opts.dec_model_dim
+    else:
+        dim = model_opts.model_dim
 
     # Create per-component shared wrapper modules.
     # These modules are shared across all tasks that use the same component (xcoder_id),

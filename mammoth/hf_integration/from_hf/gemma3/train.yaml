@@ -57,6 +57,7 @@ enc_sliding_window: -1              # full attention for encoder
 # ============================================================================
 x_transformers_opts:
   attn_flash: true
+  use_abs_pos_emb: false 
 
   # --- Decoder: mirrors Gemma3 exactly ---
   dec_heads: 4                       # num_attention_heads
@@ -70,7 +71,6 @@ x_transformers_opts:
   dec_ff_glu: true                   # GeGLU activation
   dec_ff_no_bias: true
   dec_rotary_pos_emb: true
-  dec_rotary_pos_emb_base: 1000000   # rope_theta
   dec_use_rmsnorm: true
   dec_sandwich_norm: true            # pre+post norm per layer (Gemma3)
   dec_post_emb_norm: false
@@ -89,8 +89,7 @@ x_transformers_opts:
   enc_scaled_embeddings: false
   enc_max_seq_len: 512
 
-  use_abs_pos_emb: false
-  tie_embedding: false
+
 # ============================================================================
 # Training Configuration
 # ============================================================================
@@ -99,7 +98,7 @@ accum_count: [2]                     # Gradient accumulation (effective batch = 
 batch_size: 32                      # Per-GPU batch size
 batch_type: sents                    # Batch by sentences
 queue_size: 32
-# normalization: tokens                # Normalize gradients by token count
+normalization: tokens                # Normalize gradients by token count
 valid_batch_size: 16                 # Validation batch size
 valid_steps: 12000                    # Validation frequency
 valid_metrics: [bleu]                # Validation metrics

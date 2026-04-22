@@ -1,31 +1,107 @@
 # Task Configuration - Single language pair
 tasks:
-  task_en_fi:
-    src_tgt: "en-fi"
-    weight: 1.0
+  predict_deu-deu:
+    src_tgt: "deu-deu"
+    weight: 1
     introduce_at_training_step: 0
-    node_gpu: 0:0
-    enc_sharing_group: ["en"]
-    dec_sharing_group: ["fi"]
+    node_gpu: "0:0"
+    enc_sharing_group: ["deu"]
+    dec_sharing_group: ["deu"]
     transforms: [filtertoolong]
-    path_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_en.txt
-    path_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi.txt
-    path_valid_src: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_en.txt
-    path_valid_tgt: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi.txt
+    path_src: /scratch/project_462000964/MARMoT/data/multisynt/textpredict/train/len1024/nemotron-cc-english-run1-train-00-48.deu1.gz
+    path_tgt: /scratch/project_462000964/MARMoT/data/multisynt/textpredict/train/len1024/nemotron-cc-english-run1-train-00-48.deu2.gz
+    path_valid_src: /scratch/project_462000964/MARMoT/data/multisynt/textpredict/dev/len1024/nemotron-cc-english-run1-train-49-tail2000.deu1.gz
+    path_valid_tgt: /scratch/project_462000964/MARMoT/data/multisynt/textpredict/dev/len1024/nemotron-cc-english-run1-train-49-tail2000.deu2.gz
+
 
 # ============================================================================
 # Vocabulary Configuration - HuggingFace Tokenizer
 # ============================================================================
 
 src_vocab:
-  en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
+   bos: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/bos/32000/tokenizer.json
+   bul: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/bul/32000/tokenizer.json
+   cat: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/cat/32000/tokenizer.json
+   ces: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ces/32000/tokenizer.json
+   dan: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/dan/32000/tokenizer.json
+   deu: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/deu/32000/tokenizer.json
+   ell: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ell/32000/tokenizer.json
+   eng: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/eng/32000/tokenizer.json
+   est: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/est/32000/tokenizer.json
+   eus: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/eus/32000/tokenizer.json
+   fin: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/fin/32000/tokenizer.json
+   fra: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/fra/32000/tokenizer.json
+   gle: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/gle/32000/tokenizer.json
+   glg: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/glg/32000/tokenizer.json
+   hrv: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/hrv/32000/tokenizer.json
+   hun: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/hun/32000/tokenizer.json
+   isl: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/isl/32000/tokenizer.json
+   ita: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ita/32000/tokenizer.json
+   kat: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/kat/32000/tokenizer.json
+   lav: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/lav/32000/tokenizer.json
+   lit: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/lit/32000/tokenizer.json
+   mkd: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/mkd/32000/tokenizer.json
+   mlt: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/mlt/32000/tokenizer.json
+   nld: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/nld/32000/tokenizer.json
+   nno: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/nno/32000/tokenizer.json
+   nob: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/nob/32000/tokenizer.json
+   pol: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/pol/32000/tokenizer.json
+   por: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/por/32000/tokenizer.json
+   ron: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ron/32000/tokenizer.json
+   slk: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/slk/32000/tokenizer.json
+   slv: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/slv/32000/tokenizer.json
+   spa: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/spa/32000/tokenizer.json
+   sqi: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/sqi/32000/tokenizer.json
+   srp_Cyrl: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/srp_Cyrl/32000/tokenizer.json
+   swe: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/swe/32000/tokenizer.json
+   tur: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/tur/32000/tokenizer.json
+   ukr: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ukr/32000/tokenizer.json
 
 tgt_vocab:
-  fi: /scratch/project_462000964/members/wangchao/training/151125/converted_model/tgt_fi_tokenizer.json
+   bos: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/bos/32000/tokenizer.json
+   bul: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/bul/32000/tokenizer.json
+   cat: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/cat/32000/tokenizer.json
+   ces: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ces/32000/tokenizer.json
+   dan: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/dan/32000/tokenizer.json
+   deu: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/deu/32000/tokenizer.json
+   ell: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ell/32000/tokenizer.json
+   eng: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/eng/32000/tokenizer.json
+   est: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/est/32000/tokenizer.json
+   eus: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/eus/32000/tokenizer.json
+   fin: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/fin/32000/tokenizer.json
+   fra: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/fra/32000/tokenizer.json
+   gle: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/gle/32000/tokenizer.json
+   glg: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/glg/32000/tokenizer.json
+   hrv: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/hrv/32000/tokenizer.json
+   hun: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/hun/32000/tokenizer.json
+   isl: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/isl/32000/tokenizer.json
+   ita: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ita/32000/tokenizer.json
+   kat: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/kat/32000/tokenizer.json
+   lav: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/lav/32000/tokenizer.json
+   lit: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/lit/32000/tokenizer.json
+   mkd: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/mkd/32000/tokenizer.json
+   mlt: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/mlt/32000/tokenizer.json
+   nld: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/nld/32000/tokenizer.json
+   nno: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/nno/32000/tokenizer.json
+   nob: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/nob/32000/tokenizer.json
+   pol: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/pol/32000/tokenizer.json
+   por: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/por/32000/tokenizer.json
+   ron: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ron/32000/tokenizer.json
+   slk: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/slk/32000/tokenizer.json
+   slv: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/slv/32000/tokenizer.json
+   spa: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/spa/32000/tokenizer.json
+   sqi: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/sqi/32000/tokenizer.json
+   srp_Cyrl: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/srp_Cyrl/32000/tokenizer.json
+   swe: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/swe/32000/tokenizer.json
+   tur: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/tur/32000/tokenizer.json
+   ukr: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/ukr/32000/tokenizer.json
 
-src_seq_length: 256
-tgt_seq_length: 256
-max_length: 256  # Mammoth adds bos and eos token to training data.
+
+src_seq_length_min: 1
+tgt_seq_length_min: 1
+src_seq_length_max: 512
+tgt_seq_length_max: 1024
+max_length: 1024
 
 # ============================================================================
 # Denoising Transform Parameters (BART-style)
@@ -40,9 +116,11 @@ max_length: 256  # Mammoth adds bos and eos token to training data.
 # Model Architecture
 # ============================================================================
 model_dtype: bf16
-enc_layers: [6]
+enc_layers: [12]
 dec_layers: [18]                     # num_hidden_layers
-enc_model_dim: 512                   # encoder hidden dim (custom, not from HF)
+
+
+enc_model_dim: 768                   # encoder hidden dim (custom, not from HF)
 dec_model_dim: 640                   # hidden_size from config.json
 
 # Sliding window attention (Gemma3-style dual RoPE)
@@ -76,11 +154,11 @@ x_transformers_opts:
   dec_post_emb_norm: false
   dec_scaled_embeddings: true        # multiply embeddings by sqrt(hidden_size)
   dec_max_seq_len: 32768             # max_position_embeddings
-  dec_cross_attn_dim_context: 640    # must equal encoder model_dim
+  dec_cross_attn_dim_context: 768    # must equal enc_model_dim
 
   # --- Encoder: standard transformer (not from HF config) ---
   enc_heads: 8
-  enc_attn_dim_head: 64
+  enc_attn_dim_head: 96 # enc_model_dim // enc_heads 
   enc_ff_mult: 4.0
   enc_ff_glu: true
   enc_ff_no_bias: true
@@ -94,16 +172,19 @@ x_transformers_opts:
 # Training Configuration
 # ============================================================================
 train_steps: 60000
-accum_count: [2]                     # Gradient accumulation (effective batch = 4 * 32 = 128)
-batch_size: 32                      # Per-GPU batch size
-batch_type: sents                    # Batch by sentences
-queue_size: 32
+accum_count: [4]
+lookahead_minibatches: 4                    # Gradient accumulation (effective batch = 4 * 32 = 128)
+batch_size: 16384                        # Per-GPU batch size
+batch_type: tokens                    # Batch by sentences
+queue_size: 80
 normalization: tokens                # Normalize gradients by token count
 valid_batch_size: 16                 # Validation batch size
 valid_steps: 12000                    # Validation frequency
-valid_metrics: [bleu]                # Validation metrics
-save_checkpoint_steps: 12000          # Checkpoint frequency
-keep_checkpoint: 5                   # Keep last 5 checkpoints
+valid_metrics: [bleu,chrf]                # Validation metrics
+
+save_strategy: best_and_last
+metric_for_best_model: chrf
+keep_checkpoint: 3                   # Keep last 5 checkpoints
 
 # ============================================================================
 # Optimizer Settings - AdamW with warmup
@@ -143,9 +224,7 @@ tensorboard_log_dir: ./tensorboard_logs
 # ============================================================================
 seed: 42                             # Random seed
 reset_optim: all                     # Continue training steps and the optimizer state
-label_smoothing: 0.1                 # Label smoothing
 
 
 # Model saving
-train_from: /scratch/project_462000964/members/wangchao/training/151125/converted_model/
-save_model: /scratch/project_462000964/members/wangchao/training/151125/model/
+save_model: /scratch/project_462000964/members/wangchao/training/22apr26/gemma3/model/

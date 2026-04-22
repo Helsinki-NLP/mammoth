@@ -265,7 +265,24 @@ def model_opts(parser):
         '-model_dim',
         type=int,
         default=-1,
-        help="Size of Transformer representations.",
+        help="Size of Transformer representations (shared for encoder and decoder). "
+             "Mutually exclusive with enc_model_dim / dec_model_dim.",
+    )
+    group.add(
+        '--enc_model_dim',
+        '-enc_model_dim',
+        type=int,
+        default=None,
+        help="Encoder hidden dimension. Must be set together with dec_model_dim. "
+             "Mutually exclusive with model_dim.",
+    )
+    group.add(
+        '--dec_model_dim',
+        '-dec_model_dim',
+        type=int,
+        default=None,
+        help="Decoder hidden dimension. Must be set together with enc_model_dim. "
+             "Mutually exclusive with model_dim.",
     )
     group.add(
         '--pos_ffn_activation_fn',

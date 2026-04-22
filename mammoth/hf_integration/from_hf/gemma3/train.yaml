@@ -16,8 +16,6 @@ tasks:
 # ============================================================================
 # Vocabulary Configuration - HuggingFace Tokenizer
 # ============================================================================
-use_hf_tokenizer: true
-# override_checkpoint_vocab: true # only works when 'train_from' is used
 
 src_vocab:
   en: /scratch/project_462000964/shared/hplt_bilingual/src_tokenizer/tokenizer.json
@@ -39,42 +37,60 @@ max_length: 256  # Mammoth adds bos and eos token to training data.
 # replace_length: 1             # Replace span with single mask token
 
 # ============================================================================
-# Model Architecture - ModernBERT Features
+# Model Architecture
 # ============================================================================
+model_dtype: bf16
 enc_layers: [6]
-dec_layers: [18]
+dec_layers: [18]                     # num_hidden_layers
+enc_model_dim: 512                   # encoder hidden dim (custom, not from HF)
+dec_model_dim: 640                   # hidden_size from config.json
+
+# Sliding window attention (Gemma3-style dual RoPE)
+dec_sliding_window: 512              # sliding_window
+dec_global_attn_every_n_layers: 6   # _sliding_window_pattern (full attn at layers 5,11,17)
+dec_global_rope_theta: 1000000.0    # rope_theta
+dec_local_rope_theta: 10000.0       # rope_local_base_freq
+enc_sliding_window: -1              # full attention for encoder
 
 # ============================================================================
-# x-transformers Options - ModernBERT Configuration
+# x-transformers Options
 # ============================================================================
 x_transformers_opts:
-  # Attention configuration
-  enc_heads: 8                       # Number of attention heads
-  
+  attn_flash: true
 
-  # RoPE (Rotary Position Embeddings)
-  rotary_pos_emb: true               # Use RoPE instead of absolute positions
-  dec_rotary_pos_emb_base: 1000000
-  # global_rope_theta: 160000.0      # RoPE base for global attention layers (Encoder only)
-  # local_rope_theta: 10000.0        # RoPE base for local attention layers (Encoder only)
+  # --- Decoder: mirrors Gemma3 exactly ---
+  dec_heads: 4                       # num_attention_heads
+  dec_attn_dim_head: 256             # head_dim
+  dec_attn_dropout: 0.0
+  dec_attn_qk_norm: true             # QK normalization
+  dec_attn_qk_norm_dim_scale: true   # learnable per-element scale
+  dec_attn_kv_heads: 1               # num_key_value_heads (MQA)
+  dec_ff_mult: 3.2                   # intermediate_size / hidden_size = 2048 / 640
+  dec_ff_dropout: 0.0
+  dec_ff_glu: true                   # GeGLU activation
+  dec_ff_no_bias: true
+  dec_rotary_pos_emb: true
+  dec_rotary_pos_emb_base: 1000000   # rope_theta
+  dec_use_rmsnorm: true
+  dec_sandwich_norm: true            # pre+post norm per layer (Gemma3)
+  dec_post_emb_norm: false
+  dec_scaled_embeddings: true        # multiply embeddings by sqrt(hidden_size)
+  dec_max_seq_len: 32768             # max_position_embeddings
+  dec_cross_attn_dim_context: 640    # must equal encoder model_dim
 
-  # Feed-forward network (GLU with bias-free architecture)
-  dec_ff_mult: 3.2                      
-  dec_ff_glu: true                       # Use GeGLU activation
-  dec_ff_no_bias: true                   # Bias-free architecture
+  # --- Encoder: standard transformer (not from HF config) ---
+  enc_heads: 8
+  enc_attn_dim_head: 64
+  enc_ff_mult: 4.0
+  enc_ff_glu: true
+  enc_ff_no_bias: true
+  enc_rotary_pos_emb: true
+  enc_post_emb_norm: true
+  enc_scaled_embeddings: false
+  enc_max_seq_len: 512
 
-  # Encoder uses standard feedforward (NOT GLU)
-  enc_ff_mult: 4.0                       # Standard 4x expansion
-  enc_ff_glu: false                      # Standard feedforward (NO GLU)
-  enc_ff_no_bias: true                   # Bias-free architecture
-
-  # Normalization
-  # post_emb_norm_bias: false          # Bias-free normalization
-  # layernorm_bias: false              # Bias-free LayerNorm
-
-  # Position embeddings
-  use_abs_pos_emb: false             # No absolute positions (using RoPE)
-  tie_embedding: false               # Don't tie input/output embeddings
+  use_abs_pos_emb: false
+  tie_embedding: false
 # ============================================================================
 # Training Configuration
 # ============================================================================

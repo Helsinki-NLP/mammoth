@@ -345,14 +345,17 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
     @classmethod
     def validate_model_opts(cls, model_opts):
-        # assert model_opts.model_type in ["text"], "Unsupported model type %s" % model_opts.model_type
+        enc_dim = getattr(model_opts, 'enc_model_dim', None)
+        dec_dim = getattr(model_opts, 'dec_model_dim', None)
+        shared_dim = getattr(model_opts, 'model_dim', -1)
 
-        # encoder and decoder should be same sizes
-        # assert same_size, "The encoder and decoder rnns must be the same size for now"
-
-        # if model_opts.share_embeddings:
-        #    if model_opts.model_type != "text":
-        #        raise AssertionError("--share_embeddings requires --model_type text.")
+        if (enc_dim is None) != (dec_dim is None):
+            raise ValueError("enc_model_dim and dec_model_dim must be set together.")
+        if enc_dim is not None and shared_dim != -1:
+            raise ValueError(
+                "enc_model_dim/dec_model_dim and model_dim are mutually exclusive. "
+                "Remove model_dim when using enc_model_dim/dec_model_dim."
+            )
 
         cls.validate_x_transformers_opts(model_opts)
 

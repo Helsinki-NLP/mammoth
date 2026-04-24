@@ -116,9 +116,9 @@ def get_attention_layers_kwargs(
 
     # Handle model_dim with side-specific support
     # Priority: enc_model_dim/dec_model_dim > model_dim
-    if side == Side.encoder and hasattr(model_opts, 'enc_model_dim'):
+    if side == Side.encoder and getattr(model_opts, 'enc_model_dim', None) is not None:
         dim = model_opts.enc_model_dim
-    elif side == Side.decoder and hasattr(model_opts, 'dec_model_dim'):
+    elif side == Side.decoder and getattr(model_opts, 'dec_model_dim', None) is not None:
         dim = model_opts.dec_model_dim
     else:
         dim = model_opts.model_dim
@@ -372,9 +372,9 @@ def build_xcoder(
     side_alt_str = 'src' if side == Side.encoder else 'tgt'
 
     # Get side-specific model_dim
-    if side == Side.encoder and hasattr(model_opts, 'enc_model_dim'):
+    if side == Side.encoder and getattr(model_opts, 'enc_model_dim', None) is not None:
         emb_dim = model_opts.enc_model_dim
-    elif side == Side.decoder and hasattr(model_opts, 'dec_model_dim'):
+    elif side == Side.decoder and getattr(model_opts, 'dec_model_dim', None) is not None:
         emb_dim = model_opts.dec_model_dim
     else:
         emb_dim = model_opts.model_dim
@@ -600,8 +600,8 @@ def build_model(
 
     if share_embeddings:
         # Get dimensions
-        enc_dim = model_opts.enc_model_dim if hasattr(model_opts, 'enc_model_dim') else model_opts.model_dim
-        dec_dim = model_opts.dec_model_dim if hasattr(model_opts, 'dec_model_dim') else model_opts.model_dim
+        enc_dim = model_opts.enc_model_dim if getattr(model_opts, 'enc_model_dim', None) is not None else model_opts.model_dim
+        dec_dim = model_opts.dec_model_dim if getattr(model_opts, 'dec_model_dim', None) is not None else model_opts.model_dim
 
         if enc_dim != dec_dim:
             logger.warning(
@@ -707,8 +707,8 @@ def build_model(
 
     # Check if encoder and decoder have different dimensions
     # If so, skip attention bridge (it requires matching dimensions)
-    enc_dim = model_opts.enc_model_dim if hasattr(model_opts, 'enc_model_dim') else model_opts.model_dim
-    dec_dim = model_opts.dec_model_dim if hasattr(model_opts, 'dec_model_dim') else model_opts.model_dim
+    enc_dim = model_opts.enc_model_dim if getattr(model_opts, 'enc_model_dim', None) is not None else model_opts.model_dim
+    dec_dim = model_opts.dec_model_dim if getattr(model_opts, 'dec_model_dim', None) is not None else model_opts.model_dim
 
     if enc_dim != dec_dim:
         logger.info(f'Encoder dim ({enc_dim}) != Decoder dim ({dec_dim}): Skipping attention bridge')

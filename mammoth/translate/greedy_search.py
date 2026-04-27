@@ -134,6 +134,7 @@ class GreedySearch(DecodeStrategy):
         beam_size,
         ban_unk_token,
         device,
+        decoder_start_with_eos=False,
     ):
         super(GreedySearch, self).__init__(
             pad=pad,
@@ -149,6 +150,7 @@ class GreedySearch(DecodeStrategy):
             max_length=max_length,
             ban_unk_token=ban_unk_token,
             device=device,
+            decoder_start_with_eos=decoder_start_with_eos,
         )
         self.sampling_temp = sampling_temp
         self.keep_topk = keep_topk

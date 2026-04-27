@@ -78,6 +78,7 @@ class DecodeStrategy(object):
         max_length,
         ban_unk_token,
         device,
+        decoder_start_with_eos=False,
     ):
 
         # magic indices
@@ -85,6 +86,9 @@ class DecodeStrategy(object):
         self.bos = bos
         self.eos = eos
         self.unk = unk
+        # BART-style decoder priming: feed </s> as the very first token so the
+        # model emits <s> next, matching its training distribution.
+        self.decoder_start_with_eos = decoder_start_with_eos
         self.batch_size = batch_size
         self.parallel_paths = parallel_paths
         self.global_scorer = global_scorer
@@ -124,8 +128,9 @@ class DecodeStrategy(object):
         """
         assert encoder_output is not None
         assert src_mask is not None
+        start_id = self.eos if self.decoder_start_with_eos else self.bos
         self.alive_seq = torch.full(
-            [self.batch_size * self.parallel_paths, 1], self.bos, dtype=torch.long, device=self.device,
+            [self.batch_size * self.parallel_paths, 1], start_id, dtype=torch.long, device=self.device,
         )
         self.encoder_output_tiled = tile(encoder_output, self.parallel_paths, dim=0)
         self.src_mask_tiled = tile(src_mask, self.parallel_paths, dim=0)

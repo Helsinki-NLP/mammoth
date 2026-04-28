@@ -75,6 +75,7 @@ class BeamSearchBase(DecodeStrategy):
         ban_unk_token,
         device,
         dtype=torch.float,
+        decoder_start_with_eos=False,
     ):
         super(BeamSearchBase, self).__init__(
             pad=pad,
@@ -90,6 +91,7 @@ class BeamSearchBase(DecodeStrategy):
             max_length=max_length,
             ban_unk_token=ban_unk_token,
             device=device,
+            decoder_start_with_eos=decoder_start_with_eos,
         )
         # beam parameters
         self.beam_size = beam_size

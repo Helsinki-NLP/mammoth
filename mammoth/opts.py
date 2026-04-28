@@ -195,6 +195,15 @@ def _add_dynamic_vocabs_opts(parser):
         "to HuggingFace tokenizers. Only applies when use_hf_tokenizer is True. "
         "Default: True"
     )
+    group.add(
+        "-decoder_start_with_eos",
+        "--decoder_start_with_eos",
+        action="store_true",
+        default=False,
+        help="BART-style decoder start: target sequences begin with </s> (EOS) "
+        "followed by <s> (BOS). At inference, primes the decoder with </s> "
+        "instead of <s>. Required for BART checkpoints."
+    )
 
 
 def _add_dynamic_transform_opts(parser):

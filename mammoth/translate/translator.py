@@ -24,6 +24,18 @@ from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_fro
 from mammoth.utils.parse import ArgumentParser
 
 
+def resolve_decoder_start_with_eos(opts, tgt_vocab):
+    """Decide whether the decoder must be primed with </s> (BART-style).
+
+    Priority: explicit opts.decoder_start_with_eos > tgt_vocab.decoder_start_with_eos > False.
+    Why: opts is the per-run override (inference.yaml); the vocab attribute is what
+    was set when the checkpoint was trained — usable as a sticky default.
+    """
+    if hasattr(opts, 'decoder_start_with_eos'):
+        return bool(getattr(opts, 'decoder_start_with_eos'))
+    return bool(getattr(tgt_vocab, 'decoder_start_with_eos', False))
+
+
 def build_translator(opts, task_queue_manager, task, report_score=True, logger=None, out_file=None):
     if out_file is None:
         outdir = os.path.dirname(opts.output)
@@ -196,6 +208,7 @@ class Inference(object):
         seed=-1,
         task=None,
         model_dtype="fp32",
+        decoder_start_with_eos=False,
     ):
         assert task is not None
         self.task = task
@@ -219,6 +232,7 @@ class Inference(object):
         self._tgt_bos_idx = self._tgt_vocab.stoi[DefaultTokens.BOS]
         self._tgt_unk_idx = self._tgt_vocab.stoi[DefaultTokens.UNK]
         self._tgt_vocab_len = len(self._tgt_vocab)
+        self._decoder_start_with_eos = decoder_start_with_eos
 
         self._gpu = gpu
         self._use_cuda = gpu > -1
@@ -311,6 +325,8 @@ class Inference(object):
         # TODO: maybe add dynamic part
         # cls.validate_task(model_opts.model_task)
 
+        tgt_vocab_for_resolve = dict(vocabs)[("tgt", task.tgt_lang)]
+        decoder_start_with_eos = resolve_decoder_start_with_eos(opts, tgt_vocab_for_resolve)
         return cls(
             model,
             vocabs,
@@ -344,6 +360,7 @@ class Inference(object):
             seed=opts.seed,
             task=task,
             model_dtype=getattr(model_opts, 'model_dtype', 'fp32'),
+            decoder_start_with_eos=decoder_start_with_eos,
         )
 
     def _log(self, msg):
@@ -792,6 +809,7 @@ class Translator(Inference):
                     beam_size=self.beam_size,
                     ban_unk_token=self.ban_unk_token,
                     device=self._device,
+                    decoder_start_with_eos=self._decoder_start_with_eos,
                 )
             else:
                 # TODO: support these blacklisted features
@@ -814,6 +832,7 @@ class Translator(Inference):
                     ban_unk_token=self.ban_unk_token,
                     device=self._device,
                     dtype=self._torch_dtype,
+                    decoder_start_with_eos=self._decoder_start_with_eos,
                 )
             return self._translate_batch_with_strategy(batch, src_vocabs, decode_strategy)
 

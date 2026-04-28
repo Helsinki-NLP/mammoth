@@ -346,7 +346,7 @@ class AbsolutePositionalEmbedding(Module):
             pos = (pos - seq_start_pos[..., None]).clamp(min = 0)
 
         pos_emb = self.emb(pos)
-        pos_emb = pos_emb * self.scale
+        # pos_emb = pos_emb * self.scale
         return l2norm(pos_emb) if self.l2norm_embed else pos_emb
 
 class ScaledSinusoidalEmbedding(Module):

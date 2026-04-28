@@ -156,6 +156,7 @@ def create_bart_xtransformer_model(config, final_logits_bias=None):
         pre_norm=False,  # BART uses Post-LN (normalize after residual)
         attn_qkv_bias=True,  # BART uses bias in Q, K, V projections
         layernorm_bias=True,  # BART uses bias in LayerNorm (beta parameter)
+        norm_add_unit_offset=False,  # BART gamma is stored as-is; no +1 offset
     )
 
     encoder_model = TransformerWrapper(
@@ -185,6 +186,7 @@ def create_bart_xtransformer_model(config, final_logits_bias=None):
         cross_attend=True,  # Enable cross-attention for encoder-decoder
         attn_qkv_bias=True,  # BART uses bias in Q, K, V projections
         layernorm_bias=True,  # BART uses bias in LayerNorm (beta parameter)
+        norm_add_unit_offset=False,  # BART gamma is stored as-is; no +1 offset
     )
 
     decoder_model = TransformerWrapper(

@@ -1,11 +1,12 @@
 """
-GPU profiling utilities controlled via MAMMOTH_PROFILER_BACKEND.
+GPU profiling utilities controlled via MAMMOTH_PLATFORM.
 
-Profiling backend is selected exclusively via the MAMMOTH_PROFILER_BACKEND
-environment variable:
-  - "roctx"  → AMD ROCTx markers (LUMI MI250X, etc.)
-  - "nvtx"   → NVIDIA NVTX markers (Puhti V100, etc.)
-  - not set  → no profiling (no-op markers)
+The platform is selected via the MAMMOTH_PLATFORM environment variable:
+  - "lumi"   → AMD ROCTx markers (LUMI MI250X); also enables CPU-GPU binding
+  - "nvidia" → NVIDIA NVTX markers (Puhti V100, etc.)
+  - not set  → no-op markers
+
+Markers are always emitted but only collected when launched under the profiler.
 
 Usage:
     from mammoth.utils.profiling import get_profiler_range
@@ -17,12 +18,10 @@ Usage:
 
 Profiling Control:
     # AMD profiling with rocprofv3:
-    MAMMOTH_PROFILER_BACKEND=roctx rocprofv3 --marker-trace --output-dir ./profiling -- python train.py -config config.yaml
+    MAMMOTH_PLATFORM=lumi rocprofv3 --marker-trace --output-dir ./profiling -- python train.py -config config.yaml
 
     # NVIDIA profiling with nsys:
-    MAMMOTH_PROFILER_BACKEND=nvtx nsys profile -t nvtx,cuda --output profiling/trace python train.py -config config.yaml
-
-See docs/GPU_PROFILING.md for detailed platform-specific instructions.
+    MAMMOTH_PLATFORM=nvidia nsys profile -t nvtx,cuda --output profiling/trace python train.py -config config.yaml
 """
 
 from contextlib import contextmanager
@@ -36,23 +35,23 @@ _profiler_range_impl = None
 
 
 def detect_profiler_backend():
-    """Read MAMMOTH_PROFILER_BACKEND and return the selected backend.
+    """Derive profiler backend from MAMMOTH_PLATFORM.
 
     Returns:
-        str: "nvtx", "roctx", or None (no profiling)
+        str: "nvtx", "roctx", or "none"
     """
     global _profiler_backend
     if _profiler_backend is None:
-        value = os.environ.get("MAMMOTH_PROFILER_BACKEND", "").lower()
-        if value == "roctx":
+        platform = os.environ.get("MAMMOTH_PLATFORM", "").lower()
+        if platform == "lumi":
             _profiler_backend = "roctx"
-            logger.info("ROCTx markers ACTIVE - traces collected via rocprofv3")
-        elif value == "nvtx":
+            logger.info("ROCTx markers ACTIVE (MAMMOTH_PLATFORM=lumi) - collect via rocprofv3")
+        elif platform == "nvidia":
             _profiler_backend = "nvtx"
-            logger.info("NVTX markers ACTIVE - traces collected via nsys/nvprof")
+            logger.info("NVTX markers ACTIVE (MAMMOTH_PLATFORM=nvidia) - collect via nsys/nvprof")
         else:
             _profiler_backend = "none"
-            logger.debug("MAMMOTH_PROFILER_BACKEND not set - profiling disabled")
+            logger.debug("MAMMOTH_PLATFORM not set - profiling markers disabled")
     return _profiler_backend
 
 

@@ -20,8 +20,20 @@ from mammoth.translate.greedy_search import GreedySearch
 from mammoth.translate.translation import TranslationBuilder
 from mammoth.utils.alignment import build_align_pharaoh
 from mammoth.utils.misc import set_random_seed, report_matrix, use_gpu
+from mammoth.inputters.vocab import HFTokenizerVocab
 from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_from_checkpoint
 from mammoth.utils.parse import ArgumentParser
+
+
+def _vocab_from_opts(opts, lang: str, side: str):
+    """Load a vocab from opts.src_vocab / opts.tgt_vocab yaml entries (fallback when frame lacks it)."""
+    vocab_paths = getattr(opts, f'{side}_vocab', None) or {}
+    path = vocab_paths.get(lang)
+    if path is None:
+        return None
+    if getattr(opts, 'use_hf_tokenizer', False):
+        return HFTokenizerVocab(tokenizer_path=path, tag=f'{side}_{lang}')
+    return None
 
 
 def resolve_decoder_start_with_eos(opts, tgt_vocab):
@@ -82,15 +94,14 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
     # Load only the frame
     frame, frame_checkpoint_path = load_frame_checkpoint(checkpoint_path=model_path)
 
+    src_vocab = frame["vocab"].get(('src', task.src_lang)) or _vocab_from_opts(opts, task.src_lang, 'src')
+    tgt_vocab = frame["vocab"].get(('tgt', task.tgt_lang)) or _vocab_from_opts(opts, task.tgt_lang, 'tgt')
     vocabs_dict = {
-        ('src', task.src_lang): frame["vocab"].get(('src', task.src_lang)),
-        ('tgt', task.tgt_lang): frame["vocab"].get(('tgt', task.tgt_lang)),
-        'src': frame["vocab"].get(('src', task.src_lang)),
-        'tgt': frame["vocab"].get(('tgt', task.tgt_lang)),
+        ('src', task.src_lang): src_vocab,
+        ('tgt', task.tgt_lang): tgt_vocab,
+        'src': src_vocab,
+        'tgt': tgt_vocab,
     }
-    print(f'vocabs_dict {vocabs_dict}')
-    print(f'my compontents {task_queue_manager.get_my_distributed_components()}')
-
     model_opts = ArgumentParser.checkpoint_model_opts(frame['opts'])
 
     model = build_model(

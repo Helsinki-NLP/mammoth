@@ -2,9 +2,10 @@
 GPU profiling utilities controlled via MAMMOTH_PLATFORM.
 
 The platform is selected via the MAMMOTH_PLATFORM environment variable:
-  - "lumi"   → AMD ROCTx markers (LUMI MI250X); also enables CPU-GPU binding
+  - "lumi"   → CPU-GPU binding only (no profiler markers); safe when roctx bindings are absent
+  - "roctx"  → AMD ROCTx markers + CPU-GPU binding (LUMI MI250X with roctx installed)
   - "nvidia" → NVIDIA NVTX markers (Puhti V100, etc.)
-  - not set  → no-op markers
+  - not set  → no-op markers, no CPU-GPU binding
 
 Markers are always emitted but only collected when launched under the profiler.
 
@@ -17,8 +18,11 @@ Usage:
         pass
 
 Profiling Control:
-    # AMD profiling with rocprofv3:
-    MAMMOTH_PLATFORM=lumi rocprofv3 --marker-trace --output-dir ./profiling -- python train.py -config config.yaml
+    # AMD profiling with rocprofv3 (requires roctx bindings):
+    MAMMOTH_PLATFORM=roctx rocprofv3 --marker-trace --output-dir ./profiling -- python train.py -config config.yaml
+
+    # LUMI without roctx (CPU-GPU binding only):
+    MAMMOTH_PLATFORM=lumi python train.py -config config.yaml
 
     # NVIDIA profiling with nsys:
     MAMMOTH_PLATFORM=nvidia nsys profile -t nvtx,cuda --output profiling/trace python train.py -config config.yaml
@@ -43,15 +47,18 @@ def detect_profiler_backend():
     global _profiler_backend
     if _profiler_backend is None:
         platform = os.environ.get("MAMMOTH_PLATFORM", "").lower()
-        if platform == "lumi":
+        if platform == "roctx":
             _profiler_backend = "roctx"
-            logger.info("ROCTx markers ACTIVE (MAMMOTH_PLATFORM=lumi) - collect via rocprofv3")
+            logger.info("ROCTx markers ACTIVE (MAMMOTH_PLATFORM=roctx) - collect via rocprofv3")
         elif platform == "nvidia":
             _profiler_backend = "nvtx"
             logger.info("NVTX markers ACTIVE (MAMMOTH_PLATFORM=nvidia) - collect via nsys/nvprof")
         else:
             _profiler_backend = "none"
-            logger.debug("MAMMOTH_PLATFORM not set - profiling markers disabled")
+            if platform == "lumi":
+                logger.debug("MAMMOTH_PLATFORM=lumi - CPU-GPU binding enabled, profiling markers disabled")
+            else:
+                logger.debug("MAMMOTH_PLATFORM not set - profiling markers disabled")
     return _profiler_backend
 
 

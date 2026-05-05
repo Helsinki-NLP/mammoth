@@ -51,7 +51,14 @@ from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalG
 # Config extraction
 # ---------------------------------------------------------------------------
 
-def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_embeddings: bool) -> MammothConfig:
+def config_from_opts(
+    opts,
+    src_vocab_size: int,
+    tgt_vocab_size: int,
+    tie_word_embeddings: bool,
+    enc_attn_dim_head_override: int | None = None,
+    dec_attn_dim_head_override: int | None = None,
+) -> MammothConfig:
     """Build MammothConfig from a Mammoth opts Namespace."""
     xt = getattr(opts, 'x_transformers_opts', {}) or {}
 
@@ -70,6 +77,13 @@ def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_em
         enc_model_dim = getattr(opts, 'enc_model_dim', 768)
         dec_model_dim = getattr(opts, 'dec_model_dim', enc_model_dim)
 
+    enc_heads = xt.get('enc_heads', 12)
+    dec_heads = xt.get('dec_heads', 12)
+    enc_attn_dim_head = enc_attn_dim_head_override if enc_attn_dim_head_override is not None \
+        else xt.get('enc_attn_dim_head', enc_model_dim // enc_heads)
+    dec_attn_dim_head = dec_attn_dim_head_override if dec_attn_dim_head_override is not None \
+        else xt.get('dec_attn_dim_head', dec_model_dim // dec_heads)
+
     return MammothConfig(
         src_vocab_size=src_vocab_size,
         tgt_vocab_size=tgt_vocab_size,
@@ -80,8 +94,8 @@ def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_em
         enc_max_seq_len=getattr(opts, 'src_seq_length_max', 1024),
         dec_max_seq_len=getattr(opts, 'tgt_seq_length_max', 1024),
         # Encoder attention
-        enc_heads=xt.get('enc_heads', 12),
-        enc_attn_dim_head=xt.get('enc_attn_dim_head', enc_model_dim // xt.get('enc_heads', 12)),
+        enc_heads=enc_heads,
+        enc_attn_dim_head=enc_attn_dim_head,
         enc_attn_dropout=xt.get('enc_attn_dropout', 0.0),
         enc_attn_qkv_bias=xt.get('enc_attn_qkv_bias', True),
         enc_attn_flash=xt.get('attn_flash', False),
@@ -103,8 +117,8 @@ def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_em
         enc_emb_dropout=xt.get('enc_emb_dropout', 0.0),
         enc_sliding_window=getattr(opts, 'enc_sliding_window', -1),
         # Decoder attention
-        dec_heads=xt.get('dec_heads', 12),
-        dec_attn_dim_head=xt.get('dec_attn_dim_head', dec_model_dim // xt.get('dec_heads', 12)),
+        dec_heads=dec_heads,
+        dec_attn_dim_head=dec_attn_dim_head,
         dec_attn_dropout=xt.get('dec_attn_dropout', 0.0),
         dec_attn_qkv_bias=xt.get('dec_attn_qkv_bias', True),
         dec_attn_flash=xt.get('attn_flash', False),
@@ -276,6 +290,14 @@ def assemble_state_dict(ckpt_dir: str, prefix: str, src: str, tgt: str) -> dict:
     return sd
 
 
+def _infer_attn_dim_head(hf_sd: dict, side: str, heads: int) -> int | None:
+    """Read the first to_q.weight for encoder/decoder and back-calculate dim_head."""
+    for k, v in hf_sd.items():
+        if k.startswith(f'model.{side}.attn_layers.layers.') and k.endswith('.to_q.weight'):
+            return v.shape[0] // heads
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Main conversion
 # ---------------------------------------------------------------------------
@@ -314,16 +336,36 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     )
     print(f"tie_word_embeddings: {tie}")
 
-    config = config_from_opts(opts, src_vocab_size, tgt_vocab_size, tie)
-    print(f"Config: enc {config.enc_layers}×{config.enc_model_dim}d, "
-          f"dec {config.dec_layers}×{config.dec_model_dim}d")
-
-    print("Building HF model...")
-    model = MammothForConditionalGeneration(config)
-
     print("Assembling state dict from shards...")
     hf_sd = assemble_state_dict(ckpt_dir, prefix, src, tgt)
     print(f"  Assembled {len(hf_sd)} tensors")
+
+    # Infer actual attention dim_head from checkpoint weights to avoid size mismatches
+    # when opts defaults don't match the trained model.
+    xt = getattr(opts, 'x_transformers_opts', {}) or {}
+    enc_heads = xt.get('enc_heads', 12)
+    dec_heads = xt.get('dec_heads', 12)
+    enc_attn_dim_head_override = _infer_attn_dim_head(hf_sd, 'encoder', enc_heads)
+    dec_attn_dim_head_override = _infer_attn_dim_head(hf_sd, 'decoder', dec_heads)
+    if enc_attn_dim_head_override is not None:
+        print(f"  Inferred enc_attn_dim_head={enc_attn_dim_head_override} "
+              f"(inner_dim={enc_heads * enc_attn_dim_head_override})")
+    if dec_attn_dim_head_override is not None:
+        print(f"  Inferred dec_attn_dim_head={dec_attn_dim_head_override} "
+              f"(inner_dim={dec_heads * dec_attn_dim_head_override})")
+
+    config = config_from_opts(
+        opts, src_vocab_size, tgt_vocab_size, tie,
+        enc_attn_dim_head_override=enc_attn_dim_head_override,
+        dec_attn_dim_head_override=dec_attn_dim_head_override,
+    )
+    print(f"Config: enc {config.enc_layers}×{config.enc_model_dim}d "
+          f"(heads={config.enc_heads}, dim_head={config.enc_attn_dim_head}), "
+          f"dec {config.dec_layers}×{config.dec_model_dim}d "
+          f"(heads={config.dec_heads}, dim_head={config.dec_attn_dim_head})")
+
+    print("Building HF model...")
+    model = MammothForConditionalGeneration(config)
 
     missing, unexpected = [], []
     model_sd = model.state_dict()

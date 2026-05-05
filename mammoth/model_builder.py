@@ -141,6 +141,18 @@ def get_attention_layers_kwargs(
         elif hasattr(model_opts, attr):
             kwargs[attr] = getattr(model_opts, attr)
 
+    # Default attn_dim_head to dim // heads (standard transformer convention)
+    # x-transformers defaults to 64 regardless of model size, which is wrong for e.g. dim=1024, heads=8 (should be 128).
+    if 'attn_dim_head' not in kwargs:
+        heads = kwargs.get('heads', 8)
+        default_dim_head = dim // heads
+        kwargs['attn_dim_head'] = default_dim_head
+        logger.info(
+            f'attn_dim_head not set — defaulting to dim // heads = {dim} // {heads} = {default_dim_head} '
+            f'for {side.name} (layer_stack_index={layer_stack_index}, xcoder_id={xcoder_id}). '
+            f'Set attn_dim_head explicitly in x_transformers_opts to suppress this message.'
+        )
+
     kwargs.update({
         'dim': dim,
         'depth': depth,

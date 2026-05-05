@@ -4,7 +4,7 @@ Convert a sharded Mammoth checkpoint → HuggingFace MammothForConditionalGenera
 
 Usage:
     python convert_mammoth_to_hf.py \
-        --checkpoint-dir path/to/converted_model \
+        --checkpoint-dir path/to/checkpoint_dir \
         --step 0 \
         --src es \
         --tgt en \
@@ -14,16 +14,19 @@ The checkpoint directory must contain files produced by Mammoth's model saver:
     _step_{step}_frame.pt
     _step_{step}_src_embeddings_{src}.pt
     _step_{step}_encoder_wrapper_{src}.pt
-    _step_{step}_encoder_0_{src}.pt
+    _step_{step}_encoder_0_{src}.pt          # one file per encoder component
+    _step_{step}_encoder_1_{src}.pt          # (optional, for multi-component models)
     _step_{step}_tgt_embeddings_{tgt}.pt
     _step_{step}_decoder_wrapper_{tgt}.pt
-    _step_{step}_decoder_0_{tgt}.pt
+    _step_{step}_decoder_0_{tgt}.pt          # one file per decoder component
+    _step_{step}_decoder_1_{tgt}.pt          # (optional, for multi-component models)
 
 Outputs saved with save_pretrained() plus copies of configuration_mammoth.py and
 modeling_mammoth.py so that trust_remote_code=True loading works.
 """
 
 import argparse
+import itertools
 import os
 import shutil
 import sys
@@ -43,16 +46,16 @@ from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalG
 # Config extraction
 # ---------------------------------------------------------------------------
 
-def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int) -> MammothConfig:
+def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_embeddings: bool) -> MammothConfig:
     """Build MammothConfig from a Mammoth opts Namespace."""
     xt = getattr(opts, 'x_transformers_opts', {}) or {}
 
     enc_layers = opts.enc_layers
     if isinstance(enc_layers, (list, tuple)):
-        enc_layers = enc_layers[0]
+        enc_layers = sum(enc_layers)  # total depth across all components
     dec_layers = opts.dec_layers
     if isinstance(dec_layers, (list, tuple)):
-        dec_layers = dec_layers[0]
+        dec_layers = sum(dec_layers)  # total depth across all components
 
     enc_model_dim = getattr(opts, 'enc_model_dim', 768)
     dec_model_dim = getattr(opts, 'dec_model_dim', enc_model_dim)
@@ -121,7 +124,7 @@ def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int) -> MammothC
         dec_global_rope_theta=getattr(opts, 'dec_global_rope_theta', 10000.0),
         dec_local_rope_theta=getattr(opts, 'dec_local_rope_theta', 10000.0),
         # Misc
-        tie_word_embeddings=True,
+        tie_word_embeddings=tie_word_embeddings,
         model_dtype=getattr(opts, 'model_dtype', 'bf16'),
     )
 
@@ -146,12 +149,19 @@ def assemble_state_dict(ckpt_dir: str, step: int, src: str, tgt: str) -> dict:
         model.decoder.<x-transformers key>
 
     Shard → HF prefix mapping:
-        src_embeddings_{src}.pt         emb.weight → model.encoder.token_emb.emb.weight
-        encoder_wrapper_{src}.pt        post_emb_norm.*, pos_emb.* → model.encoder.*
-        encoder_0_{src}.pt              _base_layers.* → model.encoder.attn_layers.attention_layers_stack.0.*
-        tgt_embeddings_{tgt}.pt         emb.weight → model.decoder.token_emb.emb.weight
-        decoder_wrapper_{tgt}.pt        post_emb_norm.*, pos_emb.* → model.decoder.*
-        decoder_0_{tgt}.pt              _base_layers.* → model.decoder.attn_layers.attention_layers_stack.0.*
+        src_embeddings_{src}.pt          emb.weight → model.encoder.token_emb.emb.weight
+        encoder_wrapper_{src}.pt         post_emb_norm.*, pos_emb.* → model.encoder.*
+        encoder_{i}_{src}.pt             _base_layers.{j}.* → model.encoder.attn_layers.layers.{offset+j}.*
+        tgt_embeddings_{tgt}.pt          emb.weight → model.decoder.token_emb.emb.weight
+        decoder_wrapper_{tgt}.pt         post_emb_norm.*, pos_emb.* → model.decoder.*
+        decoder_{i}_{tgt}.pt             _base_layers.{j}.* → model.decoder.attn_layers.layers.{offset+j}.*
+
+    For multi-component models, layer indices from each component shard are offset
+    by the accumulated layer count of all preceding components, producing a single
+    flat layers list matching the x-transformers AttentionLayers structure.
+    Non-_base_layers keys (e.g. final norm) from each component go directly under
+    attn_layers.*; later components overwrite earlier ones, so the last component's
+    norm wins (which is correct — only the final component has the output norm).
     """
     sd = {}
 
@@ -164,28 +174,59 @@ def assemble_state_dict(ckpt_dir: str, step: int, src: str, tgt: str) -> dict:
         for k, v in shard.items():
             sd[f'{hf_prefix}.{k}'] = v
 
-    def attn_load(filename: str, hf_prefix: str):
-        """Map _base_layers.* → {hf_prefix}.layers.* (x-transformers AttentionLayers key name)."""
+    def attn_load(filename: str, hf_prefix: str, layer_offset: int) -> int:
+        """Load one attention-component shard, offsetting _base_layers indices.
+
+        Returns the number of layers contributed by this shard (0 if file missing).
+        """
         path = os.path.join(ckpt_dir, filename)
         if not os.path.exists(path):
             print(f"  [WARN] missing shard: {path}")
-            return
+            return 0
         shard = _load(path)
+        max_local_idx = -1
         for k, v in shard.items():
             if k.startswith('_base_layers.'):
-                new_k = f'{hf_prefix}.layers.' + k[len('_base_layers.'):]
+                rest = k[len('_base_layers.'):]
+                dot_pos = rest.index('.')
+                local_idx = int(rest[:dot_pos])
+                global_idx = local_idx + layer_offset
+                new_k = f'{hf_prefix}.layers.{global_idx}{rest[dot_pos:]}'
+                if local_idx > max_local_idx:
+                    max_local_idx = local_idx
             else:
                 new_k = f'{hf_prefix}.{k}'
             sd[new_k] = v
+        return max_local_idx + 1 if max_local_idx >= 0 else 0
 
     p = f'_step_{step}'
 
     prefix_load(f'{p}_src_embeddings_{src}.pt', 'model.encoder.token_emb')
     prefix_load(f'{p}_encoder_wrapper_{src}.pt', 'model.encoder')
-    attn_load(f'{p}_encoder_0_{src}.pt',         'model.encoder.attn_layers')
     prefix_load(f'{p}_tgt_embeddings_{tgt}.pt',  'model.decoder.token_emb')
     prefix_load(f'{p}_decoder_wrapper_{tgt}.pt', 'model.decoder')
-    attn_load(f'{p}_decoder_0_{tgt}.pt',         'model.decoder.attn_layers')
+
+    enc_offset = 0
+    for i in itertools.count():
+        fname = f'{p}_encoder_{i}_{src}.pt'
+        if not os.path.exists(os.path.join(ckpt_dir, fname)):
+            if i == 0:
+                print(f"  [WARN] no encoder component shards found for src={src}")
+            break
+        n = attn_load(fname, 'model.encoder.attn_layers', enc_offset)
+        print(f"  encoder component {i}: {n} layer(s) at offset {enc_offset}")
+        enc_offset += n
+
+    dec_offset = 0
+    for i in itertools.count():
+        fname = f'{p}_decoder_{i}_{tgt}.pt'
+        if not os.path.exists(os.path.join(ckpt_dir, fname)):
+            if i == 0:
+                print(f"  [WARN] no decoder component shards found for tgt={tgt}")
+            break
+        n = attn_load(fname, 'model.decoder.attn_layers', dec_offset)
+        print(f"  decoder component {i}: {n} layer(s) at offset {dec_offset}")
+        dec_offset += n
 
     return sd
 
@@ -211,7 +252,24 @@ def convert(ckpt_dir: str, step: int, src: str, tgt: str, output_dir: str):
     tgt_vocab_size = len(tgt_vocab_obj)
     print(f"Vocab sizes: src={src_vocab_size}, tgt={tgt_vocab_size}")
 
-    config = config_from_opts(opts, src_vocab_size, tgt_vocab_size)
+    # When tied, x-transformers uses a lambda for to_logits (no saved weights).
+    # Scan the decoder wrapper + component shards for any 'to_logits' key.
+    p = f'_step_{step}'
+    decoder_shards = [f'{p}_decoder_wrapper_{tgt}.pt']
+    for i in itertools.count():
+        fname = f'{p}_decoder_{i}_{tgt}.pt'
+        if not os.path.exists(os.path.join(ckpt_dir, fname)):
+            break
+        decoder_shards.append(fname)
+    tie = not any(
+        'to_logits' in k
+        for fname in decoder_shards
+        if os.path.exists(os.path.join(ckpt_dir, fname))
+        for k in _load(os.path.join(ckpt_dir, fname))
+    )
+    print(f"tie_word_embeddings: {tie}")
+
+    config = config_from_opts(opts, src_vocab_size, tgt_vocab_size, tie)
     print(f"Config: enc {config.enc_layers}×{config.enc_model_dim}d, "
           f"dec {config.dec_layers}×{config.dec_model_dim}d")
 

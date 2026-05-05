@@ -3,31 +3,36 @@
 Convert a sharded Mammoth checkpoint → HuggingFace MammothForConditionalGeneration.
 
 Usage:
+    # Load the best checkpoint (default — requires *_best_frame.pt):
     python convert_mammoth_to_hf.py \
         --checkpoint-dir path/to/checkpoint_dir \
-        --step 0 \
-        --src es \
-        --tgt en \
-        --output-dir path/to/hf_output
+        --src es --tgt en --output-dir path/to/hf_output
 
-The checkpoint directory must contain files produced by Mammoth's model saver:
-    _step_{step}_frame.pt
-    _step_{step}_src_embeddings_{src}.pt
-    _step_{step}_encoder_wrapper_{src}.pt
-    _step_{step}_encoder_0_{src}.pt          # one file per encoder component
-    _step_{step}_encoder_1_{src}.pt          # (optional, for multi-component models)
-    _step_{step}_tgt_embeddings_{tgt}.pt
-    _step_{step}_decoder_wrapper_{tgt}.pt
-    _step_{step}_decoder_0_{tgt}.pt          # one file per decoder component
-    _step_{step}_decoder_1_{tgt}.pt          # (optional, for multi-component models)
+    # Load the checkpoint with the highest step number:
+    python convert_mammoth_to_hf.py \
+        --checkpoint-dir path/to/checkpoint_dir \
+        --load-last \
+        --src es --tgt en --output-dir path/to/hf_output
+
+    # Load a specific step:
+    python convert_mammoth_to_hf.py \
+        --checkpoint-dir path/to/checkpoint_dir \
+        --step 500 \
+        --src es --tgt en --output-dir path/to/hf_output
+
+The checkpoint directory must contain files produced by Mammoth's model saver.
+Best checkpoint naming:   _best_frame.pt, _best_src_embeddings_{src}.pt, ...
+Step checkpoint naming:   _step_{N}_frame.pt, _step_{N}_src_embeddings_{src}.pt, ...
 
 Outputs saved with save_pretrained() plus copies of configuration_mammoth.py and
 modeling_mammoth.py so that trust_remote_code=True loading works.
 """
 
 import argparse
+import glob as glob_module
 import itertools
 import os
+import re
 import shutil
 import sys
 
@@ -130,6 +135,47 @@ def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_em
 
 
 # ---------------------------------------------------------------------------
+# Checkpoint prefix resolution
+# ---------------------------------------------------------------------------
+
+def resolve_prefix(ckpt_dir: str, step: int | None, load_last: bool) -> str:
+    """Return the shard filename prefix to use (_step_N or _best).
+
+    Priority:
+      1. --step N  → _step_N  (explicit, always wins)
+      2. --load-last → _step_<largest N found>
+      3. default   → _best  (requires *_best_frame.pt to exist)
+    """
+    if step is not None:
+        return f'_step_{step}'
+
+    if load_last:
+        frames = glob_module.glob(os.path.join(ckpt_dir, '*_step_*_frame.pt'))
+        if not frames:
+            raise FileNotFoundError(f"No *_step_*_frame.pt files found in {ckpt_dir}")
+        steps = [
+            int(m.group(1))
+            for f in frames
+            if (m := re.search(r'_step_(\d+)_frame\.pt$', os.path.basename(f)))
+        ]
+        if not steps:
+            raise FileNotFoundError(f"Could not parse step numbers from frame files in {ckpt_dir}")
+        best_step = max(steps)
+        print(f"Loading last checkpoint: step {best_step}")
+        return f'_step_{best_step}'
+
+    # Default: best checkpoint
+    frames = glob_module.glob(os.path.join(ckpt_dir, '*_best_frame.pt'))
+    if not frames:
+        raise FileNotFoundError(
+            f"No *_best_frame.pt found in {ckpt_dir}. "
+            "Use --load-last to load the checkpoint with the highest step number."
+        )
+    print(f"Loading best checkpoint: {os.path.basename(frames[0])}")
+    return '_best'
+
+
+# ---------------------------------------------------------------------------
 # State dict assembly from shards
 # ---------------------------------------------------------------------------
 
@@ -140,7 +186,7 @@ def _load(path: str) -> dict:
         return torch.load(path, map_location='cpu', weights_only=False)
 
 
-def assemble_state_dict(ckpt_dir: str, step: int, src: str, tgt: str) -> dict:
+def assemble_state_dict(ckpt_dir: str, prefix: str, src: str, tgt: str) -> dict:
     """
     Reassemble a flat HF-model state dict from Mammoth's per-component shards.
 
@@ -199,7 +245,7 @@ def assemble_state_dict(ckpt_dir: str, step: int, src: str, tgt: str) -> dict:
             sd[new_k] = v
         return max_local_idx + 1 if max_local_idx >= 0 else 0
 
-    p = f'_step_{step}'
+    p = prefix
 
     prefix_load(f'{p}_src_embeddings_{src}.pt', 'model.encoder.token_emb')
     prefix_load(f'{p}_encoder_wrapper_{src}.pt', 'model.encoder')
@@ -235,8 +281,8 @@ def assemble_state_dict(ckpt_dir: str, step: int, src: str, tgt: str) -> dict:
 # Main conversion
 # ---------------------------------------------------------------------------
 
-def convert(ckpt_dir: str, step: int, src: str, tgt: str, output_dir: str):
-    frame_path = os.path.join(ckpt_dir, f'_step_{step}_frame.pt')
+def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
+    frame_path = os.path.join(ckpt_dir, f'{prefix}_frame.pt')
     frame = _load(frame_path)
     opts = frame['opts']
     vocab = frame['vocab']
@@ -254,7 +300,7 @@ def convert(ckpt_dir: str, step: int, src: str, tgt: str, output_dir: str):
 
     # When tied, x-transformers uses a lambda for to_logits (no saved weights).
     # Scan the decoder wrapper + component shards for any 'to_logits' key.
-    p = f'_step_{step}'
+    p = prefix
     decoder_shards = [f'{p}_decoder_wrapper_{tgt}.pt']
     for i in itertools.count():
         fname = f'{p}_decoder_{i}_{tgt}.pt'
@@ -277,7 +323,7 @@ def convert(ckpt_dir: str, step: int, src: str, tgt: str, output_dir: str):
     model = MammothForConditionalGeneration(config)
 
     print("Assembling state dict from shards...")
-    hf_sd = assemble_state_dict(ckpt_dir, step, src, tgt)
+    hf_sd = assemble_state_dict(ckpt_dir, prefix, src, tgt)
     print(f"  Assembled {len(hf_sd)} tensors")
 
     missing, unexpected = [], []
@@ -336,17 +382,23 @@ def main():
     parser = argparse.ArgumentParser(description="Convert Mammoth checkpoint to HuggingFace format")
     parser.add_argument('--checkpoint-dir', required=True,
                         help="Directory containing Mammoth shard files")
-    parser.add_argument('--step', type=int, default=0,
-                        help="Checkpoint step number (default: 0)")
     parser.add_argument('--src', required=True,
                         help="Source language id (e.g. 'es')")
     parser.add_argument('--tgt', required=True,
                         help="Target language id (e.g. 'en')")
     parser.add_argument('--output-dir', required=True,
                         help="Output directory for HF model")
-    args = parser.parse_args()
 
-    convert(args.checkpoint_dir, args.step, args.src, args.tgt, args.output_dir)
+    ckpt_group = parser.add_mutually_exclusive_group()
+    ckpt_group.add_argument('--step', type=int, default=None,
+                            help="Load a specific checkpoint step (e.g. --step 500)")
+    ckpt_group.add_argument('--load-last', action='store_true',
+                            help="Load the checkpoint with the largest step number")
+    # default (neither flag): loads the 'best' checkpoint (*_best_frame.pt)
+
+    args = parser.parse_args()
+    prefix = resolve_prefix(args.checkpoint_dir, args.step, args.load_last)
+    convert(args.checkpoint_dir, prefix, args.src, args.tgt, args.output_dir)
 
 
 if __name__ == '__main__':

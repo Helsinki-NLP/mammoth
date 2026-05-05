@@ -93,6 +93,8 @@ def main():
                         help="Path to a text file with one source sentence per line")
     parser.add_argument("--batch-size", type=int, default=32,
                         help="Number of sentences per batch (default: 32)")
+    parser.add_argument("--output-file", default=None,
+                        help="Path to write translations (one per line); defaults to stdout")
     args = parser.parse_args()
 
     if args.input_file:
@@ -103,19 +105,27 @@ def main():
 
     tokenizer, model = load(args.model_dir, args.device)
 
-    for i in range(0, len(sentences), args.batch_size):
-        batch = sentences[i : i + args.batch_size]
-        translations = translate(
-            tokenizer=tokenizer,
-            model=model,
-            sentences=batch,
-            num_beams=args.num_beams,
-            max_new_tokens=args.max_new_tokens,
-        )
-        for src, hyp in zip(batch, translations):
-            print(f"SRC: {src}")
-            print(f"HYP: {hyp}")
-            print("-" * 60)
+    out = open(args.output_file, "w") if args.output_file else None
+    try:
+        for i in range(0, len(sentences), args.batch_size):
+            batch = sentences[i : i + args.batch_size]
+            translations = translate(
+                tokenizer=tokenizer,
+                model=model,
+                sentences=batch,
+                num_beams=args.num_beams,
+                max_new_tokens=args.max_new_tokens,
+            )
+            for src, hyp in zip(batch, translations):
+                if out:
+                    out.write(hyp + "\n")
+                else:
+                    print(f"SRC: {src}")
+                    print(f"HYP: {hyp}")
+                    print("-" * 60)
+    finally:
+        if out:
+            out.close()
 
 
 if __name__ == "__main__":

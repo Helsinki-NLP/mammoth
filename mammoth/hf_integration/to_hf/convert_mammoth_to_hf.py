@@ -57,16 +57,24 @@ def config_from_opts(
     tie_word_embeddings: bool,
     enc_attn_dim_head_override: int | None = None,
     dec_attn_dim_head_override: int | None = None,
+    enc_layers_override: int | None = None,
+    dec_layers_override: int | None = None,
 ) -> MammothConfig:
     """Build MammothConfig from a Mammoth opts Namespace."""
     xt = getattr(opts, 'x_transformers_opts', {}) or {}
 
-    enc_layers = opts.enc_layers
-    if isinstance(enc_layers, (list, tuple)):
-        enc_layers = sum(enc_layers)  # total depth across all components
-    dec_layers = opts.dec_layers
-    if isinstance(dec_layers, (list, tuple)):
-        dec_layers = sum(dec_layers)  # total depth across all components
+    if enc_layers_override is not None:
+        enc_layers = enc_layers_override
+    else:
+        enc_layers = opts.enc_layers
+        if isinstance(enc_layers, (list, tuple)):
+            enc_layers = sum(enc_layers)
+    if dec_layers_override is not None:
+        dec_layers = dec_layers_override
+    else:
+        dec_layers = opts.dec_layers
+        if isinstance(dec_layers, (list, tuple)):
+            dec_layers = sum(dec_layers)
 
     model_dim = getattr(opts, 'model_dim', None)
     if model_dim is not None:
@@ -286,17 +294,23 @@ def assemble_state_dict(
     for i, xcoder_id in enumerate(encoder_id):
         fname = f'{p}_encoder_{i}_{xcoder_id}.pt'
         n = attn_load(fname, 'model.encoder.attn_layers', enc_offset)
-        print(f"  encoder component {i} ({xcoder_id}): {n} layer(s) at offset {enc_offset}")
+        print(f"  encoder component {i} ({xcoder_id}): {n} sub-layer(s) at offset {enc_offset}")
         enc_offset += n
 
     dec_offset = 0
     for i, xcoder_id in enumerate(decoder_id):
         fname = f'{p}_decoder_{i}_{xcoder_id}.pt'
         n = attn_load(fname, 'model.decoder.attn_layers', dec_offset)
-        print(f"  decoder component {i} ({xcoder_id}): {n} layer(s) at offset {dec_offset}")
+        print(f"  decoder component {i} ({xcoder_id}): {n} sub-layer(s) at offset {dec_offset}")
         dec_offset += n
 
-    return sd
+    # enc_offset = total sub-layers (2 per depth: self-attn + FFN)
+    # dec_offset = total sub-layers (3 per depth: self-attn + cross-attn + FFN)
+    enc_depth = enc_offset // 2
+    dec_depth = dec_offset // 3
+    print(f"  Inferred depth from checkpoint: enc_layers={enc_depth}, dec_layers={dec_depth}")
+
+    return sd, enc_depth, dec_depth
 
 
 def _infer_attn_dim_head(hf_sd: dict, side: str, heads: int) -> int | None:
@@ -375,7 +389,10 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     print(f"tie_word_embeddings: {tie}")
 
     print("Assembling state dict from shards...")
-    hf_sd = assemble_state_dict(ckpt_dir, prefix, src, tgt, encoder_id, decoder_id)
+    hf_sd, enc_depth, dec_depth = assemble_state_dict(ckpt_dir, prefix, src, tgt, encoder_id, decoder_id)
+    # inv_freq is a computed buffer (not a trained weight); strip it so load_state_dict
+    # doesn't warn about unexpected keys — it will be recomputed from config on init.
+    hf_sd = {k: v for k, v in hf_sd.items() if not k.endswith('rotary_pos_emb.inv_freq')}
     print(f"  Assembled {len(hf_sd)} tensors")
 
     # Infer actual attention dim_head from checkpoint weights to avoid size mismatches
@@ -396,6 +413,8 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
         opts, src_vocab_size, tgt_vocab_size, tie,
         enc_attn_dim_head_override=enc_attn_dim_head_override,
         dec_attn_dim_head_override=dec_attn_dim_head_override,
+        enc_layers_override=enc_depth,
+        dec_layers_override=dec_depth,
     )
     _patch_config_from_sd(config, hf_sd)
     print(f"Config: enc {config.enc_layers}×{config.enc_model_dim}d "

@@ -89,22 +89,33 @@ def main():
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--sentences", nargs="+", default=None,
                         help="Sentences to translate (default: built-in Spanish examples)")
+    parser.add_argument("--input-file", default=None,
+                        help="Path to a text file with one source sentence per line")
+    parser.add_argument("--batch-size", type=int, default=32,
+                        help="Number of sentences per batch (default: 32)")
     args = parser.parse_args()
 
-    sentences = args.sentences or DEFAULT_SENTENCES
-    tokenizer, model = load(args.model_dir, args.device)
-    translations = translate(
-        tokenizer=tokenizer,
-        model=model,
-        sentences=sentences,
-        num_beams=args.num_beams,
-        max_new_tokens=args.max_new_tokens,
-    )
+    if args.input_file:
+        with open(args.input_file) as f:
+            sentences = [line.rstrip("\n") for line in f if line.strip()]
+    else:
+        sentences = args.sentences or DEFAULT_SENTENCES
 
-    for src, hyp in zip(sentences, translations):
-        print(f"SRC: {src}")
-        print(f"HYP: {hyp}")
-        print("-" * 60)
+    tokenizer, model = load(args.model_dir, args.device)
+
+    for i in range(0, len(sentences), args.batch_size):
+        batch = sentences[i : i + args.batch_size]
+        translations = translate(
+            tokenizer=tokenizer,
+            model=model,
+            sentences=batch,
+            num_beams=args.num_beams,
+            max_new_tokens=args.max_new_tokens,
+        )
+        for src, hyp in zip(batch, translations):
+            print(f"SRC: {src}")
+            print(f"HYP: {hyp}")
+            print("-" * 60)
 
 
 if __name__ == "__main__":

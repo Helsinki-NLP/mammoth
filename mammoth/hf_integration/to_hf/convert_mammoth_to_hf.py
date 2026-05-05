@@ -62,8 +62,13 @@ def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_em
     if isinstance(dec_layers, (list, tuple)):
         dec_layers = sum(dec_layers)  # total depth across all components
 
-    enc_model_dim = getattr(opts, 'enc_model_dim', 768)
-    dec_model_dim = getattr(opts, 'dec_model_dim', enc_model_dim)
+    model_dim = getattr(opts, 'model_dim', None)
+    if model_dim is not None:
+        enc_model_dim = model_dim
+        dec_model_dim = model_dim
+    else:
+        enc_model_dim = getattr(opts, 'enc_model_dim', 768)
+        dec_model_dim = getattr(opts, 'dec_model_dim', enc_model_dim)
 
     return MammothConfig(
         src_vocab_size=src_vocab_size,
@@ -138,41 +143,35 @@ def config_from_opts(opts, src_vocab_size: int, tgt_vocab_size: int, tie_word_em
 # Checkpoint prefix resolution
 # ---------------------------------------------------------------------------
 
-def resolve_prefix(ckpt_dir: str, step: int | None, load_last: bool) -> str:
+def resolve_prefix(ckpt_dir: str, step: int | None) -> str:
     """Return the shard filename prefix to use (_step_N or _best).
 
     Priority:
       1. --step N  → _step_N  (explicit, always wins)
-      2. --load-last → _step_<largest N found>
-      3. default   → _best  (requires *_best_frame.pt to exist)
+      2. best checkpoint (*_best_frame.pt) if it exists
+      3. fallback  → _step_<largest N found>
     """
     if step is not None:
         return f'_step_{step}'
 
-    if load_last:
-        frames = glob_module.glob(os.path.join(ckpt_dir, '*_step_*_frame.pt'))
-        if not frames:
-            raise FileNotFoundError(f"No *_step_*_frame.pt files found in {ckpt_dir}")
-        steps = [
-            int(m.group(1))
-            for f in frames
-            if (m := re.search(r'_step_(\d+)_frame\.pt$', os.path.basename(f)))
-        ]
-        if not steps:
-            raise FileNotFoundError(f"Could not parse step numbers from frame files in {ckpt_dir}")
-        best_step = max(steps)
-        print(f"Loading last checkpoint: step {best_step}")
-        return f'_step_{best_step}'
+    best_frames = glob_module.glob(os.path.join(ckpt_dir, '*_best_frame.pt'))
+    if best_frames:
+        print(f"Loading best checkpoint: {os.path.basename(best_frames[0])}")
+        return '_best'
 
-    # Default: best checkpoint
-    frames = glob_module.glob(os.path.join(ckpt_dir, '*_best_frame.pt'))
+    frames = glob_module.glob(os.path.join(ckpt_dir, '*_step_*_frame.pt'))
     if not frames:
-        raise FileNotFoundError(
-            f"No *_best_frame.pt found in {ckpt_dir}. "
-            "Use --load-last to load the checkpoint with the highest step number."
-        )
-    print(f"Loading best checkpoint: {os.path.basename(frames[0])}")
-    return '_best'
+        raise FileNotFoundError(f"No checkpoint files found in {ckpt_dir}")
+    steps = [
+        int(m.group(1))
+        for f in frames
+        if (m := re.search(r'_step_(\d+)_frame\.pt$', os.path.basename(f)))
+    ]
+    if not steps:
+        raise FileNotFoundError(f"Could not parse step numbers from frame files in {ckpt_dir}")
+    best_step = max(steps)
+    print(f"No best checkpoint found, loading last checkpoint: step {best_step}")
+    return f'_step_{best_step}'
 
 
 # ---------------------------------------------------------------------------
@@ -389,15 +388,12 @@ def main():
     parser.add_argument('--output-dir', required=True,
                         help="Output directory for HF model")
 
-    ckpt_group = parser.add_mutually_exclusive_group()
-    ckpt_group.add_argument('--step', type=int, default=None,
-                            help="Load a specific checkpoint step (e.g. --step 500)")
-    ckpt_group.add_argument('--load-last', action='store_true',
-                            help="Load the checkpoint with the largest step number")
-    # default (neither flag): loads the 'best' checkpoint (*_best_frame.pt)
+    parser.add_argument('--step', type=int, default=None,
+                        help="Load a specific checkpoint step (e.g. --step 500). "
+                             "Default: best checkpoint, or last step if no best exists.")
 
     args = parser.parse_args()
-    prefix = resolve_prefix(args.checkpoint_dir, args.step, args.load_last)
+    prefix = resolve_prefix(args.checkpoint_dir, args.step)
     convert(args.checkpoint_dir, prefix, args.src, args.tgt, args.output_dir)
 
 

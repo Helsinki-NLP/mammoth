@@ -77,8 +77,8 @@ def config_from_opts(
         enc_model_dim = getattr(opts, 'enc_model_dim', 768)
         dec_model_dim = getattr(opts, 'dec_model_dim', enc_model_dim)
 
-    enc_heads = xt.get('enc_heads', 12)
-    dec_heads = xt.get('dec_heads', 12)
+    enc_heads = xt.get('heads', xt.get('enc_heads', 12))
+    dec_heads = xt.get('heads', xt.get('dec_heads', 12))
     enc_attn_dim_head = enc_attn_dim_head_override if enc_attn_dim_head_override is not None \
         else xt.get('enc_attn_dim_head', enc_model_dim // enc_heads)
     dec_attn_dim_head = dec_attn_dim_head_override if dec_attn_dim_head_override is not None \
@@ -343,8 +343,8 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     # Infer actual attention dim_head from checkpoint weights to avoid size mismatches
     # when opts defaults don't match the trained model.
     xt = getattr(opts, 'x_transformers_opts', {}) or {}
-    enc_heads = xt.get('enc_heads', 12)
-    dec_heads = xt.get('dec_heads', 12)
+    enc_heads = xt.get('heads', xt.get('enc_heads', 12))
+    dec_heads = xt.get('heads', xt.get('dec_heads', 12))
     enc_attn_dim_head_override = _infer_attn_dim_head(hf_sd, 'encoder', enc_heads)
     dec_attn_dim_head_override = _infer_attn_dim_head(hf_sd, 'decoder', dec_heads)
     if enc_attn_dim_head_override is not None:

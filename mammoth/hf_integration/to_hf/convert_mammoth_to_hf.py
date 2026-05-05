@@ -30,7 +30,6 @@ modeling_mammoth.py so that trust_remote_code=True loading works.
 
 import argparse
 import glob as glob_module
-import itertools
 import os
 import re
 import shutil
@@ -199,7 +198,29 @@ def _load(path: str) -> dict:
         return torch.load(path, map_location='cpu', weights_only=False)
 
 
-def assemble_state_dict(ckpt_dir: str, prefix: str, src: str, tgt: str) -> dict:
+def _task_xcoder_ids(opts, src: str, tgt: str):
+    """Return (encoder_id, decoder_id) lists for the given src→tgt task from opts.
+
+    Each list has one xcoder_id per layer stack index, e.g. ['eng', 'all'] for a
+    2-stack encoder where the first stack is language-specific and the second shared.
+    These map directly to the shard filenames: encoder_{i}_{encoder_id[i]}.pt.
+    """
+    tasks = getattr(opts, 'tasks', None) or {}
+    for corpus_opts in tasks.values():
+        src_tgt = corpus_opts.get('src_tgt', '')
+        task_src, _, task_tgt = src_tgt.partition('-')
+        if task_src == src and task_tgt == tgt:
+            enc_id = corpus_opts.get('enc_sharing_group', [src])
+            dec_id = corpus_opts.get('dec_sharing_group', [tgt])
+            return list(enc_id), list(dec_id)
+    available = [v.get('src_tgt') for v in tasks.values()]
+    raise ValueError(f"Task {src}-{tgt} not found in opts.tasks. Available: {available}")
+
+
+def assemble_state_dict(
+    ckpt_dir: str, prefix: str, src: str, tgt: str,
+    encoder_id: list, decoder_id: list,
+) -> dict:
     """
     Reassemble a flat HF-model state dict from Mammoth's per-component shards.
 
@@ -208,19 +229,15 @@ def assemble_state_dict(ckpt_dir: str, prefix: str, src: str, tgt: str) -> dict:
         model.decoder.<x-transformers key>
 
     Shard → HF prefix mapping:
-        src_embeddings_{src}.pt          emb.weight → model.encoder.token_emb.emb.weight
-        encoder_wrapper_{src}.pt         post_emb_norm.*, pos_emb.* → model.encoder.*
-        encoder_{i}_{src}.pt             _base_layers.{j}.* → model.encoder.attn_layers.layers.{offset+j}.*
-        tgt_embeddings_{tgt}.pt          emb.weight → model.decoder.token_emb.emb.weight
-        decoder_wrapper_{tgt}.pt         post_emb_norm.*, pos_emb.* → model.decoder.*
-        decoder_{i}_{tgt}.pt             _base_layers.{j}.* → model.decoder.attn_layers.layers.{offset+j}.*
+        src_embeddings_{src}.pt                        → model.encoder.token_emb.*
+        encoder_wrapper_{'_'.join(encoder_id)}.pt      → model.encoder.*
+        encoder_{i}_{encoder_id[i]}.pt  _base_layers.{j}.* → model.encoder.attn_layers.layers.{offset+j}.*
+        tgt_embeddings_{tgt}.pt                        → model.decoder.token_emb.*
+        decoder_wrapper_{'_'.join(decoder_id)}.pt      → model.decoder.*
+        decoder_{i}_{decoder_id[i]}.pt  _base_layers.{j}.* → model.decoder.attn_layers.layers.{offset+j}.*
 
-    For multi-component models, layer indices from each component shard are offset
-    by the accumulated layer count of all preceding components, producing a single
-    flat layers list matching the x-transformers AttentionLayers structure.
-    Non-_base_layers keys (e.g. final norm) from each component go directly under
-    attn_layers.*; later components overwrite earlier ones, so the last component's
-    norm wins (which is correct — only the final component has the output norm).
+    encoder_id / decoder_id are the xcoder_id lists from opts.tasks (enc_sharing_group /
+    dec_sharing_group), which determine both the wrapper filename and the per-stack shards.
     """
     sd = {}
 
@@ -261,30 +278,22 @@ def assemble_state_dict(ckpt_dir: str, prefix: str, src: str, tgt: str) -> dict:
     p = prefix
 
     prefix_load(f'{p}_src_embeddings_{src}.pt', 'model.encoder.token_emb')
-    prefix_load(f'{p}_encoder_wrapper_{src}.pt', 'model.encoder')
-    prefix_load(f'{p}_tgt_embeddings_{tgt}.pt',  'model.decoder.token_emb')
-    prefix_load(f'{p}_decoder_wrapper_{tgt}.pt', 'model.decoder')
+    prefix_load(f'{p}_encoder_wrapper_{"_".join(encoder_id)}.pt', 'model.encoder')
+    prefix_load(f'{p}_tgt_embeddings_{tgt}.pt', 'model.decoder.token_emb')
+    prefix_load(f'{p}_decoder_wrapper_{"_".join(decoder_id)}.pt', 'model.decoder')
 
     enc_offset = 0
-    for i in itertools.count():
-        fname = f'{p}_encoder_{i}_{src}.pt'
-        if not os.path.exists(os.path.join(ckpt_dir, fname)):
-            if i == 0:
-                print(f"  [WARN] no encoder component shards found for src={src}")
-            break
+    for i, xcoder_id in enumerate(encoder_id):
+        fname = f'{p}_encoder_{i}_{xcoder_id}.pt'
         n = attn_load(fname, 'model.encoder.attn_layers', enc_offset)
-        print(f"  encoder component {i}: {n} layer(s) at offset {enc_offset}")
+        print(f"  encoder component {i} ({xcoder_id}): {n} layer(s) at offset {enc_offset}")
         enc_offset += n
 
     dec_offset = 0
-    for i in itertools.count():
-        fname = f'{p}_decoder_{i}_{tgt}.pt'
-        if not os.path.exists(os.path.join(ckpt_dir, fname)):
-            if i == 0:
-                print(f"  [WARN] no decoder component shards found for tgt={tgt}")
-            break
+    for i, xcoder_id in enumerate(decoder_id):
+        fname = f'{p}_decoder_{i}_{xcoder_id}.pt'
         n = attn_load(fname, 'model.decoder.attn_layers', dec_offset)
-        print(f"  decoder component {i}: {n} layer(s) at offset {dec_offset}")
+        print(f"  decoder component {i} ({xcoder_id}): {n} layer(s) at offset {dec_offset}")
         dec_offset += n
 
     return sd
@@ -296,6 +305,34 @@ def _infer_attn_dim_head(hf_sd: dict, side: str, heads: int) -> int | None:
         if k.startswith(f'model.{side}.attn_layers.layers.') and k.endswith('.to_q.weight'):
             return v.shape[0] // heads
     return None
+
+
+def _patch_config_from_sd(config, hf_sd: dict) -> None:
+    """Correct config flags that can be reliably inferred from the assembled checkpoint.
+
+    Handles cases where training opts don't store every x_transformers flag
+    and the converter's defaults don't match the actual trained architecture.
+    """
+    def _has(side: str, suffix: str) -> bool:
+        prefix = f'model.{side}.attn_layers.layers.'
+        return any(k.startswith(prefix) and k.endswith(suffix) for k in hf_sd)
+
+    config.enc_attn_qkv_bias = _has('encoder', '.to_q.bias')
+    config.dec_attn_qkv_bias = _has('decoder', '.to_q.bias')
+
+    # Layer norm bias: x-transformers uses 'beta' for the bias term
+    config.enc_layernorm_bias = _has('encoder', '.beta')
+    config.dec_layernorm_bias = _has('decoder', '.beta')
+
+    # FFN bias
+    config.enc_ff_no_bias = not _has('encoder', '.ff.0.0.bias') and not _has('encoder', '.ff.2.bias')
+    config.dec_ff_no_bias = not _has('decoder', '.ff.0.0.bias') and not _has('decoder', '.ff.2.bias')
+
+    # post_emb_norm presence/bias
+    config.enc_post_emb_norm = 'model.encoder.post_emb_norm.gamma' in hf_sd
+    config.dec_post_emb_norm = 'model.decoder.post_emb_norm.gamma' in hf_sd
+    config.enc_post_emb_norm_bias = 'model.encoder.post_emb_norm.beta' in hf_sd
+    config.dec_post_emb_norm_bias = 'model.decoder.post_emb_norm.beta' in hf_sd
 
 
 # ---------------------------------------------------------------------------
@@ -319,15 +356,16 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     tgt_vocab_size = len(tgt_vocab_obj)
     print(f"Vocab sizes: src={src_vocab_size}, tgt={tgt_vocab_size}")
 
+    encoder_id, decoder_id = _task_xcoder_ids(opts, src, tgt)
+    print(f"Task components: encoder={encoder_id}, decoder={decoder_id}")
+
     # When tied, x-transformers uses a lambda for to_logits (no saved weights).
     # Scan the decoder wrapper + component shards for any 'to_logits' key.
     p = prefix
-    decoder_shards = [f'{p}_decoder_wrapper_{tgt}.pt']
-    for i in itertools.count():
-        fname = f'{p}_decoder_{i}_{tgt}.pt'
-        if not os.path.exists(os.path.join(ckpt_dir, fname)):
-            break
-        decoder_shards.append(fname)
+    dec_wrapper_key = '_'.join(decoder_id)
+    decoder_shards = [f'{p}_decoder_wrapper_{dec_wrapper_key}.pt'] + [
+        f'{p}_decoder_{i}_{xcoder_id}.pt' for i, xcoder_id in enumerate(decoder_id)
+    ]
     tie = not any(
         'to_logits' in k
         for fname in decoder_shards
@@ -337,7 +375,7 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     print(f"tie_word_embeddings: {tie}")
 
     print("Assembling state dict from shards...")
-    hf_sd = assemble_state_dict(ckpt_dir, prefix, src, tgt)
+    hf_sd = assemble_state_dict(ckpt_dir, prefix, src, tgt, encoder_id, decoder_id)
     print(f"  Assembled {len(hf_sd)} tensors")
 
     # Infer actual attention dim_head from checkpoint weights to avoid size mismatches
@@ -359,10 +397,13 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
         enc_attn_dim_head_override=enc_attn_dim_head_override,
         dec_attn_dim_head_override=dec_attn_dim_head_override,
     )
+    _patch_config_from_sd(config, hf_sd)
     print(f"Config: enc {config.enc_layers}×{config.enc_model_dim}d "
-          f"(heads={config.enc_heads}, dim_head={config.enc_attn_dim_head}), "
+          f"(heads={config.enc_heads}, dim_head={config.enc_attn_dim_head}, "
+          f"qkv_bias={config.enc_attn_qkv_bias}, ln_bias={config.enc_layernorm_bias}), "
           f"dec {config.dec_layers}×{config.dec_model_dim}d "
-          f"(heads={config.dec_heads}, dim_head={config.dec_attn_dim_head})")
+          f"(heads={config.dec_heads}, dim_head={config.dec_attn_dim_head}, "
+          f"qkv_bias={config.dec_attn_qkv_bias}, ln_bias={config.dec_layernorm_bias})")
 
     print("Building HF model...")
     model = MammothForConditionalGeneration(config)

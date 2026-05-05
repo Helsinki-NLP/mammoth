@@ -294,21 +294,22 @@ def assemble_state_dict(
     for i, xcoder_id in enumerate(encoder_id):
         fname = f'{p}_encoder_{i}_{xcoder_id}.pt'
         n = attn_load(fname, 'model.encoder.attn_layers', enc_offset)
-        print(f"  encoder component {i} ({xcoder_id}): {n} sub-layer(s) at offset {enc_offset}")
+        depth = n // 2  # encoder: 2 sub-layers per depth block (self-attn + FFN)
+        print(f"  encoder component {i} ({xcoder_id}): depth={depth} ({n} sub-layers) at offset {enc_offset}")
         enc_offset += n
 
     dec_offset = 0
     for i, xcoder_id in enumerate(decoder_id):
         fname = f'{p}_decoder_{i}_{xcoder_id}.pt'
         n = attn_load(fname, 'model.decoder.attn_layers', dec_offset)
-        print(f"  decoder component {i} ({xcoder_id}): {n} sub-layer(s) at offset {dec_offset}")
+        depth = n // 3  # decoder: 3 sub-layers per depth block (self-attn + cross-attn + FFN)
+        print(f"  decoder component {i} ({xcoder_id}): depth={depth} ({n} sub-layers) at offset {dec_offset}")
         dec_offset += n
 
-    # enc_offset = total sub-layers (2 per depth: self-attn + FFN)
-    # dec_offset = total sub-layers (3 per depth: self-attn + cross-attn + FFN)
+    # total depth = sum over components
     enc_depth = enc_offset // 2
     dec_depth = dec_offset // 3
-    print(f"  Inferred depth from checkpoint: enc_layers={enc_depth}, dec_layers={dec_depth}")
+    print(f"  Total depth from checkpoint: enc_layers={enc_depth}, dec_layers={dec_depth}")
 
     return sd, enc_depth, dec_depth
 

@@ -21,9 +21,9 @@ echo "Starting at `date`"
 set -e
 
 module purge
-module load pytorch
+module load python-pytorch/2.10
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
-/scratch/project_2017852/mammoth-shared/.venv/bin/python /scratch/2017852/mammoth-shared/mammoth/train.py -config train.yaml
+/scratch/project_2017852/mammoth-shared/.venv/bin/python /scratch/project_2017852/mammoth-shared/mammoth/train.py -config train.yaml
 
 echo "Finishing at `date`"

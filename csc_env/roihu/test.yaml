@@ -12,30 +12,128 @@ tasks:
     path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/eng_Latn.dev
     path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/spa_Latn.dev
 
+  mt_fra-spa:
+    src_tgt: "fra-spa"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:1"
+    enc_sharing_group: ["fra"]
+    dec_sharing_group: ["spa"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/sentmt/fra-spa.fra.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/sentmt/fra-spa.spa.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/spa_Latn.dev
+
+  mt_fra-por:
+    src_tgt: "fra-por"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:2"
+    enc_sharing_group: ["fra"]
+    dec_sharing_group: ["por"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/sentmt/fra-por.fra.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/sentmt/fra-por.por.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/por_Latn.dev
+
+  mt_fra-ita:
+    src_tgt: "fra-ita"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:3"
+    enc_sharing_group: ["fra"]
+    dec_sharing_group: ["ita"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/sentmt/fra-ita.fra.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/sentmt/fra-ita.ita.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/ita_Latn.dev
+
+  mt_fra-pol:
+    src_tgt: "fra-pol"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:0"
+    enc_sharing_group: ["fra"]
+    dec_sharing_group: ["pol"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/sentmt/fra-pol.fra.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/sentmt/fra-pol.pol.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/pol_Latn.dev
+
+  mt_fra-nld:
+    src_tgt: "fra-nld"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:1"
+    enc_sharing_group: ["fra"]
+    dec_sharing_group: ["nld"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/sentmt/fra-nld.fra.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/sentmt/fra-nld.nld.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/nld_Latn.dev
+
+  mt_fra-hun:
+    src_tgt: "fra-hun"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:2"
+    enc_sharing_group: ["fra"]
+    dec_sharing_group: ["hun"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/sentmt/fra-hun.fra.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/sentmt/fra-hun.hun.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/hun_Latn.dev
+
+  mt_fra-mkd:
+    src_tgt: "fra-mkd"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:3"
+    enc_sharing_group: ["fra"]
+    dec_sharing_group: ["mkd"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/sentmt/fra-mkd.fra.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/sentmt/fra-mkd.mkd.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/mkd_Cyrl.dev
 
 
 src_vocab:
   eng: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/eng/32000/tokenizer.json
+  fra: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/fra/32000/tokenizer.json
 tgt_vocab:
   spa: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/spa/32000/tokenizer.json
-
+  por: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/por/32000/tokenizer.json
+  ita: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/ita/32000/tokenizer.json
+  pol: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/pol/32000/tokenizer.json
+  nld: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/nld/32000/tokenizer.json
+  hun: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/hun/32000/tokenizer.json
+  mkd: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/mkd/32000/tokenizer.json
+  lit: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/lit/32000/tokenizer.json
+  lav: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/lav/32000/tokenizer.json
 
 # Model Architecture Options
-enc_layers: [6]
-dec_layers: [6]
+enc_layers: [4,4,4]
+dec_layers: [12]
 
-model_dim: 768      
-dropout: 0.1      
-model_dtype: bf16     
+model_dim: 1024
+dropout: 0.1
+model_dtype: bf16
 add_language_tokens: false
 
 # x-transformers specific options
 x_transformers_opts:
-  attn_flash: true     
-  rotary_pos_emb: true     
-  tie_embedding: false    
-  heads: 8
-  pre_norm: false
+  attn_flash: true
+  rotary_pos_emb: true
+  tie_embedding: false
+  heads: 16
+  pre_norm: true
   post_emb_norm: true
   attn_dropout: 0.1
   ff_dropout: 0.1
@@ -49,14 +147,14 @@ max_length: 1024
 
 # Training Configuration
 train_steps: 100000
-accum_count: [20]
-lookahead_minibatches: 20       
-batch_size: 8192    
-batch_type: tokens  
-normalization: tokens  
+accum_count: [4]
+lookahead_minibatches: 4
+batch_size: 32768
+batch_type: tokens
+normalization: tokens
 queue_size: 120
 
-# Optimizer settings (from create_opts)
+# Optimizer settings
 optim: adamw
 
 learning_rate: 0.0003
@@ -69,37 +167,34 @@ label_smoothing: 0.1
 # Learning rate scheduling
 warmup_steps: 10000
 decay_method: linear_warmup
-learning_rate_decay: 0.5     
-start_decay_steps: 10000   
+learning_rate_decay: 0.5
+start_decay_steps: 10000
 average_decay: 0
 
-world_size: 1
-gpu_ranks: [0]
-node_rank: 0
+world_size: 8
+gpu_ranks: [0,1,2,3]
+n_nodes: 2
 task_distribution_strategy: weighted_sampling
 
 seed: 42
 # Decoding parameters during validation
-valid_batch_size: 16      
-valid_steps: 2500    
-valid_timeout: 300     
-valid_decode_timeout: 60      
+valid_batch_size: 16
+valid_steps: 2500
+valid_timeout: 300
+valid_decode_timeout: 60
 valid_max_length: 1024
 valid_metrics: [bleu]
 beam_size: 1
 
-save_checkpoint_steps: 2500    
+save_checkpoint_steps: 2500
 keep_checkpoint: 1
 
 # Logging and Monitoring
-
 log_model_structure: false
-# tensorboard: true               # enable tensorboard logging
-# tensorboard_log_dir: ./logs     # tensorboard log directory
 report_tflops: true
-report_every: 500     
+report_every: 100
 report_training_accuracy: false
 
 # Model saving
-save_model: /scratch/project_2017852/members/chao/test-runs/model/
+save_model:  /scratch/project_2017852/members/chao/test-runs/multi_nodes/model/
 save_strategy: best_and_last

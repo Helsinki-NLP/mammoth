@@ -103,30 +103,30 @@ def config_from_opts(
         # Encoder attention
         enc_heads=enc_heads,
         enc_attn_dim_head=enc_attn_dim_head,
-        enc_attn_dropout=xt.get('enc_attn_dropout', 0.0),
+        enc_attn_dropout=xt.get('enc_attn_dropout', xt.get('attn_dropout', 0.0)),
         enc_attn_qkv_bias=xt.get('enc_attn_qkv_bias', True),
         enc_attn_flash=xt.get('attn_flash', False),
         # Encoder FFN
-        enc_ff_mult=xt.get('enc_ff_mult', 4.0),
-        enc_ff_glu=xt.get('enc_ff_glu', False),
-        enc_ff_no_bias=xt.get('enc_ff_no_bias', False),
-        enc_ff_dropout=xt.get('enc_ff_dropout', 0.0),
+        enc_ff_mult=xt.get('enc_ff_mult', xt.get('ff_mult', 4.0)),
+        enc_ff_glu=xt.get('enc_ff_glu', xt.get('ff_glu', False)),
+        enc_ff_no_bias=xt.get('enc_ff_no_bias', xt.get('ff_no_bias', False)),
+        enc_ff_dropout=xt.get('enc_ff_dropout', xt.get('ff_dropout', 0.0)),
         # Encoder norm/pos
-        enc_pre_norm=xt.get('enc_pre_norm', False),
-        enc_use_rmsnorm=xt.get('enc_use_rmsnorm', False),
+        enc_pre_norm=xt.get('enc_pre_norm', xt.get('pre_norm', False)),
+        enc_use_rmsnorm=xt.get('enc_use_rmsnorm', xt.get('use_rmsnorm', False)),
         enc_layernorm_bias=xt.get('enc_layernorm_bias', True),
         enc_norm_add_unit_offset=xt.get('enc_norm_add_unit_offset', False),
-        enc_rotary_pos_emb=xt.get('enc_rotary_pos_emb', False),
+        enc_rotary_pos_emb=xt.get('enc_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
         enc_use_abs_pos_emb=xt.get('use_abs_pos_emb', True),
-        enc_post_emb_norm=xt.get('enc_post_emb_norm', True),
+        enc_post_emb_norm=xt.get('enc_post_emb_norm', xt.get('post_emb_norm', True)),
         enc_post_emb_norm_bias=xt.get('enc_post_emb_norm_bias', True),
         enc_scaled_embeddings=xt.get('enc_scaled_embeddings', False),
-        enc_emb_dropout=xt.get('enc_emb_dropout', 0.0),
-        enc_sliding_window=getattr(opts, 'enc_sliding_window', -1),
+        enc_emb_dropout=xt.get('enc_emb_dropout', xt.get('emb_dropout', 0.0)),
+        enc_sliding_window=xt.get('enc_sliding_window', getattr(opts, 'enc_sliding_window', -1)),
         # Decoder attention
         dec_heads=dec_heads,
         dec_attn_dim_head=dec_attn_dim_head,
-        dec_attn_dropout=xt.get('dec_attn_dropout', 0.0),
+        dec_attn_dropout=xt.get('dec_attn_dropout', xt.get('attn_dropout', 0.0)),
         dec_attn_qkv_bias=xt.get('dec_attn_qkv_bias', True),
         dec_attn_flash=xt.get('attn_flash', False),
         dec_attn_kv_heads=xt.get('dec_attn_kv_heads', None),
@@ -134,26 +134,26 @@ def config_from_opts(
         dec_attn_qk_norm_dim_scale=xt.get('dec_attn_qk_norm_dim_scale', False),
         dec_cross_attn_dim_context=xt.get('dec_cross_attn_dim_context', None),
         # Decoder FFN
-        dec_ff_mult=xt.get('dec_ff_mult', 4.0),
-        dec_ff_glu=xt.get('dec_ff_glu', False),
-        dec_ff_no_bias=xt.get('dec_ff_no_bias', False),
-        dec_ff_dropout=xt.get('dec_ff_dropout', 0.0),
+        dec_ff_mult=xt.get('dec_ff_mult', xt.get('ff_mult', 4.0)),
+        dec_ff_glu=xt.get('dec_ff_glu', xt.get('ff_glu', False)),
+        dec_ff_no_bias=xt.get('dec_ff_no_bias', xt.get('ff_no_bias', False)),
+        dec_ff_dropout=xt.get('dec_ff_dropout', xt.get('ff_dropout', 0.0)),
         # Decoder norm/pos
-        dec_pre_norm=xt.get('dec_pre_norm', False),
-        dec_use_rmsnorm=xt.get('dec_use_rmsnorm', False),
+        dec_pre_norm=xt.get('dec_pre_norm', xt.get('pre_norm', False)),
+        dec_use_rmsnorm=xt.get('dec_use_rmsnorm', xt.get('use_rmsnorm', False)),
         dec_layernorm_bias=xt.get('dec_layernorm_bias', True),
         dec_norm_add_unit_offset=xt.get('dec_norm_add_unit_offset', False),
-        dec_rotary_pos_emb=xt.get('dec_rotary_pos_emb', False),
+        dec_rotary_pos_emb=xt.get('dec_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
         dec_use_abs_pos_emb=xt.get('use_abs_pos_emb', True),
-        dec_post_emb_norm=xt.get('dec_post_emb_norm', True),
+        dec_post_emb_norm=xt.get('dec_post_emb_norm', xt.get('post_emb_norm', True)),
         dec_post_emb_norm_bias=xt.get('dec_post_emb_norm_bias', True),
         dec_scaled_embeddings=xt.get('dec_scaled_embeddings', False),
-        dec_emb_dropout=xt.get('dec_emb_dropout', 0.0),
+        dec_emb_dropout=xt.get('dec_emb_dropout', xt.get('emb_dropout', 0.0)),
         dec_sandwich_norm=xt.get('dec_sandwich_norm', False),
-        dec_sliding_window=getattr(opts, 'dec_sliding_window', -1),
-        dec_global_attn_every_n_layers=getattr(opts, 'dec_global_attn_every_n_layers', 0),
-        dec_global_rope_theta=getattr(opts, 'dec_global_rope_theta', 10000.0),
-        dec_local_rope_theta=getattr(opts, 'dec_local_rope_theta', 10000.0),
+        dec_sliding_window=xt.get('dec_sliding_window', getattr(opts, 'dec_sliding_window', -1)),
+        dec_global_attn_every_n_layers=xt.get('dec_global_attn_every_n_layers', getattr(opts, 'dec_global_attn_every_n_layers', 0)),
+        dec_global_rope_theta=xt.get('dec_global_rope_theta', getattr(opts, 'dec_global_rope_theta', 10000.0)),
+        dec_local_rope_theta=xt.get('dec_local_rope_theta', getattr(opts, 'dec_local_rope_theta', 10000.0)),
         # Misc
         tie_word_embeddings=tie_word_embeddings,
         model_dtype=getattr(opts, 'model_dtype', 'bf16'),
@@ -451,19 +451,23 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     }
     model.save_pretrained(output_dir)
 
-    # Save tokenizer — Mammoth uses an HF-compatible tokenizers.Tokenizer,
-    # so we just wrap it with PreTrainedTokenizerFast.
-    specials = src_vocab_obj.specials  # {'<s>': 0, '<pad>': 1, '</s>': 2, ...}
-    _rev = {v: k for k, v in specials.items()}
-    tokenizer = PreTrainedTokenizerFast(
-        tokenizer_file=src_vocab_obj.path,
-        bos_token=_rev.get(config.bos_token_id, '<s>'),
-        eos_token=_rev.get(config.eos_token_id, '</s>'),
-        unk_token=_rev.get(getattr(config, 'unk_token_id', 3), '<unk>'),
-        pad_token=_rev.get(config.pad_token_id, '<pad>'),
-    )
-    tokenizer.save_pretrained(output_dir)
-    print(f"Tokenizer saved ({len(tokenizer)} tokens).")
+    def _save_tokenizer(vocab_obj, subdir: str, label: str):
+        specials = vocab_obj.specials  # {'<s>': 0, '<pad>': 1, '</s>': 2, ...}
+        _rev = {v: k for k, v in specials.items()}
+        tok = PreTrainedTokenizerFast(
+            tokenizer_file=vocab_obj.path,
+            bos_token=_rev.get(config.bos_token_id, '<s>'),
+            eos_token=_rev.get(config.eos_token_id, '</s>'),
+            unk_token=_rev.get(getattr(config, 'unk_token_id', 3), '<unk>'),
+            pad_token=_rev.get(config.pad_token_id, '<pad>'),
+        )
+        save_path = os.path.join(output_dir, subdir)
+        os.makedirs(save_path, exist_ok=True)
+        tok.save_pretrained(save_path)
+        print(f"{label} tokenizer saved → {subdir}/ ({len(tok)} tokens)")
+
+    _save_tokenizer(src_vocab_obj, config.src_tokenizer_dir, 'src')
+    _save_tokenizer(tgt_vocab_obj, config.tgt_tokenizer_dir, 'tgt')
 
     here = os.path.dirname(os.path.abspath(__file__))
     for fname in ("configuration_mammoth.py", "modeling_mammoth.py"):

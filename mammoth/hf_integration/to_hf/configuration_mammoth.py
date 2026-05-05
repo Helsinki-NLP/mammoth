@@ -77,6 +77,9 @@ class MammothConfig(PretrainedConfig):
         dec_global_attn_every_n_layers: int = 0,
         dec_global_rope_theta: float = 10000.0,
         dec_local_rope_theta: float = 10000.0,
+        # Tokenizer subdirectory names (relative to model dir)
+        src_tokenizer_dir: str = "src_tokenizer",
+        tgt_tokenizer_dir: str = "tgt_tokenizer",
         # Shared options
         tie_word_embeddings: bool = True,
         model_dtype: str = "bf16",
@@ -164,4 +167,6 @@ class MammothConfig(PretrainedConfig):
         self.dec_global_rope_theta = dec_global_rope_theta
         self.dec_local_rope_theta = dec_local_rope_theta
 
+        self.src_tokenizer_dir = src_tokenizer_dir
+        self.tgt_tokenizer_dir = tgt_tokenizer_dir
         self.model_dtype = model_dtype

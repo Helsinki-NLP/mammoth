@@ -6,6 +6,9 @@ import torch.optim as optim
 from math import sqrt
 from torch.nn.utils import clip_grad_norm_
 from mammoth.utils.logging import logger
+from mammoth.utils.profiling import get_profiler_range
+
+_profiler_range = get_profiler_range()
 
 
 def get_base_optimizer(opts):
@@ -324,15 +327,17 @@ class MultipleOptimizer(object):
         return param_groups
 
     def backward(self, loss):
-        if self.grad_scaler is not None:
-            self.grad_scaler.scale(loss).backward()
-        else:
-            loss.backward()
+        with _profiler_range("optimizer_backward"):
+            if self.grad_scaler is not None:
+                self.grad_scaler.scale(loss).backward()
+            else:
+                loss.backward()
 
     def zero_grad(self):
         """Reset the gradient of all sub-optimizers to zero"""
-        for name in self.suboptimizers:
-            self.suboptimizers[name].zero_grad()
+        with _profiler_range("optimizer_zero_grad"):
+            for name in self.suboptimizers:
+                self.suboptimizers[name].zero_grad()
 
     def externally_managed_step(self, gradient_syncs):
         """Step through only the trained suboptimizers"""
@@ -341,16 +346,19 @@ class MultipleOptimizer(object):
         trained_components = {
             gradient_sync.component.get_name() for gradient_sync in gradient_syncs
         }
-        for name, optimizer in self.suboptimizers.items():
-            if name in trained_components:
-                # logger.warning(f'Stepping {name}')   # DEBUG
-                if self.grad_scaler is not None:
-                    self.grad_scaler.unscale_(optimizer)
-                optimizer.step()
+        with _profiler_range("optimizer_unscale_and_step"):
+            for name, optimizer in self.suboptimizers.items():
+                if name in trained_components:
+                    # logger.warning(f'Stepping {name}')   # DEBUG
+                    with _profiler_range(f"optimizer_step_{name}"):
+                        if self.grad_scaler is not None:
+                            self.grad_scaler.unscale_(optimizer)
+                        optimizer.step()
 
         if self.grad_scaler is not None:
-            # Updates the scale for next iteration.
-            self.grad_scaler.update()
+            with _profiler_range("optimizer_gradscaler_update"):
+                # Updates the scale for next iteration.
+                self.grad_scaler.update()
 
     def report_steps(self):
         result = []

@@ -810,7 +810,7 @@ def _add_train_general_opts(parser):
         '--optim',
         '-optim',
         default='sgd',
-        choices=['sgd', 'adagrad', 'adadelta', 'adam', 'adamw', 'adafactor', 'fusedadam'],
+        choices=['sgd', 'adagrad', 'adadelta', 'adam', 'adamw', 'adafactor'],
         help="Optimization method.",
     )
     group.add(
@@ -840,6 +840,14 @@ def _add_train_general_opts(parser):
     )
     group.add(
         '--dropout_steps', '-dropout_steps', type=int, nargs='+', default=[0], help="Steps at which dropout changes."
+    )
+    group.add(
+        '--adamw_fused',
+        '-adamw_fused',
+        action='store_true',
+        default=False,
+        help="Use fused AdamW kernel (PyTorch >= 2.0, CUDA/ROCm only). "
+        "Faster than foreach on NVIDIA; check ROCm support before enabling on MI250X.",
     )
     group.add(
         '--adam_beta1',

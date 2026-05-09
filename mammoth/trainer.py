@@ -144,6 +144,7 @@ def build_trainer(
         vocabs_dict=vocabs_dict,
         beam_size=opts.beam_size,
         max_length=opts.max_length,
+        block_ngram_repeat=opts.block_ngram_repeat,
         world_group_sync=world_group_sync,
         flops_config=flops_config,
         report_tflops=getattr(opts, 'report_tflops', True),
@@ -203,6 +204,7 @@ class Trainer(object):
         vocabs_dict=None,
         beam_size=1,
         max_length=100,
+        block_ngram_repeat=0,
         world_group_sync=None,
         flops_config=None,
         report_tflops=True,
@@ -241,6 +243,7 @@ class Trainer(object):
         self.vocabs_dict = vocabs_dict or {}
         self.beam_size = beam_size
         self.max_length = max_length
+        self.block_ngram_repeat = block_ngram_repeat
         self.world_group_sync = world_group_sync
 
         # Get ROCTx range function (markers always active, profiling controlled by rocprofv3)
@@ -674,7 +677,7 @@ class Trainer(object):
                 global_scorer=global_scorer,
                 min_length=0,
                 max_length=max_length,
-                block_ngram_repeat=0,
+                block_ngram_repeat=self.block_ngram_repeat,
                 exclusion_tokens=set(),
                 sampling_temp=0,
                 keep_topk=1,
@@ -696,7 +699,7 @@ class Trainer(object):
                 global_scorer=global_scorer,
                 min_length=0,
                 max_length=max_length,
-                block_ngram_repeat=0,
+                block_ngram_repeat=self.block_ngram_repeat,
                 exclusion_tokens=set(),
                 stepwise_penalty=False,
                 ratio=-0.0,

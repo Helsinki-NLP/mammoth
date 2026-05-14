@@ -911,6 +911,26 @@ class SimpleRMSNorm(Module):
     def forward(self, x):
         return F.normalize(x, dim = -1) * self.scale
 
+class FusedRMSNorm(Module):
+    """RMSNorm backed by torch.nn.RMSNorm (fused CUDA/HIP kernel via F.rms_norm).
+    Same interface as RMSNorm; parameter name kept as `g` for checkpoint compatibility."""
+    def __init__(
+        self,
+        dim,
+        unit_offset = False
+    ):
+        super().__init__()
+        self.unit_offset = unit_offset
+        self._norm = nn.RMSNorm(dim, eps=1e-8, elementwise_affine=not unit_offset)
+        if unit_offset:
+            # unit_offset trick: store delta (init 0), effective weight = delta + 1
+            self.g = nn.Parameter(torch.zeros(dim))
+
+    def forward(self, x):
+        if self.unit_offset:
+            return self._norm(x) * (self.g + 1.)
+        return self._norm(x)
+
 class MultiheadRMSNorm(Module):
     def __init__(self, dim, heads):
         super().__init__()
@@ -2127,6 +2147,7 @@ class AttentionLayers(Module):
         only_cross = False,
         use_scalenorm = False,
         use_rmsnorm = False,
+        use_fused_rmsnorm = False,
         use_dynamic_tanh = False,
         dynamic_tanh_init_alpha = 1.,
         use_simple_rmsnorm = False,
@@ -2336,7 +2357,7 @@ class AttentionLayers(Module):
 
         # determine norm
 
-        assert at_most_one_of(use_scalenorm, use_rmsnorm, use_dynamic_tanh, use_simple_rmsnorm, use_adaptive_layernorm, use_adaptive_rmsnorm), 'you can only use either scalenorm, rmsnorm, adaptive layernorm, adaptive rmsnorm, or simple rmsnorm'
+        assert at_most_one_of(use_scalenorm, use_rmsnorm, use_fused_rmsnorm, use_dynamic_tanh, use_simple_rmsnorm, use_adaptive_layernorm, use_adaptive_rmsnorm), 'you can only use either scalenorm, rmsnorm, fused_rmsnorm, adaptive layernorm, adaptive rmsnorm, or simple rmsnorm'
 
         norm_need_condition = False
         dim_condition = default(dim_condition, dim)
@@ -2349,6 +2370,8 @@ class AttentionLayers(Module):
             norm_class = ScaleNorm
         elif use_rmsnorm:
             norm_class = RMSNorm
+        elif use_fused_rmsnorm:
+            norm_class = FusedRMSNorm
         elif use_simple_rmsnorm:
             norm_class = SimpleRMSNorm
         elif use_dynamic_tanh:

@@ -53,8 +53,6 @@ class FilterTooLongTransform(Transform):
         from mammoth.inputters.vocab import HFTokenizerVocab
 
         logger.info(f"FilterTooLongTransform.warm_up() called with vocabs: {list(vocabs.keys())}")
-        logger.info(f"  src vocab type: {type(vocabs.get('src', None))}")
-        logger.info(f"  tgt vocab type: {type(vocabs.get('tgt', None))}")
 
         # Check if any vocab is an HF tokenizer
         uses_hf_tokenizer = any(isinstance(v, HFTokenizerVocab) for v in vocabs.values())

@@ -78,7 +78,6 @@ def build_trainer(
     """
 
     loss_functions = nn.ModuleDict()
-    logger.info("BUILD TRAINER")
 
     for (side, lang, component_id, tgt_vocab) in task_queue_manager.get_my_vocabs('tgt', vocabs_dict):
         # Note that the old OpenNMT losses required a separate generator, which is not available in x_transformers

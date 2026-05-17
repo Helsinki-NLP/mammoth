@@ -8,6 +8,7 @@ from .x_transformers import (
     Attention,
     FeedForward,
     RMSNorm,
+    FusedRMSNorm,
     AdaptiveRMSNorm,
     TransformerWrapper,
     ViTransformerWrapper,

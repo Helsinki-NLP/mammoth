@@ -445,11 +445,12 @@ class ModelSaver(ModelSaverBase):
 
         # Validation: warn if using metric-based strategy without proper setup
         if self.save_strategy in ['best_only', 'best_and_last', 'best_n']:
-            logger.info(
-                f"Using metric-based checkpoint strategy '{self.save_strategy}'. "
-                f"Checkpoints will be saved at validation time (--valid_steps), "
-                f"not at --save_checkpoint_steps."
-            )
+            if not torch.distributed.is_initialized() or torch.distributed.get_rank() == 0:
+                logger.info(
+                    f"Using metric-based checkpoint strategy '{self.save_strategy}'. "
+                    f"Checkpoints will be saved at validation time (--valid_steps), "
+                    f"not at --save_checkpoint_steps."
+                )
 
     def _is_better_metric(self, current, best):
         """Compare metric values based on greater_is_better setting.

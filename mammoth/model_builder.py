@@ -142,16 +142,17 @@ def get_attention_layers_kwargs(
             kwargs[attr] = getattr(model_opts, attr)
 
     # Default attn_dim_head to dim // heads (standard transformer convention)
-    # x-transformers defaults to 64 regardless of model size, which is wrong for e.g. dim=1024, heads=8 (should be 128).
     if 'attn_dim_head' not in kwargs:
         heads = kwargs.get('heads', 8)
         default_dim_head = dim // heads
         kwargs['attn_dim_head'] = default_dim_head
-        logger.info(
-            f'attn_dim_head not set — defaulting to dim // heads = {dim} // {heads} = {default_dim_head} '
-            f'for {side.name} (layer_stack_index={layer_stack_index}, xcoder_id={xcoder_id}). '
-            f'Set attn_dim_head explicitly in x_transformers_opts to suppress this message.'
-        )
+        import torch.distributed as dist
+        if not dist.is_initialized() or dist.get_rank() == 0:
+            logger.info(
+                f'attn_dim_head not set — defaulting to dim // heads = {dim} // {heads} = {default_dim_head} '
+                f'for {side.name} (layer_stack_index={layer_stack_index}, xcoder_id={xcoder_id}). '
+                f'Set attn_dim_head explicitly in x_transformers_opts to suppress this message.'
+            )
 
     kwargs.update({
         'dim': dim,
@@ -580,12 +581,11 @@ def build_model(
     if hasattr(model_opts, 'model_dtype'):
         if model_opts.model_dtype == 'fp16':
             dtype = torch.float16
-            logger.info('Initializing model in fp16 precision')
         elif model_opts.model_dtype == 'bf16':
             dtype = torch.bfloat16
-            logger.info('Initializing model in bf16 precision')
-        else:
-            logger.info('Initializing model in fp32 precision')
+    import torch.distributed as dist
+    if not dist.is_initialized() or dist.get_rank() == 0:
+        logger.info(f'Initializing model in {dtype} precision')
 
     # Set default dtype for model initialization
     torch.set_default_dtype(dtype)

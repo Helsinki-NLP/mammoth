@@ -1,13 +1,25 @@
 """
 Inference template for a Mammoth model converted to HuggingFace format.
 
+Supports two modes:
+
+1. **Single-task model** (converted with --src/--tgt or a single-task checkpoint):
+
+       python example_inference.py --model-dir ./my_model
+
+2. **Multi-task bundle** (converted with --single-artifact):
+   Use --task to pick which translation direction to run:
+
+       python example_inference.py --model-dir ./bundled_model --task eng-spa
+
 Mammoth uses separate source and target vocabularies, so two tokenizers are
 stored under the model directory (src_tokenizer/ and tgt_tokenizer/).  The
 subdirectory names are recorded in config.json under `src_tokenizer_dir` /
 `tgt_tokenizer_dir`.
 
-No `mammoth` package required — the x-transformers fork is vendored inside
-the model directory.
+No `mammoth` package required for single-task models. Multi-task bundles need
+the `mammoth` package (for `MammothHub`) or you can download individual tasks
+from HF Hub via `allow_patterns`.
 
 Install:
 
@@ -15,7 +27,7 @@ Install:
     # optional, for faster attention on supported GPUs:
     pip install flash-attn
 
-Minimal snippet (paste-and-go):
+Minimal snippet — single-task (paste-and-go):
 
     import os
     from transformers import AutoConfig, AutoModelForSeq2SeqLM, PreTrainedTokenizerFast
@@ -30,6 +42,19 @@ Minimal snippet (paste-and-go):
 
     inputs = src_tokenizer(["Hola, ¿cómo estás?"], return_tensors="pt", padding=True)
     inputs.pop("token_type_ids", None)                # not consumed by Mammoth encoder
+    output_ids = model.generate(**inputs, num_beams=4, max_new_tokens=128)
+    print(tgt_tokenizer.batch_decode(output_ids, skip_special_tokens=True))
+
+Minimal snippet — multi-task bundle:
+
+    from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub
+
+    model = MammothHub.from_pretrained("your-org/your-bundled-model", task="eng-spa")
+    # model is a standard MammothForConditionalGeneration — use tokenizers from bundle
+    src_tokenizer = model.src_tokenizer   # (if available)
+    tgt_tokenizer = model.tgt_tokenizer   # (if available)
+
+    inputs = src_tokenizer(["Hello!"], return_tensors="pt", padding=True)
     output_ids = model.generate(**inputs, num_beams=4, max_new_tokens=128)
     print(tgt_tokenizer.batch_decode(output_ids, skip_special_tokens=True))
 
@@ -48,11 +73,17 @@ not pin this, pass `use_cache=False` explicitly into `generate(...)`.
 
 Run as a script:
 
-    python example_inference.py
+    # Single-task:
+    python example_inference.py --model-dir ./my_model
     python example_inference.py --model-dir ./my_model --device cuda --num-beams 4
+
+    # Multi-task bundle:
+    python example_inference.py --model-dir ./bundled_model --task eng-spa
+    python example_inference.py --model-dir ./bundled_model --task eng-fra --device cuda
 """
 
 import argparse
+import json
 import os
 
 import torch
@@ -66,7 +97,18 @@ DEFAULT_SENTENCES = [
 ]
 
 
-def load(model_dir: str, device: str):
+def _is_bundle(model_dir: str) -> bool:
+    """Check if the model directory is a multi-task bundle."""
+    config_path = os.path.join(model_dir, "config.json")
+    if not os.path.isfile(config_path):
+        return False
+    with open(config_path) as f:
+        cfg = json.load(f)
+    return cfg.get("model_type") == "mammoth_hub"
+
+
+def load_single(model_dir: str, device: str):
+    """Load a single-task converted model."""
     config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
     src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
         os.path.join(model_dir, config.src_tokenizer_dir))
@@ -74,6 +116,25 @@ def load(model_dir: str, device: str):
         os.path.join(model_dir, config.tgt_tokenizer_dir))
     model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, trust_remote_code=True)
     model.to(device).eval()
+    return src_tokenizer, tgt_tokenizer, model
+
+
+def load_bundle(model_dir: str, task: str, device: str):
+    """Load a specific task from a multi-task bundled model."""
+    from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub
+
+    model = MammothHub.from_pretrained(model_dir, task=task, device=device)
+
+    # Load per-task tokenizers from the bundle
+    config_path = os.path.join(model_dir, "config.json")
+    with open(config_path) as f:
+        manifest = json.load(f)
+    task_info = manifest["tasks"][task]
+
+    src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+        os.path.join(model_dir, f"{task}_src_tokenizer"))
+    tgt_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+        os.path.join(model_dir, f"{task}_tgt_tokenizer"))
     return src_tokenizer, tgt_tokenizer, model
 
 
@@ -99,11 +160,14 @@ def main():
     )
     parser.add_argument("--model-dir", default=DEFAULT_MODEL_DIR,
                         help="Path to the converted model directory or a HF Hub repo id")
+    parser.add_argument("--task", default=None,
+                        help="Task name for multi-task bundles (e.g. eng-spa). "
+                             "Ignored for single-task models.")
     parser.add_argument("--device", default="cpu", help="cpu / cuda / mps")
     parser.add_argument("--num-beams", type=int, default=4)
     parser.add_argument("--max-new-tokens", type=int, default=128)
     parser.add_argument("--sentences", nargs="+", default=None,
-                        help="Sentences to translate (default: built-in Spanish examples)")
+                        help="Sentences to translate (default: built-in examples)")
     parser.add_argument("--input-file", default=None,
                         help="Path to a text file with one source sentence per line")
     parser.add_argument("--batch-size", type=int, default=32,
@@ -118,7 +182,21 @@ def main():
     else:
         sentences = args.sentences or DEFAULT_SENTENCES
 
-    src_tokenizer, tgt_tokenizer, model = load(args.model_dir, args.device)
+    # Auto-detect bundle vs single-task
+    if _is_bundle(args.model_dir):
+        if not args.task:
+            # List available tasks
+            with open(os.path.join(args.model_dir, "config.json")) as f:
+                tasks = list(json.load(f).get("tasks", {}).keys())
+            parser.error(
+                f"This is a multi-task bundle. Please specify --task. "
+                f"Available tasks: {tasks}"
+            )
+        src_tokenizer, tgt_tokenizer, model = load_bundle(
+            args.model_dir, args.task, args.device)
+    else:
+        src_tokenizer, tgt_tokenizer, model = load_single(
+            args.model_dir, args.device)
 
     out = open(args.output_file, "w") if args.output_file else None
     try:

@@ -42,6 +42,7 @@ if REPO_ROOT not in sys.path:
 import torch
 from transformers import PreTrainedTokenizerFast
 
+from mammoth.constants import DefaultTokens
 from mammoth.hf_integration.to_hf.configuration_mammoth import MammothConfig
 from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalGeneration
 
@@ -59,6 +60,10 @@ def config_from_opts(
     dec_attn_dim_head_override: int | None = None,
     enc_layers_override: int | None = None,
     dec_layers_override: int | None = None,
+    bos_token_id: int = 2,
+    eos_token_id: int = 0,
+    decoder_start_token_id: int = 2,
+    pad_token_id: int = 1,
 ) -> MammothConfig:
     """Build MammothConfig from a Mammoth opts Namespace."""
     xt = getattr(opts, 'x_transformers_opts', {}) or {}
@@ -115,7 +120,7 @@ def config_from_opts(
         enc_pre_norm=xt.get('enc_pre_norm', xt.get('pre_norm', False)),
         enc_use_rmsnorm=xt.get('enc_use_rmsnorm', xt.get('use_rmsnorm', False)),
         enc_layernorm_bias=xt.get('enc_layernorm_bias', True),
-        enc_norm_add_unit_offset=xt.get('enc_norm_add_unit_offset', False),
+        enc_norm_add_unit_offset=xt.get('enc_norm_add_unit_offset', True),
         enc_rotary_pos_emb=xt.get('enc_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
         enc_use_abs_pos_emb=xt.get('use_abs_pos_emb', True),
         enc_post_emb_norm=xt.get('enc_post_emb_norm', xt.get('post_emb_norm', True)),
@@ -142,7 +147,7 @@ def config_from_opts(
         dec_pre_norm=xt.get('dec_pre_norm', xt.get('pre_norm', False)),
         dec_use_rmsnorm=xt.get('dec_use_rmsnorm', xt.get('use_rmsnorm', False)),
         dec_layernorm_bias=xt.get('dec_layernorm_bias', True),
-        dec_norm_add_unit_offset=xt.get('dec_norm_add_unit_offset', False),
+        dec_norm_add_unit_offset=xt.get('dec_norm_add_unit_offset', True),
         dec_rotary_pos_emb=xt.get('dec_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
         dec_use_abs_pos_emb=xt.get('use_abs_pos_emb', True),
         dec_post_emb_norm=xt.get('dec_post_emb_norm', xt.get('post_emb_norm', True)),
@@ -157,6 +162,10 @@ def config_from_opts(
         # Misc
         tie_word_embeddings=tie_word_embeddings,
         model_dtype=getattr(opts, 'model_dtype', 'bf16'),
+        bos_token_id=bos_token_id,
+        eos_token_id=eos_token_id,
+        decoder_start_token_id=decoder_start_token_id,
+        pad_token_id=pad_token_id,
     )
 
 
@@ -225,6 +234,35 @@ def _task_xcoder_ids(opts, src: str, tgt: str):
     raise ValueError(f"Task {src}-{tgt} not found in opts.tasks. Available: {available}")
 
 
+def _infer_xcoder_ids_from_shards(ckpt_dir: str, prefix: str, src: str, tgt: str):
+    """Infer (encoder_id, decoder_id) lists by scanning shard filenames.
+
+    Falls back to ([src], [tgt]) when no matching shards are found.
+    Shard pattern: {prefix}_encoder_{i}_{id}.pt  (and decoder equivalent).
+    """
+    import re
+    enc_pattern = re.compile(rf'^{re.escape(prefix)}_encoder_(\d+)_(.+?)(?:_optim)?\.pt$')
+    dec_pattern = re.compile(rf'^{re.escape(prefix)}_decoder_(\d+)_(.+?)(?:_optim)?\.pt$')
+
+    enc_map, dec_map = {}, {}
+    for fname in os.listdir(ckpt_dir):
+        m = enc_pattern.match(fname)
+        if m:
+            enc_map[int(m.group(1))] = m.group(2)
+        m = dec_pattern.match(fname)
+        if m:
+            dec_map[int(m.group(1))] = m.group(2)
+
+    if enc_map and dec_map:
+        encoder_id = [enc_map[i] for i in sorted(enc_map)]
+        decoder_id = [dec_map[i] for i in sorted(dec_map)]
+        print(f"[WARN] opts.tasks empty — inferred from shards: encoder={encoder_id}, decoder={decoder_id}")
+        return encoder_id, decoder_id
+
+    print(f"[WARN] opts.tasks empty and no shards found — falling back to encoder=['{src}'], decoder=['{tgt}']")
+    return [src], [tgt]
+
+
 def assemble_state_dict(
     ckpt_dir: str, prefix: str, src: str, tgt: str,
     encoder_id: list, decoder_id: list,
@@ -278,6 +316,12 @@ def assemble_state_dict(
                 new_k = f'{hf_prefix}.layers.{global_idx}{rest[dot_pos:]}'
                 if local_idx > max_local_idx:
                     max_local_idx = local_idx
+            elif k.startswith('layers.'):
+                # AdaptedAttentionLayers stores layers under both 'layers.*' and '_base_layers.*'
+                # (same tensors, different names). Skip 'layers.*' here — '_base_layers.*' already
+                # handles the offset remapping. Without this skip, component N's 'layers.0-K.*'
+                # overwrites the correctly-offset weights from all earlier components.
+                continue
             else:
                 new_k = f'{hf_prefix}.{k}'
             sd[new_k] = v
@@ -349,6 +393,23 @@ def _patch_config_from_sd(config, hf_sd: dict) -> None:
     config.enc_post_emb_norm_bias = 'model.encoder.post_emb_norm.beta' in hf_sd
     config.dec_post_emb_norm_bias = 'model.decoder.post_emb_norm.beta' in hf_sd
 
+    # norm_add_unit_offset: x-transformers LayerNorm initialises gamma to 0 when unit_offset=True
+    # and the forward applies (gamma + 1). Detect by checking if post-main-norm gammas are near-zero
+    # (meaning zero-init was used) vs near-one (ones-init, unit_offset=False).
+    def _mean_gamma(side: str) -> float | None:
+        prefix = f'model.{side}.attn_layers.layers.'
+        gammas = [v for k, v in hf_sd.items() if k.startswith(prefix) and k.endswith('.0.2.gamma')]
+        if not gammas:
+            return None
+        return sum(g.mean().item() for g in gammas) / len(gammas)
+
+    enc_gamma_mean = _mean_gamma('encoder')
+    dec_gamma_mean = _mean_gamma('decoder')
+    if enc_gamma_mean is not None:
+        config.enc_norm_add_unit_offset = abs(enc_gamma_mean) < 0.1
+    if dec_gamma_mean is not None:
+        config.dec_norm_add_unit_offset = abs(dec_gamma_mean) < 0.1
+
 
 # ---------------------------------------------------------------------------
 # Main conversion
@@ -371,7 +432,21 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     tgt_vocab_size = len(tgt_vocab_obj)
     print(f"Vocab sizes: src={src_vocab_size}, tgt={tgt_vocab_size}")
 
-    encoder_id, decoder_id = _task_xcoder_ids(opts, src, tgt)
+    # Derive BOS/EOS/PAD token IDs from the src vocab specials.
+    # Mammoth trains with source wrapped as [BOS, tokens..., EOS].
+    # DefaultTokens.BOS = '<s>', DefaultTokens.EOS = '</s>'.
+    src_specials = src_vocab_obj.specials
+    bos_str = DefaultTokens.BOS
+    eos_str = DefaultTokens.EOS
+    bos_id = src_specials.get(bos_str, 2)
+    eos_id = src_specials.get(eos_str, 0)
+    pad_id = src_specials.get(DefaultTokens.PAD, 1)
+    print(f"Token IDs: BOS={bos_str!r}={bos_id}, EOS={eos_str!r}={eos_id}, PAD={pad_id}")
+
+    try:
+        encoder_id, decoder_id = _task_xcoder_ids(opts, src, tgt)
+    except ValueError:
+        encoder_id, decoder_id = _infer_xcoder_ids_from_shards(ckpt_dir, prefix, src, tgt)
     print(f"Task components: encoder={encoder_id}, decoder={decoder_id}")
 
     # When tied, x-transformers uses a lambda for to_logits (no saved weights).
@@ -416,6 +491,10 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
         dec_attn_dim_head_override=dec_attn_dim_head_override,
         enc_layers_override=enc_depth,
         dec_layers_override=dec_depth,
+        bos_token_id=bos_id,
+        eos_token_id=eos_id,
+        decoder_start_token_id=bos_id,
+        pad_token_id=pad_id,
     )
     _patch_config_from_sd(config, hf_sd)
     print(f"Config: enc {config.enc_layers}×{config.enc_model_dim}d "
@@ -451,22 +530,30 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     }
     model.save_pretrained(output_dir)
 
-    def _save_tokenizer(vocab_obj, subdir: str, label: str):
-        specials = vocab_obj.specials  # {'<s>': 0, '<pad>': 1, '</s>': 2, ...}
+    def _save_tokenizer(vocab_obj, subdir: str, label: str, add_bos_eos: bool = False):
+        specials = vocab_obj.specials
         _rev = {v: k for k, v in specials.items()}
         tok = PreTrainedTokenizerFast(
-            tokenizer_file=vocab_obj.path,
-            bos_token=_rev.get(config.bos_token_id, '<s>'),
-            eos_token=_rev.get(config.eos_token_id, '</s>'),
+            tokenizer_object=vocab_obj.tokenizer,
+            bos_token=_rev.get(config.bos_token_id, bos_str),
+            eos_token=_rev.get(config.eos_token_id, eos_str),
             unk_token=_rev.get(getattr(config, 'unk_token_id', 3), '<unk>'),
-            pad_token=_rev.get(config.pad_token_id, '<pad>'),
+            pad_token=_rev.get(config.pad_token_id, DefaultTokens.PAD),
         )
+        if add_bos_eos:
+            # Mirror Mammoth's _maybe_numericalize: source is always fed as [BOS, tokens..., EOS].
+            from tokenizers.processors import TemplateProcessing
+            tok._tokenizer.post_processor = TemplateProcessing(
+                single=f"{bos_str}:0 $A:0 {eos_str}:0",
+                special_tokens=[(bos_str, bos_id), (eos_str, eos_id)],
+            )
         save_path = os.path.join(output_dir, subdir)
         os.makedirs(save_path, exist_ok=True)
         tok.save_pretrained(save_path)
-        print(f"{label} tokenizer saved → {subdir}/ ({len(tok)} tokens)")
+        print(f"{label} tokenizer saved → {subdir}/ ({len(tok)} tokens)"
+              + (" [with BOS/EOS post-processor]" if add_bos_eos else ""))
 
-    _save_tokenizer(src_vocab_obj, config.src_tokenizer_dir, 'src')
+    _save_tokenizer(src_vocab_obj, config.src_tokenizer_dir, 'src', add_bos_eos=True)
     _save_tokenizer(tgt_vocab_obj, config.tgt_tokenizer_dir, 'tgt')
 
     here = os.path.dirname(os.path.abspath(__file__))

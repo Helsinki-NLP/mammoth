@@ -61,9 +61,8 @@ from transformers import AutoConfig, AutoModelForSeq2SeqLM, PreTrainedTokenizerF
 
 DEFAULT_MODEL_DIR = "./converted_model"
 DEFAULT_SENTENCES = [
-    "Hola, ¿cómo estás?",
-    "El gato está sobre la mesa.",
-    "La reunión empezará a las diez de la mañana.",
+    "Helsinki is the capital of Finland.",
+    "Beijing is the capital of China",
 ]
 
 

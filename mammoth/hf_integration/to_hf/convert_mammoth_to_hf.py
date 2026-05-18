@@ -571,24 +571,195 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     print(f"Saved to {output_dir}")
 
 
+# ---------------------------------------------------------------------------
+# Multi-task bundler
+# ---------------------------------------------------------------------------
+
+def _discover_tasks(opts) -> list[tuple[str, str]]:
+    """Return [(src, tgt), ...] for every task in opts.tasks, preserving order."""
+    tasks = getattr(opts, 'tasks', None) or {}
+    pairs = []
+    for corpus_opts in tasks.values():
+        src_tgt = corpus_opts.get('src_tgt', '')
+        src, _, tgt = src_tgt.partition('-')
+        if src and tgt:
+            pairs.append((src, tgt))
+    return pairs
+
+
+def convert_multi_task_artifact(
+    ckpt_dir: str,
+    output_dir: str,
+    step: int | None = None,
+) -> None:
+    """Convert all tasks from a multi-task checkpoint into a single bundled directory.
+
+    Each task is converted via the existing convert() into a temp dir, then the
+    weight files are renamed to {task}.safetensors and collected into output_dir
+    alongside shared code files and a manifest config.json.
+    """
+    import json
+    import tempfile
+
+    prefix = resolve_prefix(ckpt_dir, step)
+    frame = _load(os.path.join(ckpt_dir, f'{prefix}_frame.pt'))
+    all_pairs = _discover_tasks(frame['opts'])
+    if not all_pairs:
+        raise ValueError(f"No tasks found in checkpoint opts at {ckpt_dir}")
+
+    os.makedirs(output_dir, exist_ok=True)
+    task_manifest = {}
+
+    with tempfile.TemporaryDirectory(prefix="mammoth_convert_") as tmp:
+        for src, tgt in all_pairs:
+            task_name = f"{src}-{tgt}"
+            task_dir = os.path.join(tmp, task_name)
+            print(f"\n=== Converting task {task_name} ===")
+            convert(ckpt_dir, prefix, src, tgt, task_dir)
+
+            # Rename model.safetensors → {task_name}.safetensors in output_dir
+            src_sf = os.path.join(task_dir, "model.safetensors")
+            dst_sf = os.path.join(output_dir, f"{task_name}.safetensors")
+            if os.path.exists(src_sf):
+                shutil.move(src_sf, dst_sf)
+            else:
+                # Try .bin as fallback
+                src_bin = os.path.join(task_dir, "pytorch_model.bin")
+                if os.path.exists(src_bin):
+                    dst_bin = os.path.join(output_dir, f"{task_name}.bin")
+                    shutil.move(src_bin, dst_bin)
+
+            # Read per-task config to extract task-specific info for the manifest
+            task_config_path = os.path.join(task_dir, "config.json")
+            with open(task_config_path) as f:
+                task_config = json.load(f)
+
+            # Store the FULL per-task config (has all architecture params)
+            # plus convenience fields for the wrapper.
+            task_manifest[task_name] = {
+                **task_config,
+                "_src": src,
+                "_tgt": tgt,
+            }
+
+            # Copy per-task tokenizers into output_dir/{task_name}_src_tokenizer/
+            for tok_side in ("src_tokenizer", "tgt_tokenizer"):
+                tok_subdir = task_config.get(
+                    f"{tok_side}_dir", f"{tok_side}"
+                )
+                tok_src = os.path.join(task_dir, tok_subdir)
+                tok_dst = os.path.join(output_dir, f"{task_name}_{tok_side}")
+                if os.path.isdir(tok_src) and not os.path.exists(tok_dst):
+                    shutil.copytree(tok_src, tok_dst)
+
+    # Vendor shared code files once
+    here = os.path.dirname(os.path.abspath(__file__))
+    for fname in ("configuration_mammoth.py", "modeling_mammoth.py"):
+        shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
+    import mammoth.x_transformers as _mxt
+    xt_src_dir = os.path.dirname(_mxt.__file__)
+    for fname in ("x_transformers.py", "attend.py", "autoregressive_wrapper.py"):
+        shutil.copy(os.path.join(xt_src_dir, fname), os.path.join(output_dir, fname))
+
+    # Write manifest config.json
+    manifest = {
+        "model_type": "mammoth_hub",
+        "tasks": task_manifest,
+    }
+    with open(os.path.join(output_dir, "config.json"), "w") as f:
+        json.dump(manifest, f, indent=2)
+
+    print(f"\nBundled {len(task_manifest)} tasks into {output_dir}")
+    for t in task_manifest:
+        print(f"  {t}")
+
+
+def convert_checkpoint(
+    ckpt_dir: str,
+    output_dir: str,
+    task: str | None = None,
+    step: int | None = None,
+) -> None:
+    """Discover tasks from the checkpoint and convert each one into a subdirectory.
+
+    - task=None on a multi-task checkpoint  -> convert every task into output_dir/<src>-<tgt>/
+    - task=None on a single-task checkpoint -> convert flat into output_dir/
+    - task="src-tgt"                        -> convert only that task
+    """
+    prefix = resolve_prefix(ckpt_dir, step)
+    frame = _load(os.path.join(ckpt_dir, f'{prefix}_frame.pt'))
+    all_pairs = _discover_tasks(frame['opts'])
+    if not all_pairs:
+        raise ValueError(
+            f"No tasks found in checkpoint opts at {ckpt_dir}. "
+            "Checkpoint must contain opts.tasks with at least one src_tgt entry."
+        )
+
+    if task is not None:
+        src, _, tgt = task.partition('-')
+        if not src or not tgt:
+            raise ValueError(f"--task must be of the form 'SRC-TGT', got: {task!r}")
+        if (src, tgt) not in all_pairs:
+            available = [f"{s}-{t}" for s, t in all_pairs]
+            raise ValueError(
+                f"Task {task!r} not found in checkpoint. Available tasks: {available}"
+            )
+        pairs = [(src, tgt)]
+    else:
+        pairs = all_pairs
+
+    use_subdirs = len(all_pairs) > 1
+    for src, tgt in pairs:
+        out = os.path.join(output_dir, f"{src}-{tgt}") if use_subdirs else output_dir
+        print(f"\n=== Converting task {src}-{tgt} -> {out} ===")
+        convert(ckpt_dir, prefix, src, tgt, out)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert Mammoth checkpoint to HuggingFace format")
     parser.add_argument('--checkpoint-dir', required=True,
                         help="Directory containing Mammoth shard files")
-    parser.add_argument('--src', required=True,
-                        help="Source language id (e.g. 'es')")
-    parser.add_argument('--tgt', required=True,
-                        help="Target language id (e.g. 'en')")
     parser.add_argument('--output-dir', required=True,
                         help="Output directory for HF model")
-
+    parser.add_argument('--src', default=None,
+                        help="Source language id (e.g. 'es')")
+    parser.add_argument('--tgt', default=None,
+                        help="Target language id (e.g. 'en')")
+    parser.add_argument('--task', default=None,
+                        help="Convert only this src-tgt pair (e.g. 'eng-spa'). "
+                             "Mutually exclusive with --src/--tgt.")
     parser.add_argument('--step', type=int, default=None,
                         help="Load a specific checkpoint step (e.g. --step 500). "
                              "Default: best checkpoint, or last step if no best exists.")
+    parser.add_argument('--single-artifact', action='store_true',
+                        help="Bundle all tasks into a single HF directory with per-task shards.")
 
     args = parser.parse_args()
-    prefix = resolve_prefix(args.checkpoint_dir, args.step)
-    convert(args.checkpoint_dir, prefix, args.src, args.tgt, args.output_dir)
+
+    if args.single_artifact:
+        convert_multi_task_artifact(
+            ckpt_dir=args.checkpoint_dir,
+            output_dir=args.output_dir,
+            step=args.step,
+        )
+    elif args.task is not None:
+        convert_checkpoint(
+            ckpt_dir=args.checkpoint_dir,
+            output_dir=args.output_dir,
+            task=args.task,
+            step=args.step,
+        )
+    elif args.src and args.tgt:
+        prefix = resolve_prefix(args.checkpoint_dir, args.step)
+        convert(args.checkpoint_dir, prefix, args.src, args.tgt, args.output_dir)
+    else:
+        # No explicit mode — auto-detect: if multi-task, convert all per-task
+        convert_checkpoint(
+            ckpt_dir=args.checkpoint_dir,
+            output_dir=args.output_dir,
+            task=None,
+            step=args.step,
+        )
 
 
 if __name__ == '__main__':

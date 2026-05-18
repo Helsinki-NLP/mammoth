@@ -2,27 +2,31 @@
 """
 Convert a sharded Mammoth checkpoint → HuggingFace MammothForConditionalGeneration.
 
+The script discovers src/tgt language pairs from the checkpoint's stored opts.tasks —
+users do not pass --src/--tgt. Single-task checkpoints write flat into --output-dir;
+multi-task checkpoints write one subdirectory per task: <output_dir>/<src>-<tgt>/.
+
 Usage:
-    # Load the best checkpoint (default — requires *_best_frame.pt):
+    # Convert all tasks (default; best checkpoint):
     python convert_mammoth_to_hf.py \
         --checkpoint-dir path/to/checkpoint_dir \
-        --src es --tgt en --output-dir path/to/hf_output
+        --output-dir path/to/hf_output
 
-    # Load the checkpoint with the highest step number:
+    # Convert a specific task only (multi-task checkpoint):
     python convert_mammoth_to_hf.py \
         --checkpoint-dir path/to/checkpoint_dir \
-        --load-last \
-        --src es --tgt en --output-dir path/to/hf_output
+        --task eng-spa \
+        --output-dir path/to/hf_output
 
-    # Load a specific step:
+    # Load a specific step instead of the best checkpoint:
     python convert_mammoth_to_hf.py \
         --checkpoint-dir path/to/checkpoint_dir \
         --step 500 \
-        --src es --tgt en --output-dir path/to/hf_output
+        --output-dir path/to/hf_output
 
-The checkpoint directory must contain files produced by Mammoth's model saver.
-Best checkpoint naming:   _best_frame.pt, _best_src_embeddings_{src}.pt, ...
-Step checkpoint naming:   _step_{N}_frame.pt, _step_{N}_src_embeddings_{src}.pt, ...
+Checkpoint shard naming:
+    Best:  _best_frame.pt, _best_src_embeddings_{src}.pt, ...
+    Step:  _step_{N}_frame.pt, _step_{N}_src_embeddings_{src}.pt, ...
 
 Outputs saved with save_pretrained() plus copies of configuration_mammoth.py and
 modeling_mammoth.py so that trust_remote_code=True loading works.
@@ -571,24 +575,84 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     print(f"Saved to {output_dir}")
 
 
+def _discover_tasks(opts) -> list[tuple[str, str]]:
+    """Return [(src, tgt), ...] for every task in opts.tasks, preserving definition order."""
+    tasks = getattr(opts, 'tasks', None) or {}
+    pairs = []
+    for corpus_opts in tasks.values():
+        src_tgt = corpus_opts.get('src_tgt', '')
+        src, _, tgt = src_tgt.partition('-')
+        if src and tgt:
+            pairs.append((src, tgt))
+    return pairs
+
+
+def convert_checkpoint(
+    ckpt_dir: str,
+    output_dir: str,
+    task: str | None = None,
+    step: int | None = None,
+) -> None:
+    """Discover tasks from the checkpoint's stored opts and convert each one.
+
+    - task=None on a multi-task checkpoint  → convert every task into output_dir/<src>-<tgt>/
+    - task=None on a single-task checkpoint → convert flat into output_dir/
+    - task="src-tgt"                        → convert only that task; flat layout
+                                              (errors if pair is not in opts.tasks)
+    """
+    prefix = resolve_prefix(ckpt_dir, step)
+    frame = _load(os.path.join(ckpt_dir, f'{prefix}_frame.pt'))
+    all_pairs = _discover_tasks(frame['opts'])
+    if not all_pairs:
+        raise ValueError(
+            f"No tasks found in checkpoint opts at {ckpt_dir}. "
+            "Checkpoint must contain opts.tasks with at least one src_tgt entry."
+        )
+
+    if task is not None:
+        src, _, tgt = task.partition('-')
+        if not src or not tgt:
+            raise ValueError(f"--task must be of the form 'SRC-TGT', got: {task!r}")
+        if (src, tgt) not in all_pairs:
+            available = [f"{s}-{t}" for s, t in all_pairs]
+            raise ValueError(
+                f"Task {task!r} not found in checkpoint. Available tasks: {available}"
+            )
+        pairs = [(src, tgt)]
+    else:
+        pairs = all_pairs
+
+    # Subdir layout is determined by the checkpoint's task count, not the filtered
+    # selection: this keeps the output layout stable across invocations so a user can
+    # convert tasks one at a time into the same output dir without collisions.
+    use_subdirs = len(all_pairs) > 1
+    for src, tgt in pairs:
+        out = os.path.join(output_dir, f"{src}-{tgt}") if use_subdirs else output_dir
+        print(f"\n=== Converting task {src}-{tgt} → {out} ===")
+        convert(ckpt_dir, prefix, src, tgt, out)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Convert Mammoth checkpoint to HuggingFace format")
     parser.add_argument('--checkpoint-dir', required=True,
                         help="Directory containing Mammoth shard files")
-    parser.add_argument('--src', required=True,
-                        help="Source language id (e.g. 'es')")
-    parser.add_argument('--tgt', required=True,
-                        help="Target language id (e.g. 'en')")
     parser.add_argument('--output-dir', required=True,
-                        help="Output directory for HF model")
-
+                        help="Output directory for HF model(s). For multi-task checkpoints, "
+                             "one subdirectory per task is created (e.g. eng-spa/, eng-fra/).")
+    parser.add_argument('--task', default=None,
+                        help="Convert only this src-tgt pair (e.g. 'eng-spa'). "
+                             "Default: convert every task found in the checkpoint.")
     parser.add_argument('--step', type=int, default=None,
                         help="Load a specific checkpoint step (e.g. --step 500). "
                              "Default: best checkpoint, or last step if no best exists.")
 
     args = parser.parse_args()
-    prefix = resolve_prefix(args.checkpoint_dir, args.step)
-    convert(args.checkpoint_dir, prefix, args.src, args.tgt, args.output_dir)
+    convert_checkpoint(
+        ckpt_dir=args.checkpoint_dir,
+        output_dir=args.output_dir,
+        task=args.task,
+        step=args.step,
+    )
 
 
 if __name__ == '__main__':

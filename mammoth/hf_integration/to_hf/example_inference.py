@@ -18,8 +18,8 @@ subdirectory names are recorded in config.json under `src_tokenizer_dir` /
 `tgt_tokenizer_dir`.
 
 No `mammoth` package required for single-task models. Multi-task bundles need
-the `mammoth` package (for `MammothHub`) or you can download individual tasks
-from HF Hub via `allow_patterns`.
+the `mammoth` package (for `MammothHub`) — or use the vendored `mammoth_hub.py`
+copied into the artifact, which supports both local paths and HF Hub repo ids.
 
 Install:
 
@@ -47,7 +47,7 @@ Minimal snippet — single-task (paste-and-go):
 
 Minimal snippet — multi-task bundle:
 
-    from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub
+    from mammoth_hub import MammothHub  # vendored in the repo — no mammoth package needed
 
     model = MammothHub.from_pretrained("your-org/your-bundled-model", task="eng-spa")
     # model is a standard MammothForConditionalGeneration — use tokenizers from bundle
@@ -121,21 +121,13 @@ def load_single(model_dir: str, device: str):
 
 def load_bundle(model_dir: str, task: str, device: str):
     """Load a specific task from a multi-task bundled model."""
-    from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub
+    try:
+        from mammoth_hub import MammothHub  # vendored in the artifact
+    except ImportError:
+        from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub  # dev fallback
 
     model = MammothHub.from_pretrained(model_dir, task=task, device=device)
-
-    # Load per-task tokenizers from the bundle
-    config_path = os.path.join(model_dir, "config.json")
-    with open(config_path) as f:
-        manifest = json.load(f)
-    task_info = manifest["tasks"][task]
-
-    src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
-        os.path.join(model_dir, f"{task}_src_tokenizer"))
-    tgt_tokenizer = PreTrainedTokenizerFast.from_pretrained(
-        os.path.join(model_dir, f"{task}_tgt_tokenizer"))
-    return src_tokenizer, tgt_tokenizer, model
+    return model.src_tokenizer, model.tgt_tokenizer, model
 
 
 @torch.inference_mode()

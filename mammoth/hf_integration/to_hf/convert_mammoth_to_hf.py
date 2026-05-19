@@ -661,7 +661,7 @@ def convert_multi_task_artifact(
 
     # Vendor shared code files once
     here = os.path.dirname(os.path.abspath(__file__))
-    for fname in ("configuration_mammoth.py", "modeling_mammoth.py"):
+    for fname in ("configuration_mammoth.py", "modeling_mammoth.py", "mammoth_hub.py"):
         shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
     import mammoth.x_transformers as _mxt
     xt_src_dir = os.path.dirname(_mxt.__file__)

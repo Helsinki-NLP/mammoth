@@ -1,11 +1,34 @@
 """MammothHub: thin wrapper to load a specific task from a bundled multi-task HF repo.
 
-Usage:
-    model = MammothHub.from_pretrained("path/to/bundle", task="eng-spa")
-    output = model.generate(input_ids=src, max_length=50)
+Quickstart (no mammoth package needed):
 
-The wrapper reads the manifest config.json, loads the per-task safetensors,
-and returns a standard MammothForConditionalGeneration model ready for inference.
+    pip install transformers torch huggingface_hub einops
+
+    python - <<'EOF'
+    from huggingface_hub import hf_hub_download
+    import importlib.util, sys
+
+    # Step 1: fetch just this one file from the Hub (< 5 KB)
+    _path = hf_hub_download("org/my-mammoth-bundle", "mammoth_hub.py")
+    _spec = importlib.util.spec_from_file_location("mammoth_hub", _path)
+    _mod  = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    MammothHub = _mod.MammothHub
+
+    # Step 2: load the model (downloads only the requested task's weights)
+    model = MammothHub.from_pretrained("org/my-mammoth-bundle", task="eng-spa")
+    inputs = model.src_tokenizer(["Hello!"], return_tensors="pt")
+    out    = model.generate(**inputs, num_beams=4, max_new_tokens=128)
+    print(model.tgt_tokenizer.batch_decode(out, skip_special_tokens=True))
+    EOF
+
+If you already have the repo cloned / downloaded locally:
+
+    model = MammothHub.from_pretrained("/local/path/to/bundle", task="eng-spa")
+
+The wrapper reads config.json, downloads only the requested task's weights from
+the Hub, and returns a MammothForConditionalGeneration with .src_tokenizer and
+.tgt_tokenizer attached.
 """
 
 import json
@@ -13,6 +36,8 @@ import os
 import shutil
 import tempfile
 from typing import Optional
+
+from transformers import PreTrainedTokenizerFast
 
 
 class MammothHub:
@@ -28,17 +53,30 @@ class MammothHub:
         """Load a specific task model from a bundled multi-task directory.
 
         Args:
-            model_id: Path to the bundled directory (local path or HF repo id).
+            model_id: Local directory path or HF Hub repo id (e.g. "org/repo").
             task: Task name, e.g. "eng-spa".
             device: Device to load the model on (default: cpu).
 
         Returns:
             A MammothForConditionalGeneration model ready for inference.
         """
-        # TODO: support HF Hub repo ids (download via snapshot_download)
-        repo_path = model_id
-        if not os.path.isdir(repo_path):
-            raise FileNotFoundError(f"Not a directory: {repo_path}")
+        if os.path.isdir(model_id):
+            repo_path = model_id
+        else:
+            # HF Hub repo id — download only the files needed for this task so we
+            # don't pull the weights for every other task in the bundle.
+            from huggingface_hub import snapshot_download
+            repo_path = snapshot_download(
+                repo_id=model_id,
+                allow_patterns=[
+                    "config.json",
+                    "*.py",
+                    f"{task}.safetensors",
+                    f"{task}.bin",
+                    f"{task}_src_tokenizer/**",
+                    f"{task}_tgt_tokenizer/**",
+                ],
+            )
 
         # Read manifest
         manifest_path = os.path.join(repo_path, "config.json")
@@ -104,4 +142,11 @@ class MammothHub:
         if device:
             model = model.to(device)
         model.eval()
+
+        # Attach tokenizers so callers don't need to know the bundle layout.
+        model.src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+            os.path.join(repo_path, f"{task}_src_tokenizer"))
+        model.tgt_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+            os.path.join(repo_path, f"{task}_tgt_tokenizer"))
+
         return model

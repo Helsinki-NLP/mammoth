@@ -119,13 +119,31 @@ def load_single(model_dir: str, device: str):
     return src_tokenizer, tgt_tokenizer, model
 
 
+def _load_mammoth_hub(model_id: str):
+    """Import MammothHub, bootstrapping from the Hub if neither local copy is available."""
+    try:
+        from mammoth_hub import MammothHub  # vendored in the artifact or on sys.path
+        return MammothHub
+    except ImportError:
+        pass
+    try:
+        from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub  # dev install
+        return MammothHub
+    except ImportError:
+        pass
+    # Clean environment: fetch mammoth_hub.py directly from the Hub repo
+    from huggingface_hub import hf_hub_download
+    import importlib.util
+    _path = hf_hub_download(model_id, "mammoth_hub.py")
+    _spec = importlib.util.spec_from_file_location("mammoth_hub", _path)
+    _mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    return _mod.MammothHub
+
+
 def load_bundle(model_dir: str, task: str, device: str):
     """Load a specific task from a multi-task bundled model."""
-    try:
-        from mammoth_hub import MammothHub  # vendored in the artifact
-    except ImportError:
-        from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub  # dev fallback
-
+    MammothHub = _load_mammoth_hub(model_dir)
     model = MammothHub.from_pretrained(model_dir, task=task, device=device)
     return model.src_tokenizer, model.tgt_tokenizer, model
 
@@ -174,18 +192,18 @@ def main():
     else:
         sentences = args.sentences or DEFAULT_SENTENCES
 
-    # Auto-detect bundle vs single-task
-    if _is_bundle(args.model_dir):
-        if not args.task:
-            # List available tasks
-            with open(os.path.join(args.model_dir, "config.json")) as f:
-                tasks = list(json.load(f).get("tasks", {}).keys())
-            parser.error(
-                f"This is a multi-task bundle. Please specify --task. "
-                f"Available tasks: {tasks}"
-            )
+    # Route: explicit --task → bundle; otherwise auto-detect
+    if args.task:
         src_tokenizer, tgt_tokenizer, model = load_bundle(
             args.model_dir, args.task, args.device)
+    elif _is_bundle(args.model_dir):
+        config_path = os.path.join(args.model_dir, "config.json")
+        with open(config_path) as f:
+            tasks = list(json.load(f).get("tasks", {}).keys())
+        parser.error(
+            f"This is a multi-task bundle. Please specify --task. "
+            f"Available tasks: {tasks}"
+        )
     else:
         src_tokenizer, tgt_tokenizer, model = load_single(
             args.model_dir, args.device)

@@ -98,22 +98,39 @@ DEFAULT_SENTENCES = [
 
 
 def _is_bundle(model_dir: str) -> bool:
-    """Check if the model directory is a multi-task bundle."""
+    """Check if the model directory/repo is a multi-task bundle."""
     config_path = os.path.join(model_dir, "config.json")
-    if not os.path.isfile(config_path):
-        return False
-    with open(config_path) as f:
-        cfg = json.load(f)
-    return cfg.get("model_type") == "mammoth_hub"
+    if os.path.isfile(config_path):
+        with open(config_path) as f:
+            cfg = json.load(f)
+        return cfg.get("model_type") == "mammoth_hub"
+    # HF Hub repo id: fetch config.json remotely
+    if not os.path.exists(model_dir):
+        try:
+            from huggingface_hub import hf_hub_download
+            _cfg_path = hf_hub_download(model_dir, "config.json")
+            with open(_cfg_path) as f:
+                cfg = json.load(f)
+            return cfg.get("model_type") == "mammoth_hub"
+        except Exception:
+            return False
+    return False
 
 
 def load_single(model_dir: str, device: str):
     """Load a single-task converted model."""
     config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
-    src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
-        os.path.join(model_dir, config.src_tokenizer_dir))
-    tgt_tokenizer = PreTrainedTokenizerFast.from_pretrained(
-        os.path.join(model_dir, config.tgt_tokenizer_dir))
+    if os.path.isdir(model_dir):
+        src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+            os.path.join(model_dir, config.src_tokenizer_dir))
+        tgt_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+            os.path.join(model_dir, config.tgt_tokenizer_dir))
+    else:
+        # HF Hub repo id: use subfolder= instead of os.path.join
+        src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+            model_dir, subfolder=config.src_tokenizer_dir)
+        tgt_tokenizer = PreTrainedTokenizerFast.from_pretrained(
+            model_dir, subfolder=config.tgt_tokenizer_dir)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_dir, trust_remote_code=True)
     model.to(device).eval()
     return src_tokenizer, tgt_tokenizer, model
@@ -192,18 +209,15 @@ def main():
     else:
         sentences = args.sentences or DEFAULT_SENTENCES
 
-    # Route: explicit --task → bundle; otherwise auto-detect
-    if args.task:
+    # Route: auto-detect bundle vs standalone; --task required for bundles only
+    if _is_bundle(args.model_dir):
+        if not args.task:
+            parser.error(
+                "This is a multi-task bundle. Please specify --task "
+                "(e.g. --task eng-spa)."
+            )
         src_tokenizer, tgt_tokenizer, model = load_bundle(
             args.model_dir, args.task, args.device)
-    elif _is_bundle(args.model_dir):
-        config_path = os.path.join(args.model_dir, "config.json")
-        with open(config_path) as f:
-            tasks = list(json.load(f).get("tasks", {}).keys())
-        parser.error(
-            f"This is a multi-task bundle. Please specify --task. "
-            f"Available tasks: {tasks}"
-        )
     else:
         src_tokenizer, tgt_tokenizer, model = load_single(
             args.model_dir, args.device)

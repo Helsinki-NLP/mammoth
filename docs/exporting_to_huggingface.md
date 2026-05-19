@@ -138,3 +138,16 @@ python inference.py \
 --task <task-id> \
 --input-file \
 ```
+
+With the above two approaches, the Hugging Face Transformers library will automatically download the model to the cache directory.
+If you want to download the model to a local path for repeated use, use `mammoth/hf_integration/to_hf/model_downloader.py`:
+```bash                            
+##### 1. Single-task model — download everything
+python model_downloader.py --repo-id org/my-model --local-dir ./my_model                                                          
+                                                                                                                                
+##### 2. Multi-task single artifact — download everything                                                                             
+python model_downloader.py --repo-id org/my-bundle --local-dir ./my_bundle                                                        
+                                                                                                                                
+##### 3. Multi-task single artifact — download ONE task only (saves disk space / bandwidth)
+python model_downloader.py --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
+```

@@ -1,10 +1,10 @@
-We provide conversion scripts for users to convert Mammoth pre-trained models to Hugging Face Model Hub compatible format, so users can download Mammoth models on Model Hub for inference without setting up Mammoth.
+We provide scripts to convert Mammoth pre-trained models to Hugging Face Model Hub compatible format, so users can download Mammoth models from Model Hub for inference without setting up Mammoth.
 
 **This guide covers:** model conversion → pushing to Hub → running inference → downloading locally.
 
 ## How We Convert the Model
 
-Since Mammoth uses [x-transformers](https://github.com/lucidrains/x-transformers/tree/main/x_transformers) as its transformer backend, converting a Mammoth pre-trained model perfectly into Hugging Face format would require rewriting all transformer-related implementations in Hugging Face format. To save time, we instead bundle the Mammoth model together with its backend (x-transformers related files) and upload the bundle to Model Hub, so users can use the model without worrying about the dependencies.
+Since Mammoth uses [x-transformers](https://github.com/lucidrains/x-transformers/tree/main/x_transformers) as its transformer backend, converting a Mammoth pre-trained model perfectly into Hugging Face format would require rewriting all transformer-related implementations in Hugging Face format. As a practical alternative, we bundle the Mammoth model together with its backend (x-transformers related files) and upload the bundle to Model Hub, so users can use the model without worrying about the dependencies.
 
 ## Model Conversion
 
@@ -18,7 +18,7 @@ python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
   --output-dir <path>
 ```
 
-By default, the script loads the best checkpoint (`_best_frame.pt`) if one exists, otherwise it falls back to the checkpoint with the highest step number. You can also use `--step` to load a specific checkpoint step.
+By default, the script loads the best checkpoint (`_best_frame.pt`) if one exists; otherwise it falls back to the checkpoint with the highest step number. You can also use `--step` to load a specific checkpoint step.
 
 The output directory will have the following structure:
 
@@ -140,11 +140,11 @@ python mammoth/hf_integration/to_hf/push_to_hub.py \
   [--token YOUR_HF_TOKEN]
 ```
 
-This script uploads the entire directory, so it works regardless of whether you are pushing a single-task model, a multi-task model, or a single artifact.
+This script uploads the entire directory, so it works for single-task, multi-task, and single-artifact models alike.
 
 ## Inference
 
-Users can use `mammoth/hf_integration/to_hf/inference.py` to run inference with a converted Mammoth model from Hugging Face Model Hub.
+Use `mammoth/hf_integration/to_hf/inference.py` to run inference with a converted Mammoth model from Hugging Face Model Hub.
 
 No Mammoth installation is required. Set up a fresh environment with the minimum dependencies:
 
@@ -186,7 +186,7 @@ python inference.py \
 
 ## Download Models for Local Use
 
-With the above approaches, the Hugging Face Transformers library will automatically download the model to the cache directory. If you want to download the model to a local path for repeated use, use `mammoth/hf_integration/to_hf/model_downloader.py`:
+By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `mammoth/hf_integration/to_hf/model_downloader.py`:
 
 ```bash
 # Single-task model — download everything

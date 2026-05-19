@@ -16,12 +16,11 @@ The original ONMT-py documentation is available [here](https://opennmt.net/OpenN
 
 We thank the NVIDIA AI Technology Center Finland for their help with the multi-gpu/node implementation.
 
-For the big updates in this branch, see CHANGELOG.md.
 
 For working on LUMI supercomputer environments, see the [LUMI quickstart guide](csc_env/README.md).
 
 We recommend to use the Hugging Face Tokenizer for training and inferencing in Mammoth, see the [HF Tokenizers guide](docs/HF_TOKENIZERS.md).
 
-For loading pretrained model weights from Hugging Face Model Hub, see the [Loading HF Models guide](docs/LOADING_HF_MODELS.md).
+To export the Mammoth pretrained model weights to Hugging Face Model Hub, see the [Exporting Mammoth to Model Hub guide](docs/exporting_to_huggingface.md).
 
 Please find the template config files for single node training and inferencing at `csc_env/lumi/train.yaml` and `csc_env/lumi/inference.yaml`.

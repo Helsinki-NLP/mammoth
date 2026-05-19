@@ -42,7 +42,6 @@ python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
 --checkpoint-dir \
 --output-dir
 ```
-You can also use the `--task` flag to convert only a specific task, since each converted model is standalone.
 Each task gets its own subdirectory, and each subdirectory has the same structure as the single-task model:
 
 ```
@@ -67,6 +66,7 @@ hf_multi_task/
 └── task2/                        # same structure as task1
     └── ...
 ```
+You can also use the `--task` flag to convert only a specific task, since each converted model is standalone.
 
 - Convert all submodels into one artifact:
 ```bash
@@ -114,6 +114,16 @@ This script uploads the entire directory, so it works regardless of whether you 
 
 ## Inference with the Mammoth Model on Hugging Face
 Users can use `mammoth/hf_integration/to_hf/inference.py` to run inference with a converted Mammoth model from Hugging Face Model Hub.
+
+No Mammoth installation is required. Set up a fresh environment with the minimum dependencies:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate       
+pip install transformers torch einops einx loguru packaging
+# optional: faster attention on supported GPUs
+pip install flash-attn
+```
 
 ### To run inference on a standalone model from Hugging Face
 ```bash

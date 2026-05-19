@@ -122,7 +122,10 @@ def config_from_opts(
         enc_ff_dropout=xt.get('enc_ff_dropout', xt.get('ff_dropout', 0.0)),
         # Encoder norm/pos
         enc_pre_norm=xt.get('enc_pre_norm', xt.get('pre_norm', False)),
-        enc_use_rmsnorm=xt.get('enc_use_rmsnorm', xt.get('use_rmsnorm', False)),
+        # use_fused_rmsnorm is a separate flag in x-transformers (FusedRMSNorm backed by nn.RMSNorm).
+        # For unit_offset=True (the default), both FusedRMSNorm and RMSNorm store the scale delta
+        # as `.g` and compute x/rms(x)*(g+1), so the HF model can use use_rmsnorm=True safely.
+        enc_use_rmsnorm=xt.get('enc_use_rmsnorm', xt.get('use_rmsnorm', False)) or xt.get('enc_use_fused_rmsnorm', xt.get('use_fused_rmsnorm', False)),
         enc_layernorm_bias=xt.get('enc_layernorm_bias', True),
         enc_norm_add_unit_offset=xt.get('enc_norm_add_unit_offset', True),
         enc_rotary_pos_emb=xt.get('enc_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
@@ -149,7 +152,7 @@ def config_from_opts(
         dec_ff_dropout=xt.get('dec_ff_dropout', xt.get('ff_dropout', 0.0)),
         # Decoder norm/pos
         dec_pre_norm=xt.get('dec_pre_norm', xt.get('pre_norm', False)),
-        dec_use_rmsnorm=xt.get('dec_use_rmsnorm', xt.get('use_rmsnorm', False)),
+        dec_use_rmsnorm=xt.get('dec_use_rmsnorm', xt.get('use_rmsnorm', False)) or xt.get('dec_use_fused_rmsnorm', xt.get('use_fused_rmsnorm', False)),
         dec_layernorm_bias=xt.get('dec_layernorm_bias', True),
         dec_norm_add_unit_offset=xt.get('dec_norm_add_unit_offset', True),
         dec_rotary_pos_emb=xt.get('dec_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
@@ -391,18 +394,22 @@ def _patch_config_from_sd(config, hf_sd: dict) -> None:
     config.enc_ff_no_bias = not _has('encoder', '.ff.0.0.bias') and not _has('encoder', '.ff.2.bias')
     config.dec_ff_no_bias = not _has('decoder', '.ff.0.0.bias') and not _has('decoder', '.ff.2.bias')
 
-    # post_emb_norm presence/bias
-    config.enc_post_emb_norm = 'model.encoder.post_emb_norm.gamma' in hf_sd
-    config.dec_post_emb_norm = 'model.decoder.post_emb_norm.gamma' in hf_sd
+    # post_emb_norm presence/bias: LayerNorm uses .gamma, RMSNorm uses .g
+    config.enc_post_emb_norm = (
+        'model.encoder.post_emb_norm.gamma' in hf_sd or 'model.encoder.post_emb_norm.g' in hf_sd
+    )
+    config.dec_post_emb_norm = (
+        'model.decoder.post_emb_norm.gamma' in hf_sd or 'model.decoder.post_emb_norm.g' in hf_sd
+    )
     config.enc_post_emb_norm_bias = 'model.encoder.post_emb_norm.beta' in hf_sd
     config.dec_post_emb_norm_bias = 'model.decoder.post_emb_norm.beta' in hf_sd
 
-    # norm_add_unit_offset: x-transformers LayerNorm initialises gamma to 0 when unit_offset=True
-    # and the forward applies (gamma + 1). Detect by checking if post-main-norm gammas are near-zero
-    # (meaning zero-init was used) vs near-one (ones-init, unit_offset=False).
+    # norm_add_unit_offset: norms init their scale param to 0 when unit_offset=True (effective=1).
+    # LayerNorm uses .gamma, RMSNorm/FusedRMSNorm (unit_offset mode) uses .g — check both.
     def _mean_gamma(side: str) -> float | None:
         prefix = f'model.{side}.attn_layers.layers.'
-        gammas = [v for k, v in hf_sd.items() if k.startswith(prefix) and k.endswith('.0.2.gamma')]
+        gammas = [v for k, v in hf_sd.items()
+                  if k.startswith(prefix) and (k.endswith('.0.2.gamma') or k.endswith('.0.2.g'))]
         if not gammas:
             return None
         return sum(g.mean().item() for g in gammas) / len(gammas)

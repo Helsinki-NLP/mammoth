@@ -66,7 +66,7 @@ def get_base_optimizer(opts):
             betas=betas,
             eps=1e-9,
             weight_decay=opts.weight_decay,
-            fused=getattr(opts, 'adamw_fused', False),
+            fused=True,
         )
     else:
         raise ValueError('Invalid optimizer type: ' + opts.optim)

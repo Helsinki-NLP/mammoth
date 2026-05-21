@@ -193,3 +193,8 @@ TIMEOUT_BUG_EXPLAINED.md
 TOKENIZATION_FLOW_CORRECTION.md
 trace_sandwich_norm.py
 TRAIN_INFERENCE_MISMATCH_ISSUE.md
+
+
+mammoth/hf_integration/to_hf/hf_*
+mammoth/hf_integration/to_hf/mammoth_*
+mammoth/hf_integration/to_hf/single_*

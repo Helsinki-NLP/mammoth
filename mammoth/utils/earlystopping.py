@@ -91,6 +91,27 @@ class EarlyStopping(object):
         self.status = PatienceEnum.IMPROVING
         self.current_step_best = 0
 
+    def update(self, is_new_best, step):
+        """Update early stopping state using a pre-computed is_new_best boolean.
+
+        Use this instead of __call__ when the improvement signal comes from an
+        aggregated metric (e.g. from model_saver across all distributed tasks).
+        Patience decreases whenever the aggregated metric did not improve.
+
+        :param is_new_best: True if the aggregated validation metric improved
+        :param step: Current training step
+        """
+        if self.status == PatienceEnum.STOPPED:
+            return
+
+        if is_new_best:
+            self.current_step_best = step
+            self.current_tolerance = self.tolerance
+            self.stalled_tolerance = self.tolerance
+            self.status = PatienceEnum.IMPROVING
+        else:
+            self._update_decreasing()
+
     def __call__(self, valid_stats, step):
         """
             Update the internal state of early stopping mechanism, whether to

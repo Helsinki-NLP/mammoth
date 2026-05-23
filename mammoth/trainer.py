@@ -461,21 +461,23 @@ class Trainer(object):
                 # For save_strategy='steps': only track metrics, don't save (saving is
                 # controlled by save_checkpoint_steps in the block below).
                 # For metric-based strategies: save checkpoint based on metric comparison.
+                is_new_best = False
                 if self.model_saver is not None:
                     save_strategy = getattr(self.model_saver, 'save_strategy', 'steps')
                     if save_strategy == 'steps':
-                        self.model_saver.track_metric(step, valid_stats, device_context)
+                        is_new_best = self.model_saver.track_metric(step, valid_stats, device_context)
                     else:
-                        self.model_saver.save_with_metric(
+                        is_new_best = self.model_saver.save_with_metric(
                             step, self._data_state, valid_stats, device_context, moving_average=self.moving_average
                         )
 
-                # Early stopping: master evaluates, then broadcasts decision to all ranks
-                # All ranks must break together to avoid NCCL deadlock from asymmetric exits
+                # Early stopping: driven by aggregated is_new_best from model_saver so that
+                # all tasks across all GPUs inform the patience counter, not just the master's
+                # local tasks. Master keeps count, then broadcasts stop decision.
                 should_stop = False
                 if device_context.is_master():
-                    if self.earlystopper is not None and valid_stats is not None:
-                        self.earlystopper(valid_stats, step)
+                    if self.earlystopper is not None and self.model_saver is not None:
+                        self.earlystopper.update(is_new_best, step)
                         if self.earlystopper.has_stopped():
                             logger.info(f"Early stopping triggered at step {step}")
                             if self.earlystopper.current_step_best is not None:

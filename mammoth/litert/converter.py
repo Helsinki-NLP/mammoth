@@ -132,12 +132,12 @@ def convert_to_tflite(
 
     quant_config = None
     if quantize:
-        from litert_torch._convert.interface import _default_quant_config
-        try:
-            quant_config = _default_quant_config()
-        except Exception:
-            # _default_quant_config is an internal; fall back gracefully.
-            quant_config = None
+        from litert_torch.quantize.pt2e_quantizer import PT2EQuantizer, get_symmetric_quantization_config
+        from litert_torch.quantize.quant_config import QuantConfig
+        quantizer = PT2EQuantizer().set_global(
+            get_symmetric_quantization_config(is_dynamic=True)
+        )
+        quant_config = QuantConfig(pt2e_quantizer=quantizer)
 
     edge_model = litert_torch.convert(
         wrapper,

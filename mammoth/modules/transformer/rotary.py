@@ -39,8 +39,8 @@ def apply_rotary(
 ) -> tuple[Tensor, Tensor]:
     # q, k: (batch, heads, seq, dim_head)
     # cos, sin: (seq, dim_head)
-    cos = cos.unsqueeze(0).unsqueeze(0)  # (1, 1, seq, dim_head)
-    sin = sin.unsqueeze(0).unsqueeze(0)
+    cos = cos.unsqueeze(0).unsqueeze(0).to(dtype=q.dtype)  # (1, 1, seq, dim_head)
+    sin = sin.unsqueeze(0).unsqueeze(0).to(dtype=q.dtype)
     q_rot = q * cos + _rotate_half(q) * sin
     k_rot = k * cos + _rotate_half(k) * sin
     return q_rot, k_rot

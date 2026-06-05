@@ -34,6 +34,10 @@ class NativeTransformerWrapper(nn.Module):
         self.emb_dropout = nn.Dropout(emb_dropout)
         self.return_only_embed = return_only_embed
 
+    @property
+    def can_cache_kv(self) -> bool:
+        return True
+
     def forward(
         self,
         x: Tensor,
@@ -43,8 +47,10 @@ class NativeTransformerWrapper(nn.Module):
         return_embeddings: bool = False,
         return_logits_and_embeddings: bool = False,
         return_attn: bool = False,
+        return_intermediates: bool = False,
         cache: Optional[KVCache] = None,
-    ) -> Union[Tensor, tuple[Tensor, Tensor]]:
+        seq_start_pos: Optional[int] = None,
+    ) -> Union[Tensor, tuple[Tensor, KVCache]]:
         h = self.emb_dropout(self.post_emb_norm(self.token_emb(x)))
         rotary = self.rotary_emb(h.size(1), h.device) if self.rotary_emb is not None else None
         # Reshape (batch, seq) bool mask → (batch, 1, 1, seq) for SDPA key masking
@@ -58,6 +64,8 @@ class NativeTransformerWrapper(nn.Module):
         if return_embeddings or self.return_only_embed:
             return h
         logits = self.to_logits(h)
+        if return_intermediates:
+            return logits, cache
         if return_logits_and_embeddings:
             return logits, h
         return logits

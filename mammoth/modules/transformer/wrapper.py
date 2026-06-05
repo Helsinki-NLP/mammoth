@@ -42,10 +42,16 @@ class NativeTransformerWrapper(nn.Module):
         context_mask: Optional[Tensor] = None,
         return_embeddings: bool = False,
         return_logits_and_embeddings: bool = False,
+        return_attn: bool = False,
         cache: Optional[KVCache] = None,
     ) -> Union[Tensor, tuple[Tensor, Tensor]]:
         h = self.emb_dropout(self.post_emb_norm(self.token_emb(x)))
         rotary = self.rotary_emb(h.size(1), h.device) if self.rotary_emb is not None else None
+        # Reshape (batch, seq) bool mask → (batch, 1, 1, seq) for SDPA key masking
+        if mask is not None and mask.dim() == 2:
+            mask = mask[:, None, None, :]
+        if context_mask is not None and context_mask.dim() == 2:
+            context_mask = context_mask[:, None, None, :]
         for stack in self.stacks:
             h, cache = stack(h, mask=mask, context=context,
                              context_mask=context_mask, rotary=rotary, cache=cache)

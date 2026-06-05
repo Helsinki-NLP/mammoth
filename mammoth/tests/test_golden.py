@@ -36,7 +36,7 @@ _parser = ArgumentParser(description='golden')
 mammoth.opts.model_opts(_parser)
 mammoth.opts._add_train_general_opts(_parser)
 
-_BASE_ARGS = '-tasks dummy -node_rank 0'
+_BASE_ARGS = '-tasks dummy -node_rank 0 -seed 42 -max_length 512'
 
 
 def _fixtures_exist():

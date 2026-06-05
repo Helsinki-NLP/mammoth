@@ -52,3 +52,6 @@ class TransformerStack(nn.Module):
     @property
     def depth(self) -> int:
         return len(self.blocks)
+
+    def get_sub_modules(self) -> dict:
+        return dict(self._modules)

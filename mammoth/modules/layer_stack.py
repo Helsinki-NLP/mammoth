@@ -1,129 +1,48 @@
 from torch import nn
-from typing import List, Sequence, Optional, Tuple, Dict
-from mammoth.x_transformers import TransformerWrapper
-from mammoth.x_transformers.x_transformers import LayerIntermediates, TokenEmbedding
+from typing import Optional, Dict
 
-from mammoth.modules.adapters import AdaptedAttentionLayers, Adapter
+from mammoth.modules.transformer import NativeTransformerWrapper, TransformerStack
 
-
-class AdaptedAttentionLayersStack(nn.Module):
-    """
-    Wrapper that allows stacking multiple AdaptedAttentionLayers.
-    Represents one particular task-specific stacking: does not allow switching out entire layers
-    (but does delegate the switching out of adapters to its components)
-    """
-    def __init__(self, attention_layers_stack: Sequence[AdaptedAttentionLayers]):
-        super().__init__()
-        self.attention_layers_stack = nn.ModuleList(attention_layers_stack)
-        assert len(set(attention_layers.dim for attention_layers in attention_layers_stack)) == 1, \
-            'All AdaptedAttentionLayers must have the same dimension'
-
-    def forward(self, x, return_hiddens=False, cache: Optional[List[LayerIntermediates]] = None, **kwargs):
-        all_intermediates = []
-        for i, attention_layers in enumerate(self.attention_layers_stack):
-            if cache:
-                cache_i = cache[i]
-            else:
-                cache_i = None
-            if return_hiddens:
-                x, intermediates = attention_layers.forward(x, return_hiddens=True, cache=cache_i, **kwargs)
-                all_intermediates.append(intermediates)
-            else:
-                x = attention_layers.forward(x, return_hiddens=False, cache=cache_i, **kwargs)
-        if return_hiddens:
-            return x, all_intermediates
-        else:
-            return x
-
-    def freeze_base_model(self, requires_grad=False):
-        for attention_layers in self.attention_layers_stack:
-            attention_layers.freeze_base_model(requires_grad=requires_grad)
-
-    def deactivate_adapters(self):
-        for attention_layers in self.attention_layers_stack:
-            attention_layers.deactivate_adapters()
-
-    def activate_adapter(self, layer_stack_index: int, adapter_group: str, sub_id: str):
-        attention_layers = self.attention_layers_stack[layer_stack_index]
-        attention_layers.activate_adapter(adapter_group, sub_id)
-
-    @property
-    def dim(self):
-        return self.attention_layers_stack[0].dim
-
-    @property
-    def depth(self):
-        return len(self.attention_layers_stack)
-
-    @property
-    def can_cache_kv(self):
-        # A stack can cache KV if all its constituent layers can.
-        # This is a simplification; a more complex logic might check if specific layers support it.
-        # For now, we assume if one layer in the stack can't cache, the whole stack can't.
-        if not self.attention_layers_stack:
-            return False
-        return all(attn_layers.can_cache_kv for attn_layers in self.attention_layers_stack)
-
-    @property
-    def disable_abs_pos_emb(self):
-        return self.attention_layers_stack[0].disable_abs_pos_emb
-
-    @property
-    def causal(self):
-        return self.attention_layers_stack[0].causal
 
 class StackXcoder(nn.ModuleDict):
     """
-    Switches between different AdaptedAttentionLayersStacks depending on the task.
+    Switches between different NativeTransformerWrappers depending on the task.
     """
     def __init__(
         self,
-        transformer_wrappers: Dict[str, TransformerWrapper],
-        attention_layer_blocks: Dict[int, Dict[str, AdaptedAttentionLayers]],
-        token_embs: Dict[str, TokenEmbedding],
-        adapters: Optional[Dict[str, Adapter]],
+        transformer_wrappers: Dict[str, NativeTransformerWrapper],
+        attention_layer_blocks: Dict[int, Dict[str, TransformerStack]],
+        token_embs: Dict[str, nn.Embedding],
+        adapters=None,  # no longer used; kept for call-site compatibility until Phase 3 rewrites model_builder
         per_component_post_emb_norms: Optional[Dict[tuple, nn.Module]] = None,
         per_component_pos_embs: Optional[Dict[tuple, nn.Module]] = None,
         per_component_project_embs: Optional[Dict[tuple, nn.Module]] = None,
         per_component_to_logits: Optional[Dict[tuple, nn.Module]] = None,
     ):
         super().__init__(transformer_wrappers)
-        self.attention_layers_by_xcoder_id: Dict[int, Dict[str, AdaptedAttentionLayers]] = attention_layer_blocks
-        self.token_embs: Dict[str, TokenEmbedding] = token_embs
+        self.attention_layers_by_xcoder_id: Dict[int, Dict[str, TransformerStack]] = attention_layer_blocks
+        self.token_embs: Dict[str, nn.Embedding] = token_embs
         self.active_task: Optional[str] = None
-        self.adapters = adapters
         self.per_component_post_emb_norms = per_component_post_emb_norms or {}
         self.per_component_pos_embs = per_component_pos_embs or {}
         self.per_component_project_embs = per_component_project_embs or {}
         self.per_component_to_logits = per_component_to_logits or {}
 
-    # TransformerWrapper wraps an AttentionLayers in embeddings and some other functionality.
-    # We use one TransformerWrapper per task.
-    def activate(self, task_id: str, adapter_ids: Optional[List[Tuple[int, str, str]]]):
+    def activate(self, task_id: str, adapter_ids=None) -> NativeTransformerWrapper:
         self.active_task = task_id
-        transformer_wrapper = self[task_id]
-        attention_layers_stack = transformer_wrapper.attn_layers
-        if adapter_ids:
-            attention_layers_stack.deactivate_adapters()
-            for layer_stack_index, adapter_group, sub_id in adapter_ids:
-                attention_layers_stack.activate_adapter(layer_stack_index, adapter_group, sub_id)
-        return transformer_wrapper
+        return self[task_id]
 
-    def get_attention_layers_by_task_id(self, task_id: str, layer_stack_index: int) -> AdaptedAttentionLayers:
-        return self[task_id].attn_layers.attention_layers_stack[layer_stack_index]
+    def get_attention_layers_by_task_id(self, task_id: str, layer_stack_index: int) -> TransformerStack:
+        return self[task_id].stacks[layer_stack_index]
 
-    def get_attention_layers_by_xcoder_id(self, layer_stack_index: int, xcoder_id: str) -> AdaptedAttentionLayers:
+    def get_attention_layers_by_xcoder_id(self, layer_stack_index: int, xcoder_id: str) -> TransformerStack:
         return self.attention_layers_by_xcoder_id[layer_stack_index][xcoder_id]
 
     def get_embedding_by_task_id(self, task_id):
-        transformer_wrapper = self[task_id]
-        return transformer_wrapper.token_emb
+        return self[task_id].token_emb
 
     def get_embedding_by_lang(self, lang):
         return self.token_embs[lang]
-
-    def get_adapter(self, adapter_name):
-        return self.adapters[adapter_name]
 
     def get_post_emb_norm_by_component(self, component_key: tuple):
         return self.per_component_post_emb_norms[component_key]

@@ -409,6 +409,13 @@ def model_opts(parser):
         help='FFN inner dimension multiplier: ff_inner = model_dim * ff_mult.',
     )
     group.add(
+        '--ff_activation', '-ff_activation', type=str, default='swiglu',
+        choices=['swiglu', 'gelu'],
+        help='Activation function for feed-forward layers in native transformer blocks. '
+             'Choices: swiglu (default), gelu. SWiGLU uses 3 matrices (gate, up, down), '
+             'GELU uses 2 matrices (up, down).',
+    )
+    group.add(
         '--rotary_pos_emb', '-rotary_pos_emb', action='store_true', default=False,
         help='Use rotary positional embeddings (RoPE) instead of absolute positional embeddings.',
     )

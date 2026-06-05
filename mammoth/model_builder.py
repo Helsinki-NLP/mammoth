@@ -61,7 +61,9 @@ def build_xcoder(
 
     heads = getattr(model_opts, 'heads', 8)
     dim_head = dim // heads
-    ff_mult = getattr(model_opts, 'ff_mult', 4.0)
+    activation = getattr(model_opts, 'ff_activation', 'swiglu')
+    default_ff_mult = 4.0 if activation == 'gelu' else getattr(model_opts, 'ff_mult', 2.67)
+    ff_mult = getattr(model_opts, 'ff_mult', default_ff_mult)
     attn_drop = getattr(model_opts, 'attn_dropout', 0.0)
     ff_drop = getattr(model_opts, 'ff_dropout', 0.0)
     use_rotary = getattr(model_opts, 'rotary_pos_emb', False)
@@ -89,7 +91,7 @@ def build_xcoder(
         is_last_stack = (layer_stack_index == len(depths) - 1)
         blocks = nn.ModuleList([
             block_cls(dim=dim, heads=heads, ff_mult=ff_mult,
-                      attn_dropout=attn_drop, ff_dropout=ff_drop)
+                      attn_dropout=attn_drop, ff_dropout=ff_drop, activation=activation)
             for _ in range(depth)
         ])
         final_norm = nn.RMSNorm(dim) if is_last_stack else None

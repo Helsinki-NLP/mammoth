@@ -17,12 +17,13 @@ class EncoderBlock(nn.Module):
         attn_dropout: float = 0.0,
         ff_dropout: float = 0.0,
         norm_bias: bool = False,
+        activation: str = "swiglu",
     ):
         super().__init__()
         self.norm1 = nn.RMSNorm(dim, elementwise_affine=True)
         self.self_attn = MultiHeadAttention(dim, heads, attn_dropout=attn_dropout)
         self.norm2 = nn.RMSNorm(dim, elementwise_affine=True)
-        self.ff = FeedForward(dim, ff_mult, ff_dropout)
+        self.ff = FeedForward(dim, ff_mult, ff_dropout, activation)
 
     def forward(
         self,
@@ -46,6 +47,7 @@ class DecoderBlock(nn.Module):
         attn_dropout: float = 0.0,
         ff_dropout: float = 0.0,
         norm_bias: bool = False,
+        activation: str = "swiglu",
     ):
         super().__init__()
         self.norm1 = nn.RMSNorm(dim, elementwise_affine=True)
@@ -53,7 +55,7 @@ class DecoderBlock(nn.Module):
         self.norm2 = nn.RMSNorm(dim, elementwise_affine=True)
         self.cross_attn = MultiHeadAttention(dim, heads, attn_dropout=attn_dropout, is_cross_attn=True)
         self.norm3 = nn.RMSNorm(dim, elementwise_affine=True)
-        self.ff = FeedForward(dim, ff_mult, ff_dropout)
+        self.ff = FeedForward(dim, ff_mult, ff_dropout, activation)
 
     def forward(
         self,

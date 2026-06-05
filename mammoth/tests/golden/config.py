@@ -12,20 +12,14 @@ SEED = 42
 
 # Model configuration matching the active training config
 MODEL_DIM = 512   # must be divisible by HEADS
+HEADS = 16
+FF_MULT = 4.0
+ROTARY_POS_EMB = True
+POST_EMB_NORM = True
+ATTN_DROPOUT = 0.1
+FF_DROPOUT = 0.1
 ENC_LAYERS = [2]
 DEC_LAYERS = [2]
-X_TRANSFORMERS_OPTS = {
-    'rotary_pos_emb': True,
-    'heads': 16,
-    'pre_norm': True,
-    'post_emb_norm': True,
-    'post_emb_norm_bias': False,
-    'attn_dropout': 0.1,
-    'ff_dropout': 0.1,
-    'layernorm_bias': False,
-    'use_abs_pos_emb': False,
-    'use_fused_rmsnorm': True,
-}
 
 # Test batch dimensions
 BATCH = 3

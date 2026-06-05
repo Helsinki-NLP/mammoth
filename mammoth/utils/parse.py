@@ -281,67 +281,12 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
             model_opts.model_dim = model_opts.model_dim
 
     @classmethod
-    def validate_x_transformers_opts(cls, opts):
-        if not opts.x_transformers_opts:
-            opts.x_transformers_opts = dict()
-        else:
-            opts.x_transformers_opts = yaml_or_dict(opts.x_transformers_opts, name="opts.x_transformers_opts")
-
-        opts_dict = opts.x_transformers_opts
-
-        # Transfer sliding window CLI options to x_transformers_opts
-        # These options support enc_/dec_ prefixes for side-specific configuration
-        if hasattr(opts, 'enc_sliding_window') and opts.enc_sliding_window is not None:
-            opts_dict['enc_sliding_window'] = opts.enc_sliding_window
-        if hasattr(opts, 'dec_sliding_window') and opts.dec_sliding_window is not None:
-            opts_dict['dec_sliding_window'] = opts.dec_sliding_window
-        if hasattr(opts, 'enc_global_attn_every_n_layers') and opts.enc_global_attn_every_n_layers is not None:
-            opts_dict['enc_global_attn_every_n_layers'] = opts.enc_global_attn_every_n_layers
-        if hasattr(opts, 'dec_global_attn_every_n_layers') and opts.dec_global_attn_every_n_layers is not None:
-            opts_dict['dec_global_attn_every_n_layers'] = opts.dec_global_attn_every_n_layers
-
-        # Transfer RoPE theta options for layer-specific sliding window attention
-        # These options support enc_/dec_ prefixes for side-specific configuration
-        if hasattr(opts, 'enc_global_rope_theta') and opts.enc_global_rope_theta is not None:
-            opts_dict['enc_global_rope_theta'] = opts.enc_global_rope_theta
-        if hasattr(opts, 'enc_local_rope_theta') and opts.enc_local_rope_theta is not None:
-            opts_dict['enc_local_rope_theta'] = opts.enc_local_rope_theta
-        if hasattr(opts, 'dec_global_rope_theta') and opts.dec_global_rope_theta is not None:
-            opts_dict['dec_global_rope_theta'] = opts.dec_global_rope_theta
-        if hasattr(opts, 'dec_local_rope_theta') and opts.dec_local_rope_theta is not None:
-            opts_dict['dec_local_rope_theta'] = opts.dec_local_rope_theta
-
-        opts.x_transformers_opts = opts_dict
-        for overwritten_key in (
-            'dim',
-            'depth',
-            'causal',
-            'cross_attend',
-            'pre_norm_has_final_norm',
-        ):
-            if overwritten_key in opts_dict:
+    def validate_transformer_opts(cls, opts):
+        if opts.model_dim != -1 and opts.heads != -1:
+            if opts.model_dim % opts.heads != 0:
                 raise ValueError(
-                    f'"{overwritten_key}" is overwritten with values from other Mammoth arguments. '
-                    'You can not set it as part of x_transformers_opts.'
+                    f'model_dim ({opts.model_dim}) must be divisible by heads ({opts.heads}).'
                 )
-        for unsupported_key in (
-            'sandwich_coef',    # Sandwich would be very unintuitive with multiple layerstacks
-            'macaron',          # Can not support macaron while injecting adapters at each 'f' layer
-        ):
-            if unsupported_key in opts_dict:
-                raise ValueError(
-                    f'"{unsupported_key}" is not supported in Mammoth.'
-                )
-        # Mammoth has a different default value than x-transformers,
-        # but you can set these explicitly
-        if 'use_simple_rmsnorm' not in opts_dict:
-            opts_dict['use_simple_rmsnorm'] = False
-        if 'attn_flash' not in opts_dict:
-            opts_dict['attn_flash'] = True
-        if 'ff_glu' not in opts_dict and 'enc_ff_glu' not in opts_dict and 'dec_ff_glu' not in opts_dict:
-            opts_dict['ff_glu'] = False
-
-        opts.x_transformers_opts = opts_dict
 
     @classmethod
     def validate_model_opts(cls, model_opts):
@@ -357,7 +302,7 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
                 "Remove model_dim when using enc_model_dim/dec_model_dim."
             )
 
-        cls.validate_x_transformers_opts(model_opts)
+        cls.validate_transformer_opts(model_opts)
 
     @classmethod
     def checkpoint_model_opts(cls, checkpoint_opt):

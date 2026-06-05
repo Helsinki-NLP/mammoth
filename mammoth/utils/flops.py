@@ -30,9 +30,8 @@ def compute_transformer_flops(
         dec_layers: Number of decoder layers.
         vocab_size: Size of the target vocabulary (for logit projection).
         ff_mult: FFN inner dimension multiplier (ff_inner = model_dim * ff_mult).
-            Read from x_transformers_opts in the training config; defaults to 4.0.
+            Corresponds to the `ff_mult` training config option; defaults to 4.0.
         use_glu: If True, GLU-style FFN multiplies inner dim by 1.5.
-            Read from x_transformers_opts (ff_glu) in the training config.
 
     Returns:
         Total FLOPs as an integer (forward + backward, with FMA factor).

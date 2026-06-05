@@ -249,7 +249,7 @@ class BeamSearchBase(DecodeStrategy):
         self.remove_finished_batches(_B_new, _B_old, non_finished, predictions, attention, step)
         is_alive = ~rearrange(self.is_finished, 'batch beam -> (batch beam)')
         if self.cache is not None:
-            # self.cache is a list of LayerIntermediates. Reach in and manipulate it.
+            # self.cache is a KVCache; drop finished beam paths.
             self.update_finished_in_cache(is_alive)
 
     def remove_finished_batches(self, _B_new, _B_old, non_finished, predictions, attention, step):

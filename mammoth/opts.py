@@ -250,9 +250,7 @@ def model_opts(parser):
         action='store_true',
         help="Share token embeddings between encoder and decoder. "
         "Only works when encoder and decoder use the same vocabulary "
-        "and have matching model dimensions. This is different from "
-        "'tie_embedding' in x_transformers_opts which ties input and "
-        "output embeddings within the decoder.",
+        "and have matching model dimensions.",
     )
 
     # Encoder-Decoder Options
@@ -403,15 +401,28 @@ def model_opts(parser):
         "https://arxiv.org/pdf/1803.02155.pdf",
     )
     group.add(
-        "-x_transformers_opts",
-        "--x_transformers_opts",
-        help="For a complete list of options (name only), see the code"
-        " https://github.com/lucidrains/x-transformers/blob/main/x_transformers/x_transformers.py ."
-        " The kwargs of `AttentionLayers` can be used without prefix,"
-        " the kwargs of `FeedForward` with the prefix `ff_`,"
-        " and the kwargs of `Attention` with the prefix `attn_`."
-        " For tips, examples, and citations see"
-        " https://github.com/lucidrains/x-transformers/blob/main/README.md ."
+        '--heads', '-heads', type=int, default=8,
+        help='Number of attention heads. model_dim must be divisible by heads.',
+    )
+    group.add(
+        '--ff_mult', '-ff_mult', type=float, default=4.0,
+        help='FFN inner dimension multiplier: ff_inner = model_dim * ff_mult.',
+    )
+    group.add(
+        '--rotary_pos_emb', '-rotary_pos_emb', action='store_true', default=False,
+        help='Use rotary positional embeddings (RoPE) instead of absolute positional embeddings.',
+    )
+    group.add(
+        '--post_emb_norm', '-post_emb_norm', action='store_true', default=False,
+        help='Apply RMSNorm after the token embedding.',
+    )
+    group.add(
+        '--attn_dropout', '-attn_dropout', type=float, default=0.0,
+        help='Dropout probability inside attention (applied to the attention weights).',
+    )
+    group.add(
+        '--ff_dropout', '-ff_dropout', type=float, default=0.0,
+        help='Dropout probability inside the feed-forward sublayer.',
     )
 
     # Generator and loss options.

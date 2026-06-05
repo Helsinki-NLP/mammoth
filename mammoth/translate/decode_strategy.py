@@ -1,8 +1,7 @@
 import torch
 from copy import deepcopy
-from typing import Optional, List
-from mammoth.x_transformers.attend import Intermediates
-from mammoth.x_transformers.x_transformers import LayerIntermediates
+from typing import Optional
+from mammoth.modules.transformer import KVCache
 
 from mammoth.utils.misc import tile
 
@@ -113,7 +112,7 @@ class DecodeStrategy(object):
         self.device = device
 
         self.done = False
-        self.cache: Optional[List[LayerIntermediates]] = None
+        self.cache: Optional[KVCache] = None
 
     def initialize(
         self,
@@ -307,48 +306,9 @@ class DecodeStrategy(object):
             return t
         return t[select_mask]
 
-    def _update_single_layer_intermediates(self, layer_intermediates, select_mask):
-        layer_intermediates.last_hidden = self._update_single_tensor(layer_intermediates.last_hidden, select_mask)
-        layer_intermediates.attn_z_loss = self._update_single_tensor(layer_intermediates.attn_z_loss, select_mask)
-        layer_intermediates.mems = self._update_single_tensor(layer_intermediates.mems, select_mask)
-        layer_intermediates.memory_tokens = self._update_single_tensor(layer_intermediates.memory_tokens, select_mask)
-
-        if layer_intermediates.hiddens is not None:
-            layer_intermediates.hiddens = [
-                self._update_single_tensor(x, select_mask) for x in layer_intermediates.hiddens
-            ]
-        if layer_intermediates.layer_hiddens is not None:
-            layer_intermediates.layer_hiddens = [
-                self._update_single_tensor(x, select_mask) for x in layer_intermediates.layer_hiddens
-            ]
-
-        if layer_intermediates.attn_intermediates is not None:
-            result = []
-            for attn_i in layer_intermediates.attn_intermediates:
-                result.append(
-                    Intermediates(
-                        qk_similarities=self._update_single_tensor(attn_i.qk_similarities, select_mask),
-                        pre_softmax_attn=self._update_single_tensor(attn_i.pre_softmax_attn, select_mask),
-                        post_softmax_attn=self._update_single_tensor(attn_i.post_softmax_attn, select_mask),
-                        cached_kv=(
-                            self._update_single_tensor(attn_i.cached_kv[0], select_mask),
-                            self._update_single_tensor(attn_i.cached_kv[1], select_mask),
-                        ),
-                        layer_type=attn_i.layer_type,
-                    )
-                )
-            layer_intermediates.attn_intermediates = result
-
     def update_finished_in_cache(self, select_mask):
-        """
-        Modify each field of a list of x-transformers LayerIntermediates objects,
-        to drop terminated beams.
-
-        This lovely beast will need to be updated whenever x-transformers changes the LayerIntermediates structure.
-        """
+        """Drop terminated beam paths from the KV cache."""
         if self.cache is None:
             return
-        self.cache = [
-            self._update_single_layer_intermediates(layer_intermediates, select_mask)
-            for layer_intermediates in self.cache
-        ]
+        alive_indices = select_mask.nonzero(as_tuple=False).view(-1)
+        self.cache.reorder_beams(alive_indices)

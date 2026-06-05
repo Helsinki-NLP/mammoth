@@ -271,5 +271,5 @@ class GreedySearch(DecodeStrategy):
         self.original_batch_idx = self.original_batch_idx[is_alive]
         self.maybe_update_target_prefix(self.select_indices)
         if self.cache is not None:
-            # self.cache is a list of LayerIntermediates. Reach in and manipulate it.
+            # self.cache is a KVCache; drop finished beam paths.
             self.update_finished_in_cache(is_alive)

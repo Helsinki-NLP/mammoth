@@ -49,7 +49,6 @@ def build_xcoder(
     single_task: if a task_id string is given, the built model contains only the components necessary for that task.
     token_embs: to tie encoder and decoder embeddings, pass existing embeddings here.
     """
-    xt = model_opts.x_transformers_opts or {}
     side_str = 'src' if side == Side.encoder else 'tgt'
     return_only_embed = (side == Side.encoder)
 
@@ -60,13 +59,13 @@ def build_xcoder(
     else:
         dim = model_opts.model_dim
 
-    heads = xt.get('heads', 8)
+    heads = getattr(model_opts, 'heads', 8)
     dim_head = dim // heads
-    ff_mult = xt.get('ff_mult', 4.0)
-    attn_drop = xt.get('attn_dropout', 0.0)
-    ff_drop = xt.get('ff_dropout', 0.0)
-    use_rotary = xt.get('rotary_pos_emb', False)
-    use_post_emb_norm = xt.get('post_emb_norm', False)
+    ff_mult = getattr(model_opts, 'ff_mult', 4.0)
+    attn_drop = getattr(model_opts, 'attn_dropout', 0.0)
+    ff_drop = getattr(model_opts, 'ff_dropout', 0.0)
+    use_rotary = getattr(model_opts, 'rotary_pos_emb', False)
+    use_post_emb_norm = getattr(model_opts, 'post_emb_norm', False)
     depths = model_opts.enc_layers if side == Side.encoder else model_opts.dec_layers
     block_cls = EncoderBlock if side == Side.encoder else DecoderBlock
 

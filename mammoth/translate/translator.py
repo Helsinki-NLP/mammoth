@@ -946,7 +946,7 @@ class Translator(Inference):
                 cache=decode_strategy.cache,
                 seq_start_pos=seq_start_pos,
             )
-            # new_cache is a list of LayerIntermediates objects, one for each layer_stack
+            # new_cache is a KVCache object
 
             if active_decoder.can_cache_kv:
                 decode_strategy.set_cache(new_cache)

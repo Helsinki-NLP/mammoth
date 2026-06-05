@@ -23,9 +23,14 @@ from mammoth.utils.loss import build_loss_function
 from mammoth.tests.golden.config import (
     SEED,
     MODEL_DIM,
+    HEADS,
+    FF_MULT,
+    ROTARY_POS_EMB,
+    POST_EMB_NORM,
+    ATTN_DROPOUT,
+    FF_DROPOUT,
     ENC_LAYERS,
     DEC_LAYERS,
-    X_TRANSFORMERS_OPTS,
     VOCABS,
     make_inputs,
 )
@@ -81,10 +86,14 @@ def _make_opts():
     enc_arg = ' '.join(str(d) for d in ENC_LAYERS)
     dec_arg = ' '.join(str(d) for d in DEC_LAYERS)
     raw = _parser.parse_known_args(
-        f'{_BASE_ARGS} -model_dim {MODEL_DIM} -enc_layers {enc_arg} -dec_layers {dec_arg}'.split(),
+        (
+            f'{_BASE_ARGS} -model_dim {MODEL_DIM} -enc_layers {enc_arg} -dec_layers {dec_arg}'
+            f' -heads {HEADS} -ff_mult {FF_MULT} -attn_dropout {ATTN_DROPOUT} -ff_dropout {FF_DROPOUT}'
+            + (' -rotary_pos_emb' if ROTARY_POS_EMB else '')
+            + (' -post_emb_norm' if POST_EMB_NORM else '')
+        ).split(),
         strict=False,
     )[0]
-    raw.x_transformers_opts = dict(X_TRANSFORMERS_OPTS)
     ArgumentParser.validate_model_opts(raw)
     return raw
 

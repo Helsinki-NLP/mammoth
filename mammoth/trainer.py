@@ -103,14 +103,13 @@ def build_trainer(
     )
 
     # Extract model config for FLOP counting
-    x_opts = opts.x_transformers_opts if opts.x_transformers_opts else {}
     flops_config = {
         'model_dim': opts.model_dim,
         'enc_layers': sum(opts.enc_layers) if opts.enc_layers else 6,
         'dec_layers': sum(opts.dec_layers) if opts.dec_layers else 6,
         'vocab_size': opts.tgt_vocab_size or 0,
-        'ff_mult': x_opts.get('ff_mult', x_opts.get('dec_ff_mult', 4.0)),
-        'use_glu': x_opts.get('ff_glu', x_opts.get('dec_ff_glu', False)),
+        'ff_mult': getattr(opts, 'ff_mult', 4.0),
+        'use_glu': False,
     }
 
     report_manager = mammoth.utils.build_report_manager(opts, device_context.node_rank, device_context.local_rank)

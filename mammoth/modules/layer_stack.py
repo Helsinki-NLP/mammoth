@@ -51,7 +51,7 @@ class StackXcoder(nn.ModuleDict):
         return self.per_component_pos_embs.get(component_key)
 
     def get_project_emb_by_component(self, component_key: tuple):
-        return self.per_component_project_embs[component_key]
+        return self.per_component_project_embs.get(component_key)
 
     def get_to_logits_by_component(self, component_key: tuple):
         return self.per_component_to_logits.get(component_key)

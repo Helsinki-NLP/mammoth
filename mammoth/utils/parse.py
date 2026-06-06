@@ -56,15 +56,6 @@ class DataOptsCheckerMixin(object):
         logger.info(f"Validated save_model path: {save_model_path}")
 
     @classmethod
-    def _validate_adapters(cls, opts):
-        """Parse corpora specified in data field of YAML file."""
-        if not opts.adapters:
-            return
-        adapter_opts = yaml_or_dict(opts.adapters, name='opts.adapters')
-        # TODO: validate adapter opts
-        opts.adapters = adapter_opts
-
-    @classmethod
     def _validate_tasks(cls, opts):
         """Parse tasks/language-pairs/corpora specified in data field of YAML file."""
         default_transforms = opts.transforms
@@ -275,7 +266,6 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
 
     @classmethod
     def update_model_opts(cls, model_opts):
-        cls._validate_adapters(model_opts)
         if model_opts.model_dim > 0:
             model_opts.model_dim = model_opts.model_dim
             model_opts.model_dim = model_opts.model_dim

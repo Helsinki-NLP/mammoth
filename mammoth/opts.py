@@ -509,11 +509,6 @@ def model_opts(parser):
         help="Attention Dropout probability; Legacy: applied in the attention bridge",
     )
 
-    # adapter options are in a dict "adapters", and in the corpus options
-    group = parser.add_argument_group("Adapters")
-    group.add('-adapters', '--adapters',
-              help="""Adapter specifications""")
-
 
 def _add_train_general_opts(parser):
     """General options for training"""

@@ -11,8 +11,12 @@ from .cache import KVCache
 class NativeTransformerWrapper(nn.Module):
     """
     token_emb -> post_emb_norm -> TransformerStack(s) -> to_logits.
-    post_emb_norm and to_logits are shared per component (xcoder_id tuple),
-    not per task -- same as the current x-transformers setup.
+
+    This wrapper is a lightweight routing view. All shared parameters
+    (stacks, token_emb, post_emb_norm, rotary_emb, to_logits) are owned
+    by StackXcoder.shared_* and stored here as plain Python references so
+    PyTorch does not re-register them as children of this module.
+    Only emb_dropout is per-task and registered normally.
     """
 
     def __init__(
@@ -26,13 +30,17 @@ class NativeTransformerWrapper(nn.Module):
         return_only_embed: bool = False,
     ):
         super().__init__()
-        self.token_emb = token_emb
-        self.post_emb_norm = post_emb_norm
-        self.stacks = nn.ModuleList(stacks)
-        self.rotary_emb = rotary_emb
-        self.to_logits = to_logits
+        # Bypass nn.Module.__setattr__ so these are not registered as children.
+        # StackXcoder.shared_* owns these; .to()/.train()/.eval() reach them
+        # through StackXcoder, not through this wrapper.
+        object.__setattr__(self, '_token_emb', token_emb)
+        object.__setattr__(self, '_post_emb_norm', post_emb_norm)
+        object.__setattr__(self, '_stacks', stacks)
+        object.__setattr__(self, '_rotary_emb', rotary_emb)
+        object.__setattr__(self, '_to_logits', to_logits)
+        object.__setattr__(self, '_return_only_embed', return_only_embed)
+        # Per-task module — not shared, registered normally.
         self.emb_dropout = nn.Dropout(emb_dropout)
-        self.return_only_embed = return_only_embed
 
     @property
     def can_cache_kv(self) -> bool:
@@ -51,19 +59,19 @@ class NativeTransformerWrapper(nn.Module):
         cache: Optional[KVCache] = None,
         seq_start_pos: Optional[int] = None,
     ) -> Union[Tensor, tuple[Tensor, KVCache]]:
-        h = self.emb_dropout(self.post_emb_norm(self.token_emb(x)))
-        rotary = self.rotary_emb(h.size(1), h.device) if self.rotary_emb is not None else None
+        h = self.emb_dropout(self._post_emb_norm(self._token_emb(x)))
+        rotary = self._rotary_emb(h.size(1), h.device) if self._rotary_emb is not None else None
         # Reshape (batch, seq) bool mask → (batch, 1, 1, seq) for SDPA key masking
         if mask is not None and mask.dim() == 2:
             mask = mask[:, None, None, :]
         if context_mask is not None and context_mask.dim() == 2:
             context_mask = context_mask[:, None, None, :]
-        for stack in self.stacks:
+        for stack in self._stacks:
             h, cache = stack(h, mask=mask, context=context,
                              context_mask=context_mask, rotary=rotary, cache=cache)
-        if return_embeddings or self.return_only_embed:
+        if return_embeddings or self._return_only_embed:
             return h
-        logits = self.to_logits(h)
+        logits = self._to_logits(h)
         if return_intermediates:
             return logits, cache
         if return_logits_and_embeddings:

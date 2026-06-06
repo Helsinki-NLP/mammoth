@@ -161,12 +161,26 @@ def build_xcoder(
             return_only_embed=return_only_embed,
         )
 
+    # Build shared nn.ModuleDicts: StackXcoder is the single owner of all parameters.
+    shared_stacks_dict = {
+        f'{layer_stack_index}__{xcoder_id}': stack
+        for layer_stack_index, xcoder_dict in attention_layer_blocks.items()
+        for xcoder_id, stack in xcoder_dict.items()
+    }
+    shared_rotary_embs_dict = {
+        '__'.join(k): v
+        for k, v in per_component_rotary_embs.items()
+        if v is not None
+    }
     return StackXcoder(
-        transformer_wrappers=transformer_wrappers,
+        task_wrappers=transformer_wrappers,
         attention_layer_blocks=dict(attention_layer_blocks),
         token_embs=token_embs,
-        per_component_post_emb_norms=per_component_post_emb_norms,
-        per_component_to_logits=per_component_to_logits,
+        shared_stacks=nn.ModuleDict(shared_stacks_dict),
+        shared_token_embs=nn.ModuleDict(token_embs),
+        shared_post_emb_norms=nn.ModuleDict({'__'.join(k): v for k, v in per_component_post_emb_norms.items()}),
+        shared_rotary_embs=nn.ModuleDict(shared_rotary_embs_dict),
+        shared_to_logits=nn.ModuleDict({'__'.join(k): v for k, v in per_component_to_logits.items()}),
     )
 
 
@@ -275,7 +289,7 @@ def build_model(
 
                     # For now, we assume matching vocab sizes means matching vocabularies
                     # A more thorough check would compare vocab tokens, but that's expensive
-                    dec_token_embs[lang] = encoder.token_embs[lang]
+                    dec_token_embs[lang] = encoder.shared_token_embs[lang]
                     successfully_shared.append(lang)
 
                 if successfully_shared:

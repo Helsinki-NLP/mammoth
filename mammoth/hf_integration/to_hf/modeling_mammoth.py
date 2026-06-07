@@ -10,11 +10,13 @@ try:
     from mammoth.modules.transformer import (
         TransformerStack, EncoderBlock, DecoderBlock, RotaryEmbedding,
     )
+    from mammoth.modules.transformer.cache import KVCache
 except ImportError:
     # Vendored standalone mode: native_transformer.py is copied into the
     # HF artifact alongside this file by convert_mammoth_to_hf.py.
     from .native_transformer import (  # noqa: F401
         TransformerStack, EncoderBlock, DecoderBlock, RotaryEmbedding,
+        KVCache,
     )
 
 from .configuration_mammoth import MammothConfig
@@ -94,11 +96,24 @@ class MammothDecoder(nn.Module):
         self.rotary_emb = RotaryEmbedding(dim // config.heads) if config.rotary_pos_emb else None
         self.to_logits = nn.Linear(dim, config.tgt_vocab_size, bias=False)
 
-    def forward(self, input_ids, context=None, context_mask=None, **kwargs):
+    def forward(self, input_ids, context=None, context_mask=None, cache=None, **kwargs):
         h = self.emb_dropout(self.post_emb_norm(self.token_emb(input_ids)))
-        rotary = self.rotary_emb(h.size(1), h.device) if self.rotary_emb is not None else None
+
+        past_length = 0
+        if cache is not None and cache.layers[0].self_k is not None:
+            past_length = cache.layers[0].self_k.size(2)
+
+        if self.rotary_emb is not None:
+            rotary = self.rotary_emb(h.size(1), h.device, offset=past_length)
+        else:
+            rotary = None
+
+        layer_offset = 0
         for stack in self.stacks:
-            h, _ = stack(h, context=context, context_mask=context_mask, rotary=rotary)
+            h, _ = stack(h, context=context, context_mask=context_mask,
+                         rotary=rotary, cache=cache, cache_offset=layer_offset)
+            layer_offset += stack.depth
+
         return self.to_logits(h)
 
 
@@ -131,6 +146,11 @@ class MammothForConditionalGeneration(MammothPreTrainedModel, GenerationMixin):
         self.decoder = MammothDecoder(config)
         self.post_init()
 
+    @classmethod
+    def _supports_default_dynamic_cache(cls) -> bool:
+        # We manage our own KVCache; opt out of HF's EncoderDecoderCache wrapping.
+        return False
+
     def get_encoder(self):
         return _HFEncoderWrapper(self.encoder)
 
@@ -144,9 +164,13 @@ class MammothForConditionalGeneration(MammothPreTrainedModel, GenerationMixin):
         decoder_input_ids: Optional[torch.LongTensor] = None,
         decoder_attention_mask: Optional[torch.Tensor] = None,
         encoder_outputs: Optional[torch.Tensor] = None,
+        past_key_values: Optional[KVCache] = None,
+        use_cache: Optional[bool] = None,
         labels: Optional[torch.LongTensor] = None,
         **kwargs,
     ) -> Seq2SeqLMOutput:
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
+
         if encoder_outputs is None:
             encoder_outputs = self.encoder(input_ids, attention_mask=attention_mask)
 
@@ -157,8 +181,17 @@ class MammothForConditionalGeneration(MammothPreTrainedModel, GenerationMixin):
         else:
             encoder_hidden = encoder_outputs
 
+        if use_cache and past_key_values is None:
+            num_dec_layers = sum(s.depth for s in self.decoder.stacks)
+            past_key_values = KVCache(num_dec_layers)
+
         context_mask = attention_mask[:, None, None, :].bool() if attention_mask is not None else None
-        logits = self.decoder(decoder_input_ids, context=encoder_hidden, context_mask=context_mask)
+        logits = self.decoder(
+            decoder_input_ids,
+            context=encoder_hidden,
+            context_mask=context_mask,
+            cache=past_key_values,
+        )
 
         loss = None
         if labels is not None:
@@ -168,6 +201,7 @@ class MammothForConditionalGeneration(MammothPreTrainedModel, GenerationMixin):
         return Seq2SeqLMOutput(
             loss=loss,
             logits=logits,
+            past_key_values=past_key_values if use_cache else None,
             encoder_last_hidden_state=encoder_hidden,
         )
 
@@ -177,10 +211,21 @@ class MammothForConditionalGeneration(MammothPreTrainedModel, GenerationMixin):
         past_key_values=None,
         attention_mask=None,
         encoder_outputs=None,
+        use_cache=None,
         **kwargs,
     ):
+        if past_key_values is not None:
+            # Cache is populated — feed only the last generated token
+            decoder_input_ids = decoder_input_ids[:, -1:]
         return {
             "decoder_input_ids": decoder_input_ids,
             "encoder_outputs": encoder_outputs,
             "attention_mask": attention_mask,
+            "past_key_values": past_key_values,
+            "use_cache": use_cache,
         }
+
+    @staticmethod
+    def _reorder_cache(past_key_values: KVCache, beam_idx: torch.Tensor) -> KVCache:
+        past_key_values.reorder_beams(beam_idx)
+        return past_key_values

@@ -30,7 +30,7 @@ class MammothConfig(PretrainedConfig):
         tgt_tokenizer_dir: str = "tgt_tokenizer",
         encoder_sharing_groups: Optional[List[str]] = None,
         decoder_sharing_groups: Optional[List[str]] = None,
-        use_cache: bool = False,
+        use_cache: bool = True,
         **kwargs,
     ):
         kwargs.pop("is_encoder_decoder", None)

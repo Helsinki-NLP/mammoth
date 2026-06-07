@@ -174,9 +174,6 @@ def translate(src_tokenizer, tgt_tokenizer, model, sentences: list[str],
     gen_kwargs = dict(num_beams=num_beams, max_new_tokens=max_new_tokens)
     if num_beams > 1:
         gen_kwargs["early_stopping"] = True
-    if getattr(model.config, "use_cache", True):
-        gen_kwargs["use_cache"] = False
-
     output_ids = model.generate(**inputs, **gen_kwargs)
     return tgt_tokenizer.batch_decode(output_ids, skip_special_tokens=True)
 

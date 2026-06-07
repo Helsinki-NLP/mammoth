@@ -21,11 +21,12 @@ class RotaryEmbedding(nn.Module):
         self._sin_cached = emb.sin()
         self._seq_len_cached = seq_len
 
-    def forward(self, seq_len: int, device: torch.device) -> tuple[Tensor, Tensor]:
-        if seq_len > self._seq_len_cached:
-            self._build_cache(seq_len, device)
+    def forward(self, seq_len: int, device: torch.device, offset: int = 0) -> tuple[Tensor, Tensor]:
+        total = offset + seq_len
+        if total > self._seq_len_cached:
+            self._build_cache(total, device)
         assert self._cos_cached is not None and self._sin_cached is not None
-        return self._cos_cached[:seq_len], self._sin_cached[:seq_len]
+        return self._cos_cached[offset:offset + seq_len], self._sin_cached[offset:offset + seq_len]
 
 
 def _rotate_half(x: Tensor) -> Tensor:

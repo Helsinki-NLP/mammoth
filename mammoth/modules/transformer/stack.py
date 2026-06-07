@@ -37,9 +37,10 @@ class TransformerStack(nn.Module):
         context_mask: Optional[Tensor] = None,
         rotary: Optional[tuple[Tensor, Tensor]] = None,
         cache: Optional[KVCache] = None,
+        cache_offset: int = 0,
     ) -> tuple[Tensor, Optional[KVCache]]:
         for i, block in enumerate(self.blocks):
-            layer_cache = cache.layers[i] if cache is not None else None
+            layer_cache = cache.layers[cache_offset + i] if cache is not None else None
             if isinstance(block, DecoderBlock):
                 x = block(x, context=context, context_mask=context_mask,
                           rotary=rotary, cache=layer_cache)

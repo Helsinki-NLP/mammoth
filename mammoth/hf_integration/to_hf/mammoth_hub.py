@@ -121,6 +121,7 @@ class MammothHub:
 
             # Symlink code files
             for fname in ("configuration_mammoth.py", "modeling_mammoth.py",
+                          "native_transformer.py",
                           "x_transformers.py", "attend.py", "autoregressive_wrapper.py"):
                 src = os.path.join(repo_path, fname)
                 if os.path.exists(src):

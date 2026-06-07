@@ -12,7 +12,7 @@ Usage:
         --checkpoint-dir path/to/checkpoint_dir \
         --output-dir path/to/hf_output
 
-    # Convert a specific task only (multi-task checkpoint):
+    # Convert a specific task only:
     python convert_mammoth_to_hf.py \
         --checkpoint-dir path/to/checkpoint_dir \
         --task eng-spa \
@@ -27,9 +27,6 @@ Usage:
 Checkpoint shard naming:
     Best:  _best_frame.pt, _best_src_embeddings_{src}.pt, ...
     Step:  _step_{N}_frame.pt, _step_{N}_src_embeddings_{src}.pt, ...
-
-Outputs saved with save_pretrained() plus copies of configuration_mammoth.py and
-modeling_mammoth.py so that trust_remote_code=True loading works.
 """
 
 import argparse
@@ -55,124 +52,44 @@ from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalG
 # Config extraction
 # ---------------------------------------------------------------------------
 
+def _first(v, default=0.0):
+    """Return scalar from a value that may be a list (opts with nargs='+')."""
+    if isinstance(v, (list, tuple)):
+        return float(v[0]) if v else default
+    return float(v) if v is not None else default
+
+
 def config_from_opts(
     opts,
     src_vocab_size: int,
     tgt_vocab_size: int,
-    tie_word_embeddings: bool,
-    enc_attn_dim_head_override: int | None = None,
-    dec_attn_dim_head_override: int | None = None,
-    enc_layers_override: int | None = None,
-    dec_layers_override: int | None = None,
     bos_token_id: int = 2,
     eos_token_id: int = 0,
-    decoder_start_token_id: int = 2,
     pad_token_id: int = 1,
+    encoder_sharing_groups: list | None = None,
+    decoder_sharing_groups: list | None = None,
 ) -> MammothConfig:
-    """Build MammothConfig from a Mammoth opts Namespace."""
-    xt = getattr(opts, 'x_transformers_opts', {}) or {}
-
-    if enc_layers_override is not None:
-        enc_layers = enc_layers_override
-    else:
-        enc_layers = opts.enc_layers
-        if isinstance(enc_layers, (list, tuple)):
-            enc_layers = sum(enc_layers)
-    if dec_layers_override is not None:
-        dec_layers = dec_layers_override
-    else:
-        dec_layers = opts.dec_layers
-        if isinstance(dec_layers, (list, tuple)):
-            dec_layers = sum(dec_layers)
-
-    model_dim = getattr(opts, 'model_dim', None)
-    if model_dim is not None:
-        enc_model_dim = model_dim
-        dec_model_dim = model_dim
-    else:
-        enc_model_dim = getattr(opts, 'enc_model_dim', 768)
-        dec_model_dim = getattr(opts, 'dec_model_dim', enc_model_dim)
-
-    enc_heads = xt.get('heads', xt.get('enc_heads', 12))
-    dec_heads = xt.get('heads', xt.get('dec_heads', 12))
-    enc_attn_dim_head = enc_attn_dim_head_override if enc_attn_dim_head_override is not None \
-        else xt.get('enc_attn_dim_head', enc_model_dim // enc_heads)
-    dec_attn_dim_head = dec_attn_dim_head_override if dec_attn_dim_head_override is not None \
-        else xt.get('dec_attn_dim_head', dec_model_dim // dec_heads)
-
+    """Build MammothConfig from a native-mode Mammoth opts Namespace."""
     return MammothConfig(
+        model_dim=opts.model_dim,
+        heads=opts.heads,
+        ff_mult=getattr(opts, 'ff_mult', 2.67),
+        ff_swiglu=getattr(opts, 'ff_swiglu', True),
+        enc_layers=list(opts.enc_layers),
+        dec_layers=list(opts.dec_layers),
+        attn_dropout=getattr(opts, 'attn_dropout', 0.0),
+        ff_dropout=getattr(opts, 'ff_dropout', 0.0),
+        emb_dropout=_first(getattr(opts, 'dropout', 0.0)),
+        rotary_pos_emb=getattr(opts, 'rotary_pos_emb', True),
+        post_emb_norm=getattr(opts, 'post_emb_norm', True),
         src_vocab_size=src_vocab_size,
         tgt_vocab_size=tgt_vocab_size,
-        enc_model_dim=enc_model_dim,
-        dec_model_dim=dec_model_dim,
-        enc_layers=enc_layers,
-        dec_layers=dec_layers,
-        enc_max_seq_len=getattr(opts, 'src_seq_length_max', 1024),
-        dec_max_seq_len=getattr(opts, 'tgt_seq_length_max', 1024),
-        # Encoder attention
-        enc_heads=enc_heads,
-        enc_attn_dim_head=enc_attn_dim_head,
-        enc_attn_dropout=xt.get('enc_attn_dropout', xt.get('attn_dropout', 0.0)),
-        enc_attn_qkv_bias=xt.get('enc_attn_qkv_bias', True),
-        enc_attn_flash=xt.get('attn_flash', False),
-        # Encoder FFN
-        enc_ff_mult=xt.get('enc_ff_mult', xt.get('ff_mult', 4.0)),
-        enc_ff_glu=xt.get('enc_ff_glu', xt.get('ff_glu', False)),
-        enc_ff_no_bias=xt.get('enc_ff_no_bias', xt.get('ff_no_bias', False)),
-        enc_ff_dropout=xt.get('enc_ff_dropout', xt.get('ff_dropout', 0.0)),
-        # Encoder norm/pos
-        enc_pre_norm=xt.get('enc_pre_norm', xt.get('pre_norm', False)),
-        # use_fused_rmsnorm is a separate flag in x-transformers (FusedRMSNorm backed by nn.RMSNorm).
-        # For unit_offset=True (the default), both FusedRMSNorm and RMSNorm store the scale delta
-        # as `.g` and compute x/rms(x)*(g+1), so the HF model can use use_rmsnorm=True safely.
-        enc_use_rmsnorm=xt.get('enc_use_rmsnorm', xt.get('use_rmsnorm', False)) or xt.get('enc_use_fused_rmsnorm', xt.get('use_fused_rmsnorm', False)),
-        enc_layernorm_bias=xt.get('enc_layernorm_bias', True),
-        enc_norm_add_unit_offset=xt.get('enc_norm_add_unit_offset', True),
-        enc_rotary_pos_emb=xt.get('enc_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
-        enc_use_abs_pos_emb=xt.get('use_abs_pos_emb', True),
-        enc_post_emb_norm=xt.get('enc_post_emb_norm', xt.get('post_emb_norm', True)),
-        enc_post_emb_norm_bias=xt.get('enc_post_emb_norm_bias', True),
-        enc_scaled_embeddings=xt.get('enc_scaled_embeddings', False),
-        enc_emb_dropout=xt.get('enc_emb_dropout', xt.get('emb_dropout', 0.0)),
-        enc_sliding_window=xt.get('enc_sliding_window', getattr(opts, 'enc_sliding_window', -1)),
-        # Decoder attention
-        dec_heads=dec_heads,
-        dec_attn_dim_head=dec_attn_dim_head,
-        dec_attn_dropout=xt.get('dec_attn_dropout', xt.get('attn_dropout', 0.0)),
-        dec_attn_qkv_bias=xt.get('dec_attn_qkv_bias', True),
-        dec_attn_flash=xt.get('attn_flash', False),
-        dec_attn_kv_heads=xt.get('dec_attn_kv_heads', None),
-        dec_attn_qk_norm=xt.get('dec_attn_qk_norm', False),
-        dec_attn_qk_norm_dim_scale=xt.get('dec_attn_qk_norm_dim_scale', False),
-        dec_cross_attn_dim_context=xt.get('dec_cross_attn_dim_context', None),
-        # Decoder FFN
-        dec_ff_mult=xt.get('dec_ff_mult', xt.get('ff_mult', 4.0)),
-        dec_ff_glu=xt.get('dec_ff_glu', xt.get('ff_glu', False)),
-        dec_ff_no_bias=xt.get('dec_ff_no_bias', xt.get('ff_no_bias', False)),
-        dec_ff_dropout=xt.get('dec_ff_dropout', xt.get('ff_dropout', 0.0)),
-        # Decoder norm/pos
-        dec_pre_norm=xt.get('dec_pre_norm', xt.get('pre_norm', False)),
-        dec_use_rmsnorm=xt.get('dec_use_rmsnorm', xt.get('use_rmsnorm', False)) or xt.get('dec_use_fused_rmsnorm', xt.get('use_fused_rmsnorm', False)),
-        dec_layernorm_bias=xt.get('dec_layernorm_bias', True),
-        dec_norm_add_unit_offset=xt.get('dec_norm_add_unit_offset', True),
-        dec_rotary_pos_emb=xt.get('dec_rotary_pos_emb', xt.get('rotary_pos_emb', False)),
-        dec_use_abs_pos_emb=xt.get('use_abs_pos_emb', True),
-        dec_post_emb_norm=xt.get('dec_post_emb_norm', xt.get('post_emb_norm', True)),
-        dec_post_emb_norm_bias=xt.get('dec_post_emb_norm_bias', True),
-        dec_scaled_embeddings=xt.get('dec_scaled_embeddings', False),
-        dec_emb_dropout=xt.get('dec_emb_dropout', xt.get('emb_dropout', 0.0)),
-        dec_sandwich_norm=xt.get('dec_sandwich_norm', False),
-        dec_sliding_window=xt.get('dec_sliding_window', getattr(opts, 'dec_sliding_window', -1)),
-        dec_global_attn_every_n_layers=xt.get('dec_global_attn_every_n_layers', getattr(opts, 'dec_global_attn_every_n_layers', 0)),
-        dec_global_rope_theta=xt.get('dec_global_rope_theta', getattr(opts, 'dec_global_rope_theta', 10000.0)),
-        dec_local_rope_theta=xt.get('dec_local_rope_theta', getattr(opts, 'dec_local_rope_theta', 10000.0)),
-        # Misc
-        tie_word_embeddings=tie_word_embeddings,
-        model_dtype=getattr(opts, 'model_dtype', 'bf16'),
         bos_token_id=bos_token_id,
         eos_token_id=eos_token_id,
-        decoder_start_token_id=decoder_start_token_id,
         pad_token_id=pad_token_id,
+        decoder_start_token_id=bos_token_id,
+        encoder_sharing_groups=encoder_sharing_groups,
+        decoder_sharing_groups=decoder_sharing_groups,
     )
 
 
@@ -223,11 +140,10 @@ def _load(path: str) -> dict:
 
 
 def _task_xcoder_ids(opts, src: str, tgt: str):
-    """Return (encoder_id, decoder_id) lists for the given src→tgt task from opts.
+    """Return (encoder_id_list, decoder_id_list) for the given src→tgt task.
 
     Each list has one xcoder_id per layer stack index, e.g. ['eng', 'all'] for a
     2-stack encoder where the first stack is language-specific and the second shared.
-    These map directly to the shard filenames: encoder_{i}_{encoder_id[i]}.pt.
     """
     tasks = getattr(opts, 'tasks', None) or {}
     for corpus_opts in tasks.values():
@@ -245,9 +161,7 @@ def _infer_xcoder_ids_from_shards(ckpt_dir: str, prefix: str, src: str, tgt: str
     """Infer (encoder_id, decoder_id) lists by scanning shard filenames.
 
     Falls back to ([src], [tgt]) when no matching shards are found.
-    Shard pattern: {prefix}_encoder_{i}_{id}.pt  (and decoder equivalent).
     """
-    import re
     enc_pattern = re.compile(rf'^{re.escape(prefix)}_encoder_(\d+)_(.+?)(?:_optim)?\.pt$')
     dec_pattern = re.compile(rf'^{re.escape(prefix)}_decoder_(\d+)_(.+?)(?:_optim)?\.pt$')
 
@@ -277,149 +191,75 @@ def assemble_state_dict(
     """
     Reassemble a flat HF-model state dict from Mammoth's per-component shards.
 
-    HF model key structure:
-        model.encoder.<x-transformers key>
-        model.decoder.<x-transformers key>
+    HF model key structure (maps directly to MammothEncoder / MammothDecoder):
+        encoder.token_emb.weight
+        encoder.post_emb_norm.weight
+        encoder.stacks.{i}.blocks.{j}.<key>
+        encoder.stacks.{i}.final_norm.weight      (last stack only)
+        decoder.token_emb.weight
+        decoder.post_emb_norm.weight
+        decoder.stacks.{i}.blocks.{j}.<key>
+        decoder.stacks.{i}.final_norm.weight      (last stack only)
+        decoder.to_logits.weight
 
-    Shard → HF prefix mapping:
-        src_embeddings_{src}.pt                        → model.encoder.token_emb.*
-        encoder_wrapper_{'_'.join(encoder_id)}.pt      → model.encoder.*
-        encoder_{i}_{encoder_id[i]}.pt  _base_layers.{j}.* → model.encoder.attn_layers.layers.{offset+j}.*
-        tgt_embeddings_{tgt}.pt                        → model.decoder.token_emb.*
-        decoder_wrapper_{'_'.join(decoder_id)}.pt      → model.decoder.*
-        decoder_{i}_{decoder_id[i]}.pt  _base_layers.{j}.* → model.decoder.attn_layers.layers.{offset+j}.*
-
-    encoder_id / decoder_id are the xcoder_id lists from opts.tasks (enc_sharing_group /
-    dec_sharing_group), which determine both the wrapper filename and the per-stack shards.
+    Shard → HF key mapping:
+        src_embeddings_{src}.pt              weight          → encoder.token_emb.weight
+        encoder_wrapper_{enc_key}.pt         post_emb_norm.* → encoder.post_emb_norm.*
+        encoder_{i}_{xcoder_id}.pt           blocks.*        → encoder.stacks.{i}.blocks.*
+                                             final_norm.*    → encoder.stacks.{i}.final_norm.*
+        tgt_embeddings_{tgt}.pt              weight          → decoder.token_emb.weight
+        decoder_wrapper_{dec_key}.pt         post_emb_norm.* → decoder.post_emb_norm.*
+                                             to_logits.*     → decoder.to_logits.*
+        decoder_{i}_{xcoder_id}.pt           blocks.*        → decoder.stacks.{i}.blocks.*
+                                             final_norm.*    → decoder.stacks.{i}.final_norm.*
     """
     sd = {}
-
-    def prefix_load(filename: str, hf_prefix: str):
-        path = os.path.join(ckpt_dir, filename)
-        if not os.path.exists(path):
-            print(f"  [WARN] missing shard: {path}")
-            return
-        shard = _load(path)
-        for k, v in shard.items():
-            sd[f'{hf_prefix}.{k}'] = v
-
-    def attn_load(filename: str, hf_prefix: str, layer_offset: int) -> int:
-        """Load one attention-component shard, offsetting _base_layers indices.
-
-        Returns the number of layers contributed by this shard (0 if file missing).
-        """
-        path = os.path.join(ckpt_dir, filename)
-        if not os.path.exists(path):
-            print(f"  [WARN] missing shard: {path}")
-            return 0
-        shard = _load(path)
-        max_local_idx = -1
-        for k, v in shard.items():
-            if k.startswith('_base_layers.'):
-                rest = k[len('_base_layers.'):]
-                dot_pos = rest.index('.')
-                local_idx = int(rest[:dot_pos])
-                global_idx = local_idx + layer_offset
-                new_k = f'{hf_prefix}.layers.{global_idx}{rest[dot_pos:]}'
-                if local_idx > max_local_idx:
-                    max_local_idx = local_idx
-            elif k.startswith('layers.'):
-                # AdaptedAttentionLayers stores layers under both 'layers.*' and '_base_layers.*'
-                # (same tensors, different names). Skip 'layers.*' here — '_base_layers.*' already
-                # handles the offset remapping. Without this skip, component N's 'layers.0-K.*'
-                # overwrites the correctly-offset weights from all earlier components.
-                continue
-            else:
-                new_k = f'{hf_prefix}.{k}'
-            sd[new_k] = v
-        return max_local_idx + 1 if max_local_idx >= 0 else 0
-
     p = prefix
 
-    prefix_load(f'{p}_src_embeddings_{src}.pt', 'model.encoder.token_emb')
-    prefix_load(f'{p}_encoder_wrapper_{"_".join(encoder_id)}.pt', 'model.encoder')
-    prefix_load(f'{p}_tgt_embeddings_{tgt}.pt', 'model.decoder.token_emb')
-    prefix_load(f'{p}_decoder_wrapper_{"_".join(decoder_id)}.pt', 'model.decoder')
+    def load_shard(filename: str) -> dict:
+        path = os.path.join(ckpt_dir, filename)
+        if not os.path.exists(path):
+            print(f"  [WARN] missing shard: {path}")
+            return {}
+        return _load(path)
 
-    enc_offset = 0
-    for i, xcoder_id in enumerate(encoder_id):
-        fname = f'{p}_encoder_{i}_{xcoder_id}.pt'
-        n = attn_load(fname, 'model.encoder.attn_layers', enc_offset)
-        depth = n // 2  # encoder: 2 sub-layers per depth block (self-attn + FFN)
-        print(f"  encoder component {i} ({xcoder_id}): depth={depth} ({n} sub-layers) at offset {enc_offset}")
-        enc_offset += n
+    # --- Encoder token embedding ---
+    shard = load_shard(f'{p}_src_embeddings_{src}.pt')
+    if 'weight' in shard:
+        sd['encoder.token_emb.weight'] = shard['weight']
 
-    dec_offset = 0
-    for i, xcoder_id in enumerate(decoder_id):
-        fname = f'{p}_decoder_{i}_{xcoder_id}.pt'
-        n = attn_load(fname, 'model.decoder.attn_layers', dec_offset)
-        depth = n // 3  # decoder: 3 sub-layers per depth block (self-attn + cross-attn + FFN)
-        print(f"  decoder component {i} ({xcoder_id}): depth={depth} ({n} sub-layers) at offset {dec_offset}")
-        dec_offset += n
+    # --- Encoder wrapper (post_emb_norm) ---
+    enc_key = '_'.join(encoder_id)
+    shard = load_shard(f'{p}_encoder_wrapper_{enc_key}.pt')
+    if 'post_emb_norm.weight' in shard:
+        sd['encoder.post_emb_norm.weight'] = shard['post_emb_norm.weight']
 
-    # total depth = sum over components
-    enc_depth = enc_offset // 2
-    dec_depth = dec_offset // 3
-    print(f"  Total depth from checkpoint: enc_layers={enc_depth}, dec_layers={dec_depth}")
+    # --- Encoder stacks ---
+    for stack_idx, xcoder_id in enumerate(encoder_id):
+        shard = load_shard(f'{p}_encoder_{stack_idx}_{xcoder_id}.pt')
+        for k, v in shard.items():
+            sd[f'encoder.stacks.{stack_idx}.{k}'] = v
 
-    return sd, enc_depth, dec_depth
+    # --- Decoder token embedding ---
+    shard = load_shard(f'{p}_tgt_embeddings_{tgt}.pt')
+    if 'weight' in shard:
+        sd['decoder.token_emb.weight'] = shard['weight']
 
+    # --- Decoder wrapper (post_emb_norm, to_logits) ---
+    dec_key = '_'.join(decoder_id)
+    shard = load_shard(f'{p}_decoder_wrapper_{dec_key}.pt')
+    if 'post_emb_norm.weight' in shard:
+        sd['decoder.post_emb_norm.weight'] = shard['post_emb_norm.weight']
+    if 'to_logits.weight' in shard:
+        sd['decoder.to_logits.weight'] = shard['to_logits.weight']
 
-def _infer_attn_dim_head(hf_sd: dict, side: str, heads: int) -> int | None:
-    """Read the first to_q.weight for encoder/decoder and back-calculate dim_head."""
-    for k, v in hf_sd.items():
-        if k.startswith(f'model.{side}.attn_layers.layers.') and k.endswith('.to_q.weight'):
-            return v.shape[0] // heads
-    return None
+    # --- Decoder stacks ---
+    for stack_idx, xcoder_id in enumerate(decoder_id):
+        shard = load_shard(f'{p}_decoder_{stack_idx}_{xcoder_id}.pt')
+        for k, v in shard.items():
+            sd[f'decoder.stacks.{stack_idx}.{k}'] = v
 
-
-def _patch_config_from_sd(config, hf_sd: dict) -> None:
-    """Correct config flags that can be reliably inferred from the assembled checkpoint.
-
-    Handles cases where training opts don't store every x_transformers flag
-    and the converter's defaults don't match the actual trained architecture.
-    """
-    def _has(side: str, suffix: str) -> bool:
-        prefix = f'model.{side}.attn_layers.layers.'
-        return any(k.startswith(prefix) and k.endswith(suffix) for k in hf_sd)
-
-    config.enc_attn_qkv_bias = _has('encoder', '.to_q.bias')
-    config.dec_attn_qkv_bias = _has('decoder', '.to_q.bias')
-
-    # Layer norm bias: x-transformers uses 'beta' for the bias term
-    config.enc_layernorm_bias = _has('encoder', '.beta')
-    config.dec_layernorm_bias = _has('decoder', '.beta')
-
-    # FFN bias
-    config.enc_ff_no_bias = not _has('encoder', '.ff.0.0.bias') and not _has('encoder', '.ff.2.bias')
-    config.dec_ff_no_bias = not _has('decoder', '.ff.0.0.bias') and not _has('decoder', '.ff.2.bias')
-
-    # post_emb_norm presence/bias: LayerNorm uses .gamma, RMSNorm uses .g
-    config.enc_post_emb_norm = (
-        'model.encoder.post_emb_norm.gamma' in hf_sd or 'model.encoder.post_emb_norm.g' in hf_sd
-    )
-    config.dec_post_emb_norm = (
-        'model.decoder.post_emb_norm.gamma' in hf_sd or 'model.decoder.post_emb_norm.g' in hf_sd
-    )
-    config.enc_post_emb_norm_bias = 'model.encoder.post_emb_norm.beta' in hf_sd
-    config.dec_post_emb_norm_bias = 'model.decoder.post_emb_norm.beta' in hf_sd
-
-    # norm_add_unit_offset: norms init their scale param to 0 when unit_offset=True (effective=1).
-    # LayerNorm uses .gamma, RMSNorm/FusedRMSNorm (unit_offset mode) uses .g — check both.
-    def _mean_gamma(side: str) -> float | None:
-        prefix = f'model.{side}.attn_layers.layers.'
-        gammas = [v for k, v in hf_sd.items()
-                  if k.startswith(prefix) and (k.endswith('.0.2.gamma') or k.endswith('.0.2.g'))]
-        if not gammas:
-            return None
-        return sum(g.mean().item() for g in gammas) / len(gammas)
-
-    enc_gamma_mean = _mean_gamma('encoder')
-    dec_gamma_mean = _mean_gamma('decoder')
-    if enc_gamma_mean is not None:
-        config.enc_norm_add_unit_offset = abs(enc_gamma_mean) < 0.1
-    if dec_gamma_mean is not None:
-        config.dec_norm_add_unit_offset = abs(dec_gamma_mean) < 0.1
+    return sd
 
 
 # ---------------------------------------------------------------------------
@@ -443,9 +283,6 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     tgt_vocab_size = len(tgt_vocab_obj)
     print(f"Vocab sizes: src={src_vocab_size}, tgt={tgt_vocab_size}")
 
-    # Derive BOS/EOS/PAD token IDs from the src vocab specials.
-    # Mammoth trains with source wrapped as [BOS, tokens..., EOS].
-    # DefaultTokens.BOS = '<s>', DefaultTokens.EOS = '</s>'.
     src_specials = src_vocab_obj.specials
     bos_str = DefaultTokens.BOS
     eos_str = DefaultTokens.EOS
@@ -460,78 +297,41 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
         encoder_id, decoder_id = _infer_xcoder_ids_from_shards(ckpt_dir, prefix, src, tgt)
     print(f"Task components: encoder={encoder_id}, decoder={decoder_id}")
 
-    # When tied, x-transformers uses a lambda for to_logits (no saved weights).
-    # Scan the decoder wrapper + component shards for any 'to_logits' key.
-    p = prefix
-    dec_wrapper_key = '_'.join(decoder_id)
-    decoder_shards = [f'{p}_decoder_wrapper_{dec_wrapper_key}.pt'] + [
-        f'{p}_decoder_{i}_{xcoder_id}.pt' for i, xcoder_id in enumerate(decoder_id)
-    ]
-    tie = not any(
-        'to_logits' in k
-        for fname in decoder_shards
-        if os.path.exists(os.path.join(ckpt_dir, fname))
-        for k in _load(os.path.join(ckpt_dir, fname))
-    )
-    print(f"tie_word_embeddings: {tie}")
-
-    print("Assembling state dict from shards...")
-    hf_sd, enc_depth, dec_depth = assemble_state_dict(ckpt_dir, prefix, src, tgt, encoder_id, decoder_id)
-    # inv_freq is a computed buffer (not a trained weight); strip it so load_state_dict
-    # doesn't warn about unexpected keys — it will be recomputed from config on init.
-    hf_sd = {k: v for k, v in hf_sd.items() if not k.endswith('rotary_pos_emb.inv_freq')}
-    print(f"  Assembled {len(hf_sd)} tensors")
-
-    # Infer actual attention dim_head from checkpoint weights to avoid size mismatches
-    # when opts defaults don't match the trained model.
-    xt = getattr(opts, 'x_transformers_opts', {}) or {}
-    enc_heads = xt.get('heads', xt.get('enc_heads', 12))
-    dec_heads = xt.get('heads', xt.get('dec_heads', 12))
-    enc_attn_dim_head_override = _infer_attn_dim_head(hf_sd, 'encoder', enc_heads)
-    dec_attn_dim_head_override = _infer_attn_dim_head(hf_sd, 'decoder', dec_heads)
-    if enc_attn_dim_head_override is not None:
-        print(f"  Inferred enc_attn_dim_head={enc_attn_dim_head_override} "
-              f"(inner_dim={enc_heads * enc_attn_dim_head_override})")
-    if dec_attn_dim_head_override is not None:
-        print(f"  Inferred dec_attn_dim_head={dec_attn_dim_head_override} "
-              f"(inner_dim={dec_heads * dec_attn_dim_head_override})")
-
     config = config_from_opts(
-        opts, src_vocab_size, tgt_vocab_size, tie,
-        enc_attn_dim_head_override=enc_attn_dim_head_override,
-        dec_attn_dim_head_override=dec_attn_dim_head_override,
-        enc_layers_override=enc_depth,
-        dec_layers_override=dec_depth,
+        opts,
+        src_vocab_size=src_vocab_size,
+        tgt_vocab_size=tgt_vocab_size,
         bos_token_id=bos_id,
         eos_token_id=eos_id,
-        decoder_start_token_id=bos_id,
         pad_token_id=pad_id,
+        encoder_sharing_groups=encoder_id,
+        decoder_sharing_groups=decoder_id,
     )
-    _patch_config_from_sd(config, hf_sd)
-    print(f"Config: enc {config.enc_layers}×{config.enc_model_dim}d "
-          f"(heads={config.enc_heads}, dim_head={config.enc_attn_dim_head}, "
-          f"qkv_bias={config.enc_attn_qkv_bias}, ln_bias={config.enc_layernorm_bias}), "
-          f"dec {config.dec_layers}×{config.dec_model_dim}d "
-          f"(heads={config.dec_heads}, dim_head={config.dec_attn_dim_head}, "
-          f"qkv_bias={config.dec_attn_qkv_bias}, ln_bias={config.dec_layernorm_bias})")
+    enc_stack_sizes = config.enc_layers
+    dec_stack_sizes = config.dec_layers
+    print(
+        f"Config: {config.model_dim}d, {config.heads}h, "
+        f"enc_layers={enc_stack_sizes}, dec_layers={dec_stack_sizes}, "
+        f"ff_mult={config.ff_mult}, ff_swiglu={config.ff_swiglu}, "
+        f"rotary={config.rotary_pos_emb}, post_emb_norm={config.post_emb_norm}"
+    )
+
+    print("Assembling state dict from shards...")
+    hf_sd = assemble_state_dict(ckpt_dir, prefix, src, tgt, encoder_id, decoder_id)
+    print(f"  Assembled {len(hf_sd)} tensors")
 
     print("Building HF model...")
     model = MammothForConditionalGeneration(config)
 
-    missing, unexpected = [], []
     model_sd = model.state_dict()
-    for k in model_sd:
-        if k not in hf_sd:
-            missing.append(k)
-    for k in hf_sd:
-        if k not in model_sd:
-            unexpected.append(k)
+    missing = [k for k in model_sd if k not in hf_sd]
+    unexpected = [k for k in hf_sd if k not in model_sd]
     if missing:
-        print(f"  [WARN] Missing keys ({len(missing)}): {missing[:5]}{'...' if len(missing) > 5 else ''}")
+        print(f"  [WARN] Missing keys ({len(missing)}): {missing[:10]}{'...' if len(missing) > 10 else ''}")
     if unexpected:
-        print(f"  [WARN] Unexpected keys ({len(unexpected)}): {unexpected[:5]}{'...' if len(unexpected) > 5 else ''}")
+        print(f"  [WARN] Unexpected keys ({len(unexpected)}): {unexpected[:10]}{'...' if len(unexpected) > 10 else ''}")
 
-    model.load_state_dict(hf_sd, strict=False)
+    model.load_state_dict(hf_sd, strict=not (missing or unexpected))
     print("Weights loaded.")
 
     os.makedirs(output_dir, exist_ok=True)
@@ -552,7 +352,6 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
             pad_token=_rev.get(config.pad_token_id, DefaultTokens.PAD),
         )
         if add_bos_eos:
-            # Mirror Mammoth's _maybe_numericalize: source is always fed as [BOS, tokens..., EOS].
             from tokenizers.processors import TemplateProcessing
             tok._tokenizer.post_processor = TemplateProcessing(
                 single=f"{bos_str}:0 $A:0 {eos_str}:0",
@@ -568,16 +367,8 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     _save_tokenizer(tgt_vocab_obj, config.tgt_tokenizer_dir, 'tgt')
 
     here = os.path.dirname(os.path.abspath(__file__))
-    for fname in ("configuration_mammoth.py", "modeling_mammoth.py"):
+    for fname in ("configuration_mammoth.py", "modeling_mammoth.py", "native_transformer.py"):
         shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
-
-    # Vendor the x-transformers fork as flat sibling .py files so trust_remote_code
-    # users do not need `pip install mammoth`. HF's dynamic-module loader only
-    # supports relative imports of sibling .py files, not sub-packages.
-    import mammoth.x_transformers as _mxt
-    xt_src_dir = os.path.dirname(_mxt.__file__)
-    for fname in ("x_transformers.py", "attend.py", "autoregressive_wrapper.py"):
-        shutil.copy(os.path.join(xt_src_dir, fname), os.path.join(output_dir, fname))
 
     print(f"Saved to {output_dir}")
 
@@ -601,9 +392,9 @@ def convert_multi_task_artifact(
 ) -> None:
     """Convert all tasks from a multi-task checkpoint into a single bundled directory.
 
-    Each task is converted via the existing convert() into a temp dir, then the
-    weight files are renamed to {task}.safetensors and collected into output_dir
-    alongside shared code files and a manifest config.json.
+    Each task is converted via convert() into a temp dir, then the weight files are
+    renamed to {task}.safetensors and collected into output_dir alongside shared code
+    files and a manifest config.json.
     """
     import json
     import tempfile
@@ -624,51 +415,37 @@ def convert_multi_task_artifact(
             print(f"\n=== Converting task {task_name} ===")
             convert(ckpt_dir, prefix, src, tgt, task_dir)
 
-            # Rename model.safetensors → {task_name}.safetensors in output_dir
             src_sf = os.path.join(task_dir, "model.safetensors")
             dst_sf = os.path.join(output_dir, f"{task_name}.safetensors")
             if os.path.exists(src_sf):
                 shutil.move(src_sf, dst_sf)
             else:
-                # Try .bin as fallback
                 src_bin = os.path.join(task_dir, "pytorch_model.bin")
                 if os.path.exists(src_bin):
-                    dst_bin = os.path.join(output_dir, f"{task_name}.bin")
-                    shutil.move(src_bin, dst_bin)
+                    shutil.move(src_bin, os.path.join(output_dir, f"{task_name}.bin"))
 
-            # Read per-task config to extract task-specific info for the manifest
             task_config_path = os.path.join(task_dir, "config.json")
             with open(task_config_path) as f:
                 task_config = json.load(f)
 
-            # Store the FULL per-task config (has all architecture params)
-            # plus convenience fields for the wrapper.
             task_manifest[task_name] = {
                 **task_config,
                 "_src": src,
                 "_tgt": tgt,
             }
 
-            # Copy per-task tokenizers into output_dir/{task_name}_src_tokenizer/
             for tok_side in ("src_tokenizer", "tgt_tokenizer"):
-                tok_subdir = task_config.get(
-                    f"{tok_side}_dir", f"{tok_side}"
-                )
+                tok_subdir = task_config.get(f"{tok_side}_dir", tok_side)
                 tok_src = os.path.join(task_dir, tok_subdir)
                 tok_dst = os.path.join(output_dir, f"{task_name}_{tok_side}")
                 if os.path.isdir(tok_src) and not os.path.exists(tok_dst):
                     shutil.copytree(tok_src, tok_dst)
 
-    # Vendor shared code files once
     here = os.path.dirname(os.path.abspath(__file__))
-    for fname in ("configuration_mammoth.py", "modeling_mammoth.py", "mammoth_hub.py"):
+    for fname in ("configuration_mammoth.py", "modeling_mammoth.py",
+                  "native_transformer.py", "mammoth_hub.py"):
         shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
-    import mammoth.x_transformers as _mxt
-    xt_src_dir = os.path.dirname(_mxt.__file__)
-    for fname in ("x_transformers.py", "attend.py", "autoregressive_wrapper.py"):
-        shutil.copy(os.path.join(xt_src_dir, fname), os.path.join(output_dir, fname))
 
-    # Write manifest config.json
     manifest = {
         "model_type": "mammoth_hub",
         "tasks": task_manifest,
@@ -679,7 +456,6 @@ def convert_multi_task_artifact(
     print(f"\nBundled {len(task_manifest)} tasks into {output_dir}")
     for t in task_manifest:
         print(f"  {t}")
-
 
 
 def convert_checkpoint(
@@ -693,7 +469,6 @@ def convert_checkpoint(
     - task=None on a multi-task checkpoint  → convert every task into output_dir/<src>-<tgt>/
     - task=None on a single-task checkpoint → convert flat into output_dir/
     - task="src-tgt"                        → convert only that task; flat layout
-                                              (errors if pair is not in opts.tasks)
     """
     prefix = resolve_prefix(ckpt_dir, step)
     frame = _load(os.path.join(ckpt_dir, f'{prefix}_frame.pt'))
@@ -717,9 +492,6 @@ def convert_checkpoint(
     else:
         pairs = all_pairs
 
-    # Subdir layout is determined by the checkpoint's task count, not the filtered
-    # selection: this keeps the output layout stable across invocations so a user can
-    # convert tasks one at a time into the same output dir without collisions.
     use_subdirs = len(all_pairs) > 1
     for src, tgt in pairs:
         out = os.path.join(output_dir, f"{src}-{tgt}") if use_subdirs else output_dir

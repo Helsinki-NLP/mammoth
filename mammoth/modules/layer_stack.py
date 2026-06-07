@@ -70,4 +70,7 @@ class StackXcoder(nn.Module):
         key = '__'.join(component_key)
         return self.shared_to_logits[key] if key in self.shared_to_logits else None
 
+    def get_project_emb_by_component(self, component_key: tuple):
+        return None
+
     # Lack of forward is intentional: call forward on the return value of activate

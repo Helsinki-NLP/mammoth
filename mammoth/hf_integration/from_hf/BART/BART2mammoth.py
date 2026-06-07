@@ -664,7 +664,6 @@ def create_model_opts_from_bart_model(encoder_model, decoder_model, config, fina
     model_opts.ab_layers = []
     model_opts.adapters = None
     model_opts.enable_embeddingless = False
-    model_opts.normformer = False
     model_opts.dropout = [config.dropout]
     model_opts.attention_dropout = [config.attention_dropout]
     model_opts.share_encoder_decoder_embeddings = True

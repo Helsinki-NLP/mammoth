@@ -454,8 +454,6 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
 
     # Basic settings
     model_opts.model_dtype = "bf16"
-    model_opts.pos_ffn_activation_fn = "gelu"
-
     # Architecture
     model_opts.model_dim = config.hidden_size
     model_opts.enc_layers = [config.num_hidden_layers]
@@ -501,8 +499,6 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
     model_opts.ab_layers = []
     model_opts.adapters = None
     model_opts.enable_embeddingless = False
-    model_opts.normformer = False
-    model_opts.self_attn_type = "scaled-dot"
     model_opts.dropout = [0.0]
     model_opts.attention_dropout = [getattr(config, "attention_dropout", 0.0)]
 

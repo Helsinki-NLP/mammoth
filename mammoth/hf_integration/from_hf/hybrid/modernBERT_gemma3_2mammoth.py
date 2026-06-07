@@ -1001,7 +1001,6 @@ def create_model_opts_from_hybrid_model(encoder_model, decoder_model, enc_config
     model_opts.ab_layers = []
     model_opts.adapters = None
     model_opts.enable_embeddingless = False
-    model_opts.normformer = False
     model_opts.dropout = [0.0]
     model_opts.attention_dropout = [dec_config.attention_dropout]
 

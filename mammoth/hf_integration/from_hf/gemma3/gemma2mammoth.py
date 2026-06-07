@@ -888,7 +888,6 @@ def create_model_opts_from_xt_model(xt_model, hf_model_path):
     model_opts.ab_layers = []
     model_opts.adapters = None
     model_opts.enable_embeddingless = False
-    model_opts.normformer = False
     model_opts.dropout = [0.0]
     model_opts.attention_dropout = [config.attention_dropout]
 

@@ -62,8 +62,7 @@ def build_xcoder(
     heads = getattr(model_opts, 'heads', 8)
     dim_head = dim // heads
     activation = getattr(model_opts, 'ff_activation', 'swiglu')
-    default_ff_mult = 4.0 if activation == 'gelu' else getattr(model_opts, 'ff_mult', 2.67)
-    ff_mult = getattr(model_opts, 'ff_mult', default_ff_mult)
+    ff_mult = getattr(model_opts, 'ff_mult', 4.0 if activation == 'gelu' else 2.67)
     attn_drop = getattr(model_opts, 'attn_dropout', 0.0)
     ff_drop = getattr(model_opts, 'ff_dropout', 0.0)
     use_rotary = getattr(model_opts, 'rotary_pos_emb', False)

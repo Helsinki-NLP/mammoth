@@ -1,8 +1,6 @@
 """ Implementation of all available options """
 import configargparse
 
-from mammoth.modules.position_ffn import ACTIVATION_FUNCTIONS
-from mammoth.modules.position_ffn import ActivationFunction
 from mammoth.transforms import AVAILABLE_TRANSFORMS
 from mammoth.distributed import TASK_DISTRIBUTION_STRATEGIES
 
@@ -291,29 +289,8 @@ def model_opts(parser):
         help="Decoder hidden dimension. Must be set together with enc_model_dim. "
              "Mutually exclusive with model_dim.",
     )
-    group.add(
-        '--pos_ffn_activation_fn',
-        '-pos_ffn_activation_fn',
-        type=str,
-        default=ActivationFunction.relu,
-        choices=ACTIVATION_FUNCTIONS.keys(),
-        help='The activation'
-        ' function to use in PositionwiseFeedForward layer. Choices are'
-        f' {ACTIVATION_FUNCTIONS.keys()}. Default to'
-        f' {ActivationFunction.relu}.',
-    )
-
-    group.add('-normformer', '--normformer', action='store_true', help='NormFormer-style normalization')
-
     # Attention options
     group = parser.add_argument_group('Model- Attention')
-    group.add(
-        '--self_attn_type',
-        '-self_attn_type',
-        type=str,
-        default="scaled-dot",
-        help='Self attention type in Transformer decoder layer -- currently "scaled-dot" or "average" ',
-    )
 
     # Sliding window attention options (Flash Attention 2)
     group.add(
@@ -405,8 +382,9 @@ def model_opts(parser):
         help='Number of attention heads. model_dim must be divisible by heads.',
     )
     group.add(
-        '--ff_mult', '-ff_mult', type=float, default=4.0,
-        help='FFN inner dimension multiplier: ff_inner = model_dim * ff_mult.',
+        '--ff_mult', '-ff_mult', type=float, default=2.67,
+        help='FFN inner dimension multiplier: ff_inner = model_dim * ff_mult. '
+             'Default 2.67 (≈ 8/3) matches parameter count of a 4× GELU FFN when using SwiGLU (3 matrices vs 2).',
     )
     group.add(
         '--ff_activation', '-ff_activation', type=str, default='swiglu',

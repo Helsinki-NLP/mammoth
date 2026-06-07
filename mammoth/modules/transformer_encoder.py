@@ -161,12 +161,10 @@ class TransformerEncoder(EncoderBase):
             opts.attention_dropout[0] if isinstance(opts.attention_dropout, list) else opts.attention_dropout,
             embeddings,
             opts.max_relative_positions,
-            pos_ffn_activation_fn=opts.pos_ffn_activation_fn,
             layer_norm_module=(
                 nn.LayerNorm(opts.model_dim, eps=1e-5) if is_on_top
                 else nn.Identity()
             ),
-            is_normformer=opts.normformer,
         )
 
     def forward(self, src, lengths=None, skip_embedding=False, mask=None):

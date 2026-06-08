@@ -94,10 +94,16 @@ def _load_tokenizers_from_frame(frame_path: str, task: str):
 
 
 def _load_tokenizers_from_dirs(src_tok_dir: str, tgt_tok_dir: str):
-    """Load tokenizers saved by convert_mammoth_to_hf.py."""
+    """Load tokenizers from a directory or a single tokenizer.json file."""
     from transformers import PreTrainedTokenizerFast
-    src_tok = PreTrainedTokenizerFast.from_pretrained(src_tok_dir)
-    tgt_tok = PreTrainedTokenizerFast.from_pretrained(tgt_tok_dir)
+
+    def _load_one(path: str) -> PreTrainedTokenizerFast:
+        if os.path.isfile(path):
+            return PreTrainedTokenizerFast(tokenizer_file=path)
+        return PreTrainedTokenizerFast.from_pretrained(path)
+
+    src_tok = _load_one(src_tok_dir)
+    tgt_tok = _load_one(tgt_tok_dir)
     bos_id = tgt_tok.bos_token_id or 2
     eos_id = tgt_tok.eos_token_id or 0
     pad_id = src_tok.pad_token_id or 1
@@ -223,6 +229,13 @@ def translate(
         np.array(src_ids_padded) == pad_id, float("-inf"), 0.0
     ).astype(np.float32).reshape(1, enc_max)
 
+    # Cross-attention mask: same padding positions as the encoder input mask.
+    # Shape (1,1,1,enc_max) for decode; broadcast to (1,1,dec_max,enc_max) for prefill.
+    cross_mask_1d = pad_mask.reshape(1, 1, 1, enc_max)
+    cross_mask_prefill = np.broadcast_to(
+        cross_mask_1d, (1, 1, dec_max, enc_max)
+    ).copy()
+
     _buf_write(enc_in_bufs[0], np.array(src_ids_padded, dtype=np.int32).reshape(1, enc_max))
     _buf_write(enc_in_bufs[1], pad_mask)
 
@@ -241,7 +254,7 @@ def translate(
     dec_input[0, 0] = bos_id
     _buf_write(pre_in_bufs[1], dec_input)
     _buf_write(pre_in_bufs[2], _causal_mask_prefill(dec_max))
-    _buf_write(pre_in_bufs[3], _cross_mask_prefill(dec_max, enc_max))
+    _buf_write(pre_in_bufs[3], cross_mask_prefill)
     # Placeholders for KV inputs (prefill ignores values, only shapes matter)
     for i in range(4, len(pre_in_bufs)):
         details = pre_in_bufs[i].get_tensor_details()
@@ -278,7 +291,7 @@ def translate(
     for i in range(2 * n):
         dec_in_bufs[5 + i] = pre_out_bufs[1 + i]
 
-    cross_mask_np = _cross_mask_decode(enc_max)
+    cross_mask_np = cross_mask_1d  # encoder-padding-aware mask, shape (1,1,1,enc_max)
 
     for step in range(1, min(dec_max, max_new_tokens + 1)):
         current_token = predicted_ids[-1]
@@ -289,7 +302,7 @@ def translate(
                    _causal_mask_decode(step, dec_max))
         _buf_write(dec_in_bufs[3], cross_mask_np)
         _buf_write(dec_in_bufs[4],
-                   np.array(step, dtype=np.int64))
+                   np.array(step, dtype=np.int32))
 
         model.run_by_index(dec_idx, dec_in_bufs, dec_out_bufs)
         # dec_out_bufs[0]      = logits (1, 1, vocab)
@@ -350,8 +363,10 @@ def main():
 
     print(f"BOS={bos_id}  EOS={eos_id}  PAD={pad_id}")
 
-    # Tokenize source
-    src_ids = src_tok.encode(args.src, add_special_tokens=True)
+    # Tokenize source.  The tokenizer.json format doesn't record bos/eos tokens,
+    # so add_special_tokens=True is a no-op; wrap manually with <s>…</s> to match
+    # the training format (both tokenizers share the same special-token IDs).
+    src_ids = [bos_id] + src_tok.encode(args.src, add_special_tokens=False) + [eos_id]
     print(f"Source: {args.src!r}  →  {src_ids}")
 
     # Load model

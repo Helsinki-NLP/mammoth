@@ -20,10 +20,10 @@
 # The fragment defines:
 #
 #   pair-extractor
-#       Verifies that `$(BINDIR)/inf_pairs.py` exists.
+#       Verifies that `$(SELF_DIR)/inf_pairs.py` exists.
 #
 #   pair-planner
-#       Verifies that `$(BINDIR)/inf_plan.py` exists.
+#       Verifies that `$(SELF_DIR)/inf_plan.py` exists.
 #
 #   require-pairs
 #       Requires the final supervised and zero-shot pair-selection files and
@@ -64,7 +64,7 @@
 # Expected from the including Makefile:
 #   TRAINCONFIG
 #   VIEWPYTHON
-#   BINDIR
+#   SELF_DIR
 #   MODELDIR
 #   OUTDIR
 #   DATADIR
@@ -80,8 +80,8 @@
 #
 # Reads
 # -----
-#   - `$(BINDIR)/inf_pairs.py`
-#   - `$(BINDIR)/inf_plan.py`
+#   - `$(SELF_DIR)/inf_pairs.py`
+#   - `$(SELF_DIR)/inf_plan.py`
 #   - the training YAML from `$(TRAINCONFIG)`
 #   - the selected supervised and zero-shot pair files, once present
 #
@@ -111,15 +111,15 @@
 # - The planning stage is intended to run outside Slurm.
 
 
-.PHONY: inference-yamls require-pairs clean-inf-inputs view-venv pair-extractor pair-planner fresh-yamls inference-yamls-ok
+.PHONY: inference-yamls require-pairs clean-inf-inputs view-venv pair-extractor pair-planner fresh-yamls inference-yamls-ok pass-pairs
 
 pair-extractor: 
-> @[[ -f "$(BINDIR)/inf_pairs.py" ]] || { echo "mk-yamls.mk: ❌ Missing $(BINDIR)/inf_pairs.py" >&2; exit 1; }
+> @[[ -f "$(SELF_DIR)/inf_pairs.py" ]] || { echo "mk-yamls.mk: ❌ Missing $(SELF_DIR)/inf_pairs.py" >&2; exit 1; }
 
 pair-planner: 
-> @ [[ -f "$(BINDIR)/inf_plan.py" ]] || { echo "mk-yamls.mk: Missing $(BINDIR)/inf_plan.py" >&2; exit 1; }
+> @ [[ -f "$(SELF_DIR)/inf_plan.py" ]] || { echo "mk-yamls.mk: Missing $(SELF_DIR)/inf_plan.py" >&2; exit 1; }
 
-require-pairs: $(ZEROSHOTPAIRS) $(SUPERVISEDPAIRS)
+require-pairs: mk-shared $(ZEROSHOTPAIRS) $(SUPERVISEDPAIRS)
 > @echo "mk-yamls.mk: ✅ Pair selections exist: "
 > @echo -n "mk-yamls.mk:    $(ZEROSHOTPAIRS):"
 > @echo `wc -l <$(ZEROSHOTPAIRS)` lines
@@ -129,12 +129,16 @@ require-pairs: $(ZEROSHOTPAIRS) $(SUPERVISEDPAIRS)
 $(ZEROSHOTPAIRSINPUT): $(TRAINCONFIG) $(VIEWPYTHON) | dirs not-in-slurm pair-extractor
 > @set -euo pipefail
 > @echo "Building $(ZEROSHOTPAIRSINPUT)..."
-> @module load cray-python; $(VIEWPYTHON) "$(BINDIR)/inf_pairs.py" "$(TRAINCONFIG)" --zs-out "$(ZEROSHOTPAIRSINPUT)" >&2
+> @module load cray-python; $(VIEWPYTHON) "$(SELF_DIR)/inf_pairs.py" "$(TRAINCONFIG)" --zs-out "$(ZEROSHOTPAIRSINPUT)" >&2
 
 $(SUPERVISEDPAIRSINPUT): $(TRAINCONFIG) $(VIEWPYTHON) | dirs not-in-slurm pair-extractor
 > @set -euo pipefail
 > @echo "Building $(SUPERVISEDPAIRSINPUT)..."
-> @module load cray-python; $(VIEWPYTHON) "$(BINDIR)/inf_pairs.py" "$(TRAINCONFIG)" --supervised-pairs-and-quit "$(SUPERVISEDPAIRSINPUT)" >&2
+> @module load cray-python; $(VIEWPYTHON) "$(SELF_DIR)/inf_pairs.py" "$(TRAINCONFIG)" --supervised-pairs-and-quit "$(SUPERVISEDPAIRSINPUT)" >&2
+
+pass-pairs: $(ZEROSHOTPAIRSINPUT) $(SUPERVISEDPAIRSINPUT)
+> cp -p $(ZEROSHOTPAIRSINPUT)   $(ZEROSHOTPAIRS)
+> cp -p $(SUPERVISEDPAIRSINPUT) $(SUPERVISEDPAIRS)
 
 $(ZEROSHOTPAIRS): $(ZEROSHOTPAIRSINPUT)
 > @echo "mk-yamls.mk: ❌ Missing zero-shot pair selection: $@" >&2
@@ -146,7 +150,7 @@ $(SUPERVISEDPAIRS): $(SUPERVISEDPAIRSINPUT)
 > @echo "mk-yamls.mk: Read suggestions from: $<" >&2
 > @exit 1
 
-mk-yamls: require-pairs inference-yamls
+mk-yamls: require-pairs inference-yamls mk-shared
 > @echo "mk-yamls.mk: ✨ I am happy."
 > @echo "mk-yamls.mk: ❓ Do you want to clean and rebuild thoses files? Say: "
 > @echo "mk-yamls.mk:       make fresh-yamls        # to clean  testing.yaml"
@@ -157,7 +161,6 @@ $(TESTCONFIG).err: $(TRAINCONFIG) #| dirs not-in-slurm require-pairs pair-planne
 > @echo "mk-yamls.mk: 🛠️ Creating tentative testing tasks..."
 > @echo -n "mk-yamls.mk:    In $(OUTDIR) the number of files is "
 > @(ls $(OUTDIR)/*.yaml 2>/dev/null || true) | wc -l
-> @   export BINDIR="$(BINDIR)"
 > @echo -----------------------------------
 > @   export MAMMOTH="$(MAMMOTH)"; \
 >     export LOGDIR="$(LOGDIR)"; \
@@ -168,7 +171,7 @@ $(TESTCONFIG).err: $(TRAINCONFIG) #| dirs not-in-slurm require-pairs pair-planne
 >     export DATADIR="$(DATADIR)"; \
 >     export ZEROSHOTPAIRS="$(ZEROSHOTPAIRS)"; \
 >     export SUPERVISEDPAIRS="$(SUPERVISEDPAIRS)"; \
-> module load cray-python; $(VIEWPYTHON) "$(BINDIR)/inf_plan.py" 2>&1 | tee "$(TESTCONFIG).err" || true
+> module load cray-python; $(VIEWPYTHON) "$(SELF_DIR)/inf_plan.py" 2>&1 | tee "$(TESTCONFIG).err" || true
 > @echo -n "mk-yamls.mk:    In $(OUTDIR) the number of files is "
 > @(ls $(OUTDIR)/*.yaml 2>/dev/null || true) | wc -l
 > @echo -----------------------------------

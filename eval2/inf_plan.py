@@ -414,9 +414,9 @@ def get_env_vars():
 
 class CallWriters:
     def __init__(self, outdir: str):
-        self.calls_path = os.path.join(outdir, "calls.out")
-        self.sacre_path = os.path.join(outdir, "calls.sacre.out")
-        self.comet_path = os.path.join(outdir, "calls.comet.out")
+        self.calls_path = os.path.join(outdir, "calls.out") # file
+        self.sacre_path = os.path.join(outdir, "calls.sacre.out") # file
+        self.comet_path = os.path.join(outdir, "calls.comet.out") # file
 
         self.calls = open(self.calls_path, "w", encoding="utf-8")
         self.sacre = open(self.sacre_path, "w", encoding="utf-8")
@@ -428,7 +428,7 @@ class CallWriters:
         self.comet.close()
 
 def validate_calls_out(outdir: str):
-    calls_path = os.path.join(outdir, "calls.out")
+    calls_path = os.path.join(outdir, "calls.out") # file
     if not os.path.exists(calls_path):
         return
     bad = []
@@ -789,12 +789,17 @@ def emit_tasks(*, xtask: str, support: TaskSupport,
     tgt_ref = inventory.code_to_ref[tgt]
     src_wmt = inventory.xcode_to_wmt_locale.get(src_xcode, "")
     tgt_wmt = inventory.xcode_to_wmt_locale.get(tgt_xcode, "")
-    inf_yaml_path = f"{outdir}/{orig_task}.yaml"
-
+    if pair_type == "supervised":
+        inf_yaml_path_file = f"{outdir}/{orig_task}.yaml"
+        inf_yaml_path = f"{outdir}/{orig_task}.yaml"
+    else:
+        inf_yaml_path_file = f"{outdir}/{orig_task}.0shot.yaml"
+        inf_yaml_path = f"{outdir}/{orig_task}.0shot.yaml"
+        
     write_inference_yaml(
         src_code=src, tgt_code=tgt, pair_type=pair_type,
         xtask=xtask, orig_task=orig_task, cfg=cfg,
-        train_cfg=cfg_path, inf_yaml_path=inf_yaml_path, outdir=outdir, support=support)
+        train_cfg=cfg_path, inf_yaml_path=inf_yaml_path_file, outdir=outdir, support=support)
 
     flo_input = os.path.join(datadir, "flores_plus", "devtest", f"{src_ref}.txt")
     flo_refer = os.path.join(datadir, "flores_plus", "devtest", f"{tgt_ref}.txt")
@@ -837,6 +842,14 @@ def emit_tasks(*, xtask: str, support: TaskSupport,
         xtask=xtask, orig_task=orig_task, pair_type=pair_type)
     
     return True
+
+def squash_debug_value(v):
+    if isinstance(v, list):
+        if len(v) == 0:
+            return []
+        if len(v) == 1:
+            return v[0]
+    return v
 
 def choose_template_task(cfg: dict, support: TaskSupport, xtask: str, orig_task: str) -> str:
     train_tasks = cfg.get("tasks", {})
@@ -899,13 +912,26 @@ def build_inference_config_from_template(
     template_cfg["_src_task_candidates"] = src_candidates
     template_cfg["_tgt_task_candidates"] = tgt_candidates
     template_cfg["_original_train_task"] = orig_task
-
+    for k in [
+            "_template_task",
+            "_pair_type",
+            "_src_task_candidates",
+            "_tgt_task_candidates",
+            "_original_train_task",]:
+        if k in template_cfg:
+            template_cfg[k] = squash_debug_value(template_cfg[k])
+        
     src_vocab = infer_cfg.get("src_vocab", {})
     tgt_vocab = infer_cfg.get("tgt_vocab", {})
     if src_vocab_code not in src_vocab:
         raise KeyError(f"source vocab code {src_vocab_code!r} missing from src_vocab")
     if tgt_vocab_code not in tgt_vocab:
         raise KeyError(f"target vocab code {tgt_vocab_code!r} missing from tgt_vocab")
+
+    # Narrow vocabularies exactly like the old extractor:
+    # keep only the entries needed by this task.
+    infer_cfg["src_vocab"] = {src_vocab_code: src_vocab[src_vocab_code]}
+    infer_cfg["tgt_vocab"] = {tgt_vocab_code: tgt_vocab[tgt_vocab_code]}
 
     # IMPORTANT:
     # Use orig_task as the only task key, because translate.py is later called with:
@@ -921,7 +947,7 @@ def build_inference_config_from_template(
     infer_cfg["gpu_ranks"] = DEFAULT_GPU_RANKS
 
     # Keep these if useful for debugging / traceability.
-    infer_cfg["task_id"] = xtask,
+    infer_cfg["task_id"] = xtask
     infer_cfg["_expanded_task"] = xtask
     infer_cfg["_train_config"] = train_cfg_path
 

@@ -1,4 +1,5 @@
 # -----------------------------------------------------------------------------
+
 # Shared checks
 # -----------------------------------------------------------------------------
 # mk-shared.mk
@@ -101,10 +102,54 @@
 
 
 
-.PHONY: check-model dirs check-in-model-dir not-in-slurm mk-shared
+.PHONY: check-model dirs check-in-model-dir not-in-slurm mk-shared inspect-model-summary $(MODELDIR)/mammoth.selected mk-shared
 
-mk-shared: check-model dirs check-in-model-dir not-in-slurm
-> @echo "mk-shared.mk: ✨ I am happy."
+CONTAINER := /appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif
+
+inspect-model-summary: $(MODELDIR)/model-summary.yaml
+> echo "mk-shared.mk: 🛠️ Short model-file summary for $(MODELDIR):"
+> @cat $(MODELDIR)/model-summary.yaml
+
+$(MODELDIR)/mammoth.selected: $(MODELDIR)/model-summary.yaml
+> @set -euo pipefail; \
+> echo "mk-shared.mk:    Reading $(MODELDIR)/model-summary.yaml"; \
+> if grep -Fq 'use older Mammoth compatible with trained_head_dim=64' "$(MODELDIR)/model-summary.yaml"; then \
+>   echo "mk-shared.mk:    The model has a hard-coded head_dim"; \
+>   printf '%s\n' "$(MAMMOTH64)" > "$@"; \
+> else \
+>   echo "mk-shared.mk:    The model uses a computed head_dim"; \
+>   printf '%s\n' "$(MAMMOTHDEF)" > "$@"; \
+> fi; \
+> echo "mk-shared.mk: ✅ Written file $@"
+
+
+# The folloing sends the names of the model files to the inspector and
+# then stores the outputs to a model-summary.yaml file.
+$(MODELDIR)/model-summary.yaml: 
+> @set -euo pipefail
+> @[[ -f "$(INSPECT_MODEL_FILES)" ]] || { echo "mk-shared.mk: ❌ Missing $(INSPECT_MODEL_FILES)" >&2; exit 1; }
+> @shopt -s nullglob; \
+> files=( "$(MODELDIR)"/*.pt ); \
+> keep=(); \
+> for f in "$${files[@]}"; do \
+>   b="$$(basename "$$f")"; \
+>   case "$$b" in \
+>     *_optim.pt) ;; \
+>     *) keep+=( "$$f" );; \
+>   esac; \
+> done; \
+> if [ "$${#keep[@]}" -eq 0 ]; then \
+>   echo "mk-shared.mk: ℹ️ No inspectable .pt model files found in $(MODELDIR)"; \
+>   exit 0; \
+> fi; \
+> module load cray-python; \
+> /usr/bin/singularity exec \
+>   -B /scratch/project_462000964:/scratch/project_462000964:rw \
+>   -B /scratch/project_462001087:/scratch/project_462001087:rw \
+>   --env PYTHONPATH="$(MAMMOTH):$${PYTHONPATH:-}" \
+>   "$(CONTAINER)" \
+>   python3 "$(INSPECT_MODEL_FILES)" --unsafe --depth 2 --top-mods 8 --model-summary --yaml-like "$${keep[@]}" \
+>	> $(MODELDIR)/model-summary.yaml
 
 check-model:
 > @set -euo pipefail
@@ -122,6 +167,12 @@ status:
 > @echo "mk-shared.mk: SACRE_CALLS:       $(SACRE_CALLS)"
 > @echo "mk-shared.mk: Inference flag:    $(INF_FLAG)"
 > @echo "mk-shared.mk: Metrics flag:      $(MET_FLAG)"
+
+mk-shared: check-model check-in-model-dir not-in-slurm dirs $(MODELDIR)/mammoth.selected
+> @MAMMOTHSEL="$$(cat "$(MODELDIR)/mammoth.selected")"; \
+> echo "mk-shared.mk: ✅ Found: $(MODELDIR)/mammoth.selected"; \
+> echo "mk-shared.mk: ✅ Using: $$MAMMOTHSEL"; 
+> @echo "mk-shared.mk: ✨ I am happy."
 
 check-in-model-dir: check-model 
 > @set -euo pipefail
@@ -149,9 +200,10 @@ check-in-model-dir: check-model
 > @echo "mk-shared.mk: ✅ We are now in the model dir $(MODELDIR)"
 
 dirs: check-model check-in-model-dir
-> @mkdir -p "$(OUTDIR)" "$(LOGDIR)" "$(SCRDIR)"
+> @mkdir -p "$(OUTDIR)" "$(LOGDIR)" "$(SCRDIR)" # "$(OUTDIR)/eval2" 
 > @echo "mk-shared.mk: 🛠️ I ensured the existence of local directories: "
 > @echo "mk-shared.mk:    $(OUTDIR)"
+#> @echo "mk-shared.mk:    $(OUTDIR)/eval2"
 > @echo "mk-shared.mk:    $(LOGDIR)"
 > @echo "mk-shared.mk:    $(SCRDIR)"
 

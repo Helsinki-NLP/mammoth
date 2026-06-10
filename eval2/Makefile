@@ -94,6 +94,8 @@
 # - This Makefile is the main entry point of the new eval2 pipeline.
 
 
+.DEFAULT_GOAL := help
+
 .RECIPEPREFIX := >
 SHELL := /bin/bash
 .SHELLFLAGS := -lc
@@ -102,22 +104,81 @@ SHELL := /bin/bash
 # Configuration
 # -----------------------------------------------------------------------------
 
-PROJECT := project_462000964
+SELF_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+INSPECT_MODEL_FILES := /scratch/project_462000964/members/aylijyra/dev/mammoth/eval2/inspect-model-files.py
+
+#PROJECT := project_462000964
+PROJECT := project_462001087
+
 #PARTITION  := small
 #TIME       := 04:00:00
 #MEM        := 8G
 
 TESTINGDIR := /scratch/$(PROJECT)/shared/testing-shared
 MAMMOTH    := /scratch/$(PROJECT)/shared/mammoth-shared/mammoth-dev/mammoth
+MAMMOTHDEF := /scratch/$(PROJECT)/shared/mammoth-shared/mammoth-dev/mammoth
+MAMMOTH64  := /scratch/$(PROJECT)/shared/mammoth-shared/mammoth-dev/mammoth-64 # head_dim=64
 VENV       := /scratch/$(PROJECT)/shared/mammoth-shared/.venv
 DATADIR    := $(TESTINGDIR)/data
 BINDIR     := $(TESTINGDIR)/bin
 
-# MODELDIR   := 
-ifndef MODELDIR
-$(info The MOLDELDIR unset. Please call make with MODEL=/path)
-$(info Here are the options:)
-$(error I need to stop now.)
+
+
+# -----------------------------------------------------------------------------
+# Model aliases
+# -----------------------------------------------------------------------------
+# Shared base directory for model aliases.
+MODELS := /scratch/project_462000964/members/tiedeman/MARMoT/models
+SODELS := /scratch/project_462000964/members/tiedeman/MARMoT/sandbox/tiedeman/oellm-lg
+
+# Add model aliases here.
+MODEL_docmt4denoisebase   := $(MODELS)/docmt-4pivots-denoise-halfsharedenc-base/mammoth
+MODEL_docmt4denoisesmall  := $(MODELS)/docmt-4pivots-denoise-halfsharedenc-small/mammoth
+MODEL_docmt4denoisexl     := $(MODELS)/docmt-4pivots-denoise-halfsharedenc-xl/mammoth
+MODEL_docmt4              := $(MODELS)/docmt-4pivots/mammoth
+MODEL_finnish             := $(MODELS)/finnish/mammoth
+#MODEL_mammothdocmt4       := $(SODELS)/mammoth-docmt4
+#MODEL_mammothdocmtlarge   := $(SODELS)/mammoth-docmt-large
+#MODEL_mammothflanmtlarge  := $(SODELS)/mammoth-flan-mt-large
+#MODEL_mammothmtlarge      := $(SODELS)/mammoth-mt-large
+#MODEL_mammothmt           := $(SODELS)/mammoth-mt
+#MODEL_mammothmtsynth      := $(SODELS)/mammoth-mtsynth
+#MODEL_oellmtranslate236   := $(SODELS)/oellm-translate2-36
+#MODEL_sentmtdenoise       := $(SODELS)/sentmt-denoise/mammoth
+#MODEL_sentmthalfsmall     := $(SODELS)/sentmt-halfsharedenc-small/mammoth
+#MODEL_sentmthalfxl        := $(SODELS)/sentmt-halfsharedenc-xl/mammoth
+MODEL_xtran               := /scratch/project_462001087/members/wangchao/train/compare/x_transformers/model
+MODEL_ALIASES := docmt4denoisebase  docmt4denoisesmall docmt4denoisexl docmt4 finnish xtran
+#	mammothdocmt4 mammothdocmtlarge mammothflanmtlarge mammothmtlarge mammothmt mammothmtsynth 
+#	oellmtranslate236 sentmtdenoise sentmthalfsmall sentmthalfxl 
+# The sandbox models have been deleted due to the lack of space.
+
+# Resolve alias used as the first goal, if any.
+FIRST_GOAL := $(firstword $(MAKECMDGOALS))
+ifneq ($(filter $(FIRST_GOAL),$(MODEL_ALIASES)),)
+  MODELDIR := $(MODEL_$(FIRST_GOAL))
+  MODEL_ALIAS_USED := 1
+else
+  MODEL_ALIAS_USED := 0
+endif
+# If any alias appears later in the goal list, reject it.
+LATE_MODEL_GOALS := $(filter $(MODEL_ALIASES),$(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS)))
+ifneq ($(strip $(LATE_MODEL_GOALS)),)
+  $(error Put the model alias first, e.g. 'make $(firstword $(LATE_MODEL_GOALS)) mk-yamls')
+endif
+# If more than one alias appears anywhere, reject it.
+ALL_MODEL_GOALS := $(filter $(MODEL_ALIASES),$(MAKECMDGOALS))
+ifneq ($(words $(ALL_MODEL_GOALS)),0)
+  ifneq ($(words $(ALL_MODEL_GOALS)),1)
+    $(error Please specify exactly one model alias. Run 'make list-models' to see choices.)
+  endif
+endif
+# Prevent workflow targets from running without a model, but allow help/list-models.
+NON_MODEL_GOALS := $(filter-out help list-models $(MODEL_ALIASES),$(MAKECMDGOALS))
+ifneq ($(strip $(NON_MODEL_GOALS)),)
+  ifndef MODELDIR
+    $(error MODELDIR is unset. Use 'make list-models' or 'make <alias> <target>' or 'make MODELDIR=/path/to/model <target>')
+  endif
 endif
 MODELDIR_CLEAN := $(patsubst %/,%,$(MODELDIR))
 MODEL := $(MODELDIR_CLEAN)/
@@ -135,7 +196,6 @@ ZEROSHOTPAIRS         := $(MODELDIR)/inf_zeroshot.txt
 SUPERVISEDPAIRSINPUT  := $(MODELDIR)/inf_supervised.txt.input
 SUPERVISEDPAIRS       := $(MODELDIR)/inf_supervised.txt
 
-
 INFERENCE_CALLS := $(OUTDIR)/calls.out
 SACRE_CALLS     := $(OUTDIR)/calls.sacre.out
 
@@ -145,25 +205,70 @@ PLAN_FLAG  := $(MODELDIR)/inference-planning.lock
 SACRE_FLAG := $(MODELDIR)/metrics-planning.lock
 
 SACRE_VENV := $(TESTINGDIR)/venvs/sacre
-SACRE_ACTIVATE := $(SACRE_VENV)/bin/activate
+TORCH_VENV := $(TESTINGDIR)/venvs/torch
 
 SACREPYTHON := $(TESTINGDIR)/venvs/sacre/bin/python
 VIEWPYTHON  := $(TESTINGDIR)/venvs/view/bin/python
+TORCHPYTHON := $(TESTINGDIR)/venvs/torch/bin/python
 INFPYTHON   := $(VENV)/bin/python
 
 # -----------------------------------------------------------------------------
 # Top-level workflow
 # -----------------------------------------------------------------------------
 
-.PHONY: all mk-shared mk-yamls mk-infer metrics status
+.DEFAULT_GOAL := list-models
 
-# mk-shared 
-all: mk-shared mk-yamls mk-infer 
+# Make alias goals no-op targets so `make docmt4 mk-yamls` works.
+.PHONY: all mk-shared mk-yamls mk-infer metrics status $(MODEL_ALIASES) help list-models 
+
+help: 
+> @printf "\n\
+eval2 Makefile\n\
+\n\
+Usage:\n\
+  make list-models\n\
+  make <model-alias> <target>\n\
+  make MODELDIR=/path/to/model <target>\n\
+\n\
+The model alias must be specified first.\n\
+\n\
+Examples:\n\
+  make docmt4 mk-shared\n\
+  make docmt4 mk-yamls\n\
+  make sentmtdenoise mk-yamls\n\
+  make MODELDIR=/scratch/.../mammoth mk-yamls\n\
+\n\
+Main targets:\n\
+  mk-shared\n\
+  mk-yamls\n\
+  status\n\
+  clean-inf-inputs\n\
+  fresh-yamls\n\n\
+Model aliases:\n"
+
+
+list-models: help
+> @$(foreach a,$(MODEL_ALIASES),printf "  %-10s -> %s\n" "$(a)" "$(MODEL_$(a))";)
+
+# This is used to inpect the model properties - helps to choose the correct MAMMOTH version
+$(MODEL_ALIASES):
+> @if [ "$(words $(MAKECMDGOALS))" -eq 1 ]; then \
+>   $(MAKE) --no-print-directory -C "$(SELF_DIR)" MODELDIR="$(MODEL_$@)" inspect-model-summary; \
+> fi
 
 include mk-shared.mk
+
 include mk-yamls.mk
 
-# include mk-infer.mk
+include mk-infer.mk
+
+all: mk-shared mk-yamls mk-infer 
+
+
 #metrics: metrics-submit
 # include mk-score.mk
+
+
+# add inspection
+# check train.yaml and ask to modify if necessary
 

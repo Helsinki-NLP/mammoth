@@ -19,7 +19,7 @@ PROJECT_PATH=/scratch/project_462000964/shared/mammoth-shared # your project pat
 VENV_PATH=$PROJECT_PATH/.venv
 REQ_FILE=/scratch/project_462000964/shared/mammoth-shared/mammoth-dev/mammoth/csc_env/lumi/requirements_lumi.txt # path to the dependencies
 
-CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif # path to the container
+CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif # path to the container
 
 # ==== DEBUG INFO ====
 echo "Project path: $PROJECT_PATH"

@@ -8,7 +8,7 @@ This library is built on top of OpenNMT-py.
 ### Documentation
 
 The original ONMT-py documentation is available [here](https://opennmt.net/OpenNMT-py/).  
-~~Our own modifications (currently-under-development) are documented [here](https://helsinki-nlp.github.io/mammoth/)~~
+The documentation to Mammoth (currently under development) is available [here](https://helsinki-nlp.github.io/mammoth/)
 
 **Note:** We would greatly appreciate issue reports for this repository and its documentation.
 
@@ -17,10 +17,10 @@ The original ONMT-py documentation is available [here](https://opennmt.net/OpenN
 We thank the NVIDIA AI Technology Center Finland for their help with the multi-gpu/node implementation.
 
 
-For working on LUMI supercomputer environments, see the [LUMI quickstart guide](csc_env/README.md).
+For working on LUMI/Roihu supercomputer environments, see the [LUMI/Roihu quickstart guide](csc_env/README.md).
 
 We recommend to use the Hugging Face Tokenizer for training and inferencing in Mammoth, see the [HF Tokenizers guide](docs/HF_TOKENIZERS.md).
 
 To export the Mammoth pretrained model weights to Hugging Face Model Hub, see the [Exporting Mammoth to Model Hub guide](docs/exporting_to_huggingface.md).
 
-Please find the template config files for single node training and inferencing at `csc_env/lumi/train.yaml` and `csc_env/lumi/inference.yaml`.
+Please find the template config files for single & multi-node training inference and profiling under `csc_env/`.

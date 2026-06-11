@@ -1,10 +1,10 @@
 # CSC Supercomputer Environments
 
-This directory contains configuration files, scripts, and documentation for running MAMMOTH on CSC supercomputers in Finland.
+This directory contains configuration files, scripts, and documentation for running MAMMOTH on LUMI/Roihu supercomputers in Finland.
 
 ## Available Environments
 
-- **[LUMI](lumi/LUMI_QUICKSTART.md)** - Pre-exascale supercomputer with AMD GPUs (ROCm)
+- **[LUMI & Roihu Quickstart](Roihu_Quickstart.md)** - LUMI (AMD MI250X / ROCm) and Roihu (NVIDIA GH200)
 
 Each environment includes:
 - Environment setup scripts

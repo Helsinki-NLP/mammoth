@@ -45,12 +45,12 @@
 #
 # Shared paths
 # ------------
-#   PROJECT
+#   DISKPROJECT
+#   JOBPROJECT
 #   TESTINGDIR
 #   MAMMOTH
 #   VENV
 #   DATADIR
-#   BINDIR
 #
 # Model-specific derived paths
 # ----------------------------
@@ -104,25 +104,24 @@ SHELL := /bin/bash
 # Configuration
 # -----------------------------------------------------------------------------
 
-SELF_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-INSPECT_MODEL_FILES := /scratch/project_462000964/members/aylijyra/dev/mammoth/eval2/inspect-model-files.py
+SELFDIR := /scratch/project_462000964/members/aylijyra/dev/mammoth/eval2
+INSPECT_MODEL_FILES := /scratch/$(DISKPROJECT)/members/aylijyra/dev/mammoth/eval2/inspect-model-files.py
 
-#PROJECT := project_462000964
-PROJECT := project_462001087
+DISKPROJECT := project_462000964
+JOBPROJECT  := project_462001087
+
+SIF := /appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif
 
 #PARTITION  := small
 #TIME       := 04:00:00
 #MEM        := 8G
 
-TESTINGDIR := /scratch/$(PROJECT)/shared/testing-shared
-MAMMOTH    := /scratch/$(PROJECT)/shared/mammoth-shared/mammoth-dev/mammoth
-MAMMOTHDEF := /scratch/$(PROJECT)/shared/mammoth-shared/mammoth-dev/mammoth
-MAMMOTH64  := /scratch/$(PROJECT)/shared/mammoth-shared/mammoth-dev/mammoth-64 # head_dim=64
-VENV       := /scratch/$(PROJECT)/shared/mammoth-shared/.venv
+MAMMOTHDEF := /scratch/$(DISKPROJECT)/shared/mammoth-shared/mammoth-dev/mammoth
+MAMMOTH64  := /scratch/$(DISKPROJECT)/shared/mammoth-shared/mammoth-64/mammoth
+VENV       := /scratch/$(DISKPROJECT)/shared/mammoth-shared/.venv
+
+TESTINGDIR := /scratch/$(DISKPROJECT)/shared/testing-shared
 DATADIR    := $(TESTINGDIR)/data
-BINDIR     := $(TESTINGDIR)/bin
-
-
 
 # -----------------------------------------------------------------------------
 # Model aliases
@@ -187,19 +186,11 @@ OUTDIR     := $(MODELDIR)/inf_out
 LOGDIR     := $(MODELDIR)/inf_logs
 SCRDIR     := $(MODELDIR)/inf_scores
 
-TRAINCONFIG := $(MODELDIR)/train.yaml
 TESTCONFIG  := $(MODELDIR)/testing.yaml
 MAKESCRIPT  := $(MODELDIR)/inf_make.sh
 
-ZEROSHOTPAIRSINPUT    := $(MODELDIR)/inf_zeroshot.txt.input
-ZEROSHOTPAIRS         := $(MODELDIR)/inf_zeroshot.txt
-SUPERVISEDPAIRSINPUT  := $(MODELDIR)/inf_supervised.txt.input
-SUPERVISEDPAIRS       := $(MODELDIR)/inf_supervised.txt
-
-INFERENCE_CALLS := $(OUTDIR)/calls.out
 SACRE_CALLS     := $(OUTDIR)/calls.sacre.out
 
-INF_FLAG   := $(MODELDIR)/inference.submitted
 MET_FLAG   := $(MODELDIR)/metrics.submitted
 PLAN_FLAG  := $(MODELDIR)/inference-planning.lock
 SACRE_FLAG := $(MODELDIR)/metrics-planning.lock
@@ -253,7 +244,7 @@ list-models: help
 # This is used to inpect the model properties - helps to choose the correct MAMMOTH version
 $(MODEL_ALIASES):
 > @if [ "$(words $(MAKECMDGOALS))" -eq 1 ]; then \
->   $(MAKE) --no-print-directory -C "$(SELF_DIR)" MODELDIR="$(MODEL_$@)" inspect-model-summary; \
+>   $(MAKE) --no-print-directory -C "$(SELFDIR)" MODELDIR="$(MODEL_$@)" inspect-model-summary; \
 > fi
 
 include mk-shared.mk
@@ -262,13 +253,6 @@ include mk-yamls.mk
 
 include mk-infer.mk
 
+include mk-score.mk
+
 all: mk-shared mk-yamls mk-infer 
-
-
-#metrics: metrics-submit
-# include mk-score.mk
-
-
-# add inspection
-# check train.yaml and ask to modify if necessary
-

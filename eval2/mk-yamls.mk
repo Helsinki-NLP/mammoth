@@ -20,10 +20,10 @@
 # The fragment defines:
 #
 #   pair-extractor
-#       Verifies that `$(SELF_DIR)/inf_pairs.py` exists.
+#       Verifies that `$(SELFDIR)/inf_pairs.py` exists.
 #
 #   pair-planner
-#       Verifies that `$(SELF_DIR)/inf_plan.py` exists.
+#       Verifies that `$(SELFDIR)/inf_plan.py` exists.
 #
 #   require-pairs
 #       Requires the final supervised and zero-shot pair-selection files and
@@ -64,7 +64,7 @@
 # Expected from the including Makefile:
 #   TRAINCONFIG
 #   VIEWPYTHON
-#   SELF_DIR
+#   SELFDIR
 #   MODELDIR
 #   OUTDIR
 #   DATADIR
@@ -80,8 +80,8 @@
 #
 # Reads
 # -----
-#   - `$(SELF_DIR)/inf_pairs.py`
-#   - `$(SELF_DIR)/inf_plan.py`
+#   - `$(SELFDIR)/inf_pairs.py`
+#   - `$(SELFDIR)/inf_plan.py`
 #   - the training YAML from `$(TRAINCONFIG)`
 #   - the selected supervised and zero-shot pair files, once present
 #
@@ -110,59 +110,67 @@
 #     "All stages of planning completed"
 # - The planning stage is intended to run outside Slurm.
 
+TRAINCONFIG := $(MODELDIR)/train.yaml
+
+ZEROSHOTPAIRSINPUT    := $(MODELDIR)/inf_zeroshot.txt.input
+ZEROSHOTPAIRS         := $(MODELDIR)/inf_zeroshot.txt
+SUPERVISEDPAIRSINPUT  := $(MODELDIR)/inf_supervised.txt.input
+SUPERVISEDPAIRS       := $(MODELDIR)/inf_supervised.txt
+
 
 .PHONY: inference-yamls require-pairs clean-inf-inputs view-venv pair-extractor pair-planner fresh-yamls inference-yamls-ok pass-pairs
 
 pair-extractor: 
-> @[[ -f "$(SELF_DIR)/inf_pairs.py" ]] || { echo "mk-yamls.mk: ❌ Missing $(SELF_DIR)/inf_pairs.py" >&2; exit 1; }
+> @[[ -f "$(SELFDIR)/inf_pairs.py" ]] || { echo "mk-yamls.mk: ❌ Missing $(SELFDIR)/inf_pairs.py" >&2; exit 1; }
 
 pair-planner: 
-> @ [[ -f "$(SELF_DIR)/inf_plan.py" ]] || { echo "mk-yamls.mk: Missing $(SELF_DIR)/inf_plan.py" >&2; exit 1; }
-
-require-pairs: mk-shared $(ZEROSHOTPAIRS) $(SUPERVISEDPAIRS)
-> @echo "mk-yamls.mk: ✅ Pair selections exist: "
-> @echo -n "mk-yamls.mk:    $(ZEROSHOTPAIRS):"
-> @echo `wc -l <$(ZEROSHOTPAIRS)` lines
-> @echo -n "mk-yamls.mk:    $(SUPERVISEDPAIRS):"
-> @echo `wc -l <$(SUPERVISEDPAIRS)` lines
+> @ [[ -f "$(SELFDIR)/inf_plan.py" ]] || { echo "mk-yamls.mk: Missing $(SELFDIR)/inf_plan.py" >&2; exit 1; }
 
 $(ZEROSHOTPAIRSINPUT): $(TRAINCONFIG) $(VIEWPYTHON) | dirs not-in-slurm pair-extractor
 > @set -euo pipefail
 > @echo "Building $(ZEROSHOTPAIRSINPUT)..."
-> @module load cray-python; $(VIEWPYTHON) "$(SELF_DIR)/inf_pairs.py" "$(TRAINCONFIG)" --zs-out "$(ZEROSHOTPAIRSINPUT)" >&2
+> @module load cray-python; $(VIEWPYTHON) "$(SELFDIR)/inf_pairs.py" "$(TRAINCONFIG)" --zs-out "$(ZEROSHOTPAIRSINPUT)" >&2
 
 $(SUPERVISEDPAIRSINPUT): $(TRAINCONFIG) $(VIEWPYTHON) | dirs not-in-slurm pair-extractor
-> @set -euo pipefail
-> @echo "Building $(SUPERVISEDPAIRSINPUT)..."
-> @module load cray-python; $(VIEWPYTHON) "$(SELF_DIR)/inf_pairs.py" "$(TRAINCONFIG)" --supervised-pairs-and-quit "$(SUPERVISEDPAIRSINPUT)" >&2
+> @set -euo pipefail; \
+> echo "Building $(SUPERVISEDPAIRSINPUT)..."; \
+> module load cray-python; $(VIEWPYTHON) "$(SELFDIR)/inf_pairs.py" "$(TRAINCONFIG)" --supervised-pairs-and-quit "$(SUPERVISEDPAIRSINPUT)" >&2
+
 
 pass-pairs: $(ZEROSHOTPAIRSINPUT) $(SUPERVISEDPAIRSINPUT)
-> cp -p $(ZEROSHOTPAIRSINPUT)   $(ZEROSHOTPAIRS)
-> cp -p $(SUPERVISEDPAIRSINPUT) $(SUPERVISEDPAIRS)
+> @cp -p $(ZEROSHOTPAIRSINPUT)   $(ZEROSHOTPAIRS); \
+> cp -p $(SUPERVISEDPAIRSINPUT) $(SUPERVISEDPAIRS); \
+> echo "mk-yamls.mk: ✅ Passed the proposed language pair inputs as selections."; \
 
 $(ZEROSHOTPAIRS): $(ZEROSHOTPAIRSINPUT)
-> @echo "mk-yamls.mk: ❌ Missing zero-shot pair selection: $@" >&2
-> @echo "mk-yamls.mk: Read suggestions from: $<" >&2
-> @exit 1
+> @echo "mk-yamls.mk: ❌ Missing zero-shot pair selection: $@" >&2 ;\
+> echo "mk-yamls.mk:    Read suggestions from: $<" >&2; \
+> echo "mk-yamls.mk:    To pass the automatic proposals as selections, use target 'pass-pairs'"; \
+> exit 1
 
 $(SUPERVISEDPAIRS): $(SUPERVISEDPAIRSINPUT)
-> @echo "mk-yamls.mk: ❌ Missing supervised pair selection: $@" >&2
-> @echo "mk-yamls.mk: Read suggestions from: $<" >&2
-> @exit 1
+> @echo "mk-yamls.mk: ❌ Missing supervised pair selection: $@" >&2; \
+> echo "mk-yamls.mk:    Read suggestions from: $<" >&2; \
+> echo "mk-yamls.mk:    To pass the automatic proposals as selections, use target 'pass-pairs'"; \
+> exit 1
+
+require-pairs: mk-shared $(ZEROSHOTPAIRS) $(SUPERVISEDPAIRS)
+> @echo "mk-yamls.mk: ✅ Pair selections exist with line counts: "; \
+> wc -l "$(ZEROSHOTPAIRS)" "$(SUPERVISEDPAIRS)" | sed 's/^/mk-yamls.mk:    /'
 
 mk-yamls: require-pairs inference-yamls mk-shared
-> @echo "mk-yamls.mk: ✨ I am happy."
-> @echo "mk-yamls.mk: ❓ Do you want to clean and rebuild thoses files? Say: "
-> @echo "mk-yamls.mk:       make fresh-yamls        # to clean  testing.yaml"
-> @echo "mk-yamls.mk:       make clean-inf-inputs   # to clean  .input files too"
+> @echo "mk-yamls.mk: ✨ I am happy with the yaml files and the planned inference calls."; \
+> echo "mk-yamls.mk: ❓ Do you want to clean and rebuild thoses files? Say: "; \
+> echo "mk-yamls.mk:       make clean-yamls  # clean .input files, yamls and commands, but leave and use manual selections to rebuild"; \
+> echo
 
-$(TESTCONFIG).err: $(TRAINCONFIG) #| dirs not-in-slurm require-pairs pair-planner
+$(TESTCONFIG).err: $(TRAINCONFIG) $(MODELDIR)/mammoth.selected | dirs not-in-slurm require-pairs pair-planner
 > @set -euo pipefail
 > @echo "mk-yamls.mk: 🛠️ Creating tentative testing tasks..."
 > @echo -n "mk-yamls.mk:    In $(OUTDIR) the number of files is "
 > @(ls $(OUTDIR)/*.yaml 2>/dev/null || true) | wc -l
-> @echo -----------------------------------
-> @   export MAMMOTH="$(MAMMOTH)"; \
+> @export MAMMOTH="$$(cat "$(MODELDIR)/mammoth.selected")"; \
+>     echo "mk-yamls.mk: ✅ Using $${MAMMOTH}"; \
 >     export LOGDIR="$(LOGDIR)"; \
 >     export SCRDIR="$(SCRDIR)"; \
 >     export MODEL="$(MODEL)"; \
@@ -171,17 +179,19 @@ $(TESTCONFIG).err: $(TRAINCONFIG) #| dirs not-in-slurm require-pairs pair-planne
 >     export DATADIR="$(DATADIR)"; \
 >     export ZEROSHOTPAIRS="$(ZEROSHOTPAIRS)"; \
 >     export SUPERVISEDPAIRS="$(SUPERVISEDPAIRS)"; \
-> module load cray-python; $(VIEWPYTHON) "$(SELF_DIR)/inf_plan.py" 2>&1 | tee "$(TESTCONFIG).err" || true
-> @echo -n "mk-yamls.mk:    In $(OUTDIR) the number of files is "
-> @(ls $(OUTDIR)/*.yaml 2>/dev/null || true) | wc -l
-> @echo -----------------------------------
-> @echo    "mk-yamls.mk:    Logged to $(TESTCONFIG).err"
-> @echo    "mk-yamls.mk:    Created   $(OUTDIR)/*.yaml"
+> module load cray-python; $(VIEWPYTHON) "$(SELFDIR)/inf_plan.py" 2>&1 | cat >"$(TESTCONFIG).err" || true; \
+> echo "mk-yamls.mk:    The last 20 lines from $(TESTCONFIG).err:"; \
+> echo -----------------------------------; \
+> tail -20 "$(TESTCONFIG).err"; \
+> echo -----------------------------------; \
+> echo "mk-yamls.mk:    Logged to $(TESTCONFIG).err"; \
+> echo "mk-yamls.mk:    Created   $(OUTDIR)/*.yaml"; \
+> echo -n "mk-yamls.mk:    In $(OUTDIR) the number of files is "; \
+> (ls $(OUTDIR)/*.yaml 2>/dev/null || true) | wc -l; 
 
-inference-yamls-ok: $(TESTCONFIG).err # | dirs require-pairs
+inference-yamls-ok: $(TESTCONFIG).err 
 > @if [ -f "$(TESTCONFIG).err" ] && grep -Fq 'All stages of planning completed' "$(TESTCONFIG).err"; then \
->		echo "mk-yamls.mk: ✅ I found a succesfully completed file "; \
->               echo "mk-yamls.mk:    $(TESTCONFIG).err"; \
+>               echo -n; \
 > else \
 >		echo "mk-yamls.mk: ❌ I found an incomplete config file"; \
 >               echo "mk-yamls.mk:    $(TESTCONFIG).err"; \
@@ -190,21 +200,18 @@ inference-yamls-ok: $(TESTCONFIG).err # | dirs require-pairs
 >		exit 1 ; \
 > fi
 
-inference-yamls: inference-yamls-ok $(TESTCONFIG).err # | dirs require-pairs
-> @echo "mk-yamls.mk: ✅ Inference YAML preparation complete:"
-> @echo "mk-yamls.mk:    $(TESTCONFIG).err"
-> @echo -n "mk-yamls.mk:    The number of lines in this file: "
-> @cat $(TESTCONFIG).err | wc -l
-> @echo -n "mk-yamls.mk:    The number of test tasks in this file: "
-> @egrep 'test_task:' $(TESTCONFIG).err | wc -l
+inference-yamls: inference-yamls-ok 
+> @echo "mk-yamls.mk: ✅ Logged the inference YAML preparation to:";\
+> echo "mk-yamls.mk:    $(TESTCONFIG).err";\
+> echo "mk-yamls.mk: ✅ Created yaml files:";\
+> ls $(OUTDIR)/*yaml  | wc | sed 's/^/mk-yamls.mk:    /';\
+> echo "mk-yamls.mk: ✅ Lines in prepared call files:";\
+> wc -l $(OUTDIR)/*.out  | sed 's/^/mk-yamls.mk:    /'
 
-clean-inf-inputs: 
-> rm -f "$(ZEROSHOTPAIRSINPUT)" "$(SUPERVISEDPAIRSINPUT)" "$(TESTCONFIG)"
-
-fresh-yamls:
-> rm -f "$(TESTCONFIG)"
-> @echo "mk-yamls.mk: ✨ Cleaning done."
-> @echo "mk-yamls.mk: ❓ Do you want to rebuild thoses files? Say: "
-> @echo "mk-yamls.mk:       make inference-yamls   # to rebuild  testing.yaml"
-> @echo "mk-yamls.mk:       make                   # also works"
+clean-yamls:
+> rm -f "$(ZEROSHOTPAIRSINPUT)" "$(SUPERVISEDPAIRSINPUT)" "$(TESTCONFIG)" $(OUTDIR)/mt*yaml
+> @echo "mk-yamls.mk: ✨ Cleaning done."; \
+> echo "mk-yamls.mk: ❓ Do you want to rebuild thoses files? Say: "; \
+> echo "mk-yamls.mk:       make mk-yamls"; \
+> echo
 

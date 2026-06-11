@@ -46,10 +46,6 @@
 # Planning mode defaults:
 #   PARTITION
 #       Optional. Default: dev-g
-#   ACCOUNT
-#       Optional. Default: project_xxxxx
-#   MAX_GCDS_PER_NODE
-#       Optional. Default: 8
 #   MAKESCRIPT
 #       Optional but useful in planning mode; used when printing the suggested
 #       `sbatch` command.
@@ -85,10 +81,10 @@ fi
 
 set -euo pipefail
 
-CALLS_FILE="${1:-$OUTDIR/calls.out}"
-PARTITION="${PARTITION:-dev-g}"     # dev-g for quick testing; small-g for longer runs
-ACCOUNT="${ACCOUNT:-project_xxxxx}" # override in env
-MAX_GCDS_PER_NODE="${MAX_GCDS_PER_NODE:-8}"
+: "${OUTDIR:?OUTDIR must be set}"
+: "${INF_SBATCH:?INF_SBATCH must be set}"
+CALLS_FILE="${OUTDIR}/calls.out"
+
 die() {
     echo "ERROR: $*" >&2
     exit 1
@@ -169,7 +165,8 @@ plan_outside_slurm() {
     echo "  wasted slots      : $CHOSEN_WASTE"
     echo "  partition         : $CHOSEN_PARTITION"
     echo
-    echo "sbatch --account=$ACCOUNT --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD --gpus-per-task=1 --cpus-per-task=7 $MAKESCRIPT"
+    echo "sbatch --parsable --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD $MAKESCRIPT"
+    echo "sbatch --parsable --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD $MAKESCRIPT" > "${INF_SBATCH}"
 }
 
 

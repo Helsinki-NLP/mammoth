@@ -30,7 +30,6 @@
 #       Verifies that:
 #         - MODELDIR exists
 #         - TESTINGDIR exists
-#         - BINDIR exists
 #         - DATADIR exists
 #         - TRAINCONFIG exists and is non-empty
 #
@@ -63,7 +62,6 @@
 # The fragment expects the including Makefile to define:
 #   MODELDIR
 #   TESTINGDIR
-#   BINDIR
 #   DATADIR
 #   TRAINCONFIG
 #   OUTDIR
@@ -102,13 +100,11 @@
 
 
 
-.PHONY: check-model dirs check-in-model-dir not-in-slurm mk-shared inspect-model-summary $(MODELDIR)/mammoth.selected mk-shared
-
-CONTAINER := /appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif
+.PHONY: check-model dirs not-in-slurm mk-shared inspect-model-summary mk-shared
 
 inspect-model-summary: $(MODELDIR)/model-summary.yaml
-> echo "mk-shared.mk: 🛠️ Short model-file summary for $(MODELDIR):"
-> @cat $(MODELDIR)/model-summary.yaml
+> @echo "mk-shared.mk: 🛠️ Short model-file summary for $(MODELDIR):"; \
+> cat $(MODELDIR)/model-summary.yaml
 
 $(MODELDIR)/mammoth.selected: $(MODELDIR)/model-summary.yaml
 > @set -euo pipefail; \
@@ -122,6 +118,9 @@ $(MODELDIR)/mammoth.selected: $(MODELDIR)/model-summary.yaml
 > fi; \
 > echo "mk-shared.mk: ✅ Written file $@"
 
+clean-shared:
+> rm $(MODELDIR)/model-summary.yaml $(MODELDIR)/mammoth.selected
+> @echo "mk-shared.mk: ✨ Cleaning done."
 
 # The folloing sends the names of the model files to the inspector and
 # then stores the outputs to a model-summary.yaml file.
@@ -144,68 +143,37 @@ $(MODELDIR)/model-summary.yaml:
 > fi; \
 > module load cray-python; \
 > /usr/bin/singularity exec \
->   -B /scratch/project_462000964:/scratch/project_462000964:rw \
->   -B /scratch/project_462001087:/scratch/project_462001087:rw \
->   --env PYTHONPATH="$(MAMMOTH):$${PYTHONPATH:-}" \
->   "$(CONTAINER)" \
+>   -B "/scratch/$(DISKPROJECT):/scratch/$(DISKPROJECT):rw" \
+>   --env PYTHONPATH="$(MAMMOTHDEF):$${PYTHONPATH:-}" \
+>   "$(SIF)" \
 >   python3 "$(INSPECT_MODEL_FILES)" --unsafe --depth 2 --top-mods 8 --model-summary --yaml-like "$${keep[@]}" \
 >	> $(MODELDIR)/model-summary.yaml
 
 check-model:
-> @set -euo pipefail
-> @ [[ -d "$(MODELDIR)"    ]] || { echo "mk-shared.mk: ❌ Missing directory: $(MODELDIR)" >&2; exit 1; }
-> @ [[ -d "$(TESTINGDIR)"  ]] || { echo "mk-shared.mk: ❌ Missing directory: $(TESTINGDIR)" >&2; exit 1; }
-> @ [[ -d "$(BINDIR)"      ]] || { echo "mk-shared.mk: ❌ Missing directory: $(BINDIR)" >&2; exit 1; }
-> @ [[ -d "$(DATADIR)"     ]] || { echo "mk-shared.mk: ❌ Missing directory: $(DATADIR)" >&2; exit 1; }
-> @ [[ -s "$(TRAINCONFIG)" ]] || { echo "mk-shared.mk: ❌ Missing training config: $(TRAINCONFIG)" >&2; exit 1; }
-> @echo "mk-shared.mk: ✅ Directories and the config file found"
+> @set -euo pipefail; \
+> [[ -d "$(MODELDIR)"    ]] || { echo "mk-shared.mk: ❌ Missing directory: $(MODELDIR)" >&2; exit 1; }; \
+> [[ -d "$(TESTINGDIR)"  ]] || { echo "mk-shared.mk: ❌ Missing directory: $(TESTINGDIR)" >&2; exit 1; }; \
+> [[ -d "$(DATADIR)"     ]] || { echo "mk-shared.mk: ❌ Missing directory: $(DATADIR)" >&2; exit 1; }; \
+> [[ -s "$(TRAINCONFIG)" ]] || { echo "mk-shared.mk: ❌ Missing training config: $(TRAINCONFIG)" >&2; exit 1; }; \
+> echo "mk-shared.mk: ✅ Directories and the config file found"
 
 status:
-> @echo "mk-shared.mk: MODELDIR:          $(MODELDIR)"
-> @echo "mk-shared.mk: TESTCONFIG:        $(TESTCONFIG)"
-> @echo "mk-shared.mk: INFERENCE_CALLS:   $(INFERENCE_CALLS)"
-> @echo "mk-shared.mk: SACRE_CALLS:       $(SACRE_CALLS)"
-> @echo "mk-shared.mk: Inference flag:    $(INF_FLAG)"
-> @echo "mk-shared.mk: Metrics flag:      $(MET_FLAG)"
+> @echo "mk-shared.mk: MODELDIR:          $(MODELDIR)"; \
+> echo "mk-shared.mk: TESTCONFIG:        $(TESTCONFIG)"; \
+> echo "mk-shared.mk: INFERENCE_CALLS:   $(INFERENCE_CALLS)"; \
+> echo "mk-shared.mk: SACRE_CALLS:       $(SACRE_CALLS)"; \
+> echo "mk-shared.mk: Inference flag:    $(INF_FLAG)"; \
+> echo "mk-shared.mk: Metrics flag:      $(MET_FLAG)"
 
-mk-shared: check-model check-in-model-dir not-in-slurm dirs $(MODELDIR)/mammoth.selected
+mk-shared: check-model not-in-slurm dirs $(MODELDIR)/mammoth.selected
 > @MAMMOTHSEL="$$(cat "$(MODELDIR)/mammoth.selected")"; \
-> echo "mk-shared.mk: ✅ Found: $(MODELDIR)/mammoth.selected"; \
-> echo "mk-shared.mk: ✅ Using: $$MAMMOTHSEL"; 
-> @echo "mk-shared.mk: ✨ I am happy."
+> echo "mk-shared.mk: ✅ Using: $$MAMMOTHSEL"; \
+> echo "mk-shared.mk: ✨ I am happy with the preparations."; \
+> echo
 
-check-in-model-dir: check-model 
-> @set -euo pipefail
-> @if [ -n "$${SLURM_JOBID:-}" ]; then \
->   submit_dir="$${SLURM_SUBMIT_DIR%/}"; \
->   model_dir="$(MODELDIR)"; \
->   model_dir="$${model_dir%/}"; \
->   if [ "$$submit_dir" != "$$model_dir" ]; then \
->     echo "Submit directory mismatch:" >&2; \
->     echo "  SLURM_SUBMIT_DIR=$$submit_dir" >&2; \
->     echo "  MODELDIR=$$model_dir" >&2; \
->     exit 1; \
->   fi; \
-> else \
->   pwd_dir="$${PWD%/}"; \
->   model_dir="$(MODELDIR)"; model_dir="$${model_dir%/}"; \
->   if [ "$$pwd_dir" != "$$model_dir" ]; then \
->     echo "mk-shared.mk: 🛠️ Switching from directory:"; \
->     echo "mk-shared.mk:    $$pwd_dir"; \
->     echo "mk-shared.mk: 🛠️ To the working directory:"; \
->     echo "mk-shared.mk:    $(MODELDIR)"; \
->     cd "$(MODELDIR)"; \
->   fi; \
-> fi
-> @echo "mk-shared.mk: ✅ We are now in the model dir $(MODELDIR)"
-
-dirs: check-model check-in-model-dir
-> @mkdir -p "$(OUTDIR)" "$(LOGDIR)" "$(SCRDIR)" # "$(OUTDIR)/eval2" 
-> @echo "mk-shared.mk: 🛠️ I ensured the existence of local directories: "
-> @echo "mk-shared.mk:    $(OUTDIR)"
-#> @echo "mk-shared.mk:    $(OUTDIR)/eval2"
-> @echo "mk-shared.mk:    $(LOGDIR)"
-> @echo "mk-shared.mk:    $(SCRDIR)"
+dirs: check-model 
+> @mkdir -p "$(OUTDIR)" "$(LOGDIR)" "$(SCRDIR)"; \
+> echo "mk-shared.mk: ✅ Ensured the existence of local inf_{out,logs,scores} directories"
 
 not-in-slurm:
 > @[[ -z "$${SLURM_JOBID:-}" ]] || { echo "mk-shared.mk: Run make outside SLURM first" >&2; exit 1; }

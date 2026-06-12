@@ -2,13 +2,13 @@
 
 
 Building a scalable modular Neural Machine Translation (mNMT) system involves considering various features to ensure flexibility, efficiency, and ease of expansion.
-MAMMOTH allows for flexible parameter sharing among modules. This includes sharing at different levels such as word embeddings, encoder states, or attention mechanisms. 
-It implements efficient GPU allocation strategies to make the most of available hardware resources. This involves optimizing the distribution of model components across GPUs, minimizing data transfer between GPUs, and leveraging parallel processing capabilities for training and inference. 
+
+It implements efficient GPU allocation strategies to make the most of available hardware resources. This involves optimizing the distribution of model components across GPUs, minimizing data transfer between GPUs, and leveraging parallel processing capabilities for training.
 
 MAMMOTH offers component-level modularity for machine translation and flexibility in designing different sharing schemes for its modules.
 The toolkit focuses on architectures where modular components can be
 defined a priori and operate as separable units to enable flexible modular configuration.
-Each task definition must explicitly state the sequence of modules to be used for the encoders and decoders (or “sharing groups”).
+Each task definition must explicitly state the sequence of modules to be used for the encoders and decoders (or "sharing groups").
 
 ## Anatomy of Parameter Sharing
 
@@ -19,14 +19,14 @@ Partial sharing includes:
 - Embeddings or vocab hacks, .e.g., [Johnson et al. (2017)](https://aclanthology.org/Q17-1024/), [Lakew et al. (2018)](https://aclanthology.org/2018.iwslt-1.8/), and [Chronopoulou et al. (2020)](https://aclanthology.org/2020.emnlp-main.214/)
 
 The training process is organized into a series of smaller "tasks," each of which is characterized by distinct attributes to enhance modularity and efficiency.
-We break down mNMT training into a series of smaller “tasks”
-- A task requires specific modules
-- A task is done on a specific device
+We break down mNMT training into a series of smaller "tasks"
+- A task requires specific modules (encoder and decoder layers)
+- A task is done on a specific device or across multiple devices
 - A task corresponds to a specific (parallel) corpus
 
 In short, a task corresponds to a specific model behavior.
 In translation settings, a task will therefore correspond to a specific translation direction (say translating from Swahili to Catalan):
-All training datapoints for this direction  (i) must involve the same modules (pertaining to Swahili encoding and Catalan decoding); (ii) must be preprocessed with the same tokenizers; and (iii) can be grouped into a single bitext.
+All training datapoints for this task  (i) must involve the same modules (pertaining to Swahili encoding and Catalan decoding); (ii) must be preprocessed with the same tokenizers; and (iii) can be grouped into a single bitext.
 A centralized manager handles tasks synchronization.
 This manager oversees the parallel execution of tasks, coordinating the flow of information between different modules, devices, and corpora to ensure a cohesive and synchronized training process.
 
@@ -34,50 +34,41 @@ This manager oversees the parallel execution of tasks, coordinating the flow of 
 
 Let's break down the key aspects of modularity by design:
 
-1. **Depth of Encoder & Decoder**:
-    - **Balanced**: The encoder and decoder have the same depths.
-    - **Deep-enc-shallow-dec**: The encoder is deep, while the decoder is relatively shallow.
-
-2. **Layerwise Parameter Sharing Schemes**:
+1. **Layerwise Parameter Sharing Schemes**:
     - **Fully Shared Encoder and Fully Shared Decoder**: Both the encoder and decoder have shared parameters, meaning they are common across all languages or translation pairs.
-    - **Fully Shared Encoder and Target-Specific Decoder**: The encoder is shared, but each target language has its own decoder.
-    - **Apple-Style Learning Language-specific Layers**: The encoder contains both source and target-specific layers.
-    - **Adapter-Like Low-Rank Residual Layers**: To facilitate adaptation for different languages or translation tasks.
+    - **Partially Shared Encoder / Decoder**: Within each encoder or decoder, individual layers can be selectively shared or made language-specific. For example, the bottom encoder layers can be shared across languages while the top layers are language-specific, or the encoder can be fully shared while each target language gets its own decoder. Same applies to the decoders.
 
-3. **Groupwise Sharing Schemes**:
-    - **Phylogenetic**: Parameters could be shared among languages that are phylogenetically related, meaning they share a common ancestry.
-    - **Clustering Based on Typological Database**: Sharing could be determined based on linguistic typological features or characteristics.
-    - **Clustering Based on Language Embeddings**: This could involve sharing parameters based on the embeddings of languages in a common vector space.
+2. **Groupwise Sharing Schemes**:
+    MAMMOTH supports grouping languages into clusters, where languages in the same cluster share parameters. Clusters are computed using hierarchical clustering (`AgglomerativeClustering` from scikit-learn) on a user-provided **distance matrix**. You can define the distance matrix using any criterion:
+    - **Phylogenetic**: Distance based on language family trees (languages sharing a common ancestry are closer).
+    - **Typological**: Distance based on linguistic features from typological databases (e.g., word order, morphology).
+    - **Language Embeddings**: Distance based on language representations in a shared vector space.
 
-4. **Subword Vocabularies**:
-    - **Fully Shared**: a fully shared subword vocabulary for all languages 
-    - **Language-Specific**: language-specific subword vocabularies for each separate language
-
-## Bridges and Structures for Sharing
+    See the [config_config documentation](config_config.md) for how to provide the distance matrix.
 
 
-Structures for the shared parameters consider two key approaches: fully-shared layers and adapters.
+<!-- ## Bridges and Structures for Sharing
+
+
+Structures for the shared parameters consider key approaches such as fully-shared layers and attention bridges.
 
 - Fully-shared layers
   - Transformer layers
-  - Feed-forward layers
   - [Attention bridges](attention_bridges.md), shared across all tasks as the visual representation as below
 
 ![attention-bridges](assets/attention-bridge.png)
 
-- [Adapters](https://aclanthology.org/D19-1165/) for finer-grained sharing by adapting specific components
-
-By combining these structures, MAMMOTH achieves a balance between broad parameter sharing through fully-shared layers and targeted adaptability through adapters. 
+By combining these structures, MAMMOTH achieves broad parameter sharing across languages and tasks. -->
 
 ## Custom Model Parallelism
 
 
-MAMMOTH enables scaling-up a mNMT to a (very) large number of languages. 
+MAMMOTH enables scaling-up a mNMT to a (very) large number of languages.
 It deals with the task2gpu allocation problem as illustrated below.
 
 ![task2gpu-allocation](assets/task2gpu-allocations.png)
 
-It allow for custom model parallelism across nodes and GPUs to ensure optimal utilization of resources.
+It allows for custom model parallelism across nodes and GPUs to ensure optimal utilization of resources.
 Modules allocated in more than 1 GPU have to be synced at all times.
 The figure below illustrates the distribution of modules across multiple nodes:
 
@@ -99,9 +90,7 @@ Custom model parallelism increases inference efficiency:
 ![Custom model parallelism increases inference efficiency](assets/inference.png)
 
 
-At training time, [^1]coder communication is based on layer stacks (and adapters).
+At training time, encoder-decoder communication is based on layer stacks.
 Gradients are broadcasted only for modules currently in use, optimizing communication and reducing computational overhead.
 
-In conclusion, the custom model parallelism in MAMMOTH is implemented to overcome the task-to-GPU allocation challenge, enhance parameter sharing versatility, and optimize both training and inference efficiency. 
-
-[^1]: Thanks to CSC infrastructure
+In conclusion, the custom model parallelism in MAMMOTH is implemented to overcome the task-to-GPU allocation challenge, enhance parameter sharing versatility, and optimize both training and inference efficiency.

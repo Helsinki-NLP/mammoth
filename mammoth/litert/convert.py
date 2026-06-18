@@ -58,6 +58,7 @@ from mammoth.litert.wrapper import (
     make_prefill_sample_inputs,
     make_decode_sample_inputs,
 )
+from mammoth.litert.gpu_patches import replace_rms_norms, sdpa_patch
 
 
 # ── Detect litert_torch availability ──────────────────────────────────────────
@@ -166,6 +167,8 @@ def build_wrappers(
     encoder = MammothLiteRTEncoder(model, enc_max_len).eval()
     prefill = MammothLiteRTPrefill(model, enc_max_len, dec_max_len).eval()
     decode = MammothLiteRTDecode(model, enc_max_len, dec_max_len).eval()
+    for w in (encoder, prefill, decode):
+        replace_rms_norms(w)
     return encoder, prefill, decode
 
 
@@ -199,12 +202,13 @@ def export_wrappers(
     output_path: str,
 ) -> None:
     print("\n── torch.export ─────────────────────────────────────────────────")
-    print("  Exporting encoder …")
-    ep_enc = torch.export.export(encoder, enc_inputs)
-    print("  Exporting prefill …")
-    ep_pre = torch.export.export(prefill, prefill_inputs)
-    print("  Exporting decode …")
-    ep_dec = torch.export.export(decode, decode_inputs)
+    with sdpa_patch():
+        print("  Exporting encoder …")
+        ep_enc = torch.export.export(encoder, enc_inputs)
+        print("  Exporting prefill …")
+        ep_pre = torch.export.export(prefill, prefill_inputs)
+        print("  Exporting decode …")
+        ep_dec = torch.export.export(decode, decode_inputs)
     print("  All three signatures exported successfully.")
 
     ep_path = output_path + ".ep"

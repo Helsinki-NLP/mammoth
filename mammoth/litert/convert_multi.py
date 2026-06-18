@@ -58,6 +58,7 @@ from mammoth.litert.wrapper import (
     make_prefill_sample_inputs,
     make_decode_sample_inputs,
 )
+from mammoth.litert.gpu_patches import replace_rms_norms, sdpa_patch
 
 
 try:
@@ -296,15 +297,16 @@ def sanity_check(encoders, prefills, decodes, enc_inputs_map, prefill_inputs_map
 
 def export_all(encoders, prefills, decodes, enc_inputs_map, prefill_inputs_map, decode_inputs_map):
     print("\n── torch.export ─────────────────────────────────────────────────")
-    for src, enc in encoders.items():
-        print(f"  encode_{src} …")
-        torch.export.export(enc, enc_inputs_map[src])
-    for tgt, prefill in prefills.items():
-        print(f"  prefill_{tgt} …")
-        torch.export.export(prefill, prefill_inputs_map[tgt])
-    for tgt, decode in decodes.items():
-        print(f"  decode_{tgt} …")
-        torch.export.export(decode, decode_inputs_map[tgt])
+    with sdpa_patch():
+        for src, enc in encoders.items():
+            print(f"  encode_{src} …")
+            torch.export.export(enc, enc_inputs_map[src])
+        for tgt, prefill in prefills.items():
+            print(f"  prefill_{tgt} …")
+            torch.export.export(prefill, prefill_inputs_map[tgt])
+        for tgt, decode in decodes.items():
+            print(f"  decode_{tgt} …")
+            torch.export.export(decode, decode_inputs_map[tgt])
     n = len(encoders) + 2 * len(prefills)
     print(f"  All {n} signatures exported.")
 
@@ -450,6 +452,7 @@ def main():
         src_models[src] = model
         src_configs[src] = model.config
         encoders[src] = MammothLiteRTEncoder(model, args.enc_max_len).eval()
+        replace_rms_norms(encoders[src])
 
     # ── Build decoders ────────────────────────────────────────────────────────
     print("\n── Loading decoders ─────────────────────────────────────────────")
@@ -470,7 +473,9 @@ def main():
         tgt_models[tgt] = model
         tgt_configs[tgt] = model.config
         prefills[tgt] = MammothLiteRTPrefill(model, args.enc_max_len, args.dec_max_len).eval()
+        replace_rms_norms(prefills[tgt])
         decodes[tgt] = MammothLiteRTDecode(model, args.enc_max_len, args.dec_max_len).eval()
+        replace_rms_norms(decodes[tgt])
 
     # ── Sample inputs ─────────────────────────────────────────────────────────
     print("\n── Building sample inputs ───────────────────────────────────────")

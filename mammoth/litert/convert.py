@@ -57,6 +57,7 @@ from mammoth.litert.wrapper import (
     make_encoder_sample_inputs,
     make_prefill_sample_inputs,
     make_decode_sample_inputs,
+    patch_rms_norms,
 )
 
 
@@ -303,6 +304,12 @@ def main():
                         help="Stop after torch.export (skip litert_torch lowering)")
     parser.add_argument("--dtype", choices=["fp32", "bf16"], default="fp32",
                         help="Cast model weights before export")
+    parser.add_argument("--patch-norms", action="store_true",
+                        help=(
+                            "Replace nn.RMSNorm with HLFB composite ops "
+                            "(odml.rms_norm) before export — required for "
+                            "GPU/NPU delegate norm fusion"
+                        ))
     args = parser.parse_args()
 
     dtype = torch.bfloat16 if args.dtype == "bf16" else torch.float32
@@ -325,6 +332,10 @@ def main():
     encoder, prefill, decode = build_wrappers(
         model, args.enc_max_len, args.dec_max_len, dtype
     )
+    if args.patch_norms:
+        print("  Patching RMSNorm → HLFB composite (odml.rms_norm) …")
+        for m in (encoder, prefill, decode):
+            patch_rms_norms(m)
     n_dec = sum(config.dec_layers)
     print(f"  Encoder stacks: {len(encoder.stacks)}  "
           f"(layers={config.enc_layers})")

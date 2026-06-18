@@ -14,8 +14,14 @@ Usage:
         --src     "Hello world ." \\
         --task    eng-spa
 
-    # GPU backend (on-device NPU):
+    # GPU backend:
     python mammoth/litert/infer.py --tflite ... --frame ... --src "..." --gpu
+
+    # Qualcomm NPU (AOT-compiled .tflite from compile_npu.py):
+    python mammoth/litert/infer.py --tflite mammoth_SM8650.tflite --frame ... --src "..." --npu
+
+    # NPU with GPU+CPU fallback chain:
+    python mammoth/litert/infer.py --tflite mammoth_SM8650.tflite --frame ... --src "..." --npu --gpu
 
     # If you already ran convert_mammoth_to_hf.py and have saved tokenizers:
     python mammoth/litert/infer.py \\
@@ -347,6 +353,10 @@ def main():
                         help="Maximum number of output tokens to generate")
     parser.add_argument("--gpu", action="store_true",
                         help="Enable GPU delegate (in addition to CPU)")
+    parser.add_argument("--npu", action="store_true",
+                        help="Enable NPU delegate — requires an AOT-compiled .tflite "
+                             "(see compile_npu.py); use with --gpu for CPU/GPU/NPU "
+                             "fallback chain")
     args = parser.parse_args()
 
     # Tokenizers
@@ -376,6 +386,8 @@ def main():
     hw = HardwareAccelerator.CPU
     if args.gpu:
         hw |= HardwareAccelerator.GPU
+    if args.npu:
+        hw |= HardwareAccelerator.NPU
 
     print(f"Loading {args.tflite} …")
     model = CompiledModel.from_file(args.tflite, hw)

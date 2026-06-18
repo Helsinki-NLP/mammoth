@@ -31,6 +31,52 @@ from mammoth.modules.transformer.rotary import apply_rotary
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# HLFB-wrapped RMSNorm for GPU / NPU delegate fusion
+# ──────────────────────────────────────────────────────────────────────────────
+
+class _HLFBRMSNorm(nn.Module):
+    """
+    Drop-in replacement for nn.RMSNorm that wraps the computation in a
+    StableHLO composite boundary (odml.rms_norm).  This lets the LiteRT
+    converter emit a fused custom op that GPU and Qualcomm NPU delegates
+    can accelerate.
+
+    Only used when --patch-norms is passed to convert.py / convert_multi.py.
+    Must be applied *before* torch.export so the composite appears in the FX
+    graph.
+    """
+
+    def __init__(self, eps: float, weight: Tensor):
+        super().__init__()
+        self._eps = eps
+        self._weight = weight
+        self._attr = {"epsilon": float(eps)}
+
+    def forward(self, x: Tensor) -> Tensor:
+        from litert_torch.backend.composite import StableHLOCompositeBuilder
+        composite = StableHLOCompositeBuilder("odml.rms_norm", self._attr)
+        x, w = composite.mark_inputs(x, self._weight)
+        y = x * torch.rsqrt(x.pow(2).mean(dim=-1, keepdim=True) + self._eps) * w
+        y = composite.mark_outputs(y)
+        return y
+
+
+def patch_rms_norms(module: nn.Module) -> None:
+    """
+    Recursively replace every nn.RMSNorm in *module* with _HLFBRMSNorm.
+
+    Call on each wrapper (encoder, prefill, decode) before torch.export when
+    targeting GPU or NPU delegates.  The replacement shares the original
+    weight tensor — no parameter duplication.
+    """
+    for name, child in list(module.named_children()):
+        if isinstance(child, nn.RMSNorm):
+            setattr(module, name, _HLFBRMSNorm(child.eps, child.weight))
+        else:
+            patch_rms_norms(child)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ──────────────────────────────────────────────────────────────────────────────
 

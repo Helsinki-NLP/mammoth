@@ -131,6 +131,10 @@ def main():
     parser.add_argument("--max-new-tokens", type=int, default=100)
     parser.add_argument("--gpu", action="store_true",
                         help="Enable GPU delegate")
+    parser.add_argument("--npu", action="store_true",
+                        help="Enable NPU delegate — requires an AOT-compiled .tflite "
+                             "(see compile_npu.py); use with --gpu for CPU/GPU/NPU "
+                             "fallback chain")
     args = parser.parse_args()
 
     # ── Load manifest ─────────────────────────────────────────────────────────
@@ -174,6 +178,8 @@ def main():
     hw = HardwareAccelerator.CPU
     if args.gpu:
         hw |= HardwareAccelerator.GPU
+    if args.npu:
+        hw |= HardwareAccelerator.NPU
 
     print(f"Loading {args.tflite} …")
     model = CompiledModel.from_file(args.tflite, hw)

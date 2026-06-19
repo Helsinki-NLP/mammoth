@@ -46,11 +46,11 @@ class _HLFBRMSNorm(nn.Module):
     graph.
     """
 
-    def __init__(self, eps: float, weight: Tensor):
+    def __init__(self, eps: float | None, weight: Tensor):
         super().__init__()
-        self._eps = eps
+        self._eps = eps if eps is not None else 1e-6
         self._weight = weight
-        self._attr = {"epsilon": float(eps)}
+        self._attr = {"epsilon": float(self._eps)}
 
     def forward(self, x: Tensor) -> Tensor:
         from litert_torch.backend.composite import StableHLOCompositeBuilder

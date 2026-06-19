@@ -209,8 +209,14 @@ def export_wrappers(
     print("  All three signatures exported successfully.")
 
     ep_path = output_path + ".ep"
-    torch.export.save(ep_enc, ep_path)
-    print(f"  Encoder exported program saved → {ep_path}")
+    try:
+        torch.export.save(ep_enc, ep_path)
+        print(f"  Encoder exported program saved → {ep_path}")
+    except Exception as e:
+        # HLFB composite ops (e.g. from --patch-norms) contain tuple-of-tuples
+        # args that torch.export's serializer cannot handle.  The .ep file is
+        # only needed for macOS export-only workflows; skip it silently here.
+        print(f"  [INFO] Skipping .ep save (not serializable with HLFB ops: {e})")
 
     return ep_enc, ep_pre, ep_dec
 

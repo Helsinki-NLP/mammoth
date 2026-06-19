@@ -161,6 +161,10 @@ def main():
     else:
         print(f"Targets: {[str(t) for t in targets]}")
 
+    # Snapshot /tmp before compilation so we can find new error files afterwards.
+    import glob
+    tmp_errors_before = set(glob.glob("/tmp/*.error"))
+
     print(f"Compiling {args.tflite} ...")
     compiled_models = aot.aot_compile(
         args.tflite,
@@ -170,6 +174,19 @@ def main():
 
     print("\n── Compilation report ───────────────────────────────────────────")
     print(compiled_models.compilation_report())
+
+    # Print any error files created by the plugin during this run.
+    tmp_errors_after = set(glob.glob("/tmp/*.error"))
+    new_errors = tmp_errors_after - tmp_errors_before
+    if new_errors:
+        print("\n── Plugin error details ─────────────────────────────────────────")
+        for path in sorted(new_errors):
+            print(f"\n{path}:")
+            try:
+                with open(path) as f:
+                    print(f.read())
+            except Exception as read_err:
+                print(f"  (could not read: {read_err})")
 
     os.makedirs(args.output, exist_ok=True)
     model_name = os.path.splitext(os.path.basename(args.tflite))[0]

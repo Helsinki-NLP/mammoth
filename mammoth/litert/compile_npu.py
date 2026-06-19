@@ -82,6 +82,35 @@ if not _QNN_AVAILABLE and not _MTK_AVAILABLE:
     )
     sys.exit(1)
 
+# ── QNN library path setup ────────────────────────────────────────────────────
+
+def _setup_qnn_lib_path() -> None:
+    """Prepend the bundled x86_64 QNN libs to LD_LIBRARY_PATH if needed.
+
+    ai_edge_litert_sdk_qualcomm ships libQnnSystem.so etc. under
+    data/lib/x86_64-linux-clang/ but does NOT add that path to
+    LD_LIBRARY_PATH, so dlopen() inside the compiler plugin fails unless
+    we do it ourselves before the first aot_compile() call.
+    """
+    try:
+        import importlib.util
+        spec = importlib.util.find_spec("ai_edge_litert_sdk_qualcomm")
+        if spec is None:
+            return
+        pkg_dir = os.path.dirname(spec.origin)
+        qnn_lib_dir = os.path.join(pkg_dir, "data", "lib", "x86_64-linux-clang")
+        if not os.path.isdir(qnn_lib_dir):
+            return
+        existing = os.environ.get("LD_LIBRARY_PATH", "")
+        if qnn_lib_dir not in existing.split(":"):
+            os.environ["LD_LIBRARY_PATH"] = (
+                qnn_lib_dir + (":" + existing if existing else "")
+            )
+            print(f"  QNN libs prepended to LD_LIBRARY_PATH: {qnn_lib_dir}")
+    except Exception as e:
+        print(f"  [WARN] Could not auto-configure QNN lib path: {e}")
+
+
 # ── Target resolution ─────────────────────────────────────────────────────────
 
 _QNN_ALIASES = {"Qualcomm", "QNN", "qnn"}
@@ -160,6 +189,10 @@ def main():
         print("Targets: all registered backends")
     else:
         print(f"Targets: {[str(t) for t in targets]}")
+
+    # Ensure bundled QNN libs are on LD_LIBRARY_PATH before the plugin dlopen()s them.
+    if _QNN_AVAILABLE:
+        _setup_qnn_lib_path()
 
     # Snapshot /tmp before compilation so we can find new error files afterwards.
     import glob

@@ -4,3 +4,5 @@ frozendict==2.4.6
 loguru==0.7.3
 sacrebleu
 tabulate
+ai-edge-litert
+ai-edge-litert-sdk-qualcomm

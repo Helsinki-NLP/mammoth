@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH -A project_462000964
+#SBATCH -A project_462001087
 #SBATCH -J setup_venv
 #SBATCH -o ./logs/setup_venv_%j.out
 #SBATCH -e ./logs/setup_venv_%j.err
 #SBATCH --partition=dev-g
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
+#SBATCH --mem=24G
 #SBATCH --gres=gpu:1
 #SBATCH --time=00:20:00
 
@@ -15,11 +15,11 @@ set -e  # stop on any error
 echo "Starting setup at $(date)"
 
 # ==== CONFIG ====
-PROJECT_PATH=/scratch/project_462000964/shared/mammoth-shared # your project path on HPC
+PROJECT_PATH=/scratch/project_462001087/members/wangchao # your project path on HPC
 VENV_PATH=$PROJECT_PATH/.venv
-REQ_FILE=/scratch/project_462000964/shared/mammoth-shared/mammoth-dev/mammoth/csc_env/lumi/requirements_lumi.txt # path to the dependencies
+REQ_FILE=/scratch/project_462001087/members/wangchao/mammoth_pytorch/mammoth/csc_env/requirements.txt # path to the dependencies
 
-CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif # path to the container
+CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif # path to the container
 
 # ==== DEBUG INFO ====
 echo "Project path: $PROJECT_PATH"
@@ -28,7 +28,7 @@ echo "Requirements: $REQ_FILE"
 
 # ==== RUN INSIDE CONTAINER ====
 singularity exec \
-    -B /scratch/project_462000964:/scratch/project_462000964:rw \
+    -B /scratch/project_462001087:/scratch/project_462001087:rw \
     $CONTAINER \
     bash -c "
 

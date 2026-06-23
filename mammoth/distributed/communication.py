@@ -4,7 +4,7 @@ import math
 import os
 import pickle
 import signal
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 import torch
 import torch.distributed
@@ -278,9 +278,16 @@ class WorldGroupGradientSync:
     Trade-off: The buffer includes zeros for components a GPU doesn't own (~bandwidth overhead).
     This is acceptable because (a) compute dominates communication and (b) one large allreduce
     is more efficient per-byte than many small ones.
+
+    Pipelining: To avoid the host blocking between buckets (each blocking allreduce stalls the
+    GPU until the network round trip finishes), buckets are reduced with *asynchronous* allreduce
+    and a small pool of buffers (``pipeline_depth``). While bucket N's allreduce runs on the NCCL
+    stream, the CPU packs bucket N+1 into a different buffer. Every rank still issues allreduces
+    in the same bucket order, so NCCL serialises them deterministically and the design stays
+    deadlock-safe. Cost: peak memory is ``pipeline_depth * max_bucket_size`` instead of one bucket.
     """
 
-    def __init__(self, all_components, model, global_rank):
+    def __init__(self, all_components, model, global_rank, pipeline_depth=2):
         """
         Build the global buffer layout by gathering param counts across all GPUs.
 
@@ -288,6 +295,9 @@ class WorldGroupGradientSync:
             all_components: list of all DistributedComponent objects (globally consistent order)
             model: the NMTModel (already on GPU)
             global_rank: this GPU's global rank
+            pipeline_depth: how many bucket allreduces may be in flight at once. 1 reproduces the
+                old sequential blocking behaviour; 2 (default) enables double-buffered overlap of
+                pack(N+1) with allreduce(N). Capped at the number of buckets.
         """
         self.global_rank = global_rank
         self.profiler_range = get_profiler_range()
@@ -364,7 +374,14 @@ class WorldGroupGradientSync:
             self.buckets.append(current_bucket)
 
         max_bucket_size = max(sum(s for _, s in b) for b in self.buckets)
-        self.buffer = torch.zeros(max_bucket_size, dtype=dtype, device=device)
+
+        # Allocate a pool of identical bucket buffers so several allreduces can be in flight at
+        # once. No point holding more buffers than there are buckets to fill.
+        self.pipeline_depth = max(1, min(pipeline_depth, len(self.buckets)))
+        self.buffers = [
+            torch.zeros(max_bucket_size, dtype=dtype, device=device)
+            for _ in range(self.pipeline_depth)
+        ]
 
         total_elements = sum(self.component_layout.values())
         logger.info(
@@ -372,7 +389,8 @@ class WorldGroupGradientSync:
             f"{len(self.component_layout)} components, "
             f"total {total_elements * element_size / 1024 / 1024:.1f} MB across "
             f"{len(self.buckets)} buckets, "
-            f"bucket buffer {max_bucket_size * element_size / 1024 / 1024:.1f} MB"
+            f"bucket buffer {max_bucket_size * element_size / 1024 / 1024:.1f} MB "
+            f"x {self.pipeline_depth} (pipeline depth)"
         )
 
     def sync(self, model, all_gradient_syncs):
@@ -380,8 +398,14 @@ class WorldGroupGradientSync:
         Perform bucketed world-group allreduces for all component gradients.
 
         Components are grouped into fixed-size buckets; each bucket is allreduced
-        independently, bounding peak GPU memory to one bucket buffer regardless of
-        total model size.
+        independently, bounding peak GPU memory to ``pipeline_depth`` bucket buffers
+        regardless of total model size.
+
+        Buckets are pipelined: each bucket's allreduce is launched asynchronously, then the
+        next bucket is packed into a different buffer while the network round trip is in flight.
+        A bucket's result is only unpacked once its allreduce has completed. All ranks iterate
+        ``self.buckets`` in the same order, so the allreduces stay deterministically ordered and
+        deadlock-safe.
 
         Args:
             model: the NMTModel
@@ -392,49 +416,81 @@ class WorldGroupGradientSync:
         sync_by_name = {gs.component.get_name(): gs for gs in all_gradient_syncs}
 
         with self.profiler_range("world_group_sync"):
+            free_buffers = list(self.buffers)
+            in_flight = deque()  # (work_handle, buffer, bucket) for allreduces not yet unpacked
+
             for bucket in self.buckets:
+                # If no buffer is free, finish the oldest in-flight allreduce to reclaim its buffer.
+                if not free_buffers:
+                    self._complete_oldest(model, sync_by_name, in_flight, free_buffers)
+
+                full_buf = free_buffers.pop()
                 bucket_size = sum(size for _, size in bucket)
-                buf = self.buffer[:bucket_size]
+                buf = full_buf[:bucket_size]
                 buf.zero_()
 
-                # Pack: each rank fills slices for components it owns and trained this step
+                # Pack: each rank fills slices for components it owns and trained this step.
+                # Runs on the default stream; the async allreduce below waits for it to finish.
                 with self.profiler_range("world_group_sync_pack"):
-                    pos = 0
-                    for name, size in bucket:
-                        gs = sync_by_name.get(name)
-                        if gs and gs.owns_component and gs.has_local_gradient:
-                            for _, p in gs.component.named_parameters(model):
-                                if not p.requires_grad:
-                                    continue
-                                numel = p.numel()
-                                if p.grad is not None:
-                                    buf[pos:pos + numel].copy_(p.grad.data.view(-1))
-                                pos += numel
-                        else:
-                            pos += size  # leave zeros for unowned / untrained components
+                    self._pack(model, sync_by_name, bucket, buf)
 
-                # Allreduce this bucket on the world group
-                with self.profiler_range("world_group_sync_allreduce"):
-                    torch.distributed.all_reduce(buf)
+                # Launch this bucket's allreduce asynchronously and move on to packing the next.
+                work = torch.distributed.all_reduce(buf, async_op=True)
+                in_flight.append((work, full_buf, bucket))
 
-                # Unpack: write reduced gradients back to owned components
-                with self.profiler_range("world_group_sync_unpack"):
-                    pos = 0
-                    for name, size in bucket:
-                        gs = sync_by_name.get(name)
-                        if gs and gs.owns_component:
-                            for _, p in gs.component.named_parameters(model):
-                                if not p.requires_grad:
-                                    continue
-                                numel = p.numel()
-                                if p.grad is None:
-                                    p.grad = torch.zeros_like(p)
-                                p.grad.data.copy_(
-                                    buf[pos:pos + numel].view_as(p.grad.data) / gs.gradient_norm
-                                )
-                                pos += numel
-                        else:
-                            pos += size
+            # Drain any allreduces still in flight.
+            while in_flight:
+                self._complete_oldest(model, sync_by_name, in_flight, free_buffers)
+
+    def _complete_oldest(self, model, sync_by_name, in_flight, free_buffers):
+        """Wait for the oldest in-flight allreduce, unpack it, and return its buffer to the pool."""
+        work, full_buf, bucket = in_flight.popleft()
+        with self.profiler_range("world_group_sync_allreduce"):
+            work.wait()  # make the default stream wait for the NCCL collective to finish
+
+        bucket_size = sum(size for _, size in bucket)
+        buf = full_buf[:bucket_size]
+        with self.profiler_range("world_group_sync_unpack"):
+            self._unpack(model, sync_by_name, bucket, buf)
+
+        free_buffers.append(full_buf)
+
+    @staticmethod
+    def _pack(model, sync_by_name, bucket, buf):
+        """Copy this rank's local gradients for the bucket's components into buf; zeros elsewhere."""
+        pos = 0
+        for name, size in bucket:
+            gs = sync_by_name.get(name)
+            if gs and gs.owns_component and gs.has_local_gradient:
+                for _, p in gs.component.named_parameters(model):
+                    if not p.requires_grad:
+                        continue
+                    numel = p.numel()
+                    if p.grad is not None:
+                        buf[pos:pos + numel].copy_(p.grad.data.view(-1))
+                    pos += numel
+            else:
+                pos += size  # leave zeros for unowned / untrained components
+
+    @staticmethod
+    def _unpack(model, sync_by_name, bucket, buf):
+        """Write reduced gradients from buf back to owned components, rescaled by gradient_norm."""
+        pos = 0
+        for name, size in bucket:
+            gs = sync_by_name.get(name)
+            if gs and gs.owns_component:
+                for _, p in gs.component.named_parameters(model):
+                    if not p.requires_grad:
+                        continue
+                    numel = p.numel()
+                    if p.grad is None:
+                        p.grad = torch.zeros_like(p)
+                    p.grad.data.copy_(
+                        buf[pos:pos + numel].view_as(p.grad.data) / gs.gradient_norm
+                    )
+                    pos += numel
+            else:
+                pos += size
 
 
 class ErrorHandler(object):

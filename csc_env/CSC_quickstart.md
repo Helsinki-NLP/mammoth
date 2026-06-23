@@ -88,6 +88,38 @@ world_size: 8
 gpu_ranks: [0, 1, 2, 3]
 ```
 
+### Inference (LUMI)
+
+Use `csc_env/translate.sh` as a template. Edit the SLURM options as needed (inference only supports one GPU at a time):
+
+```bash
+#SBATCH --partition=dev-g
+#SBATCH --nodes=1
+#SBATCH --gres=gpu:1
+#SBATCH --time=0-00:30:00
+```
+
+The script runs translation inside the container:
+
+```bash
+singularity exec \
+    -B /scratch/<your_project>:/scratch/<your_project>:rw \
+    /appl/local/laifs/containers/.../lumi-multitorch-full-....sif \
+    <Path to Python> mammoth/translate.py \
+    -config inference.yaml
+```
+
+Use the provided `csc_env/inference.yaml` as a starting point. Key fields to fill in:
+
+```yaml
+model: /path/to/checkpoints/  # directory path to checkpoint (no .pt extension)
+src: /path/to/input.txt                             # source sentences, one per line
+output: /path/to/output.txt                         # translation output
+task_id: task_en_fi                                  # must match a task from training
+beam_size: 5                                         # beam search width
+batch_size: 32
+batch_type: sents
+```
 ---
 
 ## Roihu (NVIDIA GH200)
@@ -99,7 +131,7 @@ Roihu does not require a container. Load the PyTorch module and activate the sha
 ```bash
 module purge
 module load python-pytorch/2.10
-source <Path to Python venv>
+source <Path to Python venv> # activate the virtual environment
 ```
 
 Set these environment variables before any training run:
@@ -170,6 +202,33 @@ python train.py \
     --master_ip ${MASTER_NODE} \
     --master_port ${MASTER_PORT}
 ```
+
+### Inference (Roihu)
+
+On Roihu, run translation directly without a container:
+
+```bash
+module purge
+module load python-pytorch/2.10
+source <Path to Python venv>
+
+python mammoth/translate.py \
+    -config inference.yaml \
+    --gpu_ranks 0
+```
+
+Or submit as a SLURM job (single GPU is usually enough):
+
+```bash
+#SBATCH --partition=gpupilot
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --gres=gpu:gh200:1
+#SBATCH --time=0-00:30:00
+```
+
+Use the same `csc_env/inference.yaml` template as LUMI. Fill in `model`, `src`, `output`, and `task_id`. 
+
 ---
 
 ## Monitoring Jobs
@@ -180,10 +239,3 @@ scontrol show job <job_id>              # job details
 tail -f ./log/training.<job_id>.out    # live stdout
 tail -f ./log/training.<job_id>.err    # live stderr
 ```
-
-## Further Reading
-
-- [HuggingFace Tokenizers in MAMMOTH](../docs/HF_TOKENIZERS.md)
-- [Exporting models to HuggingFace Hub](../docs/exporting_to_huggingface.md)
-- [Training config reference](../docs/source/config_config.md)
-- [MAMMOTH quickstart](../docs/source/quickstart.md)

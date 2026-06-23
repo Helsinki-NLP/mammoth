@@ -37,7 +37,6 @@ Contents
       :caption: Scripts
       :maxdepth: 2
 
-      options/build_vocab.rst
       options/train.rst
       options/translate.rst
       options/server.rst

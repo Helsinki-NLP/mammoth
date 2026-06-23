@@ -840,13 +840,14 @@ class ServerModel(object):
         """De-tokenize (or not) the sequence (with alignment).
 
         Args:
-            sequence (str): The sequence to detokenize, possible with
-                alignment seperate by ` ||| `.
+            sequence (str): The sequence to detokenize, possibly with
+                alignment separated by ``|||``.
+            src: Source sequence.
+            side (str): Side to detokenize (``'tgt'`` or ``'src'``).
 
         Returns:
-            sequence (str): The detokenized sequence.
-            align (str): The alignment correspand to detokenized src/tgt
-                sorted or None if no alignment in output.
+            A tuple of (sequence, align) where sequence is the detokenized
+            string and align is the alignment string or None.
         """
         align = None
         if self.opts.report_align:

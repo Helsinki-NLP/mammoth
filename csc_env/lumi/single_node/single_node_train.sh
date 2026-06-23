@@ -24,7 +24,7 @@ singularity exec \
     --env FLASH_ATTENTION_TRITON_AMD_ENABLE="TRUE" \
     -B /scratch/project_462000964/members:/scratch/project_462000964/members:rw \
     -B /scratch/project_462000964/shared:/scratch/project_462000964/shared:ro \
-    /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
+    /appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif \
     /scratch/project_462000964/members/wangchao/.venv/bin/python /scratch/project_462000964/members/wangchao/mammoth/train.py \
     -config single_node_train.yaml
 

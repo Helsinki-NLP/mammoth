@@ -17,16 +17,9 @@ Trainer
 .. autoclass:: mammoth.utils.Statistics
     :members:
 
-Loss
-----
-
-
-.. autoclass:: mammoth.utils.loss.LossComputeBase
-    :members:
-
 
 Optimizer
 ---------
 
-.. autoclass:: mammoth.utils.Optimizer
+.. automodule:: mammoth.utils.optimizers
     :members:

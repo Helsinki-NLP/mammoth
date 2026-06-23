@@ -20,9 +20,9 @@ set -e
 
 singularity exec \
     -B $your_path_in_lumi:$your_path_in_lumi:rw \
-    /appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
+    /appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif \
     $your_path_in_lumi/.venv/bin/python $path_to_mammoth/translate.py \
-    -config csc_env/lumi/inference.yaml
+    -config csc_env/inference.yaml
 
 echo "Finishing at `date`"
 

@@ -14,7 +14,7 @@ Data loading
 .. autoclass:: mammoth.inputters.dataloader.DynamicDatasetIter
     :members:
 
-.. autoclass:: mammoth.inputters.dataloader.LookAheadBucketing
+.. autoclass:: mammoth.inputters.dataloader.SimpleLookAheadBucketing
     :members:
 
 .. autoclass:: mammoth.inputters.dataloader.InferenceBatcher

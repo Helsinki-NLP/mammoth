@@ -771,7 +771,12 @@ class Trainer(object):
 
     def validate(self, valid_iter, moving_average=None, task=None):
         """Validate model using autoregressive generation.
+
+        Args:
             valid_iter: validate data iterator
+            moving_average: optional moving average parameters
+            task: optional task specification
+
         Returns:
             :obj:`nmt.Statistics`: validation loss statistics
         """

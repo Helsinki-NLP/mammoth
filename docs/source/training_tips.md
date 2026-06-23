@@ -45,8 +45,6 @@ You can pass through opts to the x-transformers library in the `x_transformers_o
 
 ```yaml
 x_transformers_opts:
-  # Use flash attention
-  attn_flash: True
   # The number of attention heads
   heads: 16
   # Use rotary positional embeddings.

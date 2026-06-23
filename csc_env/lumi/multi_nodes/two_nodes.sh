@@ -53,7 +53,7 @@ srun /usr/bin/singularity exec \
 --env MASTER_PORT="${MASTER_PORT}" \
 -B /scratch/project_462000964/members/wangchao:/scratch/project_462000964/members/wangchao:rw \
 -B /scratch/project_462000964/shared:/scratch/project_462000964/shared:ro \
-/appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
+/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif \
 /scratch/project_462000964/members/wangchao/training/081225/two_nodes_wrapper_script.sh
 
 echo "Finishing at `date`"

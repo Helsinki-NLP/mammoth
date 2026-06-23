@@ -171,23 +171,26 @@ class DecodeStrategy(object):
             self.is_finished.fill_(1)
 
     def block_ngram_repeats(self, log_probs):
-        """
+        """Block repeated ngrams in beam search.
+
         We prevent the beam from going in any direction that would repeat any
-        ngram of size <block_ngram_repeat> more thant once.
+        ngram of size ``block_ngram_repeat`` more than once.
 
         The way we do it: we maintain a list of all ngrams of size
-        <block_ngram_repeat> that is updated each time the beam advances, and
-        manually put any token that would lead to a repeated ngram to 0.
+        ``block_ngram_repeat`` that is updated each time the beam advances,
+        and manually put any token that would lead to a repeated ngram to 0.
 
         This improves on the previous version's complexity:
-           - previous version's complexity: batch_size * beam_size * len(self)
-           - current version's complexity: batch_size * beam_size
 
-        This improves on the previous version's accuracy;
-           - Previous version blocks the whole beam, whereas here we only
-            block specific tokens.
-           - Before the translation would fail when all beams contained
-            repeated ngrams. This is sure to never happen here.
+        - previous version's complexity: batch_size * beam_size * len(self)
+        - current version's complexity: batch_size * beam_size
+
+        This improves on the previous version's accuracy:
+
+        - Previous version blocks the whole beam, whereas here we only
+          block specific tokens.
+        - Before the translation would fail when all beams contained
+          repeated ngrams. This is sure to never happen here.
         """
 
         # we don't block nothing if the user doesn't want it

@@ -1,0 +1,104 @@
+::::::::::::::
+/scratch/project_462000964/members/tiedeman/MARMoT/models/docmt-4pivots/mammoth/inf_out/mt_mlt-fra.yaml
+::::::::::::::
+tasks:
+  mt_mlt-fra:
+    src_tgt: mlt-fra
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    enc_sharing_group:
+    - mlt
+    dec_sharing_group:
+    - fra
+    transforms: []
+src_vocab:
+  mlt: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/mlt/32000/tokenizer.json
+tgt_vocab:
+  fra: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/fra/32000/tokenizer.json
+enc_layers:
+- 6
+dec_layers:
+- 6
+model_dim: 768
+dropout: 0.1
+model_dtype: bf16
+add_language_tokens: false
+x_transformers_opts:
+  attn_flash: true
+  rotary_pos_emb: true
+  tie_embedding: false
+  heads: 8
+  pre_norm: false
+  post_emb_norm: true
+  post_emb_norm_bias: true
+  attn_dropout: 0.1
+  ff_dropout: 0.1
+  layernorm_bias: true
+  use_abs_pos_emb: false
+max_length: 1024
+batch_size: 32
+batch_type: sents
+world_size: 1
+gpu_ranks:
+- 0
+seed: 42
+beam_size: 4
+gpu: 0
+::::::::::::::
+/scratch/project_462000964/members/tiedeman/MARMoT/models/docmt-4pivots/mammoth/inf_out/eval2/mt_mlt-fra.yaml
+::::::::::::::
+tasks:
+  mt_mlt-fra:
+    src_tgt: mlt-fra
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: 0:0
+    enc_sharing_group:
+    - mlt
+    dec_sharing_group:
+    - fra
+    transforms: []
+    _template_task: mt_mlt-fra
+    _pair_type: supervised
+    _src_task_candidates: mt_mlt-fra
+    _tgt_task_candidates: mt_mlt-fra
+    _original_train_task: mt_mlt-fra
+src_vocab:
+  mlt: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/mlt/32000/tokenizer.json
+tgt_vocab:
+  fra: /scratch/project_462000964/MARMoT/tokenizer/tatoeba_hplt_multisynt/fra/32000/tokenizer.json
+enc_layers:
+- 6
+dec_layers:
+- 6
+model_dim: 768
+dropout: 0.1
+model_dtype: bf16
+add_language_tokens: false
+x_transformers_opts:
+  attn_flash: true
+  rotary_pos_emb: true
+  tie_embedding: false
+  heads: 8
+  pre_norm: false
+  post_emb_norm: true
+  post_emb_norm_bias: true
+  attn_dropout: 0.1
+  ff_dropout: 0.1
+  layernorm_bias: true
+  use_abs_pos_emb: false
+  attn_dim_head: 64
+max_length: 1024
+batch_size: 32
+batch_type: sents
+world_size: 1
+gpu_ranks:
+- 0
+seed: 42
+beam_size: 4
+head_dim: 64
+gpu: 0
+task_id: mt_XX.mlt-FR.fra
+_expanded_task: mt_XX.mlt-FR.fra
+_train_config: /scratch/project_462000964/members/tiedeman/MARMoT/models/docmt-4pivots/mammoth/train.yaml

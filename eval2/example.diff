@@ -1,0 +1,14 @@
+11a12,16
+>     _template_task: mt_mlt-fra
+>     _pair_type: supervised
+>     _src_task_candidates: mt_mlt-fra
+>     _tgt_task_candidates: mt_mlt-fra
+>     _original_train_task: mt_mlt-fra
+35a41
+>   attn_dim_head: 64
+43a50
+> head_dim: 64
+44a52,54
+> task_id: mt_XX.mlt-FR.fra
+> _expanded_task: mt_XX.mlt-FR.fra
+> _train_config: /scratch/project_462000964/members/tiedeman/MARMoT/models/docmt-4pivots/mammoth/train.yaml

@@ -61,21 +61,15 @@ else
     echo "Error: Not running inside a Slurm job. This is a task wrapper."
     exit 1
 fi
-: "${BINDIR:?BINDIR must be set}"
-[[ -d "$BINDIR" ]]                || { echo "Error: BINDIR must be an existing directory: $BINDIR" >&2; exit 1; }
-[[ -f "$BINDIR/inf_wrapper.sh" ]] || { echo "Error: The current script must be in BINDIR: $BINDIR" >&2; exit 1; }
-[[ -f "$BINDIR/inf_distr.sh"   ]] || { echo "Error: The distributor must be in BINDIR: $BINDIR" >&2; exit 1; }
+: "${SELFDIR:?SELFDIR must be set}"
+[[ -d "${SELFDIR}"      ]] || { echo "Error: BINDIR must be an existing directory: ${SELFDIR}" >&2; exit 1; }
+[[ -f "${SLURM_DIRSTR}" ]] || { echo "Error: The distributor must be in: ${SLURM_DISTR}" >&2; exit 1; }
+[[ -f "${CALLS_FILE}"   ]] || { echo "Error: The distributor requires: ${CALLS_FILE}" >&2; exit 1; }
+[[ -f "${ACTIVATE}"     ]] || { echo "Missing activate script: ${ACTIVATE}" >&2; exit 1; }
 
 job_start_ts=$(date +%s)
 echo "starting inf_wrapper.sh at ${job_start_ts}" 
-
-ACTIVATE=/scratch/project_462000964/shared/mammoth-shared/.venv/bin/activate
-[ -f "$ACTIVATE"   ] || { echo "Missing activate script: $ACTIVATE" >&2; exit 1; }
-source "$ACTIVATE"
-
-############################################################################################
-bash $BINDIR/inf_distr.sh        # This executes a proportionate share of calls.out commands
-############################################################################################
-
+source "${ACTIVATE}"
+bash   "${SLURM_DISTR}"        # This executes a proportionate share of calls.out commands
 job_end_ts=$(date +%s)
 echo "finishing inf_wrapper.sh at ${job_end_ts}" 

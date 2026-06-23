@@ -40,12 +40,7 @@
 # -----------
 # Input command file:
 #   CALLS_FILE
-#       Optional. If omitted, defaults to:
-#           $OUTDIR/calls.out
-#
 # Planning mode defaults:
-#   PARTITION
-#       Optional. Default: dev-g
 #   MAKESCRIPT
 #       Optional but useful in planning mode; used when printing the suggested
 #       `sbatch` command.
@@ -81,9 +76,8 @@ fi
 
 set -euo pipefail
 
-: "${OUTDIR:?OUTDIR must be set}"
-: "${INF_SBATCH:?INF_SBATCH must be set}"
-CALLS_FILE="${OUTDIR}/calls.out"
+: "${MAKESCRIPT:?MAKESCRIPT must be set}"
+: "${CALLS_FILE:?CALLS_FILE must be set}"
 
 die() {
     echo "ERROR: $*" >&2
@@ -107,7 +101,7 @@ load_calls() {
 
 
 # min max nodes gpus_per_node
-LUMI_PLAN_TABLE=(
+DEVG_PLAN_TABLE=(
   "1    13    1   1"
   "14   21    1   2"
   "22   28    1   3"
@@ -127,10 +121,10 @@ LUMI_PLAN_TABLE=(
   "2049 4096  32  8"
 )
 
-choose_lumi_plan_from_table() {
+choose_devg_plan_from_table_devg() {
     local mins_per_wave=4
     local row min max nodes gpn
-    for row in "${LUMI_PLAN_TABLE[@]}"; do
+    for row in "${DEVG_PLAN_TABLE[@]}"; do
         read -r min max nodes gpn <<< "$row"
         if (( NCALLS >= min && NCALLS <= max )); then
             CHOSEN_NODES="$nodes"
@@ -151,8 +145,57 @@ choose_lumi_plan_from_table() {
     return 1
 }
 
+# small-g: up to 4 nodes, up to 8 GPUs per node on LUMI-G
+# rows: min_calls max_calls nodes gpus_per_node
+SMALLG_PLAN_TABLE=(
+  "1      64      1   1"
+  "65     128     1   2"
+  "129    192     1   3"
+  "193    256     1   4"
+  "257    320     1   5"
+  "321    384     1   6"
+  "385    448     1   7"
+  "449    512     1   8"
+  "513   1024     2   8"
+  "1025  999999   4   8"
+)
+
+choose_smallg_plan_from_table() {
+    local mins_per_wave="${1:-4}"
+    local row min max nodes gpn
+
+    for row in "${SMALLG_PLAN_TABLE[@]}"; do
+        read -r min max nodes gpn <<< "$row"
+        if (( NCALLS >= min && NCALLS <= max )); then
+            CHOSEN_NODES="$nodes"
+            CHOSEN_GPUS_PER_NODE="$gpn"
+            CHOSEN_WORLD=$(( nodes * gpn ))
+            CHOSEN_BATCHES=$(( (NCALLS + CHOSEN_WORLD - 1) / CHOSEN_WORLD ))
+            CHOSEN_RUNTIME_MIN=$(( CHOSEN_BATCHES * mins_per_wave ))
+            CHOSEN_COST=$(( CHOSEN_WORLD * CHOSEN_BATCHES ))
+            CHOSEN_WASTE=$(( CHOSEN_COST - NCALLS ))
+            CHOSEN_PARTITION="small-g"
+
+            # small-g walltime limit is 3 days = 4320 minutes
+            if (( CHOSEN_RUNTIME_MIN > 4320 )); then
+                echo "small-g plan would exceed 3-day walltime for NCALLS=$NCALLS" >&2
+                return 1
+            fi
+
+            printf -v CHOSEN_TIME '%02d:%02d:00' \
+                $(( CHOSEN_RUNTIME_MIN / 60 )) \
+                $(( CHOSEN_RUNTIME_MIN % 60 ))
+
+            return 0
+        fi
+    done
+
+    echo "No small-g lookup-table plan for NCALLS=$NCALLS" >&2
+    return 1
+}
+
 plan_outside_slurm() {
-    choose_lumi_plan_from_table
+    choose_smallg_plan_from_table
     
     echo "Outside Slurm."
     echo "Suggested LUMI allocation:"
@@ -166,7 +209,7 @@ plan_outside_slurm() {
     echo "  partition         : $CHOSEN_PARTITION"
     echo
     echo "sbatch --parsable --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD $MAKESCRIPT"
-    echo "sbatch --parsable --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD $MAKESCRIPT" > "${INF_SBATCH}"
+    echo "sbatch --parsable --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD $MAKESCRIPT" > "${MAKESCRIPT}"
 }
 
 

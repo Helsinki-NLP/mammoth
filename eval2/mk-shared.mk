@@ -33,7 +33,7 @@
 #         - DATADIR exists
 #         - TRAINCONFIG exists and is non-empty
 #
-#   status
+#   model-status
 #       Prints the current values of key derived workflow paths such as:
 #         - MODELDIR
 #         - TESTCONFIG
@@ -88,7 +88,7 @@
 #
 # Output
 # ------
-# The fragment prints status, validation results, and setup messages to stdout
+# The fragment prints model-status, validation results, and setup messages to stdout
 # or stderr.
 #
 # Notes
@@ -100,7 +100,7 @@
 
 
 
-.PHONY: check-model dirs not-in-slurm mk-shared inspect-model-summary mk-shared
+.PHONY: check-model dirs not-in-slurm mk-shared inspect-model-summary mk-shared ensure-sacre-venv
 
 inspect-model-summary: $(MODELDIR)/model-summary.yaml
 > @echo "mk-shared.mk: 🛠️ Short model-file summary for $(MODELDIR):"; \
@@ -157,7 +157,7 @@ check-model:
 > [[ -s "$(TRAINCONFIG)" ]] || { echo "mk-shared.mk: ❌ Missing training config: $(TRAINCONFIG)" >&2; exit 1; }; \
 > echo "mk-shared.mk: ✅ Directories and the config file found"
 
-status:
+model-status:
 > @echo "mk-shared.mk: MODELDIR:          $(MODELDIR)"; \
 > echo "mk-shared.mk: TESTCONFIG:        $(TESTCONFIG)"; \
 > echo "mk-shared.mk: INFERENCE_CALLS:   $(INFERENCE_CALLS)"; \
@@ -165,7 +165,7 @@ status:
 > echo "mk-shared.mk: Inference flag:    $(INF_FLAG)"; \
 > echo "mk-shared.mk: Metrics flag:      $(MET_FLAG)"
 
-mk-shared: check-model not-in-slurm dirs $(MODELDIR)/mammoth.selected
+mk-shared: check-model not-in-slurm dirs $(MODELDIR)/mammoth.selected ensure-sacre-venv
 > @MAMMOTHSEL="$$(cat "$(MODELDIR)/mammoth.selected")"; \
 > echo "mk-shared.mk: ✅ Using: $$MAMMOTHSEL"; \
 > echo "mk-shared.mk: ✨ I am happy with the preparations."; \
@@ -177,4 +177,22 @@ dirs: check-model
 
 not-in-slurm:
 > @[[ -z "$${SLURM_JOBID:-}" ]] || { echo "mk-shared.mk: Run make outside SLURM first" >&2; exit 1; }
+
+ensure-sacre-venv: $(SACRE_ACTIVATE)
+> @echo "mk-shared.mk: ✅ Ensured sacrebleu virtual environment"
+
+$(SACRE_ACTIVATE): mk-shared.mk
+> @set -euo pipefail; \
+> module load cray-python; \
+> if [ ! -f "" ]; then \
+>   echo "mk-shared.mk:    Building sacrebleu virtual environment..."; \
+>   python3 -m venv "$(SACRE_VENV)"; \
+>   source "$(SACRE_ACTIVATE)"; \
+>   python -m pip install --upgrade pip; \
+>   pip install sacrebleu; \
+>   echo "Built scoring venv $(SACRE_VENV)"; \
+> fi
+
+$(SELFDIR)/inf_pairs.py:
+> @[[ -f "$(SELFDIR)/inf_pairs.py" ]] || { echo "mk-yamls.mk: ❌ Missing $(SELFDIR)/inf_pairs.py" >&2; exit 1; }
 

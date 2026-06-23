@@ -1,0 +1,41 @@
+#!/bin/bash
+changecom()dnl # disables m4 comments so #SBATCH lines are expanded; this line is supressed in macro expansion
+
+#SBATCH --partition=small
+#SBATCH --mem-per-gpu=1G
+#SBATCH --cpus-per-task=1
+#SBATCH --output=__LOGDIR__/cnt%j.out
+#SBATCH --error=__LOGDIR__/cnt%j.err
+#SBATCH --job-name=__JOB_NAME__
+#SBATCH --account=__ACCOUNT__
+#SBATCH --chdir=__MODELDIR__
+#SBATCH --nodes=1
+#SBATCH --time=00:01:00
+#SBATCH --ntasks=1
+
+set -euo pipefail
+
+export ACCOUNT=__ACCOUNT__
+export DISKPROJECT=__DISKPROJECT__
+export SELFDIR=__SELFDIR__
+export OUTDIR=__OUTDIR__
+export MAKESCRIPT=__MAKESCRIPT__
+export LOGDIR=__LOGDIR__
+export JOB_NAME=__JOB_NAME__
+export MODELDIR=__MODELDIR__
+export FLAG=__FLAG__
+export DONE=__DONE__
+
+for var in ACCOUNT DISKPROJECT SELFDIR OUTDIR  MAKESCRIPT LOGDIR JOB_NAME MODELDIR FLAG DONE; do
+  eval "value=\${$var}"
+  case "$value" in
+    __*__)
+      echo "ERROR: $var was not substituted: $value" >&2
+      exit 1
+      ;;
+  esac
+done
+
+trap 'rm -f "${FLAG}"; touch "${DONE}"' EXIT
+
+make -C "$(SELFDIR)" MODELDIR="$(MODELDIR)" continue-eval

@@ -342,8 +342,9 @@ def build_language_inventory() -> LanguageInventory:
             xcodes.append(xcode)
         inv.code_to_xcodes[code] = xcodes
     return inv
+
 def check_data_coverage(task_set, valid_xcodes):
-    pre = "❌ Following tasks do not have any test data:\ninf_plan.sh:    "
+    pre = "❌ Following designated tasks do not have any _test_ data:\ninf_plan.sh:    "
     for task in sorted(task_set):
         m = TASK_RE.match(task)
         if not m:
@@ -355,7 +356,7 @@ def check_data_coverage(task_set, valid_xcodes):
         sys.stderr.write(task + "\n")
         pre = "inf_plan.sh:    "
     if pre == "inf_plan.sh:    ":
-        log(f"✨ Stopping as I refuse to run before all tasks are covered")
+        log(f"✨ Stopping as I refuse to run before all designated tasks are covered by some _test_ data")
         exit(1)
     log(f"✅ All designated tasks covered (at least partially) by data")   
 
@@ -524,19 +525,15 @@ def plan_translation_and_scoring(
                 log(f"##             Contrasting {refer_path} VS {output_path}")
 
                 writers.sacre.write(
-                    f'if [ -s "{sacre_path}" ] && [ "$(stat -c%s "{sacre_path}")" -gt 500 ]; then\n'
-                )
+                    f'if [ -s "{sacre_path}" ] && [ "$(stat -c%s "{sacre_path}")" -gt 500 ]; then\n')
                 writers.sacre.write(
-                    f'    echo "Skipping {sacre_path} because it already exists and is >500 bytes"\n'
-                )
+                    f'    echo "Skipping {sacre_path} because it already exists and is >500 bytes"\n')
                 writers.sacre.write("else\n")
                 writers.sacre.write(f'    date | tee "{sacre_path}"\n')
                 writers.sacre.write(
-                    f'    echo {data_tag} {xtask} Contrasting {refer_path} VS {output_path} | tee -a "{sacre_path}"\n'
-                )
+                    f'    echo {data_tag} {xtask} Contrasting {refer_path} VS {output_path} | tee -a "{sacre_path}"\n')
                 writers.sacre.write(
-                    f'    sacrebleu {refer_path} -i {output_path} -m bleu chrf | tee -a "{sacre_path}"\n'
-                )
+                    f'    sacrebleu {refer_path} -i {output_path} -m bleu chrf | tee -a "{sacre_path}"\n')
                 writers.sacre.write("fi\n")
 
             writers.comet.write(
@@ -553,7 +550,7 @@ def plan_translation_and_scoring(
         f'python -u "{mammoth_dir}/translate.py" '
         f'--config "{config_path}" --model "{model_path}" --task_id "{orig_task}" '
         f'--src "{input_path}" --output "{output_path}" '
-        f'2>>"{logdir}/job${{SLURM_JOB_ID}}.{xtask}.err"\n'
+        f'2>"{logdir}/job${{SLURM_JOB_ID}}.{xtask}.{data_tag}.err"\n'
     )
     return True
 
@@ -1001,6 +998,8 @@ def add_zeroshot_tasks(cfg, zeroshot_pair_set, support: TaskSupport, inventory: 
         if not prefixes:
             log(f"  ❌ zero-shot pair {src}-{tgt} not supported by any existing task family in TRAINCONFIG")
             return None
+        else:
+            log(f"  ✅ zero-shot pair {src}-{tgt} is supported by an existing task family in TRAINCONFIG: {prefixes}")
         return prefixes
     
     def get_lang_xcodes(inventory, lang):
@@ -1009,7 +1008,10 @@ def add_zeroshot_tasks(cfg, zeroshot_pair_set, support: TaskSupport, inventory: 
     log(f"🛠️ Adding localized zero-shot evaluation tasks:")
     added_zeroshot = 0    
     for src, tgt in sorted(zeroshot_pair_set):
-        task_prefixes = sorted(get_zeroshot_prefix(support, src, tgt))
+        task_prefixes = get_zeroshot_prefix(support, src, tgt)
+        if not task_prefixes:
+            continue
+        task_prefixes = sorted(task_prefixes)
         src_xcodes = get_lang_xcodes(inventory, src)
         tgt_xcodes = get_lang_xcodes(inventory, tgt)
         log(f" {src}-{tgt}: {task_prefixes} x {src_xcodes} x {tgt_xcodes}")
@@ -1209,16 +1211,16 @@ def add_zeroshot_task(support, cfg, prefix, xsrc, xtgt, inventory):
 
 def main() -> int:
     (datadir, outdir, model, trainconfig, supervisedpairs, zeroshotpairs,
-     mammoth, logdir, scrdir, cfg, inventory) = get_env_vars()
+     mammoth, logdir, scrdir, cfg, lang_inventory) = get_env_vars()
     writers = CallWriters(outdir)
     try:
-        support = collect_task_support(cfg, inventory)
+        support = collect_task_support(cfg, lang_inventory)
         (supervised_pair_set, zeroshot_pair_set) = read_pairs(supervisedpairs, zeroshotpairs)
         zeroshot_pair_set = filter_zeroshotpairs(supervised_pair_set, zeroshot_pair_set)
-        support, rejected = filter_supervised_tasks(support, supervised_pair_set, inventory,)
-        check_data_coverage(support.task_set, inventory.valid_xcodes)
-        added_zeroshot = add_zeroshot_tasks( cfg, zeroshot_pair_set=zeroshot_pair_set, support=support, inventory=inventory)
-        produce_infyamls_and_calls(inventory, support, datadir, outdir, trainconfig, cfg,
+        support, rejected = filter_supervised_tasks(support, supervised_pair_set, lang_inventory,)
+        check_data_coverage(support.task_set, lang_inventory.valid_xcodes)
+        added_zeroshot = add_zeroshot_tasks( cfg, zeroshot_pair_set=zeroshot_pair_set, support=support, inventory=lang_inventory)
+        produce_infyamls_and_calls(lang_inventory, support, datadir, outdir, trainconfig, cfg,
                                    writers, model, mammoth, logdir, scrdir,)
     finally:
         writers.close()

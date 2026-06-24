@@ -2,7 +2,6 @@
 changecom()dnl # disables m4 comments so #SBATCH lines are expanded; this line is supressed in macro expansion
 
 #SBATCH --partition=small
-#SBATCH --mem-per-gpu=1G
 #SBATCH --cpus-per-task=1
 #SBATCH --output=__LOGDIR__/cnt%j.out
 #SBATCH --error=__LOGDIR__/cnt%j.err
@@ -25,8 +24,9 @@ export JOB_NAME=__JOB_NAME__
 export MODELDIR=__MODELDIR__
 export FLAG=__FLAG__
 export DONE=__DONE__
+export FIRST_GOAL=__FIRST_GOAL__
 
-for var in ACCOUNT DISKPROJECT SELFDIR OUTDIR  MAKESCRIPT LOGDIR JOB_NAME MODELDIR FLAG DONE; do
+for var in ACCOUNT DISKPROJECT SELFDIR OUTDIR  MAKESCRIPT LOGDIR JOB_NAME MODELDIR FLAG DONE FIRST_GOAL; do
   eval "value=\${$var}"
   case "$value" in
     __*__)
@@ -38,4 +38,4 @@ done
 
 trap 'rm -f "${FLAG}"; touch "${DONE}"' EXIT
 
-make -C "$(SELFDIR)" MODELDIR="$(MODELDIR)" continue-eval
+make -C "$(SELFDIR)" "$(FIRST_GOAL)" continue-eval

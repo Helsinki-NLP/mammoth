@@ -47,6 +47,8 @@ VIEWPYTHON   := $(TESTINGDIR)/venvs/view/bin/python
 TORCHPYTHON  := $(TESTINGDIR)/venvs/torch/bin/python
 INFPYTHON    := $(VENV)/bin/python
 
+BAS_DONE     := $(MODELDIR)/preps.done
+PRS_DONE     := $(MODELDIR)/pairs.done
 INF_DONE     := $(MODELDIR)/inference.done
 CNT_DONE     := $(MODELDIR)/cnt.done
 MET_DONE     := $(MODELDIR)/metrics.done
@@ -82,7 +84,7 @@ MET_SBATCH   := $(OUTDIR)/met.sbatch
 .DEFAULT_GOAL := list
 
 # Make alias goals no-op targets so `make docmt4 mk-yamls` works.
-.PHONY: all mk-shared mk-yamls mk-infer metrics status $(MODEL_ALIASES) help list 
+.PHONY: all mk-basic mk-yamls mk-infer metrics status $(MODEL_ALIASES) help list 
 
 help: 
 > @printf "\n\
@@ -96,7 +98,7 @@ Usage:\n\
 The model alias must be specified first.\n\
 \n\
 Examples:\n\
-  make docmt4 mk-shared\n\
+  make docmt4 mk-basic\n\
   make docmt4 mk-yamls\n\
   make sentmtdenoise mk-yamls\n\
   make MODELDIR=/scratch/.../mammoth mk-yamls\n\
@@ -110,25 +112,34 @@ Main targets:\n\
 
 list: 
 > @$(foreach a,$(MODEL_ALIASES),printf "  %-10s -> %s\n" "$(a)" "$(MODEL_$(a))";)
+> @echo Remember to mount the project directories when using containers
 
 # This is used to inpect the model properties - helps to choose the correct MAMMOTH version
 $(MODEL_ALIASES):
 > @if [ "$(words $(MAKECMDGOALS))" -eq 1 ]; then \
 >   $(MAKE) --no-print-directory -C "$(SELFDIR)" MODELDIR="$(MODEL_$@)" inspect-model-summary; \
 > fi
-> @echo Remember to mount the project directories when using containers
 
-include $(SELFDIR)/mk-shared.mk
-include $(SELFDIR)/mk-slurm.mk
-include $(SELFDIR)/mk-pairs.mk
-include $(SELFDIR)/mk-calls.mk
-include $(SELFDIR)/mk-infer.mk
-include $(SELFDIR)/mk-score.mk
-include $(SELFDIR)/mk-control.mk
-
+include $(SELFDIR)/mk-basic.mk # venvs, model inspection, mammoth ver, dirs, (non)slurm detection
+include $(SELFDIR)/mk-pairs.mk # determine the desired language pairs
+include $(SELFDIR)/mk-calls.mk # calls.*.out and yaml files
+include $(SELFDIR)/mk-slurm.mk # slurm scripts and sbatch lines
+include $(SELFDIR)/mk-infer.mk # run inference calls
+include $(SELFDIR)/mk-score.mk # run scoring calls
+include $(SELFDIR)/mk-contr.mk # loop runs until done
 
 all: mk-infer 
 
-.PHONY: status
+.PHONY: status mt-bleu mt-chrf mt-bleu-chrf 
 status:
 > @module load cray-python; python3 "$(SELFDIR)/status.py" $(STATUS_MODELS)
+
+mt-bleu:
+> @module load cray-python; python "$(SELFDIR)/summarize_sacre.py" --metric BLEU --kind mt $(MODELDIR)/inf_scores/
+
+mt-chrf:
+> @module load cray-python; python "$(SELFDIR)/summarize_sacre.py" --metric chrF2 --kind mt $(MODELDIR)/inf_scores/
+
+mt-bleu-chrf:
+> @module load cray-python; python "$(SELFDIR)/summarize_sacre.py" --kind mt $(MODELDIR)/inf_scores/
+

@@ -415,15 +415,18 @@ def get_env_vars():
 
 class CallWriters:
     def __init__(self, outdir: str):
+        self.plan_path  = os.path.join(outdir, "plan.out") # file
         self.calls_path = os.path.join(outdir, "calls.out") # file
         self.sacre_path = os.path.join(outdir, "calls.sacre.out") # file
         self.comet_path = os.path.join(outdir, "calls.comet.out") # file
 
+        self.plan  = open(self.plan_path,  "w", encoding="utf-8")
         self.calls = open(self.calls_path, "w", encoding="utf-8")
         self.sacre = open(self.sacre_path, "w", encoding="utf-8")
         self.comet = open(self.comet_path, "w", encoding="utf-8")
 
     def close(self):
+        self.plan.close()
         self.calls.close()
         self.sacre.close()
         self.comet.close()
@@ -502,12 +505,20 @@ def plan_translation_and_scoring(
 ) -> bool:
     if pair_type == "zeroshot":
         shortoutput = f"{xtask}.{data_tag}.0shyp"
+        sacre_path = os.path.join(scrdir, f"{xtask}.{data_tag}.0ssacre")
+        comet_path = os.path.join(scrdir, f"{xtask}.{data_tag}.0scomet")
     else:
         shortoutput = f"{xtask}.{data_tag}.hyp"
+        sacre_path = os.path.join(scrdir, f"{xtask}.{data_tag}.sacre")
+        comet_path = os.path.join(scrdir, f"{xtask}.{data_tag}.comet")
     output_path = os.path.join(outdir, shortoutput)
     if not files_available(dataset, input_path, refer_path, config_path):
          return False
 
+    writers.plan.write(
+        f'--task_id "{orig_task}" --src "{input_path}" --output "{output_path}" --refer "{refer_path}" '
+        f'--log {logdir}/job${{SLURM_JOB_ID}}.{xtask}.{data_tag}.err"\n'
+    )
     if os.path.exists(output_path):
         with open(input_path, "r", encoding="utf-8") as f:
             input_lines = sum(1 for _ in f)
@@ -515,9 +526,6 @@ def plan_translation_and_scoring(
             output_lines = sum(1 for _ in f)
 
         if input_lines == output_lines:
-            sacre_path = os.path.join(scrdir, f"{xtask}.{data_tag}.sacre")
-            comet_path = os.path.join(scrdir, f"{xtask}.{data_tag}.comet")
-
             if os.path.exists(sacre_path) and os.path.getsize(sacre_path) > 500:
                 log(f"##      GOOD - already scored: {sacre_path}")
             else:
@@ -525,15 +533,15 @@ def plan_translation_and_scoring(
                 log(f"##             Contrasting {refer_path} VS {output_path}")
 
                 writers.sacre.write(
-                    f'if [ -s "{sacre_path}" ] && [ "$(stat -c%s "{sacre_path}")" -gt 500 ]; then\n')
+                    f'if [ -s "{sacre_path}" ] && [ "$(stat -c%s "{sacre_path}")" -gt 500 ]; then ')
                 writers.sacre.write(
-                    f'    echo "Skipping {sacre_path} because it already exists and is >500 bytes"\n')
-                writers.sacre.write("else\n")
-                writers.sacre.write(f'    date | tee "{sacre_path}"\n')
+                    f'    echo "Skipping {sacre_path} because it already exists and is >500 bytes"; ')
+                writers.sacre.write("else ")
+                writers.sacre.write(f'    date | tee "{sacre_path}"; ')
                 writers.sacre.write(
-                    f'    echo {data_tag} {xtask} Contrasting {refer_path} VS {output_path} | tee -a "{sacre_path}"\n')
+                    f'    echo {data_tag} {xtask} Contrasting {refer_path} VS {output_path} | tee -a "{sacre_path}"; ')
                 writers.sacre.write(
-                    f'    sacrebleu {refer_path} -i {output_path} -m bleu chrf | tee -a "{sacre_path}"\n')
+                    f'    sacrebleu {refer_path} -i {output_path} -m bleu chrf | tee -a "{sacre_path}"; ')
                 writers.sacre.write("fi\n")
 
             writers.comet.write(
@@ -713,8 +721,8 @@ def filter_zeroshotpairs(supervised_pair_set, zeroshot_pair_set):
     log(f"✅ Filtered the zeroshot tasks selection")
     return zeroshot_pair_set
 
-TASK_RE  = re.compile(r"^(mt|sentmt|docmt)_([^-]+)-([^-]+)$")
-TASK_REX = re.compile(r"^(mt|sentmt|docmt)_[A-Z][A-Z].([^-_]+)[^-_]*-[A-Z][A-Z].([^-_]+)[^-_]*$")
+TASK_RE  = re.compile(r"^(mt|sentmt|docmt)[0-9]?_([^-]+)-([^-]+)$")
+TASK_REX = re.compile(r"^(mt|sentmt|docmt)[0-9]?_[A-Z][A-Z].([^-_]+)[^-_]*-[A-Z][A-Z].([^-_]+)[^-_]*$")
 
 def filter_supervised_tasks(support: TaskSupport, supervised_pair_set, inventory: LanguageInventory,):
     filtered_task_set = set()

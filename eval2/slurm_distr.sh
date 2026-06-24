@@ -78,6 +78,8 @@ set -euo pipefail
 
 : "${MAKESCRIPT:?MAKESCRIPT must be set}"
 : "${CALLS_FILE:?CALLS_FILE must be set}"
+: "${SBATCH_LINE:?SBATCH_LINE must be set}"
+: "${PARTITION:?PARTITION must be set}"
 
 die() {
     echo "ERROR: $*" >&2
@@ -94,9 +96,9 @@ load_calls() {
     echo -n "Zeroshot pair   inferences: "
     grep -F ".0shyp" $CALLS_FILE | wc -l || true
     echo "---"
-    mapfile -t CALLS < <(grep '^python' "$CALLS_FILE" || true)
+    mapfile -t CALLS < <(egrep '^(python|if)' "$CALLS_FILE" || true)
     NCALLS="${#CALLS[@]}"
-    (( NCALLS > 0 )) || die "No python calls found in $CALLS_FILE"
+    (( NCALLS > 0 )) || die "No calls found in $CALLS_FILE"
 }
 
 
@@ -122,7 +124,7 @@ DEVG_PLAN_TABLE=(
 )
 
 choose_devg_plan_from_table_devg() {
-    local mins_per_wave=4
+    local mins_per_wave="${1:-9}"
     local row min max nodes gpn
     for row in "${DEVG_PLAN_TABLE[@]}"; do
         read -r min max nodes gpn <<< "$row"
@@ -161,7 +163,7 @@ SMALLG_PLAN_TABLE=(
 )
 
 choose_smallg_plan_from_table() {
-    local mins_per_wave="${1:-4}"
+    local mins_per_wave="${1:-9}"
     local row min max nodes gpn
 
     for row in "${SMALLG_PLAN_TABLE[@]}"; do
@@ -194,24 +196,90 @@ choose_smallg_plan_from_table() {
     return 1
 }
 
+# rows: min_calls  max_calls  nodes  ntasks
+SMALL_PLAN_TABLE=(
+  "1      32      1   1"
+  "33     64      1   2"
+  "65     96      1   3"
+  "97     128     1   4"
+  "129    160     1   5"
+  "161    192     1   6"
+  "193    224     1   7"
+  "225    256     1   8"
+  "257    512     2   8"
+  "513    1024    4   8"
+  "1025   2048    4   8"
+  "2049   4096    4   8"
+  "4097   8192    4   8"
+)
+
+choose_small_plan_from_table() {
+    local mins_per_wave="${1:-9}"
+    local row min max nodes ntasks
+
+    for row in "${SMALL_PLAN_TABLE[@]}"; do
+        read -r min max nodes ntasks <<< "$row"
+        if (( NCALLS >= min && NCALLS <= max )); then
+            CHOSEN_NODES="$nodes"
+            CHOSEN_NTASKS="$ntasks"
+            CHOSEN_WORLD=$(( nodes * ntasks ))
+            CHOSEN_BATCHES=$(( (NCALLS + CHOSEN_WORLD - 1) / CHOSEN_WORLD ))
+            CHOSEN_RUNTIME_MIN=$(( CHOSEN_BATCHES * mins_per_wave ))
+            CHOSEN_COST=$(( CHOSEN_WORLD * CHOSEN_BATCHES ))
+            CHOSEN_WASTE=$(( CHOSEN_COST - NCALLS ))
+            CHOSEN_PARTITION="small"
+
+            # small walltime limit is 3 days = 4320 minutes
+            if (( CHOSEN_RUNTIME_MIN > 4320 )); then
+                echo "small plan would exceed 3-day walltime for NCALLS=$NCALLS" >&2
+                return 1
+            fi
+
+            printf -v CHOSEN_TIME '%02d:%02d:00' \
+                $(( CHOSEN_RUNTIME_MIN / 60 )) \
+                $(( CHOSEN_RUNTIME_MIN % 60 ))
+
+            return 0
+        fi
+    done
+
+    echo "No small lookup-table plan for NCALLS=$NCALLS" >&2
+    return 1
+}
+
 plan_outside_slurm() {
-    choose_smallg_plan_from_table
-    
+    if [ "$PARTITION" = "small-g" ]; then
+	choose_smallg_plan_from_table
+    else
+	choose_small_plan_from_table
+    fi
     echo "Outside Slurm."
     echo "Suggested LUMI allocation:"
     echo "  calls             : $NCALLS"
     echo "  nodes             : $CHOSEN_NODES"
-    echo "  GPUs per node     : $CHOSEN_GPUS_PER_NODE"
+    if [ "$CHOSEN_PARTITION" = "small-g" ]; then
+        echo "  GPUs per node     : $CHOSEN_GPUS_PER_NODE"
+    fi
     echo "  world size        : $CHOSEN_WORLD"
     echo "  waves             : $CHOSEN_BATCHES"
     echo "  expected runtime  : $CHOSEN_TIME"
     echo "  wasted slots      : $CHOSEN_WASTE"
     echo "  partition         : $CHOSEN_PARTITION"
     echo
-    echo "sbatch --parsable --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD $MAKESCRIPT"
-    echo "sbatch --parsable --partition=$CHOSEN_PARTITION --time=$CHOSEN_TIME --nodes=$CHOSEN_NODES --ntasks=$CHOSEN_WORLD $MAKESCRIPT" > "${MAKESCRIPT}"
+    if [ "$CHOSEN_PARTITION" = "small-g" ]; then
+        sbatch_cmd=$(
+            printf 'sbatch --parsable --partition=%s --time=%s --nodes=%s --ntasks=%s --gpus-per-node=%s %s' \
+                "$CHOSEN_PARTITION" "$CHOSEN_TIME" "$CHOSEN_NODES" "$CHOSEN_WORLD" "$CHOSEN_GPUS_PER_NODE" \
+                "$MAKESCRIPT")
+    else
+        sbatch_cmd=$(
+            printf 'sbatch --parsable --partition=%s --time=%s --nodes=%s --ntasks=%s %s' \
+                "$CHOSEN_PARTITION" "$CHOSEN_TIME" "$CHOSEN_NODES" "$CHOSEN_WORLD" \
+                "$MAKESCRIPT")
+    fi
+    printf '%s\n' "$sbatch_cmd"
+    printf '%s\n' "$sbatch_cmd" > "${SBATCH_LINE}"
 }
-
 
 # SLURM-INTERNAL:
 assign_rank_calls_for_show() {

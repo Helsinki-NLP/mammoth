@@ -24,7 +24,7 @@ MODEL_LGAenc_fincentric   := $(MODELS)/docmt-denoise-LGAenc-fincentric/mammoth
 MODEL_sentmtdenoise       := $(MODELS)/sentmt-denoise/mammoth
 MODEL_sentmthalfsmall     := $(MODELS)/sentmt-halfsharedenc-small/mammoth
 MODEL_sentmthalfxl        := $(MODELS)/sentmt-halfsharedenc-xl/mammoth
-MODEL_ALIASES := docmt4denhalfbig docmt4denhalfbase docmt4denhalfsmall docmt4denhalfxl \
+MODEL_ALIASES := docmt4denhalfbase docmt4denhalfsmall docmt4denhalfxl \
   docmt10denhalf docmt4 finnish finnish_denoise_xl denoise d_fincentric \
   d_halfsharedenc d_sharedenc LGAenc LGAenc_fincentric sentmtdenoise sentmthalfsmall \
   sentmthalfxl
@@ -52,7 +52,7 @@ ifneq ($(words $(ALL_MODEL_GOALS)),0)
   endif
 endif
 # Prevent workflow targets from running without a model, but allow help/list.
-NON_MODEL_GOALS := $(filter-out help list status $(MODEL_ALIASES),$(MAKECMDGOALS))
+NON_MODEL_GOALS := $(filter-out help list status continue-all $(MODEL_ALIASES),$(MAKECMDGOALS))
 ifneq ($(strip $(NON_MODEL_GOALS)),)
   ifndef MODELDIR
     $(error MODELDIR is unset. Use 'make list' or 'make <alias> <target>' or 'make MODELDIR=/path/to/model <target>')

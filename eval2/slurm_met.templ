@@ -2,7 +2,6 @@
 changecom()dnl # disables m4 comments so #SBATCH lines are expanded; this line is supressed in macro expansion
 
 #SBATCH --partition=small
-#SBATCH --mem-per-gpu=8G
 #SBATCH --cpus-per-task=1
 #SBATCH --output=__LOGDIR__/sacrebleu%j.out
 #SBATCH --error=__LOGDIR__/sacrebleu%j.err
@@ -10,7 +9,7 @@ changecom()dnl # disables m4 comments so #SBATCH lines are expanded; this line i
 #SBATCH --account=__ACCOUNT__
 #SBATCH --chdir=__MODELDIR__
 
-# This have to be give as command line arguments:
+# These have to be given as command line arguments:
 ##SBATCH --time=__TIME__
 ##SBATCH --ntasks=__NTASKS__
 ##SBATCH --nodes=__NODES__
@@ -28,8 +27,10 @@ export JOB_NAME=__JOB_NAME__
 export MODELDIR=__MODELDIR__
 export FLAG=__FLAG__
 export DONE=__DONE__
+export SBATCH_LINE=__SBATCH_LINE__
+export PARTITION=__PARTITION__
 
-for var in ACCOUNT DISKPROJECT SELFDIR OUTDIR ACTIVATE MAKESCRIPT LOGDIR JOB_NAME MODELDIR FLAG DONE; do
+for var in ACCOUNT DISKPROJECT SELFDIR OUTDIR ACTIVATE MAKESCRIPT LOGDIR JOB_NAME MODELDIR FLAG DONE SBATCH_LINE PARTITION; do
   eval "value=\${$var}"
   case "$value" in
     __*__)

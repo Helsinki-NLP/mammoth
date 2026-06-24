@@ -63,7 +63,7 @@ else
 fi
 : "${SELFDIR:?SELFDIR must be set}"
 [[ -d "${SELFDIR}"      ]] || { echo "Error: BINDIR must be an existing directory: ${SELFDIR}" >&2; exit 1; }
-[[ -f "${SLURM_DIRSTR}" ]] || { echo "Error: The distributor must be in: ${SLURM_DISTR}" >&2; exit 1; }
+[[ -f "${SLURM_DISTR}"  ]] || { echo "Error: The distributor must be in: ${SLURM_DISTR}" >&2; exit 1; }
 [[ -f "${CALLS_FILE}"   ]] || { echo "Error: The distributor requires: ${CALLS_FILE}" >&2; exit 1; }
 [[ -f "${ACTIVATE}"     ]] || { echo "Missing activate script: ${ACTIVATE}" >&2; exit 1; }
 

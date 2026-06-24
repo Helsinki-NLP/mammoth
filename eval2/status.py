@@ -17,10 +17,17 @@ def count_files(path: Path, pattern: str) -> int:
 def count_lines(path: Path) -> int:
     if not path.is_file():
         return 0
-    with path.open(errors="replace") as f:
+    with path.open("r", errors="replace") as f:
         return sum(1 for _ in f)
 
+def count_regex_lines(path: Path, pattern: str) -> int:
+    if not path.is_file():
+        return 0
+    rx = re.compile(pattern)
+    with path.open("r", errors="replace") as f:
+        return sum(1 for line in f if rx.search(line))
 
+    
 def slurm_time_to_hhmm(value: str) -> str:
     # Supports: D-HH:MM:SS, HH:MM:SS, MM:SS, HH:MM
     days = 0
@@ -134,36 +141,43 @@ def current_runtime(model_dir: Path) -> str:
     return runtime_raw
 
 
+def pair_count_str(zero_count: int, main_count: int) -> str:
+    return f"{zero_count}+{main_count}"
+
 def row(alias: str, model_dir_s: str) -> tuple:
     model_dir = Path(model_dir_s)
 
     yaml_ok = count_files(model_dir / "inf_out", "*.yaml")
     calls = count_lines(model_dir / "inf_out" / "calls.out")
-    hyp_count = count_files(model_dir / "inf_out", "*.hyp")
+
+    plan_file = model_dir / "inf_out" / "plan.out"
+    plan_hyp = count_regex_lines(plan_file, r"\.hyp\b")
+    plan_0shyp = count_regex_lines(plan_file, r"\.0shyp\b")
+    plan = pair_count_str(plan_0shyp, plan_hyp)
+    
     zhyp_count = count_files(model_dir / "inf_out", "*.0shyp")
-    sacre = count_files(model_dir / "inf_scores", "*.sacre")
+    hyp_count = count_files(model_dir / "inf_out", "*.hyp")
+    hyp = pair_count_str(zhyp_count, hyp_count)
+    
+    sacre0_count = count_files(model_dir / "inf_scores", "*.0ssacre")
+    sacre_count = count_files(model_dir / "inf_scores", "*.sacre")
+    sacre = pair_count_str(sacre0_count, sacre_count)
 
-    sacre_calls_file = model_dir / "inf_out" / "calls.sacre.out"
-    sacre_calls = 0
-    if sacre_calls_file.is_file():
-        text = sacre_calls_file.read_text(errors="replace")
-        sacre_calls = len(re.findall(r"\bsacrebleu\b", text))
-
-    comet = count_lines(model_dir / "inf_out" / "calls.comet.out")
+    comet0_count = count_files(model_dir / "inf_scores", "*.0scomet")
+    comet_count = count_files(model_dir / "inf_scores", "*.comet")
+    comet = pair_count_str(comet0_count, comet_count)
 
     return (
         alias,
         yaml_ok,
+        plan,
         calls,
         infer_info(model_dir),
         current_runtime(model_dir),
-        hyp_count,
-        zhyp_count,
-        sacre_calls,
+        hyp,
         sacre,
         comet,
     )
-
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -183,15 +197,14 @@ def main() -> None:
         alias, model_dir = item.split("=", 1)
         models.append((alias, model_dir))
 
-    fmt = "{:<22} {:<5} {:<6} {:<10} {:<5} {:<5} {:<6} {:<6} {:<6} {:<6}"
-    print(fmt.format("model", "yamls", "calls", "HH:MMxGPUs", "elaps", "hyp", "0shyp", "calls", "sacre", "comet"))
-    print(fmt.format("-" * 22, "-" * 5, "-" * 6, "-" * 10, "-" * 5, "-" * 5, "-" * 6, "-" * 6, "-" * 6, "-" * 6))
+    fmt = "{:<22} {:<5} {:<12} {:<6} {:<10} {:<5} {:<9} {:<9} {:<9}"
+    print(fmt.format("model", "yamls", "0s+spv tasks", "calls", "HH:MMxGPUs", "elaps", "hyp", "sacre", "comet"))
+    print(fmt.format("-" * 22, "-" * 5, "-" * 12, "-" * 6, "-" * 10, "-" * 5, "-" * 9, "-" * 9, "-" * 9))
 
     for alias, model_dir in models:
         print(fmt.format(*row(alias, model_dir)))
 
-    print(fmt.format("-" * 22, "-" * 5, "-" * 6, "-" * 10, "-" * 5, "-" * 5, "-" * 6, "-" * 6, "-" * 6, "-" * 6))
-
+    print(fmt.format("-" * 22, "-" * 5, "-" * 12, "-" * 6, "-" * 10, "-" * 5, "-" * 9, "-" * 9, "-" * 9))
 
 if __name__ == "__main__":
     main()

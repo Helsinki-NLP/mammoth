@@ -86,9 +86,11 @@ DATASET_NAMES = {
     "wmt": "WMT24++",
     "flo": "Flores+",
     "bqt": "Bouquet",
+    "bqtpar": "Bouquet-par",
 }
 
-METRICS = ["BLEU", "chrF2", "TER"]
+# METRICS = ["BLEU", "chrF2", "TER"]
+METRICS = ["BLEU", "chrF2"]
 
 # Language-name map for the codes that appear in your files.
 # Fallback is the code itself if something is missing.
@@ -177,13 +179,13 @@ def sort_key_for_pair(src_lang, src_country, tgt_lang, tgt_country, use_names=Tr
 def parse_filename(filename: str, kind: str):
     base = os.path.basename(filename)
     m = re.fullmatch(
-        rf"{re.escape(kind)}_([A-Z]{{2}}\.[A-Za-z_]+)-([A-Z]{{2}}\.[A-Za-z_]+)\.(wmt|flo|bqt)\.sacre",
+        rf"{re.escape(kind)}_([A-Z]{{2}}\.[A-Za-z_]+)-([A-Z]{{2}}\.[A-Za-z_]+)\.(wmt|flo|bqt|bqtpar)\.(0s)?sacre",
         base,
     )
     if not m:
         return None
 
-    src_tok, tgt_tok, dataset = m.groups()
+    src_tok, tgt_tok, dataset, zs = m.groups()
     src_lang, src_country = parse_lang_token(src_tok)
     tgt_lang, tgt_country = parse_lang_token(tgt_tok)
 
@@ -249,8 +251,8 @@ def build_matrix(dataset_rows, metric, dataset):
         row_labels.add(src)
         col_labels.add(tgt)
         key = (src, tgt)
-        if key in values:
-            print(f"Warning: duplicate cell for {dataset} {metric}: {src} -> {tgt}", file=sys.stderr)
+#        if key in values:
+#            print(f"Warning: duplicate cell for {dataset} {metric}: {src} -> {tgt}", file=sys.stderr)
         values[key] = val
 
     row_labels = sorted(row_labels, key=str.lower)
@@ -298,7 +300,7 @@ def ascii_matrix(row_labels, col_labels, values, title=None, cell_fmt="{:.1f}"):
 def print_metric_matrices(dataset_to_rows, only_metric=None):
     metrics = [only_metric] if only_metric else METRICS
 
-    for dataset in ["wmt", "flo", "bqt"]:
+    for dataset in ["wmt", "flo", "bqt", "bqtpar"]:
         dataset_name = DATASET_NAMES.get(dataset, dataset)
         rows_for_dataset = dataset_to_rows.get(dataset, [])
 
@@ -341,7 +343,7 @@ def collect_scores(indir: str, kind: str, use_names=True, verbose=True):
     prefix = f"{kind}_"
 
     for fn in sorted(os.listdir(indir)):
-        if not fn.endswith(".sacre"):
+        if not fn.endswith(".sacre") and not fn.endswith(".0ssacre"):
             continue
         if not fn.startswith(prefix):
             continue
@@ -473,7 +475,7 @@ def format_score(x):
 
 
 def print_metric_tables(dataset_to_rows):
-    for dataset in ["wmt", "flo", "bqt"]:
+    for dataset in ["wmt", "flo", "bqt", "bqtpar"]:
         dataset_name = DATASET_NAMES.get(dataset, dataset)
         rows_for_dataset = dataset_to_rows.get(dataset, [])
 
@@ -494,7 +496,7 @@ def print_wide_tables(dataset_to_rows):
     """
     Optional: one table per dataset with all metrics side-by-side.
     """
-    for dataset in ["wmt", "flo", "bqt"]:
+    for dataset in ["wmt", "flo", "bqt", "bqtpar"]:
         dataset_name = DATASET_NAMES.get(dataset, dataset)
         rows_for_dataset = dataset_to_rows.get(dataset, [])
 

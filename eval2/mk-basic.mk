@@ -1,16 +1,16 @@
 # -----------------------------------------------------------------------------
 
-# Shared checks
+# Basic checks
 # -----------------------------------------------------------------------------
-# mk-shared.mk
+# mk-basic.mk
 #
 # Purpose
 # -------
-# Shared checks and common setup rules for the eval2 workflow.
+# Basic checks and common setup rules for the eval2 workflow.
 #
 # This Makefile fragment provides the basic validation and directory-setup
 # targets that the rest of the eval2 pipeline depends on. It verifies that the
-# model directory and shared resources exist, ensures that the local output
+# model directory and basic resources exist, ensures that the local output
 # directories are present, checks that the workflow is started from the correct
 # model directory, and refuses to run the setup phase inside an existing Slurm
 # job.
@@ -19,8 +19,8 @@
 # ----------------
 # The fragment defines:
 #
-#   mk-shared
-#       Runs the shared setup sequence:
+#   mk-basic
+#       Runs the basic setup sequence:
 #         - check-model
 #         - dirs
 #         - check-in-model-dir
@@ -100,33 +100,33 @@
 
 
 
-.PHONY: check-model dirs not-in-slurm mk-shared inspect-model-summary mk-shared ensure-sacre-venv
+.PHONY: check-model dirs not-in-slurm mk-basic inspect-model-summary mk-basic ensure-sacre-venv
 
 inspect-model-summary: $(MODELDIR)/model-summary.yaml
-> @echo "mk-shared.mk: 🛠️ Short model-file summary for $(MODELDIR):"; \
+> @echo "mk-basic.mk: 🛠️ Short model-file summary for $(MODELDIR):"; \
 > cat $(MODELDIR)/model-summary.yaml
 
 $(MODELDIR)/mammoth.selected: $(MODELDIR)/model-summary.yaml
 > @set -euo pipefail; \
-> echo "mk-shared.mk:    Reading $(MODELDIR)/model-summary.yaml"; \
+> echo "mk-basic.mk:    Reading $(MODELDIR)/model-summary.yaml"; \
 > if grep -Fq 'use older Mammoth compatible with trained_head_dim=64' "$(MODELDIR)/model-summary.yaml"; then \
->   echo "mk-shared.mk:    The model has a hard-coded head_dim"; \
+>   echo "mk-basic.mk:    The model has a hard-coded head_dim"; \
 >   printf '%s\n' "$(MAMMOTH64)" > "$@"; \
 > else \
->   echo "mk-shared.mk:    The model uses a computed head_dim"; \
+>   echo "mk-basic.mk:    The model uses a computed head_dim"; \
 >   printf '%s\n' "$(MAMMOTHDEF)" > "$@"; \
 > fi; \
-> echo "mk-shared.mk: ✅ Written file $@"
+> echo "mk-basic.mk: ✅ Written file $@"
 
-clean-shared:
+clean-basic:
 > rm $(MODELDIR)/model-summary.yaml $(MODELDIR)/mammoth.selected
-> @echo "mk-shared.mk: ✨ Cleaning done."
+> @echo "mk-basic.mk: ✨ Cleaning done."
 
 # The folloing sends the names of the model files to the inspector and
 # then stores the outputs to a model-summary.yaml file.
 $(MODELDIR)/model-summary.yaml: 
 > @set -euo pipefail
-> @[[ -f "$(INSPECT_MODEL_FILES)" ]] || { echo "mk-shared.mk: ❌ Missing $(INSPECT_MODEL_FILES)" >&2; exit 1; }
+> @[[ -f "$(INSPECT_MODEL_FILES)" ]] || { echo "mk-basic.mk: ❌ Missing $(INSPECT_MODEL_FILES)" >&2; exit 1; }
 > @shopt -s nullglob; \
 > files=( "$(MODELDIR)"/*.pt ); \
 > keep=(); \
@@ -138,7 +138,7 @@ $(MODELDIR)/model-summary.yaml:
 >   esac; \
 > done; \
 > if [ "$${#keep[@]}" -eq 0 ]; then \
->   echo "mk-shared.mk: ℹ️ No inspectable .pt model files found in $(MODELDIR)"; \
+>   echo "mk-basic.mk: ℹ️ No inspectable .pt model files found in $(MODELDIR)"; \
 >   exit 0; \
 > fi; \
 > module load cray-python; \
@@ -149,50 +149,42 @@ $(MODELDIR)/model-summary.yaml:
 >   python3 "$(INSPECT_MODEL_FILES)" --unsafe --depth 2 --top-mods 8 --model-summary --yaml-like "$${keep[@]}" \
 >	> $(MODELDIR)/model-summary.yaml
 
-check-model:
+$(MODELDIR) $(TESTINGDIR) $(DATADIR) $(TRAINCONFIG): 
 > @set -euo pipefail; \
-> [[ -d "$(MODELDIR)"    ]] || { echo "mk-shared.mk: ❌ Missing directory: $(MODELDIR)" >&2; exit 1; }; \
-> [[ -d "$(TESTINGDIR)"  ]] || { echo "mk-shared.mk: ❌ Missing directory: $(TESTINGDIR)" >&2; exit 1; }; \
-> [[ -d "$(DATADIR)"     ]] || { echo "mk-shared.mk: ❌ Missing directory: $(DATADIR)" >&2; exit 1; }; \
-> [[ -s "$(TRAINCONFIG)" ]] || { echo "mk-shared.mk: ❌ Missing training config: $(TRAINCONFIG)" >&2; exit 1; }; \
-> echo "mk-shared.mk: ✅ Directories and the config file found"
+> [[ -d "$(MODELDIR)"    ]] || { echo "mk-basic.mk: ❌ Missing directory: $(MODELDIR)" >&2; exit 1; }; \
+> [[ -d "$(TESTINGDIR)"  ]] || { echo "mk-basic.mk: ❌ Missing directory: $(TESTINGDIR)" >&2; exit 1; }; \
+> [[ -d "$(DATADIR)"     ]] || { echo "mk-basic.mk: ❌ Missing directory: $(DATADIR)" >&2; exit 1; }; \
+> [[ -s "$(TRAINCONFIG)" ]] || { echo "mk-basic.mk: ❌ Missing training config: $(TRAINCONFIG)" >&2; exit 1; }; \
+> echo "mk-basic.mk: ✅ Directories and the config file found"
 
-model-status:
-> @echo "mk-shared.mk: MODELDIR:          $(MODELDIR)"; \
-> echo "mk-shared.mk: TESTCONFIG:        $(TESTCONFIG)"; \
-> echo "mk-shared.mk: INFERENCE_CALLS:   $(INFERENCE_CALLS)"; \
-> echo "mk-shared.mk: SACRE_CALLS:       $(SACRE_CALLS)"; \
-> echo "mk-shared.mk: Inference flag:    $(INF_FLAG)"; \
-> echo "mk-shared.mk: Metrics flag:      $(MET_FLAG)"
-
-mk-shared: check-model not-in-slurm dirs $(MODELDIR)/mammoth.selected ensure-sacre-venv
+$(BAS_DONE): $(MODELDIR) $(TESTINGDIR) $(DATADIR) $(TRAINCONFIG) $(MODELDIR)/mammoth.selected $(SACRE_ACTIVATE) $(OUTDIR) $(LOGDIR) $(SCRDIR)
 > @MAMMOTHSEL="$$(cat "$(MODELDIR)/mammoth.selected")"; \
-> echo "mk-shared.mk: ✅ Using: $$MAMMOTHSEL"; \
-> echo "mk-shared.mk: ✨ I am happy with the preparations."; \
+> echo "mk-basic.mk:    Using: $$MAMMOTHSEL"; \
+> echo "mk-basic.mk:    Ensured sacrebleu virtual environment"; \
+> echo "mk-basic.mk:    Ensured the existence of local inf_{out,logs,scores} directories"; \
+> echo "mk-pairs.mk: ✨ I am happy with the basics."; \
+> touch $(BAS_DONE)
+
+mk-basic: $(BAS_DONE) 
+> @echo "mk-basic.mk:    MODELDIR:          $(MODELDIR)"; \
+> echo "mk-basic.mk:    TESTCONFIG:        $(TESTCONFIG)"; \
+> [[ -z "$${SLURM_JOBID:-}" ]] || { echo "mk-basic.mk: Run make outside SLURM first" >&2; exit 1; }
+> @echo "mk-basic.mk: ✅ Running outside SLURM"; \
+> echo "mk-basic.mk: ✨ I am happy with the preparations (dirs, venvs, version)."; \
 > echo
 
-dirs: check-model 
-> @mkdir -p "$(OUTDIR)" "$(LOGDIR)" "$(SCRDIR)"; \
-> echo "mk-shared.mk: ✅ Ensured the existence of local inf_{out,logs,scores} directories"
+$(OUTDIR) $(LOGDIR) $(SCRDIR): 
+> @mkdir -p "$(OUTDIR)" "$(LOGDIR)" "$(SCRDIR)"
 
-not-in-slurm:
-> @[[ -z "$${SLURM_JOBID:-}" ]] || { echo "mk-shared.mk: Run make outside SLURM first" >&2; exit 1; }
-
-ensure-sacre-venv: $(SACRE_ACTIVATE)
-> @echo "mk-shared.mk: ✅ Ensured sacrebleu virtual environment"
-
-$(SACRE_ACTIVATE): mk-shared.mk
+$(SACRE_ACTIVATE): 
 > @set -euo pipefail; \
 > module load cray-python; \
 > if [ ! -f "" ]; then \
->   echo "mk-shared.mk:    Building sacrebleu virtual environment..."; \
+>   echo "mk-basic.mk:    Building sacrebleu virtual environment..."; \
 >   python3 -m venv "$(SACRE_VENV)"; \
 >   source "$(SACRE_ACTIVATE)"; \
 >   python -m pip install --upgrade pip; \
 >   pip install sacrebleu; \
 >   echo "Built scoring venv $(SACRE_VENV)"; \
 > fi
-
-$(SELFDIR)/inf_pairs.py:
-> @[[ -f "$(SELFDIR)/inf_pairs.py" ]] || { echo "mk-yamls.mk: ❌ Missing $(SELFDIR)/inf_pairs.py" >&2; exit 1; }
 

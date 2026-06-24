@@ -1,8 +1,8 @@
 #!/bin/bash
 changecom()dnl # disables m4 comments so #SBATCH lines are expanded; this line is supressed
 
-#SBATCH --partition=dev-g
-#SBATCH --mem-per-gpu=60G
+#SBATCH --partition=small-g
+#SBATCH --mem=60G
 #SBATCH --gpus-per-task=1
 #SBATCH --cpus-per-task=7
 #SBATCH --output=__LOGDIR__/infjob%j.out
@@ -11,7 +11,7 @@ changecom()dnl # disables m4 comments so #SBATCH lines are expanded; this line i
 #SBATCH --account=__ACCOUNT__
 #SBATCH --chdir=__MODELDIR__
 
-# This have to be give as command line arguments:
+# These have to be given as command line arguments:
 ##SBATCH --time=__TIME__
 ##SBATCH --ntasks=__NTASKS__
 ##SBATCH --gpus=__GPUS__
@@ -31,8 +31,10 @@ export JOB_NAME=__JOB_NAME__
 export MODELDIR=__MODELDIR__
 export FLAG=__FLAG__
 export DONE=__DONE__
+export SBATCH_LINE=__SBATCH_LINE__
+export PARTITION=__PARTITION__
 
-for var in SIF ACCOUNT DISKPROJECT SELFDIR OUTDIR ACTIVATE MAKESCRIPT LOGDIR JOB_NAME MODELDIR FLAG DONE; do
+for var in SIF ACCOUNT DISKPROJECT SELFDIR OUTDIR ACTIVATE MAKESCRIPT LOGDIR JOB_NAME MODELDIR FLAG DONE SBATCH_LINE PARTITION; do
   eval "value=\${$var}"
   case "$value" in
     __*__)

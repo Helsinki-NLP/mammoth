@@ -967,6 +967,16 @@ class Trainer(object):
         device_type = 'cuda' if self.device_context.is_gpu() else 'cpu'
         dtype = torch.float16 if self.model_dtype == 'fp16' else torch.bfloat16 if self.model_dtype == 'bf16' else torch.float32
 
+        # Tensor accumulators for the fast (non-accuracy) path. Every `.item()` /
+        # `if tensor:` forces the CPU to wait for the GPU (a GPU->CPU sync) and
+        # stalls the pipeline. Instead of syncing on every accumulation batch, we
+        # keep these counters on-device and read them back ONCE after the loop.
+        accumulated_loss = None       # summed per-batch loss
+        accumulated_tgt_tokens = None  # summed tgt non-padding tokens (n_words)
+        accumulated_src_words = None   # summed src non-padding tokens
+        nan_flag = None                # True if any batch produced a NaN loss
+        last_metadata = None
+
         for k, (batch, metadata, comm_batch) in enumerate(batches_with_meta):
             if metadata != expected_metadata:
                 raise Exception(
@@ -978,12 +988,15 @@ class Trainer(object):
             # update data state
             self._data_state[metadata.corpus_id] = batch.line_idx
 
-            num_tokens = batch.tgt.mask.sum().item()
+            # Keep token counts on the GPU (no `.item()` here -> no per-batch sync).
+            num_tokens_tensor = batch.tgt.mask.sum()
             if self.norm_method == "tokens":
-                normalization += num_tokens
+                # `normalization` is currently unused downstream (the `loss /=
+                # normalization` line below is commented out); count sentences to
+                # avoid an extra sync, matching the "sents" branch.
+                normalization += batch.batch_size
             else:
                 normalization += batch.batch_size
-            report_stats.n_src_words += batch.src.mask.sum().item()
             report_stats.n_sents += batch.batch_size
 
             # Track cumulative sentence count (this persists across report_stats resets)
@@ -1021,30 +1034,59 @@ class Trainer(object):
                     # logger.info(loss)
 
             if loss is not None:
-                if torch.isnan(loss):
-                    raise NanLossException('Loss blowout')
                 # loss /= normalization
                 with self.profiler_range(f"backward_pass_batch_{k}"):
                     self.optim.backward(loss)
 
             if self.report_training_accuracy:
-                # Slow: requires max over logits, eq, masked_select
+                # Slow debug path: keep per-batch syncs here (it already has to
+                # read logits back for the accuracy computation).
+                if torch.isnan(loss):
+                    raise NanLossException('Loss blowout')
                 batch_stats = Statistics.from_loss_logits_target(
                     loss.item(),
                     logits,
                     target,
                     padding_idx=self.loss_functions[metadata.tgt_lang].ignore_index,
                 )
+                total_stats.update(batch_stats)
+                report_stats.update(batch_stats)
+                report_stats.update_task_loss(batch_stats.loss, metadata)
             else:
-                batch_stats = Statistics(
-                    loss.item(),
-                    num_tokens,
-                    n_correct=None,
-                )
+                # Fast path: accumulate everything on-device; sync once after the
+                # loop. NaN detection is folded into the same single sync.
+                loss_d = loss.detach()
+                batch_nan = torch.isnan(loss_d)
+                if accumulated_loss is None:
+                    accumulated_loss = loss_d
+                    accumulated_tgt_tokens = num_tokens_tensor
+                    accumulated_src_words = batch.src.mask.sum()
+                    nan_flag = batch_nan
+                else:
+                    accumulated_loss = accumulated_loss + loss_d
+                    accumulated_tgt_tokens = accumulated_tgt_tokens + num_tokens_tensor
+                    accumulated_src_words = accumulated_src_words + batch.src.mask.sum()
+                    nan_flag = nan_flag | batch_nan
+                last_metadata = metadata
 
+        # Single GPU->CPU synchronisation point for the whole accumulation window
+        # (fast path only). One `.tolist()` reads back loss, token counts and the
+        # NaN flag together, replacing the old 3*N per-batch `.item()` calls.
+        if not self.report_training_accuracy and accumulated_loss is not None:
+            loss_val, tgt_tokens_val, src_words_val, nan_val = torch.stack([
+                accumulated_loss.float().reshape(()),
+                accumulated_tgt_tokens.float().reshape(()),
+                accumulated_src_words.float().reshape(()),
+                nan_flag.float().reshape(()),
+            ]).tolist()
+            if nan_val:
+                raise NanLossException('Loss blowout')
+            num_tokens = int(tgt_tokens_val)
+            report_stats.n_src_words += int(src_words_val)
+            batch_stats = Statistics(loss_val, num_tokens, n_correct=None)
             total_stats.update(batch_stats)
             report_stats.update(batch_stats)
-            report_stats.update_task_loss(batch_stats.loss, metadata)
+            report_stats.update_task_loss(loss_val, last_metadata)
 
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')

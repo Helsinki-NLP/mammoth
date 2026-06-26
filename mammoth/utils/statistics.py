@@ -5,6 +5,8 @@ import sys
 import warnings
 
 from collections import Counter
+
+import torch
 from torch.linalg import norm
 
 from mammoth.utils.logging import logger
@@ -40,6 +42,100 @@ class Statistics(object):
 
         # validation metrics
         self.validation_metrics = {}
+
+        # Device-side accumulators for deferred GPU->CPU sync (see
+        # `accumulate_device` / `materialize`). These hold running sums as GPU
+        # scalar tensors so the training hot loop never blocks on a `.item()`.
+        # They are folded into the plain CPU fields above only when the figures
+        # are actually needed (at the report step).
+        self._dev_loss = None
+        self._dev_n_words = None
+        self._dev_n_src_words = None
+        self._dev_nan = None
+        self._dev_loss_per_task = {}
+        # Sticky flag: True once any materialised window contained a NaN loss.
+        self.had_nan = False
+
+    def accumulate_device(self, loss, n_words, nan_flag, n_src_words=None, metadata=None):
+        """Accumulate one window's statistics as GPU tensors, WITHOUT syncing.
+
+        Everything stays on the GPU; nothing is copied to the CPU here, so this
+        adds no `.item()` stall to the training loop. Call `materialize()` to
+        read the running totals back (a single GPU->CPU sync) when they are
+        needed.
+
+        Args:
+            loss: scalar GPU tensor, summed loss for this window.
+            n_words: scalar GPU tensor, summed target (non-padding) tokens.
+            nan_flag: scalar GPU bool tensor, True if any loss in the window was NaN.
+            n_src_words: optional scalar GPU tensor, summed source tokens.
+            metadata: optional task metadata; if given, the window loss is also
+                tracked per task (src_lang_tgt_lang).
+        """
+        loss = loss.detach()
+        if self._dev_loss is None:
+            self._dev_loss = loss
+            self._dev_n_words = n_words
+            self._dev_nan = nan_flag
+            self._dev_n_src_words = n_src_words
+        else:
+            self._dev_loss = self._dev_loss + loss
+            self._dev_n_words = self._dev_n_words + n_words
+            self._dev_nan = self._dev_nan | nan_flag
+            if n_src_words is not None:
+                if self._dev_n_src_words is None:
+                    self._dev_n_src_words = n_src_words
+                else:
+                    self._dev_n_src_words = self._dev_n_src_words + n_src_words
+
+        if metadata is not None:
+            key = f'{metadata.src_lang}_{metadata.tgt_lang}'
+            if key in self._dev_loss_per_task:
+                self._dev_loss_per_task[key] = self._dev_loss_per_task[key] + loss
+            else:
+                self._dev_loss_per_task[key] = loss
+
+    def materialize(self):
+        """Fold the device-side accumulators into the CPU fields (one sync).
+
+        This is the ONLY place the deferred statistics touch the CPU. All pending
+        GPU scalars are stacked into a single tensor and read back with one
+        `.tolist()`, so a whole reporting interval costs exactly one GPU->CPU
+        synchronisation instead of one per step. No-op (and idempotent) when
+        nothing is pending.
+        """
+        if self._dev_loss is None:
+            return
+
+        task_keys = list(self._dev_loss_per_task.keys())
+        stack = [
+            self._dev_loss.float().reshape(()),
+            self._dev_n_words.float().reshape(()),
+            self._dev_nan.float().reshape(()),
+        ]
+        if self._dev_n_src_words is not None:
+            stack.append(self._dev_n_src_words.float().reshape(()))
+        stack.extend(self._dev_loss_per_task[k].float().reshape(()) for k in task_keys)
+
+        values = torch.stack(stack).tolist()
+        loss_val, n_words_val, nan_val = values[0], values[1], values[2]
+        idx = 3
+        if self._dev_n_src_words is not None:
+            self.n_src_words += int(values[idx])
+            idx += 1
+        for key in task_keys:
+            self.loss_per_task[key] += values[idx]
+            idx += 1
+
+        self.loss += loss_val
+        self.n_words += int(n_words_val)
+        self.had_nan = self.had_nan or bool(nan_val)
+
+        self._dev_loss = None
+        self._dev_n_words = None
+        self._dev_n_src_words = None
+        self._dev_nan = None
+        self._dev_loss_per_task = {}
 
     @classmethod
     def from_loss_logits_target(cls, loss: float, logits, target, padding_idx):

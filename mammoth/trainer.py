@@ -410,6 +410,16 @@ class Trainer(object):
                 sampled_task_counts = self.task_queue_manager.sampled_task_counts
             else:
                 sampled_task_counts = None
+
+            # Read the deferred GPU stats back exactly when we are about to report
+            # them: one GPU->CPU sync per report interval instead of one per step.
+            # NaN detection rides along in the same sync (a NaN in the interval
+            # poisoned the on-device loss sum, so it surfaces here).
+            if self.report_manager is not None and step % self.report_manager.report_every == 0:
+                report_stats.materialize()
+                if report_stats.had_nan:
+                    raise NanLossException('Loss blowout')
+
             report_stats = self._maybe_report_training(
                 step,
                 train_steps,
@@ -503,6 +513,14 @@ class Trainer(object):
 
             if train_steps > 0 and step >= train_steps:
                 break
+
+        # Final GPU->CPU sync for the trailing interval (the steps since the last
+        # report boundary). Folds the deferred stats into total_stats so the
+        # returned totals are real numbers, and catches a NaN in that tail window
+        # before the final checkpoint is written.
+        total_stats.materialize()
+        if total_stats.had_nan:
+            raise NanLossException('Loss blowout')
 
         # Final checkpoint save — all ranks must participate because _save() contains
         # collective ops (all_gather_object for data state). Only master writes files.
@@ -1071,30 +1089,34 @@ class Trainer(object):
                     nan_flag = nan_flag | batch_nan
                 last_metadata = metadata
 
-        # Single GPU->CPU synchronisation point for the whole accumulation window
-        # (fast path only). One `.tolist()` reads back loss, token counts and the
-        # NaN flag together, replacing the old 3*N per-batch `.item()` calls.
+        # No GPU->CPU sync here. The window's loss, token counts and NaN flag stay
+        # on the GPU; we hand them to the Statistics device accumulators, which are
+        # read back ONCE at the report step (see Statistics.materialize, called
+        # from the training loop / FLOPs path). This removes the last per-step sync
+        # from the fast path entirely. NaN detection is likewise deferred: a NaN
+        # poisons the on-device running sum and surfaces at the next report step.
         if not self.report_training_accuracy and accumulated_loss is not None:
-            loss_val, tgt_tokens_val, src_words_val, nan_val = torch.stack([
-                accumulated_loss.float().reshape(()),
-                accumulated_tgt_tokens.float().reshape(()),
-                accumulated_src_words.float().reshape(()),
-                nan_flag.float().reshape(()),
-            ]).tolist()
-            if nan_val:
-                raise NanLossException('Loss blowout')
-            num_tokens = int(tgt_tokens_val)
-            report_stats.n_src_words += int(src_words_val)
-            batch_stats = Statistics(loss_val, num_tokens, n_correct=None)
-            total_stats.update(batch_stats)
-            report_stats.update(batch_stats)
-            report_stats.update_task_loss(loss_val, last_metadata)
+            report_stats.accumulate_device(
+                loss=accumulated_loss,
+                n_words=accumulated_tgt_tokens,
+                nan_flag=nan_flag,
+                n_src_words=accumulated_src_words,
+                metadata=last_metadata,
+            )
+            total_stats.accumulate_device(
+                loss=accumulated_loss,
+                n_words=accumulated_tgt_tokens,
+                nan_flag=nan_flag,
+            )
 
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')
 
         # Compute FLOPs for this step and record in report_stats
         if self.report_tflops and self.flops_config.get('model_dim', 0) > 0:
+            # This debug/measurement path needs the CPU token counts now, so it
+            # pays the GPU->CPU sync here (only when --report_tflops is enabled).
+            report_stats.materialize()
             n_src = report_stats.n_src_words
             n_tgt = report_stats.n_words
             # Use batch sequence lengths as approximation

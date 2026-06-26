@@ -419,6 +419,7 @@ class Trainer(object):
                 report_stats.materialize()
                 if report_stats.had_nan:
                     raise NanLossException('Loss blowout')
+                self._maybe_compute_flops(report_stats)
 
             report_stats = self._maybe_report_training(
                 step,
@@ -1112,11 +1113,22 @@ class Trainer(object):
         if len(seen_comm_batches) != 1:
             logger.warning('Communication batches out of synch with batch accumulation')
 
-        # Compute FLOPs for this step and record in report_stats
+        # NOTE: FLOPs are intentionally NOT computed here. Computing them needs
+        # the token counts on the CPU, which would force a per-step GPU->CPU sync
+        # (report_tflops defaults to True). The reported FLOPs only depend on the
+        # interval totals, so we compute them once at the report step instead -
+        # see _maybe_compute_flops, called from the training loop.
+
+    def _maybe_compute_flops(self, report_stats):
+        """Compute the interval FLOPs from the (already materialised) report stats.
+
+        Called only at the report step, so it reads CPU token counts that have
+        already been synced by `report_stats.materialize()` - it adds no extra
+        GPU->CPU sync of its own. The result matches the old per-step value,
+        which was always overwritten with the full-interval totals on the last
+        step before reporting.
+        """
         if self.report_tflops and self.flops_config.get('model_dim', 0) > 0:
-            # This debug/measurement path needs the CPU token counts now, so it
-            # pays the GPU->CPU sync here (only when --report_tflops is enabled).
-            report_stats.materialize()
             n_src = report_stats.n_src_words
             n_tgt = report_stats.n_words
             # Use batch sequence lengths as approximation

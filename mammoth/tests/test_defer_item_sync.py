@@ -179,6 +179,23 @@ class TestHotLoopIsSyncFree:
             f"over {n_steps} accumulation window(s)"
         )
 
+    @pytest.mark.parametrize("n_steps", [1, 5])
+    def test_no_sync_during_accumulation_with_report_tflops(self, n_steps):
+        # report_tflops defaults to True; FLOPs must NOT be computed per-step
+        # (that used to force report_stats.materialize() -> a sync every step).
+        metadata, fake_self, batches = self._build(n_steps)
+        fake_self.report_tflops = True
+        fake_self.flops_config = {"model_dim": 512}
+        total_stats = Statistics()
+        report_stats = Statistics()
+        with _count_syncs() as counter:
+            for _ in range(n_steps):
+                _accumulate_window(fake_self, batches, metadata, total_stats, report_stats)
+        assert counter[0] == 0, (
+            f"report_tflops re-introduced a per-step sync: {counter[0]} syncs "
+            f"over {n_steps} window(s)"
+        )
+
 
 class TestSingleSyncPerReport:
     """N steps + one materialize() == exactly one sync, independent of N."""

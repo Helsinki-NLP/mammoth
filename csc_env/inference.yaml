@@ -1,0 +1,56 @@
+# Task Configuration
+task_id: eng-spa
+tasks:
+  eng-spa:
+    src_tgt: "eng-spa"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:0"
+    enc_sharing_group: ["eng"]
+    dec_sharing_group: ["spa"]
+
+# ============================================================================
+# Vocabulary Configuration - HuggingFace Tokenizer
+# ============================================================================
+use_hf_tokenizer: true
+
+src_vocab:
+   eng: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/eng/32000/tokenizer.json
+   
+tgt_vocab:
+   spa: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/spa/32000/tokenizer.json
+
+max_length: 512
+
+# ============================================================================
+# Model Architecture
+# ============================================================================
+model_dtype: bf16
+
+
+# ============================================================================
+# Inference Configuration
+# ============================================================================
+# Model checkpoint to load
+model: 
+
+# Input/output files
+src: /scratch/project_2017852/MARMoT/data/flores200/dev/eng_Latn.dev
+output: 
+
+# Decoding parameters
+beam_size: 5
+batch_size: 32
+batch_type: sents
+
+# GPU settings
+gpu: 0
+world_size: 1
+gpu_ranks: [0]
+
+# Report settings
+report_time: true
+# verbose: true # currently not supported in inference, need to modify code to enable it
+
+# Random seed
+seed: 42

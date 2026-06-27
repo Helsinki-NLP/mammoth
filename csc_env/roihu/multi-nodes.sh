@@ -1,10 +1,10 @@
 #!/bin/bash
 
-#SBATCH -A project_2001194
+#SBATCH -A project_2017852
 #SBATCH -J 2nodes
 #SBATCH -o ./log/train/%j.out
 #SBATCH -e ./log/train/%j.err
-#SBATCH --partition=gpupilot
+#SBATCH --partition=gpularge
 #SBATCH --nodes=2
 #SBATCH --ntasks=8
 #SBATCH --cpus-per-task=288
@@ -43,8 +43,9 @@ echo "Master port: $MASTER_PORT"
 
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
-python /scratch/project_2001194/mammoth-shared/mammoth_dev/mammoth/train.py \
-    -config /scratch/project_2017852/members/chao/test-runs/multi_node_train.yaml \
+
+python /scratch/project_2017852/mammoth-shared/mammoth_pytorch/mammoth/train.py \
+    -config <training_config.yaml> \
     --node_rank ${SLURM_PROCID} \
     --master_ip $MASTER_NODE \
     --master_port $MASTER_PORT \

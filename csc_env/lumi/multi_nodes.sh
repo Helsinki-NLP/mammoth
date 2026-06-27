@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -A project_462000964
+#SBATCH -A project_462001087
 #SBATCH -J test
 #SBATCH -o ./log/train/%j.out
 #SBATCH -e ./log/train/%j.err
@@ -28,32 +28,31 @@ echo "Master port: ${MASTER_PORT}"
 echo "Node list: ${SLURM_JOB_NODELIST}"
 
 # Create the training script that will be executed on each node
-cat > /scratch/project_462000964/members/wangchao/training/081225/two_nodes_wrapper_script.sh << 'EOF'
+cat > ./two_nodes_wrapper_script.sh << 'EOF'
 #!/bin/bash
-source /scratch/project_462000964/members/wangchao/.venv/bin/activate
-cd /scratch/project_462000964/members/wangchao/
+source /scratch/project_462001087/shared/.venv/bin/activate
+cd /scratch/project_462001087/shared/mammoth_pytorch
 
 echo "Node ${SLURM_NODEID} starting training"
 echo "Master node: ${MASTER_NODE}"
 echo "Master port: ${MASTER_PORT}"
 
 python mammoth/train.py \
-    -config /scratch/project_462000964/members/wangchao/training/081225/two_nodes.yaml \
+    -config ./two_nodes.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip ${MASTER_NODE} \
     --master_port ${MASTER_PORT} \
 EOF
 
-chmod +x /scratch/project_462000964/members/wangchao/training/081225/two_nodes_wrapper_script.sh
+chmod +x ./two_nodes_wrapper_script.sh
 
 # Execute the training script on each node using singularity
 
 srun /usr/bin/singularity exec \
 --env MASTER_NODE="${MASTER_NODE}" \
 --env MASTER_PORT="${MASTER_PORT}" \
--B /scratch/project_462000964/members/wangchao:/scratch/project_462000964/members/wangchao:rw \
--B /scratch/project_462000964/shared:/scratch/project_462000964/shared:ro \
-/appl/local/containers/sif-images/lumi-pytorch-rocm-6.2.4-python-3.12-pytorch-v2.7.1.sif \
-/scratch/project_462000964/members/wangchao/training/081225/two_nodes_wrapper_script.sh
+-B /scratch/project_462001087:/scratch/project_462001087:rw \
+/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif \
+./two_nodes_wrapper_script.sh
 
 echo "Finishing at `date`"

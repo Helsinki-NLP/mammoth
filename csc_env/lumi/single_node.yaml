@@ -1,0 +1,109 @@
+tasks:
+  eng-spa:
+    src_tgt: "eng-spa"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:0"
+    enc_sharing_group: ["eng"]
+    dec_sharing_group: ["spa"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_462001087/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.eng.gz
+    path_tgt: /scratch/project_462001087/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.spa.gz
+    path_valid_src: /scratch/project_462001087/MARMoT/data/flores200/dev/eng_Latn.dev
+    path_valid_tgt: /scratch/project_462001087/MARMoT/data/flores200/dev/spa_Latn.dev
+
+  
+
+
+src_vocab:
+   eng: /scratch/project_462001087/MARMoT/tokenizer/tatoeba_hplt_multisynt/eng/32000/tokenizer.json
+tgt_vocab:
+   spa: /scratch/project_462001087/MARMoT/tokenizer/tatoeba_hplt_multisynt/spa/32000/tokenizer.json
+
+# Model Architecture Options
+enc_layers: [6]
+dec_layers: [6]
+
+model_dim: 1024
+model_dtype: bf16
+add_language_tokens: false
+
+# Native pytorch transformer options
+heads: 16              # attention heads (model_dim must be divisible by heads)
+rotary_pos_emb: true   # rotary positional embeddings (RoPE, currently the only option)
+post_emb_norm: true    # RMSNorm applied after token embedding (RMSNorm, the only option)
+attn_dropout: 0.1
+ff_dropout: 0.1
+ff_activation: swiglu  # choose between "swiglu" and "gelu", "swiglu" by default
+
+src_seq_length_min: 1
+tgt_seq_length_min: 1
+src_seq_length_max: 512
+tgt_seq_length_max: 512
+max_length: 512
+
+# Training Configuration
+train_steps: 100000
+early_stopping: 5
+accum_count: [4]
+lookahead_minibatches: 8
+batch_size: 23000
+batch_type: tokens
+normalization: tokens
+queue_size: 120
+
+# Optimizer settings (from create_opts)
+optim: adamw
+learning_rate: 0.0003
+adam_beta1: 0.9
+adam_beta2: 0.95
+weight_decay: 0.01
+max_grad_norm: 1.0
+label_smoothing: 0.1
+
+# Learning rate scheduling
+warmup_steps: 1000
+decay_method: linear_warmup
+learning_rate_decay: 0.5
+start_decay_steps: 10000
+average_decay: 0
+
+world_size: 1
+gpu_ranks: [0]
+node_rank: 0
+n_nodes: 1
+task_distribution_strategy: weighted_sampling
+seed: 42
+
+# Decoding parameters during validation
+valid_batch_size: 16
+valid_steps: 1500
+valid_timeout: 300
+valid_decode_timeout: 60
+valid_max_length: 128
+valid_metrics: [bleu,chrf]
+beam_size: 1
+
+save_checkpoint_steps: 2500
+keep_checkpoint: 1
+
+# Logging and Monitoring
+
+log_model_structure: false
+tensorboard: false
+tensorboard_log_dir: /scratch/project_462001087/members/wangchao/train/compare/train/
+report_tflops: true
+report_every: 100
+report_training_accuracy: false
+# Denoising transform parameters
+denoising_objective: bart
+mask_ratio: 0.2              # Fraction of tokens to mask
+mask_length: span-poisson    # Options: "subword", "word", "span-poisson"
+poisson_lambda: 3.0          # Lambda for span length distribution
+replace_length: 1            # -1: keep N tokens, 0: remove all, 1: single mask per span
+
+
+# Model saving
+save_model: /scratch/project_462001087/members/wangchao/train/one_gpu/model/
+save_strategy: best_and_last
+reset_optim: none

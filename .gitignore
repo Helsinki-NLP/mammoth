@@ -166,7 +166,6 @@ INDEXED_DATASET_ERROR_ANALYSIS.md
 INDEXED_DATASET_FLOW_COMPARISON.md
 INDEXED_DATASET_TRANSFORM_FIX.md
 inference_hf_tokenizer.yaml
-inference.yaml
 inspect_packages.py
 check_weights.py
 CHECKPOINT_CONFIG_OVERRIDE_ANALYSIS.md

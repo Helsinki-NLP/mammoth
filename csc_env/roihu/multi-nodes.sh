@@ -45,7 +45,7 @@ export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 
 python /scratch/project_2017852/mammoth-shared/mammoth_pytorch/mammoth/train.py \
-    -config <training_config.yaml> \
+    -config .multi_nodes.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip $MASTER_NODE \
     --master_port $MASTER_PORT \

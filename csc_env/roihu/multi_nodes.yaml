@@ -1,0 +1,207 @@
+tasks:
+  fin-swe:
+    src_tgt: "fin-swe"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:0"
+    enc_sharing_group: ["fin","all"]
+    dec_sharing_group: ["swe"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.fin.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.swe.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fin_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/swe_Latn.dev
+
+  fin-ukr:
+    src_tgt: "fin-ukr"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:1"
+    enc_sharing_group: ["fin","all"]
+    dec_sharing_group: ["ukr"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.fin.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.ukr.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/fin_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/ukr_Cyrl.dev
+
+  mt_bos-deu:
+    src_tgt: "bos-deu"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:2"
+    enc_sharing_group: ["bos","all"]
+    dec_sharing_group: ["deu"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.bos.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.deu.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/bos_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/deu_Latn.dev
+
+  mt_bos-eng:
+    src_tgt: "bos-eng"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "0:3"
+    enc_sharing_group: ["bos","all"]
+    dec_sharing_group: ["eng"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.bos.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.eng.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/bos_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/eng_Latn.dev
+
+  mt_bos-fra:
+    src_tgt: "bos-fra"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:0"
+    enc_sharing_group: ["bos","all"]
+    dec_sharing_group: ["fra"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.bos.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.fra.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/bos_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/fra_Latn.dev
+
+  mt_bos-spa:
+    src_tgt: "bos-spa"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:1"
+    enc_sharing_group: ["bos","all"]
+    dec_sharing_group: ["spa"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.bos.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.spa.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/bos_Latn.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/spa_Latn.dev
+
+  mt_bul-deu:
+    src_tgt: "bul-deu"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:2"
+    enc_sharing_group: ["bul","all"]
+    dec_sharing_group: ["deu"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.bul.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.deu.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/bul_Cyrl.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/deu_Latn.dev
+
+  mt_bul-eng:
+    src_tgt: "bul-eng"
+    weight: 1
+    introduce_at_training_step: 0
+    node_gpu: "1:3"
+    enc_sharing_group: ["bul","all"]
+    dec_sharing_group: ["eng"]
+    transforms: [filtertoolong]
+    path_src: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.bul.gz
+    path_tgt: /scratch/project_2017852/MARMoT/data/multisynt/train/len1024/nemotron-cc-english-run1-train-00-48.eng.gz
+    path_valid_src: /scratch/project_2017852/MARMoT/data/flores200/dev/bul_Cyrl.dev
+    path_valid_tgt: /scratch/project_2017852/MARMoT/data/flores200/dev/eng_Latn.dev
+
+
+
+src_vocab:
+   bos: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/bos/32000/tokenizer.json
+   bul: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/bul/32000/tokenizer.json
+   fin: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/fin/32000/tokenizer.json
+
+tgt_vocab:
+   deu: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/deu/32000/tokenizer.json
+   eng: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/eng/32000/tokenizer.json
+   fra: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/fra/32000/tokenizer.json
+   spa: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/spa/32000/tokenizer.json
+   swe: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/swe/32000/tokenizer.json
+   ukr: /scratch/project_2017852/MARMoT/tokenizer/tatoeba_hplt_multisynt/ukr/32000/tokenizer.json
+
+# Model Architecture Options
+enc_layers: [6,6]
+dec_layers: [12]
+
+model_dim: 1024
+dropout: 0.1
+model_dtype: bf16
+add_language_tokens: false
+
+# Native pytorch transformer options
+heads: 16              # attention heads (model_dim must be divisible by heads)
+rotary_pos_emb: true   # rotary positional embeddings (RoPE, currently the only option)
+post_emb_norm: true    # RMSNorm applied after token embedding (RMSNorm, the only option)
+attn_dropout: 0.1
+ff_dropout: 0.1
+ff_activation: swiglu  # choose between "swiglu" and "gelu", "swiglu" by default
+
+src_seq_length_min: 1
+tgt_seq_length_min: 1
+src_seq_length_max: 512
+tgt_seq_length_max: 512
+max_length: 512
+
+# Training Configuration
+train_steps: 100000
+early_stopping: 5
+accum_count: [4]
+lookahead_minibatches: 4
+batch_size: 18000
+batch_type: tokens
+normalization: tokens
+queue_size: 120
+
+# Optimizer settings (from create_opts)
+optim: adamw
+learning_rate: 0.0003
+adam_beta1: 0.9
+adam_beta2: 0.95
+weight_decay: 0.01
+max_grad_norm: 1.0
+label_smoothing: 0.1
+
+# Learning rate scheduling
+warmup_steps: 1000
+decay_method: linear_warmup
+learning_rate_decay: 0.5
+start_decay_steps: 10000
+average_decay: 0
+
+world_size: 8
+gpu_ranks: [0,1,2,3]
+n_nodes: 2
+task_distribution_strategy: weighted_sampling
+seed: 42
+
+# Decoding parameters during validation
+valid_batch_size: 16
+valid_steps: 1500
+valid_timeout: 300
+valid_decode_timeout: 60
+valid_max_length: 128
+valid_metrics: [bleu,chrf]
+beam_size: 1
+
+save_checkpoint_steps: 2500
+keep_checkpoint: 1
+
+# Logging and Monitoring
+
+log_model_structure: false
+tensorboard: false
+tensorboard_log_dir: /pfs/lustrep1/scratch/project_2017852/members/tiedeman/MARMoT/models/docmt-4pivots-denoise-halfsharedenc-xl/mammoth/tb_logs
+report_tflops: true
+report_every: 100
+report_training_accuracy: false
+# Denoising transform parameters
+denoising_objective: bart
+mask_ratio: 0.2              # Fraction of tokens to mask
+mask_length: span-poisson    # Options: "subword", "word", "span-poisson"
+poisson_lambda: 3.0          # Lambda for span length distribution
+replace_length: 1            # -1: keep N tokens, 0: remove all, 1: single mask per span
+
+
+# Model saving
+save_model: /scratch/project_2017852/members/chao/test-runs/scalability/2nodes/model/
+save_strategy: best_and_last
+reset_optim: none

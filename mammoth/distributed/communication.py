@@ -302,6 +302,13 @@ class WorldGroupGradientSync:
         self.global_rank = global_rank
         self.profiler_range = get_profiler_range()
 
+        # Only multi-device components need an allreduce. A component owned by a single GPU is a
+        # no-op: every other rank packs zeros and its gradient_norm is 1, so
+        # allreduce((g, 0, 0, 0)) / 1 == g leaves the gradient unchanged. Including it just wastes a
+        # network round trip. The init-broadcast path (train_single.py) and the legacy per-component
+        # sync path (trainer.py) already filter with needs_communication(); do the same here.
+        all_components = self._communicating_components(all_components)
+
         # Step 1: For each component this GPU owns, compute param count
         my_param_counts = OrderedDict()
         for component in all_components:
@@ -392,6 +399,18 @@ class WorldGroupGradientSync:
             f"bucket buffer {max_bucket_size * element_size / 1024 / 1024:.1f} MB "
             f"x {self.pipeline_depth} (pipeline depth)"
         )
+
+    @staticmethod
+    def _communicating_components(all_components):
+        """Return only components that live on more than one device.
+
+        Single-owner components do not need an allreduce: their gradient is already correct in
+        p.grad after backprop (gradient_norm == 1), and allreduce against all-zero contributions
+        from the other ranks would return the same value. Filtering preserves the globally
+        consistent order, and the decision depends only on global_ranks (identical on every rank),
+        so all GPUs build the same layout.
+        """
+        return [c for c in all_components if c.needs_communication()]
 
     def sync(self, model, all_gradient_syncs):
         """

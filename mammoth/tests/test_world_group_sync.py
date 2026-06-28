@@ -46,6 +46,47 @@ def _build_sync(buckets, pipeline_depth, dtype=torch.float32):
     return obj
 
 
+class _FakeOwnedComponent:
+    """Minimal stand-in carrying just the ownership info the filter looks at."""
+
+    def __init__(self, name, ranks):
+        self._name = name
+        self.global_ranks = set(ranks)
+
+    def get_name(self):
+        return self._name
+
+    def needs_communication(self):
+        # mirrors DistributedComponent.needs_communication
+        return len(self.global_ranks) > 1
+
+
+class TestCommunicatingComponentsFilter(unittest.TestCase):
+    """Single-owner components are a no-op for allreduce and must not enter the bucket layout.
+
+    For a component owned by exactly one GPU, every other rank packs zeros and gradient_norm is 1,
+    so allreduce((g, 0, 0, 0)) / 1 == g — the gradient is unchanged. Including it just wastes a
+    network round trip, so __init__ must filter these out before building buckets.
+    """
+
+    def test_keeps_only_multi_device_components(self):
+        comps = [
+            _FakeOwnedComponent('decoder_eng', {0}),            # single owner -> skip
+            _FakeOwnedComponent('decoder_fra', {1}),            # single owner -> skip
+            _FakeOwnedComponent('encoder_shared', {0, 1}),      # shared -> keep
+            _FakeOwnedComponent('attention_bridge', {0, 1, 2, 3}),  # shared -> keep
+        ]
+        result = WorldGroupGradientSync._communicating_components(comps)
+        self.assertEqual(
+            [c.get_name() for c in result],
+            ['encoder_shared', 'attention_bridge'],
+        )
+
+    def test_all_single_owner_yields_empty(self):
+        comps = [_FakeOwnedComponent('a', {0}), _FakeOwnedComponent('b', {1})]
+        self.assertEqual(WorldGroupGradientSync._communicating_components(comps), [])
+
+
 class TestWorldGroupGradientSyncPipeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

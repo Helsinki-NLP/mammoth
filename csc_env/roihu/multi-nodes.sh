@@ -6,7 +6,7 @@
 #SBATCH -e ./log/train/%j.err
 #SBATCH --partition=gpularge
 #SBATCH --nodes=2
-#SBATCH --ntasks=8
+#SBATCH --ntasks=2
 #SBATCH --cpus-per-task=288
 #SBATCH --mem=0
 #SBATCH --time=4:00:00

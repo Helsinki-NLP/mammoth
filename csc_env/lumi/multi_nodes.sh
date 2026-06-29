@@ -7,10 +7,10 @@
 #SBATCH --partition=dev-g
 #SBATCH --nodes=2
 #SBATCH --ntasks=2
-#SBATCH --cpus-per-task=8
-#SBATCH --mem-per-cpu=8G
+#SBATCH --cpus-per-task=56
+#SBATCH --mem=0
 #SBATCH --time=00:30:00
-#SBATCH --gres=gpu:4
+#SBATCH --gres=gpu:8
 
 
 echo "Starting at `date`"

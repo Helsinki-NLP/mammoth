@@ -18,8 +18,6 @@ primitives. The multi-task and distributed infrastructure is unchanged.
 
 ## CLI / YAML config changes
 
-The new transformer module comes with a more streamlined configuration format.
-
 Most config options are unchanged. There are two notable differences:
 
 1. The `x_transformers_opts` block is gone. Its keys are now top-level
@@ -78,7 +76,9 @@ ff_activation: swiglu  # choose between "swiglu" and "gelu", "swiglu" by default
 ```
 A training template is available at: `/scratch/project_462001087/members/wangchao/train/compare/train_pytorch.yaml`
 
-For inference, since the model architecture is fixed at the training time, you do not need to specify any architecture options in the inference config. An inference recipe is at: `/scratch/project_462001087/members/wangchao/train/compare/inference/inference_pytorch.yaml`
+For inference, since the model architecture is fixed at the training time, you do not need to specify any architecture options in the inference config. 
+
+An inference recipe is at: `/scratch/project_462001087/members/wangchao/train/compare/inference/inference_pytorch.yaml`
 
 
 **Keys that no longer exist and should not be used with the PyTorch-backend Mammoth:**
@@ -96,13 +96,16 @@ For inference, since the model architecture is fixed at the training time, you d
 
 ### Roihu:
 Mammoth Pytorch-backend on Roihu: `/scratch/project_2017852/mammoth-shared/mammoth_pytorch/mammoth`
+
 Slurm job launch wrapper: `mammoth/csc_env/roihu/single-node.sh` and `mammoth/csc_env/roihu/multi-nodes.sh`
+
 Note: 
 Now on Roihu-GPU it's only possible to reserve 217G of memory and 72 CPU cores per GPU.
 
 
 ### LUMI
 Mammoth Pytorch-backend on LUMI: `/scratch/project_462001087/shared/mammoth_pytorch/mammoth`
+
 Slurm job launch wrapper: `mammoth/csc_env/lumi/single_node.sh` and `mammoth/csc_env/lumi/multi_nodes.sh`
 
 ## Further reading

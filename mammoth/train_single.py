@@ -297,6 +297,7 @@ def main(
             optim=optim,
             task_queue_manager=task_queue_manager,
             reset_optim=should_reset_optimizer_state,
+            yes_i_messed_with_the_checkpoint=getattr(opts, 'yes_i_messed_with_the_checkpoint', False),
         )
 
         # Determine whether to load training step based on reset_optim

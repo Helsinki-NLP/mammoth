@@ -99,7 +99,11 @@ def train(opts):
 
         # Check if we should override checkpoint vocab with config vocab
         override_checkpoint_vocab = getattr(opts, 'override_checkpoint_vocab', False)
-        use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False)
+        use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False) or any(
+            opts.__getattribute__(f'{side}_vocab')[lang].endswith('.json')
+            for side in ('src', 'tgt')
+            for lang in global_task_queue_manager.get_langs(side)
+        )
 
         if override_checkpoint_vocab and use_hf_tokenizer:
             logger.info("Overriding checkpoint vocabulary with config HuggingFace tokenizers (override_checkpoint_vocab=True)")

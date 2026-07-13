@@ -28,13 +28,13 @@ status-infer: clean-inf-lock | mk-calls
 >   echo "mk-infer.mk: ❌  template: $(INF_TEMPLATE) missing"; exit 1; fi; \
 > if  [ -e "$(INF_SCRIPT)" ];   then echo "mk-infer.mk:       script: $(INF_SCRIPT)";   else \
 >   echo "mk-infer.mk: ❌    script: $(INF_SCRIPT) missing"; exit 1; fi; \
-> if  [ -e "$(CNT_TEMPLATE)" ]; then echo "mk-infer.mk:     template: $(CNT_TEMPLATE)"; else \
->   echo "mk-infer.mk: ❌  template: $(CNT_TEMPLATE) missing"; exit 1; fi; \
-> if  [ -e "$(CNT_SCRIPT)" ];   then echo "mk-infer.mk:       script: $(CNT_SCRIPT)";   else \
->   echo "mk-infer.mk: ❌    script: $(CNT_SCRIPT) missing"; exit 1; fi; \
 > if  [ -e "$(INF_SBATCH)" ];   then echo "mk-infer.mk:       sbatch: $(INF_SBATCH)";   else \
 >   echo "mk-infer.mk: ❌    script: $(INF_SBATCH) missing"; exit 1; fi; \
 > cat "$(INF_SBATCH)" | sed 's/^/mk-infer.mk: /'; \
+> if  [ -e "$(CNT_TEMPLATE)" ]; then echo "mk-infer.mk:     continuation template: $(CNT_TEMPLATE)"; else \
+>   echo "mk-infer.mk: ❌  template: $(CNT_TEMPLATE) missing"; exit 1; fi; \
+> if  [ -e "$(CNT_SCRIPT)" ];   then echo "mk-infer.mk:       continuation script: $(CNT_SCRIPT)";   else \
+>   echo "mk-infer.mk: ❌    script: $(CNT_SCRIPT) missing"; exit 1; fi; \
 > if  [ -e "$(INF_FLAG)" ];     then \
 >     job=$$(sed -n 's/^Submitted batch job \([0-9][0-9]*\).*/\1/p; /^[0-9][0-9]*$$/p' "$(INF_FLAG)" | head -n1); \
 >     squeue -j "$$job" -o "%.18i %.40j %.10T %.12M %.12l %.30R"; \

@@ -9,7 +9,7 @@ changecom()dnl # disables m4 comments so #SBATCH lines are expanded; this line i
 #SBATCH --account=__ACCOUNT__
 #SBATCH --chdir=__MODELDIR__
 #SBATCH --nodes=1
-#SBATCH --time=00:01:00
+#SBATCH --time=00:10:00
 #SBATCH --ntasks=1
 
 set -euo pipefail
@@ -38,4 +38,4 @@ done
 
 trap 'rm -f "${FLAG}"; touch "${DONE}"' EXIT
 
-make -C "$(SELFDIR)" "$(FIRST_GOAL)" continue-eval
+make -C "${SELFDIR}" "${FIRST_GOAL}" continue-eval

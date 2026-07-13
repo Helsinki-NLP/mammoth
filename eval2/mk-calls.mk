@@ -24,12 +24,7 @@ mk-calls: calls
 > @true
 
 mk-calls-force: 
-> @$(MAKE) --no-print-directory -C "$(SELFDIR)" MODELDIR="$(MODELDIR)"; \
->   MODEL="$(MODEL)" FORCE_PAIRS=1 $(FIRST_GOAL) calls
-
-.PHONY: refresh-calls
-
-refresh-calls: $(INF_CALLS) $(TESTCONFIG).out
+> @$(MAKE) --no-print-directory -C "$(SELFDIR)" FORCE_PAIRS=1 $(FIRST_GOAL) calls
 
 $(INF_CALLS): $(TESTCONFIG).out
 > @test -f "$(INF_CALLS)"

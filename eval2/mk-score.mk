@@ -16,7 +16,7 @@
 
 .PHONY: mk-score mk-score-force status-score score 
 
-status-score: | mk-calls slurm clean-met-lock 
+status-score: clean-met-lock | mk-calls 
 > @echo "mk-score.mk: ✅ Checking the status of scoring planning:"; \
 > if  [ -e "$(SACRE_CALLS)" ];    then \
 >   echo "mk-score.mk:        calls: $(SACRE_CALLS)";\
@@ -48,12 +48,12 @@ status-score: | mk-calls slurm clean-met-lock
 
 score: $(SACRE_CALLS) $(MET_SCRIPT) $(MET_SBATCH) $(CNT_SCRIPT) | status-score 
 > @set -euo pipefail; \
+> rm -f "$(MET_DONE)"; \
 > cat "$(MET_SBATCH)"; \
 > score_out="$$(bash "$(MET_SBATCH)")"; \
 > echo "$$score_out"; \
 > score_job="$$(printf '%s\n' "$$score_out" | awk '{print $$NF}')"; \
 > echo "$$score_job" > "$(MET_FLAG)"; \
-> rm -f "$(MET_DONE)"; \
 > echo "mk-score.mk: ✅ Submitted scoring job $$score_job"; \
 > cnt_job="$$(sbatch --parsable --dependency=afterany:$$score_job "$(CNT_SCRIPT)")"; \
 > echo "mk-score.mk: ✅ Submitted continuation job $$cnt_job after scoring"

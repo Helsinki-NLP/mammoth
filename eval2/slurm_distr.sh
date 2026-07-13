@@ -92,11 +92,11 @@ load_calls() {
     [[ -f "$CALLS_FILE" ]] || die "Missing calls file: $CALLS_FILE"
     echo "Loading $CALLS_FILE"
     echo -n "Supervised pair inferences: "
-    grep -F ".hyp" $CALLS_FILE | wc -l || true
+    grep -F ".hyp" "$CALLS_FILE" | wc -l || true
     echo -n "Zeroshot pair   inferences: "
-    grep -F ".0shyp" $CALLS_FILE | wc -l || true
+    grep -F ".0shyp" "$CALLS_FILE" | wc -l || true
     echo "---"
-    mapfile -t CALLS < <(egrep '^(python|if)' "$CALLS_FILE" || true)
+    mapfile -t CALLS < <(egrep '^(python|if)' "$CALLS_FILE" | shuf)
     NCALLS="${#CALLS[@]}"
     (( NCALLS > 0 )) || die "No calls found in $CALLS_FILE"
 }
@@ -137,6 +137,9 @@ choose_devg_plan_from_table_devg() {
             CHOSEN_COST=$(( CHOSEN_WORLD * CHOSEN_BATCHES ))
             CHOSEN_WASTE=$(( CHOSEN_COST - NCALLS ))
             CHOSEN_PARTITION="dev-g"
+	    if (( CHOSEN_RUNTIME_MIN < 60 )); then
+		CHOSEN_RUNTIME_MIN=$(( CHOSEN_RUNTIME_MIN + 60 ))
+	    fi
             printf -v CHOSEN_TIME '%02d:%02d:00' \
                 $(( CHOSEN_RUNTIME_MIN / 60 )) \
                 $(( CHOSEN_RUNTIME_MIN % 60 ))
@@ -183,7 +186,9 @@ choose_smallg_plan_from_table() {
                 echo "small-g plan would exceed 3-day walltime for NCALLS=$NCALLS" >&2
                 return 1
             fi
-
+	    if (( CHOSEN_RUNTIME_MIN < 60 && CHOSEN_WORLD == 1)); then
+		CHOSEN_RUNTIME_MIN=$(( CHOSEN_RUNTIME_MIN + 480 ))
+	    fi
             printf -v CHOSEN_TIME '%02d:%02d:00' \
                 $(( CHOSEN_RUNTIME_MIN / 60 )) \
                 $(( CHOSEN_RUNTIME_MIN % 60 ))
@@ -214,7 +219,7 @@ SMALL_PLAN_TABLE=(
 )
 
 choose_small_plan_from_table() {
-    local mins_per_wave="${1:-9}"
+    local mins_per_wave="${1:-3}"
     local row min max nodes ntasks
 
     for row in "${SMALL_PLAN_TABLE[@]}"; do
@@ -234,7 +239,6 @@ choose_small_plan_from_table() {
                 echo "small plan would exceed 3-day walltime for NCALLS=$NCALLS" >&2
                 return 1
             fi
-
             printf -v CHOSEN_TIME '%02d:%02d:00' \
                 $(( CHOSEN_RUNTIME_MIN / 60 )) \
                 $(( CHOSEN_RUNTIME_MIN % 60 ))
@@ -253,6 +257,7 @@ plan_outside_slurm() {
     else
 	choose_small_plan_from_table
     fi
+    
     echo "Outside Slurm."
     echo "Suggested LUMI allocation:"
     echo "  calls             : $NCALLS"

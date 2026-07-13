@@ -275,7 +275,7 @@ TRIPLES = [
     ("nno", "nno_Latn", ["nn_??"]),
     ("nob", "nob_Latn", ["no_NO"]),
     ("pol", "pol_Latn", ["pl_PL"]),
-    ("por", "por_Latn", ["pt_PT", "pt_BR"]),
+    ("por", {"default": "por_Latn","flo": "por_Latn","bqt": "por_Latn","bqtpar": "por_Latn_braz1246",}, ["pt_PT", "pt_BR"]),
     ("ron", "ron_Latn", ["ro_RO"]),
     ("slk", "slk_Latn", ["sk_SK"]),
     ("slv", "slv_Latn", ["sl_SI"]),
@@ -295,6 +295,8 @@ class LanguageInventory:
         Language code -> benchmark file stem
         Example: "fra" -> "fra_Latn"
         Used in emit_tasks
+    code_to_dataset_ref: 
+        Dict[str, Dict[str, str]] = field(default_factory=dict)
     code_to_xcodes:
         Language code -> all localized task-xcode labels
         Example: "fra" -> ["CA.fra", "FR.fra"]
@@ -310,10 +312,13 @@ class LanguageInventory:
     """
     valid_codes: Set[str] = field(default_factory=set)
     code_to_ref: Dict[str, str] = field(default_factory=dict)
+    code_to_dataset_ref: Dict[str, Dict[str, str]] = field(default_factory=dict)
     code_to_xcodes: Dict[str, List[str]] = field(default_factory=dict)
     xcode_to_code: Dict[str, str] = field(default_factory=dict)
     valid_xcodes: Set[str] = field(default_factory=set)
     xcode_to_wmt_locale: Dict[str, str] = field(default_factory=dict)
+    code_to_model_code: Dict[str, str] = field(default_factory=dict)
+
 def build_language_inventory() -> LanguageInventory:
     def variant_tag_for_locale(locale: str) -> str:
         if "_" in locale:
@@ -324,9 +329,25 @@ def build_language_inventory() -> LanguageInventory:
             tag = "XX"
         return tag
     inv = LanguageInventory()
-    for code, ref, locales in TRIPLES:
+    for code, refspec, locales in TRIPLES:
         inv.valid_codes.add(code)
-        inv.code_to_ref[code] = ref
+        if isinstance(refspec, dict):
+            default_ref = refspec.get("default")
+            if not default_ref:
+                die(f"TRIPLES entry for {code} has dict refspec but no 'default'")
+            inv.code_to_ref[code] = default_ref
+            inv.code_to_dataset_ref[code] = dict(refspec)
+            inv.code_to_model_code[code] = refspec.get("model", code)
+        else:
+            inv.code_to_ref[code] = refspec
+            inv.code_to_dataset_ref[code] = {
+                "default": refspec,
+                "flo": refspec,
+                "bqt": refspec,
+                "bqtpar": refspec,
+                "wmt": refspec,
+            }
+            inv.code_to_model_code[code] = code
         xcodes: List[str] = []
         if not locales:
             log(f"ERROR: no locale for {code}")
@@ -342,6 +363,12 @@ def build_language_inventory() -> LanguageInventory:
             xcodes.append(xcode)
         inv.code_to_xcodes[code] = xcodes
     return inv
+
+def dataset_ref(inventory: LanguageInventory, code: str, dataset_tag: str) -> str:
+    refs = inventory.code_to_dataset_ref.get(code)
+    if not refs:
+        return inventory.code_to_ref[code]
+    return refs.get(dataset_tag, refs.get("default", inventory.code_to_ref[code]))
 
 def check_data_coverage(task_set, valid_xcodes):
     pre = "❌ Following designated tasks do not have any _test_ data:\ninf_plan.sh:    "
@@ -792,6 +819,13 @@ def emit_tasks(*, xtask: str, support: TaskSupport,
         exit(1)
     src_ref = inventory.code_to_ref[src]
     tgt_ref = inventory.code_to_ref[tgt]
+    flo_src_ref = dataset_ref(inventory, src, "flo")
+    flo_tgt_ref = dataset_ref(inventory, tgt, "flo")
+    bqt_src_ref = dataset_ref(inventory, src, "bqt")
+    bqt_tgt_ref = dataset_ref(inventory, tgt, "bqt")
+    bqtpar_src_ref = dataset_ref(inventory, src, "bqtpar")
+    bqtpar_tgt_ref = dataset_ref(inventory, tgt, "bqtpar")
+    
     src_wmt = inventory.xcode_to_wmt_locale.get(src_xcode, "")
     tgt_wmt = inventory.xcode_to_wmt_locale.get(tgt_xcode, "")
     if pair_type == "supervised":
@@ -806,24 +840,25 @@ def emit_tasks(*, xtask: str, support: TaskSupport,
         xtask=xtask, orig_task=orig_task, cfg=cfg,
         train_cfg=cfg_path, inf_yaml_path=inf_yaml_path_file, outdir=outdir, support=support)
 
-    flo_input = os.path.join(datadir, "flores_plus", "devtest", f"{src_ref}.txt")
-    flo_refer = os.path.join(datadir, "flores_plus", "devtest", f"{tgt_ref}.txt")
+    flo_input = os.path.join(datadir, "flores_plus", "devtest", f"{flo_src_ref}.txt")
+    flo_refer = os.path.join(datadir, "flores_plus", "devtest", f"{flo_tgt_ref}.txt")
+    
     plan_translation_and_scoring(
         writers=writers, dataset="Flores+", data_tag="flo", input_path=flo_input, refer_path=flo_refer,
         config_path=inf_yaml_path, model_path=model, mammoth_dir=mammoth,
         logdir=logdir, scrdir=scrdir, outdir=outdir,
         xtask=xtask, orig_task=orig_task, pair_type=pair_type)
     
-    bqt_input = os.path.join(datadir, "bouquet", "test", f"{src_ref}.txt")
-    bqt_refer = os.path.join(datadir, "bouquet", "test", f"{tgt_ref}.txt")
+    bqt_input = os.path.join(datadir, "bouquet", "test", f"{bqt_src_ref}.txt")
+    bqt_refer = os.path.join(datadir, "bouquet", "test", f"{bqt_tgt_ref}.txt")
     plan_translation_and_scoring(
         writers=writers, dataset="BOUQuET", data_tag="bqt", input_path=bqt_input, refer_path=bqt_refer,
         config_path=inf_yaml_path, model_path=model, mammoth_dir=mammoth,
         logdir=logdir, scrdir=scrdir, outdir=outdir,
         xtask=xtask, orig_task=orig_task, pair_type=pair_type)
 
-    bqtpar_input = os.path.join(datadir, "bouquet_par", "test", f"{src_ref}.txt")
-    bqtpar_refer = os.path.join(datadir, "bouquet_par", "test", f"{tgt_ref}.txt")
+    bqtpar_input = os.path.join(datadir, "bouquet_par", "test", f"{bqtpar_src_ref}.txt")
+    bqtpar_refer = os.path.join(datadir, "bouquet_par", "test", f"{bqtpar_tgt_ref}.txt")
     plan_translation_and_scoring(
         writers=writers, dataset="BOUQuETpar", data_tag="bqtpar", input_path=bqtpar_input, refer_path=bqtpar_refer,
         config_path=inf_yaml_path, model_path=model, mammoth_dir=mammoth,

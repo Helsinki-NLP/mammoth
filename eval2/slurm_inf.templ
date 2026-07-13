@@ -67,6 +67,12 @@ if [ -n "${SLURM_JOBID:-}" ]; then
     export NCCL_SOCKET_IFNAME=hsn0,hsn1,hsn2,hsn3
     export NCCL_NET_GDR_LEVEL=PHB
     export NCCL_DEBUG=INFO
+    # preflight check for SIF:
+    [[ -r "${SIF}" ]] || {
+	echo "ERROR: SIF image not readable on compute node: ${SIF}" >&2
+	echo "Try: find -L /appl/local/laifs/containers -maxdepth 3 -type f -name '*.sif'" >&2
+	exit 1
+    }    
     echo "Launching srun..."
     srun /usr/bin/singularity exec \
 	 --env NCCL_SOCKET_IFNAME="${NCCL_SOCKET_IFNAME}" \

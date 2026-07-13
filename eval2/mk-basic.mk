@@ -188,3 +188,16 @@ $(SACRE_ACTIVATE):
 >   echo "Built scoring venv $(SACRE_VENV)"; \
 > fi
 
+$(PLOT_ACTIVATE): 
+> @set -euo pipefail; \
+> module load cray-python; \
+> if [ ! -f "" ]; then \
+>   echo "mk-basic.mk:    Building plotting virtual environment..."; \
+>   python3 -m venv "$(PLOT_VENV)"; \
+>   source "$(PLOT_ACTIVATE)"; \
+>   python -m pip install --upgrade pip; \
+>   pip install matplotlib; \
+>   echo "Built plotting venv $(PLOT_VENV)"; \
+> fi
+
+venvs: $(PLOT_ACTIVATE) $(SACRE_ACTIVATE)

@@ -195,6 +195,7 @@ def parse_filename(filename: str, kind: str):
         "src_country": src_country,
         "tgt_lang": tgt_lang,
         "tgt_country": tgt_country,
+        "zeroshot": zs is not None,
     }
 
 def parse_sacre_file(path: str):
@@ -253,7 +254,7 @@ def build_matrix(dataset_rows, metric, dataset):
         key = (src, tgt)
 #        if key in values:
 #            print(f"Warning: duplicate cell for {dataset} {metric}: {src} -> {tgt}", file=sys.stderr)
-        values[key] = val
+        values[key] = (val, item["zeroshot"])
 
     row_labels = sorted(row_labels, key=str.lower)
     col_labels = sorted(col_labels, key=str.lower)
@@ -261,14 +262,69 @@ def build_matrix(dataset_rows, metric, dataset):
 
 
 def ascii_matrix(row_labels, col_labels, values, title=None, cell_fmt="{:.1f}"):
+    headers = ["src \\ tgt"] + col_labels
+
+    def cell_value(r, c):
+        cell = values.get((r, c))
+        if cell is None:
+            return ("|", "")
+
+        score, zeroshot = cell
+        boundary = "?" if zeroshot else "!"
+        return (boundary, cell_fmt.format(score))
+
+    rows = []
+    for r in row_labels:
+        row = [(None, r)]
+        for c in col_labels:
+            row.append(cell_value(r, c))
+        rows.append(row)
+
+    widths = [len(str(h)) for h in headers]
+    for row in rows:
+        for i, (_boundary, cell) in enumerate(row):
+            widths[i] = max(widths[i], len(str(cell)))
+
+    def fmt_header():
+        return "|" + "|".join(str(h).ljust(widths[i]) for i, h in enumerate(headers)) + "|"
+
+    def fmt_row(row):
+        out = "|"
+        for i, (boundary, cell) in enumerate(row):
+            if i == 0:
+                out += str(cell).ljust(widths[i])
+            else:
+                out += (boundary or "|") + str(cell).ljust(widths[i])
+        out += "|"
+        return out
+
+    sep = "+" + "+".join("-" * w for w in widths) + "+"
+
+    lines = []
+    if title:
+        lines.append(title)
+    lines.append(sep)
+    lines.append(fmt_header())
+    lines.append(sep)
+    for row in rows:
+        lines.append(fmt_row(row))
+    lines.append(sep)
+    return "\n".join(lines)
+
+def old_ascii_matrix(row_labels, col_labels, values, title=None, cell_fmt="{:.1f}"):
     """
     Render an ASCII matrix with source langs as rows and target langs as columns.
     """
     headers = ["src \\ tgt"] + col_labels
 
     def cell_value(r, c):
-        v = values.get((r, c))
-        return "" if v is None else cell_fmt.format(v)
+        cell = values.get((r, c))
+        if cell is None:
+            return ""
+
+        score, zeroshot = cell
+        prefix = "?" if zeroshot else "!"
+        return prefix + cell_fmt.format(score)
 
     rows = []
     for r in row_labels:
@@ -385,6 +441,7 @@ def collect_scores(indir: str, kind: str, use_names=True, verbose=True):
             "src_country": meta["src_country"],
             "tgt_lang": meta["tgt_lang"],
             "tgt_country": meta["tgt_country"],
+            "zeroshot": meta["zeroshot"],
         })
 
     for dataset in dataset_to_rows:

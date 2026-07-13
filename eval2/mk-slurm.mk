@@ -190,5 +190,6 @@ clean-met-lock:
 >   echo "mk-slurm.mk: Removing stale scoring flag for job $$oldjob"; \
 >   rm -f "$(MET_FLAG)"; \
 > fi; \
+> rm -f "$(MET_DONE)"; \
 > echo "mk-slurm.mk: ✅ Verified that no other scoring job is running"
 

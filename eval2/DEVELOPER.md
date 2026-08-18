@@ -190,18 +190,58 @@ inf_zeroshot.txt.input    ->  inf_zeroshot.txt
 ```
 
 `inf_pairs.py` reads `train.yaml`, extracts supervised translation edges, and ranks candidate zero-shot edges using graph structure plus linguistic compatibility data.
+The zero-shot ranking treats the supervised training tasks as a directed language graph. Candidate pairs are pairs that are not directly present as training tasks but are reachable through that graph.
+Ranking combines graph-based and linguistic signals, including:
+- reachability and shortest-path structure;
+- availability of pivot languages;
+- pivot hub strength;
+- alternative shortest paths;
+- URIEL/lang2vec-based linguistic compatibility.
+Thus the ranking is intended as a planning heuristic rather than a statement that the highest-ranked zero-shot pair will necessarily obtain the best translation score.
+For debugging or standalone use, `inf_pairs.py` can also be invoked directly:
+
+```bash
+python inf_pairs.py train.yaml --zs-out zeroshot_pairs.input
+python inf_pairs.py train.yaml --supervised-pairs-and-quit supervised_pairs.input
+python inf_pairs.py train.yaml --rank-list-only
+```
 
 `mk-pairs` requires explicit selected files. `mk-pairs-force` sets `FORCE_PAIRS=1`, causing proposals to be copied to the selected files.
+
+
+### Historical implementation: `inf_top_zeroshots.py`
+
+`inf_top_zeroshots.py` ranks candidate zero-shot evaluation pairs from a
+Mammoth `train.yaml`.
+
+It reads the supervised translation tasks defined in the training
+configuration, interprets them as a directed language graph, and proposes
+source-target pairs that are not directly present as training tasks but are
+reachable through the graph.
+
+The ranking combines several signals:
+
+- graph reachability and shortest-path structure;
+- pivot availability;
+- pivot hub strength based on centrality;
+- availability of alternative shortest paths;
+- linguistic compatibility based on URIEL/lang2vec distances.
+
+The script is intended as a planning aid for selecting promising zero-shot
+evaluation pairs. The ranking is a heuristic for evaluation planning; it does
+not predict which pairs will necessarily obtain the highest translation
+scores.
+
+Typical standalone use:
+
+```bash
+python inf_top_zeroshots.py train.yaml
+``
+
 
 ### State
 
 `pairs_input.done` marks proposal generation, while `pairs.done` records that selected pair files exist and are current.
-
-### Generic vs site-specific
-
-The graph/task-selection logic is generic. However, `inf_pairs.py` currently contains a hard-coded lang2vec repository path under a LUMI project, and its setup comments assume `cray-python` and LUMI `/scratch`.
-
-For portability, make the lang2vec source/dependency configurable or use an installed package.
 
 ## 7. `mk-calls.mk` and `inf_plan.py`
 
@@ -242,17 +282,27 @@ That success string is therefore another implicit Make/Python API.
 
 ### Outputs
 
-Under `OUTDIR`:
+Under `OUTDIR` -- here `inf_out/`:
 
 ```text
-plan.out
-calls.out
-calls.sacre.out
-calls.comet.out
-<task>.yaml
+<task>.yaml              # pair-specific yaml files
+plan.out                 # records the selected lg pairs, model conf, available data, and existing results.
+calls.out                # inference call list
+calls.sacre.out          # sacre scoring call list
+calls.comet.out          # comet scoring call list
 ```
 
-`calls.out` is validated so executable lines must start with `python`.
+The three call lists represent different stages of the same planned
+evaluation:
+
+- `calls.out` — Mammoth translation/inference commands; `calls.out` is validated so executable lines must start with `python`.
+- `calls.sacre.out` — SacreBLEU/chrF scoring commands;
+- `calls.comet.out` — COMET scoring commands.
+
+The planner regenerates these lists from the selected tasks and current
+filesystem state, so they should be treated as derived workflow state rather
+than manually maintained job lists.
+
 
 ### Generated YAMLs
 
@@ -441,20 +491,19 @@ The comparison logic is generic; model registry and plotting Python path are sit
 
 Utility for comparing file sets across directories, with recursive and filtering options. It is independent of LUMI.
 
-## 16. Dataset preparation scripts
-
-The archive includes standalone download/preparation helpers:
-
-- `dl-flores-all.py` — FLORES+;
-- `dl-wmt-all.py` — WMT24++;
-- `dl-bouquet-all.py` — sentence-level BOUQuET;
-- `dl-bouquet-all-par.py` — paragraph-level BOUQuET.
-
-They transform public benchmark datasets into the plain-text layout expected by the planner. They are conceptually independent of Slurm and should be documented/configured as data-preparation tools rather than LUMI execution components.
-
 ## 17. State and dependency model
 
 The workflow uses Make timestamps plus explicit marker files.
+
+### Slurn scipts and job records:
+
+```text
+inf.slurm                # Slurm script for inferences 
+cnt.slurm                # Slurm script for continuation
+met.slurm                # Slurm script for scoring
+inf.sbatch               # record of the submitted Slurm job
+met.sbatch               # record of the submitted Slurm job
+```
 
 ### Preparation/selection markers
 
@@ -489,117 +538,6 @@ The submitted markers contain scheduler job ids. Lock-cleaning targets compare t
 ### Planner locks
 
 The top-level Makefile also defines planning-lock paths (`inference-planning.lock`, `metrics-planning.lock`). Developers should verify actual usage before relying on them; they are configuration/state vocabulary but are not prominent in the supplied fragment rules.
-
-## 18. Portability matrix
-
-| Component | Generic core | Slurm-specific | LUMI-specific |
-|---|:---:|:---:|:---:|
-| `inspect-model-files.py` analysis | ✓ |  |  |
-| `mk-basic.mk` inspection launcher |  | partly | ✓ |
-| `mk-model.mk` alias mechanism | ✓ |  | current paths ✓ |
-| `inf_pairs.py` graph/ranking logic | ✓ |  | lang2vec path ✓ |
-| `mk-pairs.mk` selection workflow | ✓ |  | Python module setup ✓ |
-| `inf_plan.py` task/YAML planning | mostly ✓ | log job-id naming partly |  |
-| `mk-calls.mk` orchestration | mostly ✓ |  | module command ✓ |
-| generated `calls.out` concept | ✓ |  |  |
-| generated scoring calls | ✓ |  |  |
-| `mk-slurm.mk` |  | ✓ | resource parameters partly ✓ |
-| `slurm_*.templ` |  | ✓ | partitions/account/binds/container ✓ |
-| `slurm_distr.sh` strided distribution | ✓ | interface ✓ | allocation tables ✓ |
-| `slurm_wrapper.sh` | concept ✓ | implementation ✓ |  |
-| `mk-infer.mk` |  | ✓ |  |
-| `mk-score.mk` |  | ✓ |  |
-| `mk-contr.mk` replanning logic | ✓ | current locks/dependencies ✓ |  |
-| `status.py` filesystem status | ✓ | live-job query ✓ |  |
-| `summarize_sacre.py` | ✓ |  |  |
-| `compare.py` | ✓ |  | configured paths/venv ✓ |
-| dataset download scripts | ✓ |  | default local layout may be site-specific |
-
-## 19. Porting checklist for developers
-
-### Same LUMI, different project
-
-Audit every occurrence of:
-
-```text
-project_462...
-/scratch/...
-/appl/local/laifs/...
-```
-
-Then check:
-
-- `DISKPROJECT` vs `JOBPROJECT` semantics;
-- Singularity bind mounts;
-- model aliases;
-- Mammoth checkouts;
-- shared venv/data locations;
-- lang2vec path;
-- Slurm account.
-
-### Another Slurm cluster
-
-In addition to paths:
-
-- replace module/environment setup;
-- replace container runtime/image and binds;
-- rewrite partition names;
-- rewrite allocation lookup tables;
-- validate Slurm directives and GPU semantics;
-- validate the `srun` launch layout;
-- check job-id output parsing and `squeue` formats.
-
-### Non-Slurm backend
-
-Recommended refactoring boundary:
-
-```text
-planner -> call lists -> execution backend -> outputs -> planner
-```
-
-Keep `inf_plan.py` and call-list conventions. Introduce a backend interface that provides:
-
-- submit/launch;
-- rank/world distribution or local parallelism;
-- active-job query;
-- dependency/continuation scheduling;
-- job/run identifier for logs.
-
-Then reimplement the current Slurm-specific Make fragments behind that interface.
-
-## 20. Suggested refactoring for portability
-
-The current code can become substantially easier to port by moving site values out of the top-level Makefile and Python scripts.
-
-A possible configuration split is:
-
-```text
-config/
-    site.mk          # filesystem, account, scheduler, container, modules
-    models.mk        # model aliases only
-    datasets.mk      # benchmark root/layout
-```
-
-High-value variables to externalize include:
-
-```text
-DISKPROJECT
-JOBPROJECT
-SELFDIR
-SIF
-MAMMOTHDEF
-MAMMOTH64
-VENV
-TESTINGDIR
-DATADIR
-L2V_REPO
-GPU_PARTITION
-CPU_PARTITION
-DEV_GPU_PARTITION
-CONTAINER_RUNTIME
-```
-
-For stronger portability, make the allocation planner data-driven rather than embedding LUMI tables in `slurm_distr.sh`.
 
 ## 21. Current inconsistencies / maintenance notes
 

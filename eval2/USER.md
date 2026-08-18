@@ -29,22 +29,12 @@ A model directory is expected to contain at least:
     inf_supervised.txt           # language pairs selected for evaluation
     inf_zeroshot.txt.input       # most promising zeroshot language pairs as proposals for evaluation
     inf_zeroshot.txt             # zeroshot language pairs selected for evaluation
-    testing.yaml.out             # summary of parameters for tests
-    inf_out/                     
-        *.yaml                   # pair-specific yaml files
-        plan.out                 
-        calls.out                # inference tasks
-        calls.sacre.out          # sacre scoring tasks
-        calls.comet.out          # comet scoring tasks
-        inf.slurm                # SLURM script for inferences 
-        cnt.slurm                # SLURM script for continuation
-        met.slurm                # SLURM script for scoring
-        inf.sbatch               
-        met.sbatch
+    testing.yaml.out             # the planner's stderr from a successful planning run
+    inf_out/                     # the planner's output files
     inf_logs/                    # log files
     inf_scores/                  # score files
-    *.done
-    *.submitted
+    *.done                       # workflow-level marker saying the stage has completed
+    *.submitted                  # workflow-level marker saying the stage has been submitted
 ```
 
 The generated `.input` pair files are **proposals**. The files without `.input` are the selected pairs that the evaluation actually uses.
@@ -92,11 +82,9 @@ For the current LUMI workflow, aliases are the best-tested path because job name
 | `list`                | List configured model aliases | No model changes |
 | `status`              | Show status of configured models | Reports YAML/call/output counts and Slurm runtime when available |
 | `<alias>`             | Inspect one configured model | Builds/prints `model-summary.yaml` if needed |
-|---|---|---|
 | `mt-bleu`             | Summarize MT BLEU scores | Reads `inf_scores/*.sacre` |
 | `mt-chrf`             | Summarize MT chrF2 scores | Reads `inf_scores/*.sacre` |
 | `mt-bleu-chrf`        | Summarize both MT metrics | Reads `inf_scores/*.sacre` |
-|---|---|---|
 | `mk-basic`            | Check model/resources and create evaluation directories | Selects compatible Mammoth checkout and prepares scoring environment |
 | `mk-pairs`            | Prepare/validate evaluation pair selections | Stops if proposed pairs have not yet been accepted/edited |
 | `mk-pairs-force`      | Accept all automatically proposed pairs | Copies `*.input` pair proposals to selected pair files |
@@ -282,74 +270,4 @@ The current Makefile contains example comparison targets `plot-docmt` and `plot-
 | Scoring summaries | `summarize_sacre.py` is filesystem-based | Top-level targets load `cray-python` | Invoke with any suitable Python |
 | Model comparison | `compare.py` and output formats are generic | Plot Python path is a shared LUMI venv | Install plotting dependencies locally |
 | COMET | Call planning exists | Submission target is currently a placeholder | Implement execution independently of porting |
-
-## 8. Porting notes
-
-### A. Moving to another LUMI project
-
-This is the smallest port. Review at least:
-
-```make
-DISKPROJECT := ...
-JOBPROJECT  := ...
-SELFDIR     := ...
-INSPECT_MODEL_FILES := ...
-MAMMOTHDEF  := ...
-MAMMOTH64   := ...
-VENV        := ...
-TESTINGDIR  := ...
-DATADIR     := ...
-```
-
-Also update `mk-model.mk`, because its model roots are absolute `/scratch/...` paths.
-
-Check the selected SIF image and the project bind mounts in `mk-basic.mk` and `slurm_inf.templ`. A change of project id is not complete until both **host paths** and **container binds** have been updated.
-
-### B. Moving within the same LUMI project
-
-If only the checkout/model location changes, usually update:
-
-- `SELFDIR`;
-- `INSPECT_MODEL_FILES`;
-- model aliases in `mk-model.mk`;
-- Mammoth checkout paths if they moved;
-- shared venv/testing paths if they moved.
-
-The LUMI partitions, account, container runtime, and allocation tables may remain usable.
-
-### C. Moving to another Slurm cluster
-
-Keep the planning layer, but audit the execution layer carefully:
-
-1. Replace project/account names and filesystem paths.
-2. Replace module commands (`module load cray-python`) with the target environment setup.
-3. Replace the LUMI SIF path and container bind mounts.
-4. Update `small-g`, `dev-g`, and `small` partition names.
-5. Rewrite the resource tables in `slurm_distr.sh` for the new node/GPU topology and walltime limits.
-6. Check Slurm options in `slurm_*.templ` and generated `sbatch` commands.
-7. Confirm that `SLURM_PROCID`, `SLURM_NTASKS`, `SLURM_LOCALID`, and `SLURM_JOB_ID` have the expected meanings on the target cluster.
-8. Test with one model and a very small call list before enabling `continue-all`.
-
-### D. Moving to a non-Slurm machine
-
-The planning and reporting pieces can still be reused, but the current high-level execution targets are not scheduler-neutral.
-
-A practical port is:
-
-1. run `mk-basic`, pair selection, and `mk-calls` after replacing LUMI-only setup commands;
-2. execute lines from `inf_out/calls.out` locally or through another launcher;
-3. rerun `mk-calls` to discover remaining scoring work;
-4. execute `calls.sacre.out`;
-5. use `summarize_sacre.py` / `compare.py` for reporting.
-
-For a permanent non-Slurm port, replace `mk-slurm.mk`, the three `slurm_*.templ` files, `slurm_distr.sh`, `slurm_wrapper.sh`, and scheduler-dependent status/continuation checks with a scheduler-independent execution backend.
-
-## 9. Current limitations worth knowing
-
-The uploaded version is still under development. In particular:
-
-- COMET call planning exists, but `mk-comet` currently reports that COMET evaluation is not implemented.
-- `continue-eval` refers to a later visualization stage (`mk-viz` / `viz.done`) that is not defined in the supplied files.
-- Some help text and older comments still use earlier target names such as `mk-yamls` or older script names. Prefer the targets documented above, which are present in the current Make fragments.
-- Several paths are hard-coded and should eventually move into a site configuration file if this workflow is intended to be portable.
 

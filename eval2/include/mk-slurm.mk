@@ -57,7 +57,7 @@ mk-slurm: $(INF_SCRIPT) $(CNT_SCRIPT) $(MET_SCRIPT) $(INF_CALLS) $(SACRE_CALLS) 
 > echo
 
 # creates the model specific slurm script for inferences
-$(INF_SCRIPT): $(INF_TEMPLATE) $(SELFDIR)/mk-infer.mk $(INF_CALLS) clean-inf-lock mk-slurm.mk
+$(INF_SCRIPT): $(INF_TEMPLATE) $(SELFDIR)/include/mk-infer.mk $(INF_CALLS) clean-inf-lock $(SELFDIR)/include/mk-slurm.mk
 > @ncalls="$$(wc -l < $(OUTDIR)/calls.out)"; \
 > echo "mk-slurm.mk: ✅ Inference slurm template found $<"; \
 > echo "mk-slurm.mk:    Creating a script for job $(FIRST_GOAL)_inf_$${ncalls}_tasks..."; \
@@ -82,7 +82,7 @@ $(INF_SCRIPT): $(INF_TEMPLATE) $(SELFDIR)/mk-infer.mk $(INF_CALLS) clean-inf-loc
 > chmod +x "$@"
 
 # creates the model specific slurm script for continuation
-$(CNT_SCRIPT): $(CNT_TEMPLATE) $(SELFDIR)/mk-infer.mk clean-cnt-lock mk-slurm.mk
+$(CNT_SCRIPT): $(CNT_TEMPLATE) $(SELFDIR)/include/mk-infer.mk clean-cnt-lock $(SELFDIR)/include/mk-slurm.mk
 > @set -euo pipefail; \
 > echo "mk-slurm.mk: ✅ Continuation slurm template found $<"; \
 > echo "mk-slurm.mk:    Creating a script for job $(FIRST_GOAL)_cnt..."; \
@@ -105,7 +105,7 @@ $(CNT_SCRIPT): $(CNT_TEMPLATE) $(SELFDIR)/mk-infer.mk clean-cnt-lock mk-slurm.mk
 > chmod +x "$@"
 
 # creates the model specific slurm script for scoring
-$(MET_SCRIPT): $(MET_TEMPLATE) $(SELFDIR)/mk-score.mk $(SACRE_CALLS) clean-met-lock mk-slurm.mk
+$(MET_SCRIPT): $(MET_TEMPLATE) $(SELFDIR)/include/mk-score.mk $(SACRE_CALLS) clean-met-lock $(SELFDIR)/include/mk-slurm.mk
 > @set -euo pipefail; \
 > ncalls="$$(wc -l < $(OUTDIR)/calls.sacre.out)"; \
 > echo "mk-slurm.mk: ✅ Scoring slurm template found $<"; \
@@ -129,12 +129,12 @@ $(MET_SCRIPT): $(MET_TEMPLATE) $(SELFDIR)/mk-score.mk $(SACRE_CALLS) clean-met-l
 > echo "mk-slurm.mk:    $@"; \
 > chmod +x "$@"
 
-$(INF_SBATCH): $(INF_CALLS) $(INF_SCRIPT) clean-inf-lock mk-slurm.mk slurm_distr.sh
+$(INF_SBATCH): $(INF_CALLS) $(INF_SCRIPT) clean-inf-lock $(SELFDIR)/include/mk-slurm.mk $(SELFDIR)/bin/slurm_distr.sh
 > @bash $(INF_SCRIPT) | sed 's/^/slurm-distr.sh:    /' ; \
 > echo "mk-slurm.mk: ✅ Created the sbatch command:"; \
 > cat $(INF_SBATCH) | sed 's/^/mk-slurm.mk:    /'
 
-$(MET_SBATCH): $(SACRE_CALLS) $(MET_SCRIPT) clean-met-lock mk-slurm.mk slurm_distr.sh
+$(MET_SBATCH): $(SACRE_CALLS) $(MET_SCRIPT) clean-met-lock $(SELFDIR)/include/mk-slurm.mk $(SELFDIR)/bin/slurm_distr.sh
 > @bash $(MET_SCRIPT) | sed 's/^/slurm-distr.sh:    /' ; \
 > echo "mk-slurm.mk: ✅ Created the sbatch command:"; \
 > cat $(MET_SBATCH) | sed 's/^/mk-slurm.mk:    /'

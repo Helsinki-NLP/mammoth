@@ -41,7 +41,7 @@ for var in ACCOUNT DISKPROJECT SELFDIR OUTDIR ACTIVATE MAKESCRIPT LOGDIR JOB_NAM
 done
 
 export SLURM_DISTR="${SELFDIR}/slurm_distr.sh"
-export SLURM_WRAPPER="${SELFDIR}/slurm_wrapper.sh"
+export SLURM_WRAPPER="${SELFDIR}/bin/slurm_wrapper.sh"
 export CALLS_FILE="${OUTDIR}/calls.sacre.out"
 
 [[ -f "${SLURM_WRAPPER}" ]] || { echo "Error: The wrapper not found in ${SLURM_WRAPPER}" >&2; exit 1; }

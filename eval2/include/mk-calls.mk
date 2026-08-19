@@ -42,7 +42,7 @@ $(TESTCONFIG).out: $(TRAINCONFIG) $(MODELDIR)/mammoth.selected $(PRS_DONE)
 >   export ZEROSHOTPAIRS="$(ZEROSHOTPAIRS)"; \
 >   export SUPERVISEDPAIRS="$(SUPERVISEDPAIRS)"; \
 > module load cray-python; \
-> $(VIEWPYTHON) "$(SELFDIR)/inf_plan.py" >"$(TESTCONFIG).err" 2>&1 || true; \
+> $(VIEWPYTHON) "$(SELFDIR)/bin/inf_plan.py" >"$(TESTCONFIG).err" 2>&1 || true; \
 > if [ -f "$(TESTCONFIG).err" ] && grep -Fq 'All stages of planning completed' "$(TESTCONFIG).err"; then \
 >    mv "$(TESTCONFIG).err" "$(TESTCONFIG).out"; \
 > else \

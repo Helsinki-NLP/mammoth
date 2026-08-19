@@ -7,23 +7,21 @@ SHELL := /bin/bash
 # Configuration
 # -----------------------------------------------------------------------------
 
-DISKPROJECT := project_462000964
 JOBPROJECT  := project_462001087
-
-SELFDIR := /scratch/project_462000964/members/aylijyra/dev/mammoth/eval2
-INSPECT_MODEL_FILES := /scratch/$(DISKPROJECT)/members/aylijyra/dev/mammoth/eval2/inspect-model-files.py
 
 # SIF := /appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260225_144743/lumi-multitorch-full-u24r64f21m43t29-20260225_144743.sif
 SIF := /appl/local/laifs/containers/lumi-multitorch-u24r70f21m50t210-20260513_121430/lumi-multitorch-full-u24r70f21m50t210-20260513_121430.sif
 
-MAMMOTHDEF := /scratch/$(DISKPROJECT)/shared/mammoth-shared/mammoth-dev/mammoth
-MAMMOTH64  := /scratch/$(DISKPROJECT)/shared/mammoth-shared/mammoth-64/mammoth
-VENV       := /scratch/$(DISKPROJECT)/shared/mammoth-shared/.venv
+DISKPROJECT := project_462001087
+SELFDIR     := /scratch/$(DISKPROJECT)/members/aylijyra/dev/mammoth/eval2
+MAMMOTHDEF  := /scratch/$(DISKPROJECT)/shared/mammoth-shared/mammoth-dev/mammoth
+MAMMOTH64   := /scratch/$(DISKPROJECT)/shared/mammoth-shared/mammoth-64/mammoth
+VENV        := /scratch/$(DISKPROJECT)/shared/mammoth-shared/.venv
+TESTINGDIR  := /scratch/$(DISKPROJECT)/shared/testing-shared
 
-TESTINGDIR := /scratch/$(DISKPROJECT)/shared/testing-shared
 DATADIR    := $(TESTINGDIR)/data
 
-include $(SELFDIR)/mk-model.mk
+include $(SELFDIR)/include/mk-model.mk
 
 export $(addprefix MODEL_,$(MODEL_ALIASES))
 STATUS_MODELS := $(foreach a,$(MODEL_ALIASES),--model "$(a)=$(MODEL_$(a))")
@@ -104,9 +102,9 @@ INF_CALLS    := $(OUTDIR)/calls.out
 SACRE_CALLS  := $(OUTDIR)/calls.sacre.out
 COMET_CALLS  := $(OUTDIR)/calls.comet.out
 
-INF_TEMPLATE := $(SELFDIR)/slurm_inf.templ
-CNT_TEMPLATE := $(SELFDIR)/slurm_cnt.templ
-MET_TEMPLATE := $(SELFDIR)/slurm_met.templ
+INF_TEMPLATE := $(SELFDIR)/template/slurm_inf.templ
+CNT_TEMPLATE := $(SELFDIR)/template/slurm_cnt.templ
+MET_TEMPLATE := $(SELFDIR)/template/slurm_met.templ
 
 INF_SCRIPT   := $(OUTDIR)/inf.slurm
 CNT_SCRIPT   := $(OUTDIR)/cnt.slurm
@@ -115,6 +113,8 @@ MET_SCRIPT   := $(OUTDIR)/met.slurm
 INF_SBATCH   := $(OUTDIR)/inf.sbatch
 CMT_SBATCH   := $(OUTDIR)/cmt.sbatch
 MET_SBATCH   := $(OUTDIR)/met.sbatch
+
+INSPECT_MODEL_FILES := $(SELFDIR)/bin/inspect-model-files.py
 
 # -----------------------------------------------------------------------------
 # Top-level workflow
@@ -151,7 +151,7 @@ Main targets:\n\
 
 list: 
 > @$(foreach a,$(MODEL_ALIASES),printf "  %-10s -> %s\n" "$(a)" "$(MODEL_$(a))";)
-> @echo Remember to mount the project directories when using containers
+> @echo Remember to mount the project directories in slurm_*.templ files when using containers
 
 # This is used to inpect the model properties - helps to choose the correct MAMMOTH version
 $(MODEL_ALIASES):
@@ -159,29 +159,29 @@ $(MODEL_ALIASES):
 >   $(MAKE) --no-print-directory -C "$(SELFDIR)" MODELDIR="$(MODEL_$@)" inspect-model-summary; \
 > fi
 
-include $(SELFDIR)/mk-basic.mk # venvs, model inspection, mammoth ver, dirs, (non)slurm detection
-include $(SELFDIR)/mk-pairs.mk # determine the desired language pairs
-include $(SELFDIR)/mk-calls.mk # calls.*.out and yaml files
-include $(SELFDIR)/mk-slurm.mk # slurm scripts and sbatch lines
-include $(SELFDIR)/mk-infer.mk # run inference calls
-include $(SELFDIR)/mk-score.mk # run scoring calls
-include $(SELFDIR)/mk-contr.mk # loop runs until done
+include $(SELFDIR)/include/mk-basic.mk # venvs, model inspection, mammoth ver, dirs, (non)slurm detection
+include $(SELFDIR)/include/mk-pairs.mk # determine the desired language pairs
+include $(SELFDIR)/include/mk-calls.mk # calls.*.out and yaml files
+include $(SELFDIR)/include/mk-slurm.mk # slurm scripts and sbatch lines
+include $(SELFDIR)/include/mk-infer.mk # run inference calls
+include $(SELFDIR)/include/mk-score.mk # run scoring calls
+include $(SELFDIR)/include/mk-contr.mk # loop runs until done
 
 all: mk-infer 
 
 .PHONY: status mt-bleu mt-chrf mt-bleu-chrf test-sif find-sif
 
 status:
-> @module load cray-python; python3 "$(SELFDIR)/status.py" $(STATUS_MODELS)
+> @module load cray-python; python3 "$(SELFDIR)/bin/status.py" $(STATUS_MODELS)
 
 mt-bleu:
-> @module load cray-python; python "$(SELFDIR)/summarize_sacre.py" --metric BLEU --kind mt $(MODELDIR)/inf_scores/
+> @module load cray-python; python "$(SELFDIR)/bin/summarize_sacre.py" --metric BLEU --kind mt $(MODELDIR)/inf_scores/
 
 mt-chrf:
-> @module load cray-python; python "$(SELFDIR)/summarize_sacre.py" --metric chrF2 --kind mt $(MODELDIR)/inf_scores/
+> @module load cray-python; python "$(SELFDIR)/bin/summarize_sacre.py" --metric chrF2 --kind mt $(MODELDIR)/inf_scores/
 
 mt-bleu-chrf:
-> @module load cray-python; python "$(SELFDIR)/summarize_sacre.py" --kind mt $(MODELDIR)/inf_scores/
+> @module load cray-python; python "$(SELFDIR)/bin/summarize_sacre.py" --kind mt $(MODELDIR)/inf_scores/
 
 test-sif:
 > srun --partition=dev-g --account=$(JOBPROJECT) --time=00:10:00 \
@@ -195,7 +195,7 @@ find-sif:
 
 plot-docmt:
 > $(PLOTPYTHON) compare.py \
->  --mk-models mk-model.mk \
+>  --mk-models include/mk-model.mk \
 >  --kind mt \
 >  --dataset bqtpar \
 >  --models docmt4denhalfbase docmt4denhalfsmall docmt4denhalfxl docmt10denhalf \
@@ -206,7 +206,7 @@ plot-docmt:
 > cat cmp_docmt/condorcet.txt
 
 plot-sentmt:
-> $(PLOTPYTHON) compare.py   --mk-models mk-model.mk   --kind sentmt   \
+> $(PLOTPYTHON) compare.py   --mk-models include/mk-model.mk   --kind sentmt   \
 >   --dataset bqtpar   --models sentmtdenoise sentmthalfsmall sentmthalfxl  \
 >   --delta sentmthalfsmall sentmthalfxl   --outdir cmp_sentmt
 

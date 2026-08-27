@@ -546,7 +546,7 @@ def _add_train_general_opts(parser):
         '--metric_for_best_model',
         '-metric_for_best_model',
         type=str,
-        default='ppl',
+        default='bleu',
         help="Metric to use for determining best checkpoint. "
         "Options: 'ppl' (perplexity), 'accuracy', 'bleu', 'chrf', or custom metric name",
     )

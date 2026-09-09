@@ -8,6 +8,16 @@ from mammoth.inputters.dataset import get_corpus
 from mammoth.utils.logging import logger
 
 
+def task_needs_validation_dataset(is_train, path_valid_src):
+    """Whether a task needs a dataset iterator built for the current mode.
+
+    At validation time a task is included whenever it defines validation
+    data, regardless of its training `weight` — weight=0 (eval-only) tasks
+    must still be validated even though they're never sampled for training.
+    """
+    return is_train or path_valid_src is not None
+
+
 def build_dataloader(
     dataset,
     batch_size,
@@ -497,7 +507,8 @@ class DynamicDatasetIter(object):
             # Case 2: we are validation (hence self.is_train := False), we need an iterator
             # if and only the task defines validation data, i.e. if the key `path_valid_src`
             # is defined
-            if self.is_train or self.opts.tasks[task.corpus_id].get('path_valid_src', None) is not None:
+            path_valid_src = self.opts.tasks[task.corpus_id].get('path_valid_src', None)
+            if task_needs_validation_dataset(self.is_train, path_valid_src):
                 corpus = get_corpus(
                     self.opts,
                     task,

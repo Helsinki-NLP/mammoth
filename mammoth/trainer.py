@@ -36,6 +36,26 @@ class NanLossException(Exception):
     pass
 
 
+class PerTaskSampleLogger:
+    """Decides whether to log a validation sample for a task's current batch.
+
+    Validation batches from every task are drawn from a single chained
+    iterator, so a global "log the first N batches" counter starves tasks
+    whose batches happen to come later (e.g. later corpus_ids in iteration
+    order). Giving each corpus_id its own budget of `max_batches_to_log`
+    ensures every validated task gets its own logged samples.
+    """
+
+    def __init__(self, max_batches_to_log):
+        self.max_batches_to_log = max_batches_to_log
+        self._batches_seen = {}
+
+    def should_log(self, corpus_id):
+        count = self._batches_seen.get(corpus_id, 0) + 1
+        self._batches_seen[corpus_id] = count
+        return count <= self.max_batches_to_log
+
+
 def iter_on_device(iterator, device_context):
     """Move batches to device with ROCTx profiling annotation"""
     if device_context.is_gpu():
@@ -555,8 +575,11 @@ class Trainer(object):
         """Compute additional validation metrics like BLEU.
 
         Args:
-            predictions_by_direction: Dict mapping (src_lang, tgt_lang) to list of predictions
-            references_by_direction: Dict mapping (src_lang, tgt_lang) to list of references
+            predictions_by_direction: Dict mapping corpus_id to list of predictions.
+                Grouped by corpus_id (not by (src_lang, tgt_lang) direction) so that
+                two different tasks which happen to declare the same direction still
+                get independent scores instead of being silently merged.
+            references_by_direction: Dict mapping corpus_id to list of references
             valid_metrics: List of metric names to compute
 
         Returns:
@@ -577,27 +600,27 @@ class Trainer(object):
             if name not in valid_metrics:
                 continue
 
-            per_direction_scores = []
-            for (src_lang, tgt_lang), preds in predictions_by_direction.items():
-                refs = references_by_direction.get((src_lang, tgt_lang), [])
+            per_task_scores = []
+            for task_key, preds in predictions_by_direction.items():
+                refs = references_by_direction.get(task_key, [])
 
                 if not preds or not refs:
                     logger.warning(
-                        f"Skipping {name} for {src_lang}→{tgt_lang}: empty predictions or references"
+                        f"Skipping {name} for {task_key}: empty predictions or references"
                     )
                     continue
 
                 try:
                     score = fn(preds, [refs]).score
-                    metrics[f'{name}/{src_lang}-{tgt_lang}'] = score
-                    per_direction_scores.append(score)
+                    metrics[f'{name}/{task_key}'] = score
+                    per_task_scores.append(score)
                 except Exception as e:
-                    logger.warning(f"Error computing {name} for {src_lang}→{tgt_lang}: {e}")
+                    logger.warning(f"Error computing {name} for {task_key}: {e}")
 
-            # Aggregate across directions so `metric_for_best_model='<name>'` resolves.
+            # Aggregate across tasks so `metric_for_best_model='<name>'` resolves.
             # Mean is the conventional summary for multilingual eval.
-            if per_direction_scores:
-                metrics[name] = sum(per_direction_scores) / len(per_direction_scores)
+            if per_task_scores:
+                metrics[name] = sum(per_task_scores) / len(per_task_scores)
 
         return metrics
 
@@ -799,9 +822,9 @@ class Trainer(object):
         valid_model = self.model
 
         # Initialize collections for BLEU computation if needed
-        # Group by translation direction to avoid mixing languages in BLEU computation
-        predictions_by_direction = {}  # {(src_lang, tgt_lang): [predictions]}
-        references_by_direction = {}   # {(src_lang, tgt_lang): [references]}
+        # Group by corpus_id so tasks sharing a direction still get independent scores
+        predictions_by_direction = {}  # {corpus_id: [predictions]}
+        references_by_direction = {}   # {corpus_id: [references]}
         compute_metrics = bool(self.valid_metrics)
         if moving_average:
             # swap model params w/ moving average
@@ -824,8 +847,9 @@ class Trainer(object):
             import random
             import time
 
-            # Log samples from only a few batches instead of every batch
-            max_batches_to_log = 3  # Only log samples from first 3 batches
+            # Log samples from only a few batches per task instead of every batch
+            max_batches_to_log = 3  # Only log samples from each task's first 3 batches
+            sample_logger = PerTaskSampleLogger(max_batches_to_log)
             batch_count = 0
             valid_start_time = time.monotonic()
             valid_max_time = self.valid_timeout
@@ -842,10 +866,13 @@ class Trainer(object):
                     break
 
                 batch_count += 1
-                
 
-                # Only set logged_sample_idx for the first few batches
-                logged_sample_idx = random.randint(0, batch.batch_size - 1) if batch_count <= max_batches_to_log else -1
+                # Only set logged_sample_idx for each task's first few batches
+                logged_sample_idx = (
+                    random.randint(0, batch.batch_size - 1)
+                    if sample_logger.should_log(metadata.corpus_id)
+                    else -1
+                )
                 if stats is None:
                     stats = mammoth.utils.Statistics(n_correct=0)
 
@@ -942,13 +969,16 @@ class Trainer(object):
                                     logger.info(f"  ref_text ({len(ref_text.split())} words):  {ref_text[:200]}")
 
                                 if pred_text and ref_text:
-                                    # Group by translation direction to avoid mixing languages in BLEU
-                                    direction_key = (metadata.src_lang, metadata.tgt_lang)
-                                    if direction_key not in predictions_by_direction:
-                                        predictions_by_direction[direction_key] = []
-                                        references_by_direction[direction_key] = []
-                                    predictions_by_direction[direction_key].append(pred_text)
-                                    references_by_direction[direction_key].append(ref_text)
+                                    # Group by corpus_id (not by (src_lang, tgt_lang) direction)
+                                    # so that two tasks sharing a declared direction — e.g. a
+                                    # weight=0 eval-only task cloned from a training task —
+                                    # still get independent scores instead of being merged.
+                                    task_key = metadata.corpus_id
+                                    if task_key not in predictions_by_direction:
+                                        predictions_by_direction[task_key] = []
+                                        references_by_direction[task_key] = []
+                                    predictions_by_direction[task_key].append(pred_text)
+                                    references_by_direction[task_key].append(ref_text)
                                 else:
                                     logger.warning(f"[VALIDATION] Empty text after decoding: pred_empty={not pred_text}, ref_empty={not ref_text}")
                             else:

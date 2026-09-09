@@ -571,3 +571,43 @@ def test_invalid_curriculum():
             }
         )
     assert "Invalid curriculum" in str(exc_info.value)
+
+
+def test_zero_weight_task_with_validation_paths_is_still_assigned():
+    """A weight=0 corpus (eval-only, never sampled for training) must still
+    show up in get_my_tasks() when it defines validation paths, so that it
+    gets validated even though it's excluded from training sampling."""
+    opt_dict = {
+        "seed": 1024,
+        "accum_count": 1,
+        "task_distribution_strategy": "weighted_sampling",
+        "world_size": 1,
+        "n_nodes": 1,
+        "gpu_ranks": [0],
+        "enc_layers": [1],
+        "dec_layers": [1],
+        "tasks": {
+            "train_a-b": {
+                "src_tgt": "a-b",
+                "node_gpu": "0:0",
+                "weight": 1,
+                "introduce_at_training_step": 0,
+            },
+            "eval_a-b": {
+                "src_tgt": "a-b",
+                "node_gpu": "0:0",
+                "weight": 0,
+                "introduce_at_training_step": 0,
+                "path_valid_src": "dummy_valid.src",
+                "path_valid_tgt": "dummy_valid.tgt",
+            },
+        },
+    }
+    opts = Namespace(**opt_dict)
+    world_context = WorldContext.from_opts(opts)
+    global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
+    local_tqm = global_task_queue_manager.global_to_local(node_rank=0, local_rank=0, opts=opts)
+    my_tasks = {task.corpus_id: task for task in local_tqm.get_my_tasks()}
+
+    assert my_tasks.keys() == {"train_a-b", "eval_a-b"}
+    assert my_tasks["eval_a-b"].weight == 0

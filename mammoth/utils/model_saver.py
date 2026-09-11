@@ -738,10 +738,14 @@ class ModelSaver(ModelSaverBase):
             try:
                 metric_value = self._extract_metric_value(valid_stats)
             except ValueError as e:
-                logger.warning(f"Could not extract metric: {e}. Skipping metric tracking.")
-                return False
+                logger.warning(f"Could not extract metric: {e}. Treating as no metric for this device.")
+                metric_value = None
 
-        # Aggregate metrics across all devices in distributed training
+        # Aggregate metrics across all devices in distributed training.
+        # Every rank MUST reach this collective call regardless of whether metric
+        # extraction succeeded locally: skipping it on some ranks desyncs the
+        # collective call order for the rest of the process group and corrupts
+        # unrelated collectives later on (e.g. all_gather_object in _save()).
         aggregated_metric = self._aggregate_metrics_across_devices(metric_value, device_context)
 
         # Store metadata (only on master device)
@@ -797,11 +801,17 @@ class ModelSaver(ModelSaverBase):
             try:
                 metric_value = self._extract_metric_value(valid_stats)
             except ValueError as e:
-                logger.warning(f"Could not extract metric: {e}. Falling back to regular save.")
-                self.save(step, data_state, moving_average)
-                return False
+                logger.warning(f"Could not extract metric: {e}. Treating as no metric for this device.")
+                metric_value = None
 
-        # Aggregate metrics across all devices in distributed training
+        # Aggregate metrics across all devices in distributed training.
+        # Every rank MUST reach this collective call regardless of whether metric
+        # extraction succeeded locally: skipping it on some ranks (e.g. by taking
+        # a "fallback save" shortcut here) desyncs the collective call order for
+        # the rest of the process group. A later, unrelated all_gather_object
+        # (e.g. the data_state gather in _save()) then gets matched against this
+        # one on other ranks, corrupting both -- this is what caused
+        # "TypeError: '<' not supported between instances of 'dict' and 'float'".
         aggregated_metric = self._aggregate_metrics_across_devices(metric_value, device_context)
 
         # Store metadata for this checkpoint (only on master device)

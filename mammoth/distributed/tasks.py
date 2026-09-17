@@ -386,15 +386,20 @@ class TaskQueueManager:
         for task in self.tasks:
             # TODO: DRY violation, this computation is implemented in many places
             global_rank = task.node_rank * self.gpus_per_node + task.local_rank
-            builder.add(
-                DistributedEmbedding(
-                    global_ranks={global_rank},
-                    task_ids={task.corpus_id},
-                    group=None,
-                    side=Side.encoder,
-                    lang=task.src_lang,
+            # A decoder-only task (task.encoder_id == []) has no model.encoder at
+            # all (see model_builder.py::build_model, opts.decoder_only), so no
+            # encoder-side components must be created for it -- their get_module()
+            # would dereference model.encoder, which is None.
+            if task.encoder_id:
+                builder.add(
+                    DistributedEmbedding(
+                        global_ranks={global_rank},
+                        task_ids={task.corpus_id},
+                        group=None,
+                        side=Side.encoder,
+                        lang=task.src_lang,
+                    )
                 )
-            )
             builder.add(
                 DistributedEmbedding(
                     global_ranks={global_rank},
@@ -406,15 +411,16 @@ class TaskQueueManager:
             )
             # Per-component wrapper modules (to_logits, post_emb_norm, pos_emb, project_emb).
             # Shared across all tasks that use the same component (xcoder_id combination).
-            builder.add(
-                DistributedWrapperModules(
-                    global_ranks={global_rank},
-                    task_ids={task.corpus_id},
-                    group=None,
-                    side=Side.encoder,
-                    component_key=tuple(task.encoder_id),
+            if task.encoder_id:
+                builder.add(
+                    DistributedWrapperModules(
+                        global_ranks={global_rank},
+                        task_ids={task.corpus_id},
+                        group=None,
+                        side=Side.encoder,
+                        component_key=tuple(task.encoder_id),
+                    )
                 )
-            )
             builder.add(
                 DistributedWrapperModules(
                     global_ranks={global_rank},

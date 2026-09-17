@@ -28,6 +28,7 @@ class NativeTransformerWrapper(nn.Module):
         to_logits: Optional[nn.Linear],
         emb_dropout: float = 0.0,
         return_only_embed: bool = False,
+        embed_scale: Optional[float] = None,
     ):
         super().__init__()
         # Bypass nn.Module.__setattr__ so these are not registered as children.
@@ -39,6 +40,7 @@ class NativeTransformerWrapper(nn.Module):
         object.__setattr__(self, '_rotary_emb', rotary_emb)
         object.__setattr__(self, '_to_logits', to_logits)
         object.__setattr__(self, '_return_only_embed', return_only_embed)
+        object.__setattr__(self, '_embed_scale', embed_scale)
         # Per-task module — not shared, registered normally.
         self.emb_dropout = nn.Dropout(emb_dropout)
 
@@ -59,7 +61,10 @@ class NativeTransformerWrapper(nn.Module):
         cache: Optional[KVCache] = None,
         seq_start_pos: Optional[int] = None,
     ) -> Union[Tensor, tuple[Tensor, KVCache]]:
-        h = self.emb_dropout(self._post_emb_norm(self._token_emb(x)))
+        tok_emb = self._token_emb(x)
+        if self._embed_scale is not None:
+            tok_emb = tok_emb * self._embed_scale
+        h = self.emb_dropout(self._post_emb_norm(tok_emb))
         rotary = self._rotary_emb(h.size(1), h.device) if self._rotary_emb is not None else None
         # Reshape (batch, seq) bool mask → (batch, 1, 1, seq) for SDPA key masking
         if mask is not None and mask.dim() == 2:

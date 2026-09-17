@@ -60,27 +60,33 @@ class NMTModel(BaseModel):
 
     def forward(self, src, decoder_input, src_mask, metadata=None):
         # Activate the correct pluggable embeddings and modules
-        active_encoder = self.encoder.activate(
-            task_id=metadata.corpus_id,
-            adapter_ids=metadata.encoder_adapter_ids,
-        )
         active_decoder = self.decoder.activate(
             task_id=metadata.corpus_id,
             adapter_ids=metadata.decoder_adapter_ids,
         )
 
-        encoder_output = active_encoder(
-            x=src,
-            mask=src_mask,
-            return_embeddings=True,
-        )
+        if self.encoder is None:
+            # True decoder-only model (see model_builder.py's `decoder_only`
+            # opt): there is no encoder to run, and the decoder's blocks
+            # never build/run cross-attention, so context must be None.
+            encoder_output = None
+        else:
+            active_encoder = self.encoder.activate(
+                task_id=metadata.corpus_id,
+                adapter_ids=metadata.encoder_adapter_ids,
+            )
+            encoder_output = active_encoder(
+                x=src,
+                mask=src_mask,
+                return_embeddings=True,
+            )
 
-        # Apply attention bridge if it exists 
-        if self.attention_bridge is not None:
-            encoder_output, alphas = self.attention_bridge(encoder_output, src_mask)
-            if self.attention_bridge.is_fixed_length:
-                # turn off masking in the transformer decoder
-                src_mask = None
+            # Apply attention bridge if it exists
+            if self.attention_bridge is not None:
+                encoder_output, alphas = self.attention_bridge(encoder_output, src_mask)
+                if self.attention_bridge.is_fixed_length:
+                    # turn off masking in the transformer decoder
+                    src_mask = None
 
         retval = active_decoder(
             decoder_input,

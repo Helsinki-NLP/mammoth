@@ -59,16 +59,96 @@ def build_xcoder(
     else:
         dim = model_opts.model_dim
 
-    heads = getattr(model_opts, 'heads', 8)
-    dim_head = dim // heads
-    activation = getattr(model_opts, 'ff_activation', 'swiglu')
-    ff_mult = getattr(model_opts, 'ff_mult', 4.0 if activation == 'gelu' else 2.67)
-    attn_drop = getattr(model_opts, 'attn_dropout', 0.0)
-    ff_drop = getattr(model_opts, 'ff_dropout', 0.0)
+    # side-prefixed opts (e.g. dec_attn_dim_head) override the shared/global
+    # ones, so encoder and decoder can have independently-shaped attention
+    # (needed for Gemma3: head_dim=256 while dim/heads=160, and Gemma3-only
+    # features like GQA/QK-norm/sandwich-norm/sliding-window/dual-RoPE must
+    # not leak into a plain encoder stack). See CLAUDE.md "Gemma3-270M ->
+    # Mammoth Conversion" for the source of these knobs
+    # (transformers.models.gemma3.configuration_gemma3.Gemma3TextConfig).
+    prefix = 'enc' if side == Side.encoder else 'dec'
+
+    def side_opt(name, default):
+        value = getattr(model_opts, f'{prefix}_{name}', None)
+        return value if value is not None else getattr(model_opts, name, default)
+
+    heads = side_opt('heads', 8)
+    dim_head = side_opt('attn_dim_head', dim // heads)
+    activation = side_opt('ff_activation', 'swiglu')
+    ff_mult = side_opt('ff_mult', 4.0 if activation == 'gelu' else 2.67)
+    attn_drop = side_opt('attn_dropout', 0.0)
+    ff_drop = side_opt('ff_dropout', 0.0)
     use_rotary = getattr(model_opts, 'rotary_pos_emb', False)
     use_post_emb_norm = getattr(model_opts, 'post_emb_norm', False)
     depths = model_opts.enc_layers if side == Side.encoder else model_opts.dec_layers
     block_cls = EncoderBlock if side == Side.encoder else DecoderBlock
+
+    # Gemma3-style decoder-only extensions (all no-ops unless set; EncoderBlock
+    # does not accept them, so they are never resolved/used on the encoder side).
+    kv_heads = getattr(model_opts, f'{prefix}_attn_kv_heads', None)
+    qk_norm = getattr(model_opts, f'{prefix}_attn_qk_norm', False)
+    attn_scale = getattr(model_opts, f'{prefix}_attn_scale', None)
+    sandwich_norm = getattr(model_opts, f'{prefix}_sandwich_norm', False)
+    sliding_window = getattr(model_opts, f'{prefix}_sliding_window', -1) or -1
+    global_attn_every_n_layers = getattr(model_opts, f'{prefix}_global_attn_every_n_layers', 3)
+    global_rope_theta = getattr(model_opts, f'{prefix}_global_rope_theta', None)
+    local_rope_theta = getattr(model_opts, f'{prefix}_local_rope_theta', None)
+    embed_scale = dim ** 0.5 if getattr(model_opts, f'{prefix}_scaled_embeddings', False) else None
+    # RMSNorm epsilon: None keeps torch's dtype-based default (pre-existing
+    # behavior); Gemma3 requires the fixed 1e-6 from its config (see
+    # DecoderBlock's norm_eps docstring for why this isn't just cosmetic).
+    norm_eps = getattr(model_opts, f'{prefix}_norm_eps', None)
+    # Cross-attn K/V context dim: defaults to enc_model_dim so a decoder
+    # naturally cross-attends to whatever the encoder actually produces,
+    # without requiring dim_head/dim to match encoder and decoder (see
+    # CLAUDE.md "Gemma3-270M -> Mammoth Conversion" known-limitations note).
+    context_dim = getattr(model_opts, 'dec_cross_attn_dim_context', None)
+    if context_dim is None:
+        context_dim = getattr(model_opts, 'enc_model_dim', None)
+    # True decoder-only mode (CLAUDE.md "Gemma3-270M -> Mammoth Conversion",
+    # "option 1"): no cross-attn module is built or run at all, as opposed to
+    # the fake-encoder path which keeps cross-attn but zeros its output.
+    decoder_only = getattr(model_opts, 'decoder_only', False)
+
+    # Dual-theta rope (Gemma3-style): every DecoderBlock gets its own
+    # per-layer RotaryEmbedding below (`layer_rotary_emb`) and always
+    # overrides whatever `rotary` tuple is passed into it (see
+    # DecoderBlock.forward). In that case the generic per-component
+    # RotaryEmbedding built further down (`per_component_rotary_embs`) would
+    # never be used in forward -- just dead weight held as a submodule and
+    # written into the wrapper checkpoint file. Skip building it whenever
+    # blocks own their own rotary.
+    blocks_own_their_rotary = (
+        block_cls is DecoderBlock
+        and use_rotary
+        and global_rope_theta is not None
+        and local_rope_theta is not None
+    )
+
+    def make_block(layer_idx: int) -> nn.Module:
+        if block_cls is not DecoderBlock:
+            return EncoderBlock(dim=dim, heads=heads, dim_head=dim_head, ff_mult=ff_mult,
+                                 attn_dropout=attn_drop, ff_dropout=ff_drop, activation=activation,
+                                 norm_eps=norm_eps)
+
+        # Gemma3 layer_types pattern: full/global attention is the LAST layer
+        # of every group of `global_attn_every_n_layers`, the rest are local
+        # sliding-window layers (see Gemma3TextConfig.__init__).
+        is_global_layer = (sliding_window <= 0) or ((layer_idx + 1) % global_attn_every_n_layers == 0)
+        layer_sliding_window = None if is_global_layer else sliding_window
+        layer_rotary_emb = None
+        if use_rotary and global_rope_theta is not None and local_rope_theta is not None:
+            theta = global_rope_theta if is_global_layer else local_rope_theta
+            layer_rotary_emb = RotaryEmbedding(dim_head, base=theta)
+
+        return DecoderBlock(
+            dim=dim, heads=heads, dim_head=dim_head, ff_mult=ff_mult,
+            attn_dropout=attn_drop, ff_dropout=ff_drop, activation=activation,
+            norm_eps=norm_eps, kv_heads=kv_heads, qk_norm=qk_norm, attn_scale=attn_scale,
+            sandwich_norm=sandwich_norm, sliding_window=layer_sliding_window,
+            rotary_emb=layer_rotary_emb, context_dim=context_dim,
+            use_cross_attn=not decoder_only,
+        )
 
     # 1. Build one TransformerStack per (layer_stack_index, xcoder_id)
     distributed_xcoder_class = (
@@ -88,12 +168,8 @@ def build_xcoder(
         xcoder_id = component.xcoder_id
         depth = depths[layer_stack_index]
         is_last_stack = (layer_stack_index == len(depths) - 1)
-        blocks = nn.ModuleList([
-            block_cls(dim=dim, heads=heads, ff_mult=ff_mult,
-                      attn_dropout=attn_drop, ff_dropout=ff_drop, activation=activation)
-            for _ in range(depth)
-        ])
-        final_norm = nn.RMSNorm(dim) if is_last_stack else None
+        blocks = nn.ModuleList([make_block(i) for i in range(depth)])
+        final_norm = nn.RMSNorm(dim, eps=norm_eps) if is_last_stack else None
         attention_layer_blocks[layer_stack_index][xcoder_id] = TransformerStack(
             blocks=blocks,
             final_norm=final_norm,
@@ -133,10 +209,10 @@ def build_xcoder(
 
     for component_key, vocab_size in component_vocab_sizes.items():
         per_component_post_emb_norms[component_key] = (
-            nn.RMSNorm(dim) if use_post_emb_norm else nn.Identity()
+            nn.RMSNorm(dim, eps=norm_eps) if use_post_emb_norm else nn.Identity()
         )
         per_component_rotary_embs[component_key] = (
-            RotaryEmbedding(dim_head) if use_rotary else None
+            RotaryEmbedding(dim_head) if (use_rotary and not blocks_own_their_rotary) else None
         )
         if not return_only_embed:
             per_component_to_logits[component_key] = nn.Linear(dim, vocab_size, bias=False)
@@ -158,6 +234,7 @@ def build_xcoder(
             rotary_emb=per_component_rotary_embs[component_key],
             to_logits=per_component_to_logits.get(component_key),
             return_only_embed=return_only_embed,
+            embed_scale=embed_scale,
         )
 
     # Build shared nn.ModuleDicts: StackXcoder is the single owner of all parameters.
@@ -240,18 +317,27 @@ def build_model(
     # Set default dtype for model initialization
     torch.set_default_dtype(dtype)
 
-    encoder = build_xcoder(
-        side=Side.encoder,
-        model_opts=model_opts,
-        vocabs_dict=vocabs_dict,
-        device=device,
-        task_queue_manager=task_queue_manager,
-        single_task=single_task,
-    )
+    # True decoder-only mode (CLAUDE.md "Gemma3-270M -> Mammoth Conversion",
+    # "option 1"): no encoder is built at all -- not even the small
+    # randomly-initialized "fake encoder" used by the alternative path
+    # (convert_gemma3_native.py). See NMTModel.forward for how encoder=None
+    # is handled at inference time.
+    decoder_only = getattr(model_opts, 'decoder_only', False)
+
+    encoder = None
+    dec_token_embs = None
+    if not decoder_only:
+        encoder = build_xcoder(
+            side=Side.encoder,
+            model_opts=model_opts,
+            vocabs_dict=vocabs_dict,
+            device=device,
+            task_queue_manager=task_queue_manager,
+            single_task=single_task,
+        )
 
     # Optionally share embeddings between encoder and decoder
-    dec_token_embs = None
-    share_embeddings = getattr(model_opts, 'share_encoder_decoder_embeddings', False)
+    share_embeddings = (not decoder_only) and getattr(model_opts, 'share_encoder_decoder_embeddings', False)
 
     if share_embeddings:
         # Get dimensions
@@ -355,14 +441,17 @@ def build_model(
 
     # Check if encoder and decoder have different dimensions
     # If so, skip attention bridge (it requires matching dimensions)
-    enc_dim = model_opts.enc_model_dim if getattr(model_opts, 'enc_model_dim', None) is not None else model_opts.model_dim
-    dec_dim = model_opts.dec_model_dim if getattr(model_opts, 'dec_model_dim', None) is not None else model_opts.model_dim
-
-    if enc_dim != dec_dim:
-        logger.info(f'Encoder dim ({enc_dim}) != Decoder dim ({dec_dim}): Skipping attention bridge')
+    if decoder_only:
         attention_bridge = None
     else:
-        attention_bridge = build_attention_bridge(model_opts)
+        enc_dim = model_opts.enc_model_dim if getattr(model_opts, 'enc_model_dim', None) is not None else model_opts.model_dim
+        dec_dim = model_opts.dec_model_dim if getattr(model_opts, 'dec_model_dim', None) is not None else model_opts.model_dim
+
+        if enc_dim != dec_dim:
+            logger.info(f'Encoder dim ({enc_dim}) != Decoder dim ({dec_dim}): Skipping attention bridge')
+            attention_bridge = None
+        else:
+            attention_bridge = build_attention_bridge(model_opts)
 
     model = NMTModel(
         encoder=encoder,

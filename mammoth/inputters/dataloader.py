@@ -442,7 +442,7 @@ class DynamicDatasetIter(object):
         batch_type,
         batch_size,
         batch_size_multiple,
-        max_look_ahead_sentences=2048,
+        max_look_ahead_sentences=20480,
         lookahead_minibatches=4,
         line_idx_restore=None,
     ):

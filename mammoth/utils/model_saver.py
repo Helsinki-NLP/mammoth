@@ -28,6 +28,7 @@ def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_ma
         optim,
         opts.keep_checkpoint,
         task_queue_manager,
+        opts=opts,
     )
     return model_saver
 
@@ -404,6 +405,7 @@ class ModelSaver(ModelSaverBase):
         optim,
         keep_checkpoint=-1,
         task_queue_manager=None,
+        opts=None,
     ):
         super().__init__(
             base_path,
@@ -415,14 +417,22 @@ class ModelSaver(ModelSaverBase):
             task_queue_manager,
         )
 
-        # Metric-based checkpoint tracking
-        self.save_strategy = model_opts.save_strategy if hasattr(model_opts, 'save_strategy') else 'steps'
-        self.metric_for_best_model = (
-            model_opts.metric_for_best_model if hasattr(model_opts, 'metric_for_best_model') else 'ppl'
-        )
-        self.greater_is_better = (
-            model_opts.greater_is_better if hasattr(model_opts, 'greater_is_better') else None
-        )
+        # Metric-based checkpoint tracking.
+        # save_strategy/metric_for_best_model/greater_is_better are run-time
+        # training config, not model architecture, so they must come from
+        # `opts` (this run's live config) rather than `model_opts`. When
+        # `train_from` is set, `model_opts` is loaded wholesale from the OLD
+        # checkpoint's frame opts (see train_single.py::_get_model_opts), so
+        # reading these off `model_opts` would silently discard the current
+        # run's save_strategy in favor of whatever the source checkpoint had
+        # (typically the default 'steps') -- resulting in only the metadata
+        # JSON being written and no real checkpoint files being saved. Fall
+        # back to `model_opts` for callers that don't pass `opts` (e.g. the
+        # one-shot conversion scripts' build_model_saver() calls).
+        strategy_opts = opts if opts is not None else model_opts
+        self.save_strategy = getattr(strategy_opts, 'save_strategy', 'steps')
+        self.metric_for_best_model = getattr(strategy_opts, 'metric_for_best_model', 'ppl')
+        self.greater_is_better = getattr(strategy_opts, 'greater_is_better', None)
 
         # Auto-infer greater_is_better if not specified
         if self.greater_is_better is None:

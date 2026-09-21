@@ -31,6 +31,7 @@ Usage:
 import argparse
 import json
 import os
+import shutil
 import sys
 import tempfile
 from argparse import Namespace
@@ -305,6 +306,13 @@ def convert(
     if save_path is not None:
         save_dir = os.path.dirname(save_path) or "."
         os.makedirs(save_dir, exist_ok=True)
+
+        # src and tgt share the same stripped tokenizer (see
+        # prepare_text_only_tokenizer) -- save the one copy alongside the
+        # checkpoint so it can be referenced from train.yaml's
+        # src_vocab/tgt_vocab maps.
+        shutil.copyfile(tokenizer_path, os.path.join(save_dir, "converted_vocab.json"))
+
         optimizer = MultipleOptimizer.from_opts(
             model=mammoth_model, opts=model_opts, task_queue_manager=tqm, frame_checkpoint=None,
         )

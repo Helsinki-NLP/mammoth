@@ -690,7 +690,9 @@ def _add_train_general_opts(parser):
         '--freeze_decoder',
         '-freeze_decoder',
         action='store_true',
-        help="Freeze all decoder parameters (self-attention, cross-attention, and feedforward). "
+        help="Freeze all decoder parameters (self-attention, cross-attention, feedforward, "
+             "sandwich-norm post-branch norms where present, and the vocabulary output "
+             "projection). "
              "Does not affect embeddings unless --freeze_decoder_embeddings is also set. "
              "Adapters remain trainable if configured. "
              "Can be combined with --freeze_cross_attention=false to keep only cross-attention trainable.",
@@ -699,13 +701,15 @@ def _add_train_general_opts(parser):
         '--freeze_encoder_embeddings',
         '-freeze_encoder_embeddings',
         action='store_true',
-        help="Freeze encoder token embeddings. Can be used independently or with --freeze_encoder.",
+        help="Freeze encoder token embeddings and the shared post-embedding norm. "
+             "Can be used independently or with --freeze_encoder.",
     )
     group.add(
         '--freeze_decoder_embeddings',
         '-freeze_decoder_embeddings',
         action='store_true',
-        help="Freeze decoder token embeddings. Can be used independently or with --freeze_decoder.",
+        help="Freeze decoder token embeddings and the shared post-embedding norm. "
+             "Can be used independently or with --freeze_decoder.",
     )
     group.add(
         '--freeze_cross_attention',
@@ -728,7 +732,9 @@ def _add_train_general_opts(parser):
         '--freeze_decoder_except_cross_attention',
         '-freeze_decoder_except_cross_attention',
         action='store_true',
-        help="Freeze decoder self-attention and feedforward layers, but keep cross-attention trainable. "
+        help="Freeze decoder self-attention, feedforward, sandwich-norm post-branch norms "
+             "(where present), and the vocabulary output projection, but keep cross-attention "
+             "trainable. "
              "Useful for adapting how decoder attends to encoder representations while keeping "
              "decoder's internal processing frozen. Adapters remain trainable if configured. "
              "Mutually exclusive with --freeze_decoder and --freeze_cross_attention.",

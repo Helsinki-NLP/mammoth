@@ -598,6 +598,18 @@ def _freeze_decoder_layers(model, freeze_cross_attn=True):
     """
     Freeze decoder layers, with optional control over cross-attention freezing.
 
+    Iterates stack.named_parameters() rather than listing block submodules by
+    name, so this automatically covers every parameter the stack owns -
+    including DecoderBlock's optional sandwich-norm post-branch norms
+    (norm1_post/norm3_post, only present when sandwich_norm=True, e.g. the
+    Gemma3 conversion) and TransformerStack.final_norm - without having to
+    keep a manually-enumerated list in sync with block.py.
+
+    Also freezes the shared vocabulary output projection (to_logits), since
+    it is decoder "body" output, not embeddings or cross-attention, and is
+    stored outside the stack (StackXcoder.shared_to_logits) so the stack loop
+    can't reach it.
+
     Args:
         model: NMTModel instance
         freeze_cross_attn: Whether to freeze cross-attention layers (default: True)
@@ -607,22 +619,18 @@ def _freeze_decoder_layers(model, freeze_cross_attn=True):
     """
     frozen_count = 0
 
-    def _freeze(module):
-        nonlocal frozen_count
-        for param in module.parameters():
-            param.requires_grad = False
-            frozen_count += param.numel()
-
     for layer_stack_index in model.decoder.attention_layers_by_xcoder_id.keys():
         for xcoder_id, stack in model.decoder.attention_layers_by_xcoder_id[layer_stack_index].items():
-            for block in stack.blocks:
-                _freeze(block.norm1)
-                _freeze(block.self_attn)
-                if freeze_cross_attn:
-                    _freeze(block.norm2)
-                    _freeze(block.cross_attn)
-                _freeze(block.norm3)
-                _freeze(block.ff)
+            for name, param in stack.named_parameters():
+                if not freeze_cross_attn and ('.cross_attn.' in name or '.norm2.' in name):
+                    continue
+                param.requires_grad = False
+                frozen_count += param.numel()
+
+    for head in model.decoder.shared_to_logits.values():
+        for param in head.parameters():
+            param.requires_grad = False
+            frozen_count += param.numel()
 
     return frozen_count
 
@@ -641,11 +649,8 @@ def _freeze_cross_attention_only(model):
 
     for layer_stack_index in model.decoder.attention_layers_by_xcoder_id.keys():
         for xcoder_id, stack in model.decoder.attention_layers_by_xcoder_id[layer_stack_index].items():
-            for block in stack.blocks:
-                for param in block.norm2.parameters():
-                    param.requires_grad = False
-                    frozen_count += param.numel()
-                for param in block.cross_attn.parameters():
+            for name, param in stack.named_parameters():
+                if '.cross_attn.' in name or '.norm2.' in name:
                     param.requires_grad = False
                     frozen_count += param.numel()
 
@@ -654,7 +659,11 @@ def _freeze_cross_attention_only(model):
 
 def _freeze_embeddings(xcoder):
     """
-    Freeze all token embeddings in an encoder or decoder.
+    Freeze all token embeddings in an encoder or decoder, along with the
+    shared post-embedding norm (StackXcoder.shared_post_emb_norms) - it is
+    applied directly to the token embedding output before any transformer
+    block runs, so it is grouped with "embeddings" rather than with the
+    attention/feedforward freeze functions.
 
     Args:
         xcoder: Encoder or Decoder instance (StackXcoder)
@@ -667,6 +676,11 @@ def _freeze_embeddings(xcoder):
     # Freeze all language-specific token embeddings
     for lang, token_emb in xcoder.token_embs.items():
         for param in token_emb.parameters():
+            param.requires_grad = False
+            frozen_count += param.numel()
+
+    for norm in xcoder.shared_post_emb_norms.values():
+        for param in norm.parameters():
             param.requires_grad = False
             frozen_count += param.numel()
 

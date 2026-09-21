@@ -469,12 +469,17 @@ class ModelSaver(ModelSaverBase):
         is better than the previous best. Simple but crucial!
 
         Args:
-            current: Current metric value
+            current: Current metric value (None if unavailable this round --
+                e.g. the configured metric_for_best_model couldn't be computed,
+                such as 'bleu' before the model produces any non-empty
+                predictions)
             best: Best metric value seen so far
 
         Returns:
             bool: True if current is better than best
         """
+        if current is None:
+            return False
         if self.greater_is_better:
             return current > best
         else:
@@ -512,8 +517,16 @@ class ModelSaver(ModelSaverBase):
         valid_metrics = [m for m in all_metrics if m is not None]
 
         if not valid_metrics:
+            # No device had a usable value for the configured metric this round
+            # (e.g. metric_for_best_model='bleu' but no device produced any
+            # non-empty predictions yet). Propagate None rather than a bogus
+            # sentinel: `_is_better_metric` treats None as "not better", so this
+            # round is skipped instead of comparing against a fabricated value
+            # that would incorrectly count as best (previously always float('inf'),
+            # which for greater_is_better metrics like bleu/accuracy compares as
+            # better than everything).
             logger.warning("No validation metrics collected from any device!")
-            return metric_value if metric_value is not None else float('inf')
+            return metric_value
 
         # Choose aggregation strategy based on metric type (conservative approach)
         if self.greater_is_better:

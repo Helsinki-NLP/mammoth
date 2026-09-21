@@ -77,7 +77,7 @@ def build_model_opts(config, enc_layers=1, enc_model_dim=64):
 
     opts = Namespace()
     opts.seed = 1
-    opts.model_dtype = "fp32"
+    opts.model_dtype = "bf16"
     opts.log_model_structure = False
     # Always weighted_sampling (see build_task_queue_manager) -- recorded
     # here too so the opts Namespace we save alongside the checkpoint is
@@ -287,7 +287,7 @@ def convert(
 
     config = get_text_config(hf_model_path)
     hf_model = AutoModelForCausalLM.from_pretrained(
-        hf_model_path, torch_dtype=torch.float32, local_files_only=True,
+        hf_model_path, torch_dtype=torch.bfloat16, local_files_only=True,
     ).eval()
 
     tokenizer_path = prepare_text_only_tokenizer(hf_model_path, config.vocab_size)

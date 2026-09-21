@@ -109,7 +109,7 @@ def compare(hf_model_path, mammoth_checkpoint, sentences, max_new_tokens,
             enc_layers, enc_model_dim):
     tok = AutoTokenizer.from_pretrained(hf_model_path, local_files_only=True)
     hf_model = AutoModelForCausalLM.from_pretrained(
-        hf_model_path, torch_dtype=torch.float32, local_files_only=True,
+        hf_model_path, dtype=torch.bfloat16, local_files_only=True,
     ).eval()
 
     mammoth_model, tqm = load_mammoth_model(

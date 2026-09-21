@@ -630,6 +630,13 @@ class ModelSaver(ModelSaverBase):
 
         metadata_file = f"{self.base_path}_checkpoint_metadata.json"
 
+        # This can be the first checkpoint-related write of the run (e.g. the
+        # save_strategy='steps' path calls this from track_metric() before any
+        # actual _save()), so the directory isn't guaranteed to exist yet.
+        metadata_dir = os.path.dirname(metadata_file)
+        if metadata_dir:
+            os.makedirs(metadata_dir, exist_ok=True)
+
         metadata = {
             "best_checkpoint": {
                 "step": self.best_checkpoint_step,

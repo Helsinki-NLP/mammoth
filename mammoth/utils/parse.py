@@ -35,8 +35,13 @@ class DataOptsCheckerMixin(object):
     def _validate_save_model_path(cls, opts):
         """Validate save_model path early to catch directory issues before training starts."""
         save_model_path = os.path.abspath(opts.save_model)
-        save_dir = os.path.dirname(save_model_path)
-        
+        # Take dirname of the raw path (before abspath) so a directory-style
+        # save_model ending in '/' resolves to itself, not its parent --
+        # abspath() strips the trailing slash, which would shift dirname()
+        # up one level. This must match the dirname logic in model_saver.py's
+        # _save(), which uses the raw (non-abspath'd) base_path.
+        save_dir = os.path.abspath(os.path.dirname(opts.save_model) or '.')
+
         # Check if the directory exists or can be created
         try:
             os.makedirs(save_dir, exist_ok=True)

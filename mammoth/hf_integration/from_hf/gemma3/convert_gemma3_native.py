@@ -287,7 +287,7 @@ def convert(
 
     config = get_text_config(hf_model_path)
     hf_model = AutoModelForCausalLM.from_pretrained(
-        hf_model_path, torch_dtype=torch.bfloat16, local_files_only=True,
+        hf_model_path, dtype=torch.bfloat16, local_files_only=True,
     ).eval()
 
     tokenizer_path = prepare_text_only_tokenizer(hf_model_path, config.vocab_size)

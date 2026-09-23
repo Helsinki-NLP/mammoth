@@ -194,7 +194,11 @@ def build_xcoder(
     for lang in all_langs:
         if lang not in token_embs:
             vocab = vocabs_dict[(side_str, lang)]
-            token_embs[lang] = nn.Embedding(len(vocab), dim)
+            emb = nn.Embedding(len(vocab), dim)
+            # Transformer-scale init: N(0, dim ** -0.5), so embedding norms stay
+            # O(1) regardless of model width (Vaswani et al. 2017 / fairseq convention).
+            nn.init.normal_(emb.weight, mean=0.0, std=dim ** -0.5)
+            token_embs[lang] = emb
 
     # 3. Build per-component shared modules (keyed by xcoder_id tuple)
     tasks = task_queue_manager.get_my_tasks()

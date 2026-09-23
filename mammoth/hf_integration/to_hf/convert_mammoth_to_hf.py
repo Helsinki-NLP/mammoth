@@ -73,7 +73,7 @@ def config_from_opts(
     return MammothConfig(
         model_dim=opts.model_dim,
         heads=opts.heads,
-        ff_mult=getattr(opts, 'ff_mult', 2.67),
+        ff_mult=getattr(opts, 'ff_mult', None) or 2.67,
         ff_swiglu=getattr(opts, 'ff_swiglu', True),
         enc_layers=list(opts.enc_layers),
         dec_layers=list(opts.dec_layers),

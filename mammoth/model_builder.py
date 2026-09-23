@@ -75,7 +75,13 @@ def build_xcoder(
     heads = side_opt('heads', 8)
     dim_head = side_opt('attn_dim_head', dim // heads)
     activation = side_opt('ff_activation', 'swiglu')
-    ff_mult = side_opt('ff_mult', 4.0 if activation == 'gelu' else 2.67)
+    # ff_mult has no static argparse default (see opts.py) so that an unset
+    # value here genuinely means "not provided" and falls through to the
+    # activation-based default below, rather than always resolving to
+    # swiglu's 2.67 regardless of ff_activation.
+    ff_mult = side_opt('ff_mult', None)
+    if ff_mult is None:
+        ff_mult = 4.0 if activation == 'gelu' else 2.67
     attn_drop = side_opt('attn_dropout', 0.0)
     ff_drop = side_opt('ff_dropout', 0.0)
     use_rotary = getattr(model_opts, 'rotary_pos_emb', False)

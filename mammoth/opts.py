@@ -382,9 +382,10 @@ def model_opts(parser):
         help='Number of attention heads. model_dim must be divisible by heads.',
     )
     group.add(
-        '--ff_mult', '-ff_mult', type=float, default=2.67,
+        '--ff_mult', '-ff_mult', type=float, default=None,
         help='FFN inner dimension multiplier: ff_inner = model_dim * ff_mult. '
-             'Default 2.67 (≈ 8/3) matches parameter count of a 4× GELU FFN when using SwiGLU (3 matrices vs 2).',
+             'If unset, the default is chosen from ff_activation: 2.67 (≈ 8/3, matches parameter '
+             'count of a 4× GELU FFN) for swiglu, 4.0 for gelu.',
     )
     group.add(
         '--ff_activation', '-ff_activation', type=str, default='swiglu',

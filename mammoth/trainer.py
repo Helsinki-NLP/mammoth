@@ -128,7 +128,7 @@ def build_trainer(
         'enc_layers': sum(opts.enc_layers) if opts.enc_layers else 6,
         'dec_layers': sum(opts.dec_layers) if opts.dec_layers else 6,
         'vocab_size': opts.tgt_vocab_size or 0,
-        'ff_mult': getattr(opts, 'ff_mult', 4.0),
+        'ff_mult': getattr(opts, 'ff_mult', None) or (4.0 if getattr(opts, 'ff_activation', 'swiglu') == 'gelu' else 2.67),
         'use_glu': False,
     }
 

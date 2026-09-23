@@ -628,19 +628,6 @@ def _add_train_general_opts(parser):
         action='store_true',
         help="Legacy opt for attention bridge. Init parameters with xavier_uniform.",
     )
-    group.add(
-        '--param_init_method',
-        '-param_init_method',
-        type=str,
-        default='xavier',
-        choices=['xavier', 'kaiming'],
-        help="Weight initialization method for the native PyTorch transformer backend "
-        "(encoder/decoder built by build_xcoder). Applied to every weight matrix (parameters "
-        "with more than 1 dimension) in the built encoder and decoder, including embeddings "
-        "and the output projection. 'xavier' uses xavier_uniform_ (default), 'kaiming' uses "
-        "kaiming_uniform_; both use gain/nonlinearity='relu'. Unrelated to --param_init / "
-        "--param_init_glorot, which only apply to the (legacy) attention bridge.",
-    )
 
     group.add(
         '--train_from',

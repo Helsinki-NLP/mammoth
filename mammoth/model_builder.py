@@ -5,7 +5,7 @@ and creates each encoder and decoder accordingly.
 import torch
 import torch.nn as nn
 from collections import defaultdict
-from torch.nn.init import xavier_uniform_, kaiming_uniform_
+from torch.nn.init import xavier_uniform_
 from typing import Optional, List, Dict, Tuple
 
 from mammoth.distributed.components import (
@@ -194,7 +194,11 @@ def build_xcoder(
     for lang in all_langs:
         if lang not in token_embs:
             vocab = vocabs_dict[(side_str, lang)]
-            token_embs[lang] = nn.Embedding(len(vocab), dim)
+            emb = nn.Embedding(len(vocab), dim)
+            # Transformer-scale init: N(0, dim ** -0.5), so embedding norms stay
+            # O(1) regardless of model width (Vaswani et al. 2017 / fairseq convention).
+            nn.init.normal_(emb.weight, mean=0.0, std=dim ** -0.5)
+            token_embs[lang] = emb
 
     # 3. Build per-component shared modules (keyed by xcoder_id tuple)
     tasks = task_queue_manager.get_my_tasks()
@@ -266,22 +270,6 @@ def build_xcoder(
     )
 
 
-def initialize_native_transformer_weights(module: nn.Module, method: str = 'xavier') -> None:
-    """Initialize weight matrices of the native PyTorch transformer backend (encoder/decoder
-    built by build_xcoder). Mirrors the legacy attention-bridge init pattern (param_init_glorot):
-    only parameters with more than 1 dimension are touched, so RMSNorm weights (1-D) are left
-    at their default of 1.0. All Linear layers in this backend are bias-free, so there are no
-    biases to skip either.
-    """
-    init_fn = {
-        'xavier': lambda p: xavier_uniform_(p, gain=nn.init.calculate_gain('relu')),
-        'kaiming': lambda p: kaiming_uniform_(p, nonlinearity='relu'),
-    }[method]
-    for p in module.parameters():
-        if p.dim() > 1:
-            init_fn(p)
-
-
 def build_attention_bridge(model_opts):
     attention_bridge = AttentionBridge.from_opts(model_opts)
 
@@ -345,7 +333,6 @@ def build_model(
     # (convert_gemma3_native.py). See NMTModel.forward for how encoder=None
     # is handled at inference time.
     decoder_only = getattr(model_opts, 'decoder_only', False)
-    param_init_method = getattr(model_opts, 'param_init_method', 'xavier')
 
     encoder = None
     dec_token_embs = None
@@ -358,7 +345,6 @@ def build_model(
             task_queue_manager=task_queue_manager,
             single_task=single_task,
         )
-        initialize_native_transformer_weights(encoder, param_init_method)
 
     # Optionally share embeddings between encoder and decoder
     share_embeddings = (not decoder_only) and getattr(model_opts, 'share_encoder_decoder_embeddings', False)
@@ -462,7 +448,6 @@ def build_model(
         single_task=single_task,
         token_embs=dec_token_embs,
     )
-    initialize_native_transformer_weights(decoder, param_init_method)
 
     # Check if encoder and decoder have different dimensions
     # If so, skip attention bridge (it requires matching dimensions)

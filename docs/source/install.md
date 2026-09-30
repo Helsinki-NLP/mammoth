@@ -1,4 +1,3 @@
-
 # LUMI & Roihu Quickstart
 
 This guide covers how to set up and run MAMMOTH training jobs on two CSC supercomputers:

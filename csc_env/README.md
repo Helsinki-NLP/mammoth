@@ -4,7 +4,7 @@ This directory contains configuration files, scripts, and documentation for runn
 
 ## Available Environments
 
-- **[LUMI & Roihu Quickstart](Roihu_Quickstart.md)** - LUMI (AMD MI250X / ROCm) and Roihu (NVIDIA GH200)
+- **[LUMI & Roihu Quickstart](../docs/source/CSC_quickstart.md)** - LUMI (AMD MI250X / ROCm) and Roihu (NVIDIA GH200)
 
 Each environment includes:
 - Environment setup scripts

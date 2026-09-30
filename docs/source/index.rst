@@ -29,9 +29,13 @@ Contents
       :maxdepth: 2
 
       install.md
+      CSC_quickstart.md
       prepare_data.md
+      HF_TOKENIZERS.md
+      INDEXED_DATASET_GUIDE.md
       examples/train_mammoth_101.md
       examples/sharing_schemes.md
+      exporting_to_huggingface.md
 
 .. toctree::
       :caption: Scripts

@@ -1,59 +1,77 @@
 # MAMMOTH Sharing Schemes
-MAMMOTH is designed as a flexible modular system, allowing users to configure, train, and test various sharing schemes. This tutorial will guide you through the process of setting up and experimenting with different sharing schemes, including:
+MAMMOTH is designed as a flexible modular system, allowing users to configure, train, and test various sharing schemes. This tutorial walks through setting up and experimenting with different sharing schemes, including:
 
 - fully shared
 - fully unshared
 - encoder shared
 - decoder shared
+- modular (partially shared) stacks
 
-The configuration for each scheme is managed through YAML files, ensuring a seamless and customizable experience.
+The scheme is controlled entirely by the YAML config, so switching between schemes never requires a code change.
 
-
-## Dataset
-For this tutorial, we will be utilizing the [UNPC](https://opus.nlpl.eu/UNPC/corpus/version/UNPC) dataset, which consists of manually translated UN documents spanning the last 25 years (1990 to 2014) for the six official UN languages: Arabic, Chinese, English, French, Russian, and Spanish.
-
-
-Before diving into the sharing schemes, we need to preprocess the data. You can download the processed data using the following command:
-```bash
-wget https://mammoth-share.a3s.fi/unpc.tar
-```
-
-Additionally, we require the corresponding vocabularies for the dataset. Download the vocabularies with the following command:
-```bash 
-wget https://mammoth-share.a3s.fi/vocab.tar.gz
-```
+The commands below follow the ready-to-use setups in `csc_env/` for the CSC supercomputers ([LUMI](https://docs.lumi-supercomputer.eu/) with AMD MI250X, and Roihu with NVIDIA GH200). The same configs work on any SLURM cluster, or on a single workstation GPU, once you adapt the paths.
 
 
-Now, let's explore an overview of the sharing schemes to better understand their functionalities.
+## Data and Tokenizers
+Each translation task needs:
+
+- **Parallel training data** — one source file and one target file per task (plain text or `.gz`, one sentence per line, line-aligned).
+- **Validation data (Optional)** — a source/target pair per task (the `csc_env` configs use [FLORES-200](https://github.com/openlanguagedata/flores) `dev`).
+- **One HuggingFace tokenizer per language** (`tokenizer.json`). MAMMOTH uses **separate source and target vocabularies**: `src_vocab` tokenizes the input, `tgt_vocab` tokenizes the output. HuggingFace tokenizer is suggested while SentencePiece model is also supported as a legacy option.
+
+Language codes are arbitrary strings (such as `eng`, `spa`, `fin`); they are used as keys in `src_vocab`/`tgt_vocab` and inside the sharing groups.
 
 
 ## Sharing Schemes Overview
 
-Let's delve into an overview of the MAMMOTH Sharing Schemes, each offering unique configurations for a flexible modular system.
+Think of the encoder and the decoder as a row of **components**, where each component holds one block of transformer layers (a "stack"). `enc_layers: [6]` means one component with 6 layers; `enc_layers: [6,6]` means two components with 6 layers each.
+
+Every task then puts a **name tag** on each component, using `enc_sharing_group` for the encoder components and `dec_sharing_group` for the decoder components. The rule is:
+
+> If two tasks put the same name tag on the same component, they use the **same weights** for it. Different tags mean separate weights.
+
+So the name tag decides who shares with whom:
+
+- a language name such as `eng` → only the tasks that also tag that component `eng` share it;
+- a common name such as `all` → every task that uses `all` shares it.
+
+The tag is just a label, so `all` is a convention and not a keyword. Any name works, as long as tasks that should share use the same one.
+
+Each list needs exactly one tag per component, so its length equals the length of `enc_layers` (or `dec_layers`). With a single component, that is a list with one tag, e.g. `["eng"]`.
+
+All examples below use the languages `eng`, `spa`, `fin` and `swe`, with one task per language pair. Only the sharing-group lines are shown; the rest of each task entry is identical to the full config in the next section.
 
 ### 1. **Fully Unshared:**
    - Each language maintains a distinct set of parameters for both encoder and decoder.
    - No parameter sharing occurs between languages.
 ```yaml
-  train_ar-ar:
-    dec_sharing_group:
-    - ar
-    enc_sharing_group:
-    - ar
+tasks:
+  eng-spa:
+    src_tgt: "eng-spa"
+    enc_sharing_group: ["eng"]
+    dec_sharing_group: ["spa"]
+  fin-swe:
+    src_tgt: "fin-swe"
+    enc_sharing_group: ["fin"]
+    dec_sharing_group: ["swe"]
 ```
-- `train_ar-ar`: This denotes the training configuration for the Arabic-to-Arabic language pair.
-- `dec_sharing_group`: Specifies the decoder sharing group, indicating which languages share decoder parameters. In this case, only Arabic (ar) is included, meaning no sharing with other languages for decoding.
-- `enc_sharing_group`: Denotes the encoder sharing group, signifying which languages share encoder parameters. Here, it's also set to only Arabic (ar), indicating no encoder parameter sharing with other languages.
+- `src_tgt`: the source and target language of the task; it selects the `src_vocab` and `tgt_vocab` entries.
+- `enc_sharing_group`: which encoder parameters this task uses. `["eng"]` is used only by tasks that also list `eng`, so nothing is shared with `fin`.
+- `dec_sharing_group`: same for the decoder. The two tasks have different source and target languages, so no parameters are shared at all. (If two tasks used the same decoder id, e.g. both `["spa"]`, they would share that decoder.)
 
 ### 2. **Shared Encoder, Separate Decoder:**
    - Encoder parameters are shared across all languages.
    - Each language has a separate set of parameters for the decoder.
 ```yaml
-  train_ar-ar:
-    dec_sharing_group:
-    - ar
-    enc_sharing_group:
-    - all
+tasks:
+  eng-spa:
+    src_tgt: "eng-spa"
+    enc_sharing_group: ["all"]
+    dec_sharing_group: ["spa"]
+  eng-fin:
+    src_tgt: "eng-fin"
+    enc_sharing_group: ["all"] # Notice the "all" component is shared by the both tasks
+    dec_sharing_group: ["fin"] # The decoder component is not shared
 ```
 
 ### 3. **Separate Encoder, Shared Decoder:**
@@ -61,91 +79,144 @@ Let's delve into an overview of the MAMMOTH Sharing Schemes, each offering uniqu
    - Decoder parameters are shared across all languages.
 
 ```yaml
-  train_ar-en:
-    dec_sharing_group:
-    - all
-    enc_sharing_group:
-    - ar
+tasks:
+  eng-spa:
+    src_tgt: "eng-spa"
+    enc_sharing_group: ["eng"]
+    dec_sharing_group: ["all"]
+  fin-spa:
+    src_tgt: "fin-spa"
+    enc_sharing_group: ["fin"] # The encoder component is not shared
+    dec_sharing_group: ["all"] # Notice the "all" component is shared by the both tasks
 ```
 
 ### 4. **Fully Shared:**
    - Both encoder and decoder parameters are shared across all languages.
-   - The entire model is shared among all language pairs.
+   - The entire transformer is shared among all language pairs.
 ```yaml
-  train_ar-ar:
-    dec_sharing_group:
-    - all
-    enc_sharing_group:
-    - all
+tasks:
+  eng-spa:
+    src_tgt: "eng-spa"
+    enc_sharing_group: ["all"]
+    dec_sharing_group: ["all"]
+  fin-spa:
+    src_tgt: "fin-spa"
+    enc_sharing_group: ["all"] # Both encoder and decoder are shared. 
+    dec_sharing_group: ["all"] # Note the "all" in encoder and "all" in decoder are TWO DIFFERENT components even if they use same name.
+```
+Note that embeddings and vocabularies stay per-language even in the fully shared scheme; only the transformer layer stacks are shared.
+
+### 5. **Modular (Partially Shared) Stacks:**
+   - `enc_layers` / `dec_layers` take a list, one entry per stack, and each stack gets its own sharing id.
+   - This lets one part of the encoder be language-specific while another part is shared.
+
+The multi-node Roihu example (`csc_env/roihu/multi_nodes.yaml`) uses a two-stack encoder and a single shared-by-target decoder stack:
+```yaml
+enc_layers: [6,6]    # two encoder stacks of 6 layers each
+dec_layers: [12]     # one decoder stack of 12 layers
+
+tasks:
+  fin-swe:
+    src_tgt: "fin-swe"
+    enc_sharing_group: ["fin","all"]   # stack 0: Finnish-specific, stack 1: shared by everyone
+    dec_sharing_group: ["swe"]         # Swedish-specific decoder
+```
+The `enc_sharing_group` list must have as many entries as `enc_layers` (likewise for the decoder).
+
+
+## Example Configuration
+
+A complete single-task config (`csc_env/lumi/single_node.yaml`; `csc_env/roihu/single_node.yaml` is identical apart from the paths). Adapt the paths to your machine:
+
+```yaml
+tasks:
+  eng-spa:
+    src_tgt: "eng-spa"
+    weight: 1                       # relative sampling weight of this task
+    introduce_at_training_step: 0   # step at which the task starts being sampled
+    node_gpu: "0:0"                 # "node:gpu" this task is placed on
+    enc_sharing_group: ["eng"]
+    dec_sharing_group: ["spa"]
+    transforms: [filtertoolong]
+    path_src: /path/to/train.eng.gz
+    path_tgt: /path/to/train.spa.gz
+    path_valid_src: /path/to/flores200/dev/eng_Latn.dev
+    path_valid_tgt: /path/to/flores200/dev/spa_Latn.dev
+
+src_vocab:
+   eng: /path/to/tokenizer/eng/32000/tokenizer.json
+tgt_vocab:
+   spa: /path/to/tokenizer/spa/32000/tokenizer.json
+
+# Model architecture
+enc_layers: [6]
+dec_layers: [6]
+model_dim: 1024
+model_dtype: bf16
+add_language_tokens: false
+
+# Native PyTorch transformer options
+heads: 16              # model_dim must be divisible by heads
+rotary_pos_emb: true   # RoPE (currently the only option)
+post_emb_norm: true    # RMSNorm after the token embedding
+attn_dropout: 0.1
+ff_dropout: 0.1
+ff_activation: swiglu  # "swiglu" (default) or "gelu"
+
+# Sequence lengths
+src_seq_length_min: 1
+tgt_seq_length_min: 1
+src_seq_length_max: 512
+tgt_seq_length_max: 512
+max_length: 512
+
+# Training
+train_steps: 100000
+early_stopping: 5
+accum_count: [4]
+lookahead_minibatches: 8
+batch_size: 23000
+batch_type: tokens
+normalization: tokens
+queue_size: 120
+
+# Optimizer and LR schedule
+optim: adamw
+learning_rate: 0.0003
+adam_beta1: 0.9
+adam_beta2: 0.95
+weight_decay: 0.01
+max_grad_norm: 1.0
+label_smoothing: 0.1
+warmup_steps: 1000
+decay_method: linear_warmup
+learning_rate_decay: 0.5
+start_decay_steps: 10000
+
+# Distributed setup
+world_size: 1          # total number of GPUs across all nodes
+gpu_ranks: [0]         # GPU ids used on each node
+node_rank: 0
+n_nodes: 1
+task_distribution_strategy: weighted_sampling
+seed: 42
+
+# Validation decoding
+valid_batch_size: 16
+valid_steps: 1500
+valid_metrics: [bleu, chrf]
+beam_size: 1
+
+# Checkpointing
+save_model: /path/to/output/model/
+save_strategy: best_and_last
+save_checkpoint_steps: 2500
+keep_checkpoint: 1
 ```
 
-You can conveniently download the complete configurations using the following command:
-```bash
-wget https://mammoth-share.a3s.fi/configs.tar.gz
-```
+The example configs also enable a BART-style denoising objective (`denoising_objective: bart`, `mask_ratio`, `mask_length`, `poisson_lambda`, `replace_length`); remove those keys if you only want plain translation training.
 
-These configurations provide a solid foundation for configuring, training, and testing various sharing schemes in the MAMMOTH framework. Ensure to modify the file paths according to your specific compute device configurations. Feel free to experiment and tailor these settings to suit your specific needs.
+For multi-GPU / multi-node runs, add one entry to `tasks` per language pair and place each on a GPU with `node_gpu: "<node>:<gpu>"`. Set `n_nodes`, `gpu_ranks` (GPU ids per node) and `world_size` (total GPU count) to match. See `csc_env/roihu/multi_nodes.yaml` for a 2-node × 4-GPU example with eight tasks.
 
-## Training Modular Systems
-
-
-### 1. **Setup:**
-To initiate the training process for MAMMOTH's modular systems, start by setting up the necessary environment variables:
-
-```bash
-export MAMMOTH=/path/to/mammoth
-export CONFIG=/path/to/configs/config.yaml
-```
-
-#### 2. **Training Command:**
-
-Execute the following command to commence training:
-
-```bash
-srun /path/to/wrapper.sh $MAMMOTH/train.py \
-    -config $CONFIG \
-    -master_ip $SLURMD_NODENAME \
-    -master_port 9969
-```
-
-For the wrapper script, use an example like the one below:
-```bash
-python -u "$@" --node_rank $SLURM_NODEID
-```
-
-This tutorial utilizes SLURM for job scheduling and parallel computing.
-You can tailor the provided commands for your specific needs, adapting them to alternative job scheduling systems or standalone setups.
-Ensure that the `config.yaml` file specifies the desired sharing scheme.
-
-The training can be run on a single GPU in which case the wrapper wouldn't be necessary. In this case, you can train with the following command. 
-```bash
-python -u $MAMMOTH/train.py -config $CONFIG
-```
-
-#### 3. **Inference Command:**
-
-After training, use the following command to test the model:
-```bash
-python3 -u $MAMMOTH/translate.py \
-    --config $CONFIG \
-    --model "$checkpoint" \
-    --task_id train_$sl-$tl \
-    --src $processed_data/$lp/$lp.$sl.sp \
-    --output $out_path/$sl-$tl.${base}hyp.sp \
-    --gpu 0 --shard_size 0 \
-    --batch_size 512
-```
-
-Remember to replace `$checkpoint`, `$sl` (source language), `$tl` (target language), `$lp` (language pair), `$processed_data`, and `$out_path` with appropriate values.
-
-We provide the model checkpoint trained using the aforementioned encoder shared scheme.
-```bash
-wget https://mammoth-share.a3s.fi/encoder-shared-models.tar.gz
-```
-
-#### Notes:
-- Make sure to adapt the paths and variables to your specific directory structure.
-- Adjust the `--gpu` flag in the testing command based on your GPU availability.
-- Ensure that the configuration file (`config.yaml`) contains the correct sharing scheme based on your experiment.
-
-This tutorial serves as a general guide, and it is recommended to refer to the specific configuration file for additional details and customization options. Feel free to explore and adapt the commands to suit your specific training and testing requirements, regardless of the job scheduling system you choose to employ.
+## Notes:
+- To test a different scheme, change only the `enc_sharing_group` / `dec_sharing_group` entries (and `node_gpu` if you add tasks), retrain, and point `task_id` at the task you want to decode.

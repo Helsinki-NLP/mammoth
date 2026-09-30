@@ -5,7 +5,7 @@
 
 ### What is MAMMOTH?
 
-MAMMOTH (Massively Multilingual Modular Open Translation Toolkit) is an open-source toolkit for training neural machine translation (NMT) models. It is built on top of [OpenNMT-py](https://opennmt.net/OpenNMT-py/) and uses [x-transformers](https://github.com/lucidrains/x-transformers) as its transformer backend. MAMMOTH is designed for large-scale multilingual training across multiple GPUs and nodes.
+MAMMOTH (Massively Multilingual Modular Open Translation Toolkit) is an open-source toolkit for training neural machine translation (NMT) models. It is built on top of [OpenNMT-py](https://opennmt.net/OpenNMT-py/) and uses its own native PyTorch transformer implementation as the transformer backend. MAMMOTH is designed for large-scale multilingual training across multiple GPUs and nodes.
 
 ### What can I use MAMMOTH for?
 
@@ -13,7 +13,7 @@ You can use MAMMOTH to:
 
 - Train translation models from scratch using your own parallel corpora (any language pair)
 - Train massively multilingual models — hundreds of language pairs in a single training run
-- Fine-tune from pretrained HuggingFace models (BART, Gemma3, or a hybrid of both)
+- Fine-tune from pretrained HuggingFace models (Gemma3)
 - Export trained models to HuggingFace format for easy sharing and inference
 
 ### How does MAMMOTH relate to OpenNMT-py?
@@ -29,7 +29,7 @@ We welcome contributions from the community. Please see [`CONTRIBUTING.md`](CONT
 
 ### How do I install MAMMOTH and run my first training?
 
-For installing on HPC clusters (LUMI, Roihu, etc.), see the [LUMI/Roihu quickstart guide](../../csc_env/CSC_quickstart.md).
+For installing on HPC clusters (LUMI, Roihu, etc.), see the [LUMI/Roihu quickstart guide](CSC_quickstart.md).
 
 The basic workflow is:
 
@@ -49,11 +49,6 @@ Writing training configs by hand gets difficult once you have many language pair
 - Parameter sharing groups based on language clustering
 
 See the [config_config documentation](config_config.md) for details. -->
-
-### How do I configure multi-node or multi-GPU training?
-
-
-For ready-to-use multi-node training scripts on LUMI and Roihu, see the [LUMI/Roihu quickstart guide](../../csc_env/CSC_quickstart.md).
 
 ### How do I set up parameter sharing between languages?
 
@@ -75,7 +70,7 @@ See the [sharing schemes example](examples/sharing_schemes.md) for more patterns
 
 ### Should I use HuggingFace tokenizers or SentencePiece?
 
-Both work, but we recommend HuggingFace tokenizers for new projects. They are faster (implemented in Rust), easier to set up, and integrate smoothly with the HuggingFace ecosystem. See the [HF tokenizers guide](../HF_TOKENIZERS.md) for instructions.
+Both work, but we recommend HuggingFace tokenizers for new projects. They are faster (implemented in Rust), working on-the-fly (you don't need to pre-tokenize the data), easier to set up, and integrate smoothly with the HuggingFace ecosystem. See the [HF tokenizers guide](HF_TOKENIZERS.md) for instructions.
 
 SentencePiece is still supported if you prefer it or have existing models.
 
@@ -83,7 +78,6 @@ SentencePiece is still supported if you prefer it or have existing models.
 
 Yes. MAMMOTH can convert pretrained HuggingFace models into MAMMOTH checkpoints for fine-tuning:
 
-- **BART** — use as an classic transformer architecture model (encoder + decoder)
 - **Gemma3** — use as decoder (a new encoder is randomly initialized)
 
 If you need a model that is not yet supported, please [open an issue](https://github.com/Helsinki-NLP/mammoth/issues) — we also welcome contributions for new model converters.
@@ -105,7 +99,9 @@ data/
     ...
 ```
 
-You can either pre-process files (e.g., apply subword tokenization yourself) or let MAMMOTH handle it at training time using **transforms** (e.g., `sentencepiece`, `prefix`, `filtertoolong`). Using transforms is recommended — it saves disk space and makes config generation faster.
+Your training files can be plain, untokenized text. With a HuggingFace tokenizer (the .json path in your vocab config), MAMMOTH tokenizes on the fly during training, so you don't need to pre-process anything. Use transforms for other on-the-fly steps such as filtertoolong, prefix or denoising.
+
+To tokenize once up front instead, set data_type: indexed. This writes .bin/.idx files next to your text, which removes tokenization cost during training. Transforms don't work with indexed data, so filter your data first. See [INDEXED_DATASET_GUIDE.md](INDEXED_DATASET_GUIDE.md).
 
 See [prepare_data.md](prepare_data.md) for full details.
 
@@ -122,13 +118,13 @@ python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
     --output-dir /path/to/hf_model
 ```
 
-For multi-task models, you can convert each task separately (per-task) or bundle everything into a single artifact. See the [exporting guide](../exporting_to_huggingface.md) for all options.
+For multi-task models, you can convert each task separately (per-task) or bundle everything into a single artifact. See the [exporting guide](exporting_to_huggingface.md) for all options.
 
 ### Can I run inference without installing MAMMOTH?
 
 Yes. Once you convert a model to HuggingFace format, anyone can run inference using standard HuggingFace dependencies plus extra dependencies (`transformers`, `torch`). No MAMMOTH installation needed.
 
-### How do I download models from HuggingFace Hub?
+### How do I download Mammoth (or any) models from HuggingFace Hub?
 
 Use the provided downloader:
 
@@ -138,7 +134,7 @@ python mammoth/hf_integration/to_hf/model_downloader.py \
     --local-dir ./my_model
 ```
 
-For multi-task single artifacts, you can download just one task to save space:
+For multi-task single artifact, you can download just one task to save space (Mammoth model only):
 
 ```bash
 python mammoth/hf_integration/to_hf/model_downloader.py \
@@ -163,8 +159,7 @@ See [training_tips.md](training_tips.md) for a full guide.
 Try these in order:
 
 1. Reduce `batch_size` (e.g., from 8192 to 4096 tokens)
-2. Reduce `src_seq_length_max` and `tgt_seq_length_max`
-3. Increase `accum_count` to keep the same effective batch size with smaller per-step memory
+2. Increase `accum_count` to keep the same effective batch size with smaller per-step memory (set `lookahead_minibatches` equals `accum_count`)
 
 ### What learning rate schedule should I use?
 
@@ -177,7 +172,7 @@ Enable TensorBoard in your config:
 ```yaml
 tensorboard: true
 report_every: 100
-report_training_accuracy: true
+report_training_accuracy: true # Note turning on this slows down training
 ```
 
 On LUMI, you can use the TensorBoard app on the dashboard. You can also tail the log files directly:
@@ -195,6 +190,7 @@ MAMMOTH distributes training across multiple GPUs and nodes. Each GPU handles a 
 
 You control this with:
 
+- `world_size`: total number of GPUs (one process per GPU) across all nodes, e.g. 2 nodes × 4 GPUs = 8.
 - `--node_rank`: which node this process runs on (0, 1, 2, ...)
 - `--master_ip` / `--master_port`: where all nodes connect to coordinate
 - `gpu_ranks`: which GPUs to use on the current node

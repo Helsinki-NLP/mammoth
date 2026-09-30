@@ -33,7 +33,7 @@ cat > ./multinode_train_script.sh << 'EOF'
 #!/bin/bash
 
 module purge
-load python-pytorch/2.10
+module load python-pytorch/2.10
 source /scratch/project_2017852/mammoth-shared/.venv/bin/activate
 
 

@@ -26,8 +26,7 @@ pip install tokenizers
 Use the provided example script to train a tokenizer:
 
 ```bash
-cd examples/hf_tokenizers
-python train.py --input_file your_corpus --output_dir your_output_dir --vocab_size 32000
+python mammoth/bin/build_vocab.py --input_file your_corpus --output_dir your_output_dir --vocab_size 32000
 ```
 
 **Key Configuration:**
@@ -57,7 +56,7 @@ MAMMOTH will automatically detect the `.json` extension and load it as a Hugging
 
 ### Tokenizer Training
 
-The example script (`examples/hf_tokenizers/train.py`) demonstrates:
+The example script (`mammoth/bin/build_vocab.py`) demonstrates:
 
 1. **Initialization**: Create a BPE tokenizer with special tokens
 2. **Pre-tokenization**: Configure Metaspace pre-tokenizer for word boundaries

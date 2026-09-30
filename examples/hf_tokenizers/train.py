@@ -110,8 +110,9 @@ tokenizer.enable_padding(pad_id=tokenizer.token_to_id("<pad>"), pad_token="<pad>
 
 # Save the trained tokenizer
 os.makedirs(OUTPUT_DIR, exist_ok=True)
-tokenizer.save(os.path.join(OUTPUT_DIR, "tokenizer.json"))
-print(f"Tokenizer saved to {OUTPUT_DIR}tokenizer.json")
+tokenizer_path = os.path.join(OUTPUT_DIR, "tokenizer.json")
+tokenizer.save(tokenizer_path)
+print(f"Tokenizer saved to {tokenizer_path}")
 
 # Also save in HuggingFace format for easy loading later
 from transformers import PreTrainedTokenizerFast

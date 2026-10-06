@@ -309,6 +309,14 @@ class DecodeStrategy(object):
             return t
         return t[select_mask]
 
+    def reorder_cache(self):
+        """Align the KV cache with this step's path selection.
+
+        Called once per step after advance()/update_finished(). Strategies
+        that pick parents each step (beam search) override this; greedy
+        decoding only prunes finished paths, which update_finished() handles.
+        """
+
     def update_finished_in_cache(self, select_mask):
         """Drop terminated beam paths from the KV cache."""
         if self.cache is None:

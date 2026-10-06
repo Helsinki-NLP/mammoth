@@ -172,13 +172,12 @@ class GreedySearch(DecodeStrategy):
                 target_prefix = rearrange(target_prefix, 'b -> 1 b')
             # repeat the prefix for each beam
             target_prefix = tile(target_prefix, self.parallel_paths, dim=1)
-        tiled_encoder_output = tile(encoder_output, self.parallel_paths, dim=1)
-        tiled_src_mask = tile(src_mask, self.parallel_paths, dim=1)
-
+        # encoder_output / src_mask are batch-first (B, T, ...); the base class
+        # tiles them once along the batch dim (one copy per path).
         super(GreedySearch, self).initialize(
             target_prefix=target_prefix,
-            encoder_output=tiled_encoder_output,
-            src_mask=tiled_src_mask,
+            encoder_output=encoder_output,
+            src_mask=src_mask,
         )
         self.select_indices = torch.arange(self.batch_size * self.beam_size, dtype=torch.long, device=self.device)
         self.original_batch_idx = tile(

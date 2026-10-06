@@ -976,6 +976,18 @@ def train_opts(parser):
     _add_decoding_opts(parser, include_reproducibility=False)
 
 
+def _str2bool(value):
+    """Parse true/false style values for boolean options that default to True."""
+    if isinstance(value, bool):
+        return value
+    v = str(value).strip().lower()
+    if v in ('true', 't', 'yes', 'y', '1', 'on'):
+        return True
+    if v in ('false', 'f', 'no', 'n', '0', 'off'):
+        return False
+    raise configargparse.ArgumentTypeError(f"Expected true or false, got {value!r}")
+
+
 def _add_decoding_opts(parser, include_reproducibility=True):
     group = parser.add_argument_group('Beam Search')
     beam_size = group.add('--beam_size', '-beam_size', type=int, default=1, help='Beam size')
@@ -1103,6 +1115,18 @@ def _add_decoding_opts(parser, include_reproducibility=True):
         '-ban_unk_token',
         action="store_true",
         help="Prevent unk token generation by setting unk proba to 0",
+    )
+    group.add(
+        '--kv_cache',
+        '-kv_cache',
+        type=_str2bool,
+        nargs='?',
+        const=True,
+        default=True,
+        help="Use the decoder KV cache (true/false, default true). With false, "
+        "the full target prefix is re-encoded at every step: much slower, "
+        "only useful for debugging or for checking that cached decoding "
+        "gives the same output.",
     )
     group.add(
         '--phrase_table',

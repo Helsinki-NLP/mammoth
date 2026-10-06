@@ -131,13 +131,12 @@ class BeamSearchBase(DecodeStrategy):
                 target_prefix = rearrange(target_prefix, 'b -> 1 b')
             # repeat the prefix for each beam
             target_prefix = tile(target_prefix, self.parallel_paths, dim=1)
-        tiled_encoder_output = tile(encoder_output, self.parallel_paths, dim=1)
-        tiled_src_mask = tile(src_mask, self.parallel_paths, dim=1)
-
+        # encoder_output / src_mask are batch-first (B, T, ...); the base class
+        # tiles them once along the batch dim (one copy per beam).
         super(BeamSearchBase, self).initialize(
             target_prefix=target_prefix,
-            encoder_output=tiled_encoder_output,
-            src_mask=tiled_src_mask,
+            encoder_output=encoder_output,
+            src_mask=src_mask,
         )
 
         self.best_scores = torch.full([self.batch_size], -1e10, dtype=self.dtype, device=self.device)
@@ -247,10 +246,22 @@ class BeamSearchBase(DecodeStrategy):
 
         _B_new = non_finished.shape[0]
         self.remove_finished_batches(_B_new, _B_old, non_finished, predictions, attention, step)
-        is_alive = ~rearrange(self.is_finished, 'batch beam -> (batch beam)')
-        if self.cache is not None:
-            # self.cache is a KVCache; drop finished beam paths.
-            self.update_finished_in_cache(is_alive)
+        # The KV cache is reordered by reorder_cache(), using select_indices.
+
+    def reorder_cache(self):
+        """Align the KV cache rows with the beams chosen by advance().
+
+        select_indices maps each surviving (batch, beam) row to its parent row
+        in the cache. After update_finished() it also excludes sentences that
+        completed, so this one gather covers both reordering and pruning.
+        """
+        if self.cache is None:
+            return
+        idx = self.select_indices
+        # Parents stay inside their own sentence and cross-attn K/V are the
+        # same for every beam of a sentence, so they only need indexing when
+        # whole sentences were dropped (row count shrank).
+        self.cache.reorder_beams(idx, reorder_cross=idx.numel() != self.cache.batch_size)
 
     def remove_finished_batches(self, _B_new, _B_old, non_finished, predictions, attention, step):
         # Remove finished batches for the next step.

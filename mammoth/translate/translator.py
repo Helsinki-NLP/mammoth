@@ -220,6 +220,7 @@ class Inference(object):
         task=None,
         model_dtype="fp32",
         decoder_start_with_eos=False,
+        use_kv_cache=True,
     ):
         assert task is not None
         self.task = task
@@ -244,6 +245,7 @@ class Inference(object):
         self._tgt_unk_idx = self._tgt_vocab.stoi[DefaultTokens.UNK]
         self._tgt_vocab_len = len(self._tgt_vocab)
         self._decoder_start_with_eos = decoder_start_with_eos
+        self.use_kv_cache = use_kv_cache
 
         self._gpu = gpu
         self._use_cuda = gpu > -1
@@ -372,6 +374,7 @@ class Inference(object):
             task=task,
             model_dtype=getattr(model_opts, 'model_dtype', 'fp32'),
             decoder_start_with_eos=decoder_start_with_eos,
+            use_kv_cache=getattr(opts, 'kv_cache', True),
         )
 
     def _log(self, msg):
@@ -589,12 +592,14 @@ class Inference(object):
         for batch in batches:
             batch.to(corpus.device)
 
-            # DEBUG: Print source tokens to verify transforms (e.g. prefix) were applied
-            src_vocab = corpus.vocabs['src']
-            src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1)  # [T, B, 1] -> [B, T]
-            for i, src_seq in enumerate(src_ids):
-                src_tokens = [src_vocab.itos[tok_id.item()] for tok_id in src_seq if tok_id.item() != 0]
-                self._log(f"[DEBUG] transforms={transforms} | src tokens: {src_tokens}")
+            # DEBUG: Print source tokens to verify transforms (e.g. prefix) were applied.
+            # Only with --verbose: it needs a device->host copy of the whole batch.
+            if self.verbose:
+                src_vocab = corpus.vocabs['src']
+                src_ids = batch.src.tensor.squeeze(-1).transpose(0, 1).tolist()  # [T, B, 1] -> [B, T]
+                for src_seq in src_ids:
+                    src_tokens = [src_vocab.itos[tok_id] for tok_id in src_seq if tok_id != 0]
+                    self._log(f"[DEBUG] transforms={transforms} | src tokens: {src_tokens}")
 
             batch_data = self.translate_batch(batch, corpus.vocabs['src'], attn_debug)
             translations = xlation_builder.from_batch(batch_data)
@@ -797,6 +802,49 @@ class Inference(object):
         return results
 
 
+def run_decode_loop(active_decoder, decode_strategy, seq_start_pos=None, use_kv_cache=True):
+    """Drive ``decode_strategy`` to completion with ``active_decoder``.
+
+    With ``use_kv_cache`` (and a decoder that supports it) the decoder is fed
+    only the newest token each step and keeps per-layer K/V in a ``KVCache``
+    that the strategy reorders/prunes as beams are selected and sentences
+    finish. Without it, the full prefix is re-encoded every step (slow, but
+    useful as a reference when checking the cached path).
+    """
+    cache_kv = use_kv_cache and active_decoder.can_cache_kv
+    if cache_kv and decode_strategy.cache is None:
+        decode_strategy.set_cache(active_decoder.new_kv_cache())
+
+    for step in range(decode_strategy.max_length):
+        decoder_input = decode_strategy.alive_seq
+        if cache_kv:
+            decoder_input = decoder_input[:, -1:]
+
+        logits_for_whole_sequence, new_cache = active_decoder(
+            decoder_input,
+            context=decode_strategy.encoder_output_tiled,
+            context_mask=decode_strategy.src_mask_tiled,
+            return_attn=False,
+            return_embeddings=False,
+            return_intermediates=True,
+            cache=decode_strategy.cache if cache_kv else None,
+            seq_start_pos=seq_start_pos,
+        )
+
+        # we only need the logits of the new prediction
+        logits = logits_for_whole_sequence[:, -1]
+        log_probs = torch.log_softmax(logits, dim=-1)
+
+        decode_strategy.advance(log_probs)
+        any_finished = decode_strategy.is_finished.any()
+        if any_finished:
+            decode_strategy.update_finished()
+            if decode_strategy.done:
+                break
+        if cache_kv:
+            decode_strategy.reorder_cache()
+
+
 class Translator(Inference):
 
     def translate_batch(self, batch, src_vocabs, attn_debug):
@@ -933,34 +981,9 @@ class Translator(Inference):
         )
 
         # (5) Begin decoding step by step:
-        for step in range(decode_strategy.max_length):
-            decoder_input = decode_strategy.alive_seq
-
-            logits_for_whole_sequence, new_cache = active_decoder(
-                decoder_input,
-                context=decode_strategy.encoder_output_tiled,
-                context_mask=decode_strategy.src_mask_tiled,
-                return_attn=False,
-                return_embeddings=False,
-                return_intermediates=True,
-                cache=decode_strategy.cache,
-                seq_start_pos=seq_start_pos,
-            )
-            # new_cache is a KVCache object
-
-            if active_decoder.can_cache_kv:
-                decode_strategy.set_cache(new_cache)
-
-            # we only need the logits of the new prediction
-            logits = logits_for_whole_sequence[:, -1]
-            log_probs = torch.log_softmax(logits, dim=-1)
-
-            decode_strategy.advance(log_probs)
-            any_finished = decode_strategy.is_finished.any()
-            if any_finished:
-                decode_strategy.update_finished()
-                if decode_strategy.done:
-                    break
+        run_decode_loop(
+            active_decoder, decode_strategy, seq_start_pos=seq_start_pos, use_kv_cache=self.use_kv_cache,
+        )
         # Log final results
         if self.logger:
             # Log the final token IDs for each sequence

@@ -19,12 +19,27 @@ class KVCache:
     def __init__(self, num_layers: int):
         self.layers: list[LayerCache] = [LayerCache() for _ in range(num_layers)]
 
-    def reorder_beams(self, beam_indices: Tensor) -> None:
-        """Reorder cache tensors in-place. Called by decode_strategy.py."""
+    @property
+    def batch_size(self) -> Optional[int]:
+        """Number of rows (batch * beam) currently held, or None if empty."""
+        for layer in self.layers:
+            if layer.self_k is not None:
+                return layer.self_k.size(0)
+            if layer.cross_k is not None:
+                return layer.cross_k.size(0)
+        return None
+
+    def reorder_beams(self, beam_indices: Tensor, reorder_cross: bool = True) -> None:
+        """Reorder cache tensors in-place. Called by decode_strategy.py.
+
+        Cross-attn K/V are identical across the beams of one sentence, so a
+        pure within-sentence beam reshuffle can pass ``reorder_cross=False``
+        and skip copying them; they only need indexing when rows are dropped.
+        """
         for layer in self.layers:
             if layer.self_k is not None:
                 layer.self_k = layer.self_k[beam_indices]
                 layer.self_v = layer.self_v[beam_indices]
-            if layer.cross_k is not None:
+            if reorder_cross and layer.cross_k is not None:
                 layer.cross_k = layer.cross_k[beam_indices]
                 layer.cross_v = layer.cross_v[beam_indices]

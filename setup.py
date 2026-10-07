@@ -11,7 +11,7 @@ setup(
     description='Massively Multilingual Modular Open Translation @ Helsinki',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    version='0.2.1',
+    version='0.3.0rc1',
     packages=find_packages(),
     project_urls={
         "Documentation": "https://helsinki-nlp.github.io/mammoth/",
@@ -19,15 +19,35 @@ setup(
         # "Gitter": "https://gitter.im/OpenNMT/OpenNMT-py",
         "Source": "https://github.com/Helsinki-NLP/mammoth",
     },
-    python_requires=">=3.9",
+    python_requires=">=3.10",
+    # Keep in sync with requirements.txt (see the comments there for why each bound exists).
     install_requires=[
+        "torch>=2.8",
+        "numpy>=2.0",
+        "einops>=0.8.1",
+        "transformers>=4.57",
+        "tokenizers>=0.22",
+        "huggingface-hub>=0.34.4",
+        "safetensors>=0.6.2",
+        "PyYAML>=6.0.2",
+        "ConfigArgParse>=1.7.1",
+        "click>=8.0",
+        "tqdm>=4.67.1",
+        "tensorboard>=2.20.0",
+        "sacrebleu>=2.5.1",
     ],
+    extras_require={
+        # Deprecated: use HF tokenizers. 0.2.2 changes tokenization and breaks test_sentencepiece.
+        "sentencepiece": ["sentencepiece==0.2.1"],
+        # CPU affinity binding on LUMI (train_single.py skips it if missing).
+        "affinity": ["psutil"],
+    },
     entry_points={
         "console_scripts": [
             # "onmt_server=mammoth.bin.server:main",
             "mammoth_train=mammoth.bin.train:main",
             "mammoth_translate=mammoth.bin.translate:main",
-            "mammoth_config_config=mammoth.bin.config_config:main",
+            # "mammoth_config_config=mammoth.bin.config_config:main",
             "mammoth_iterate_tasks=mammoth.bin.iterate_tasks:main",
             "mammoth_generate_synth_data=mammoth.bin.generate_synth_data:main",
             # "onmt_release_model=mammoth.bin.release_model:main",

@@ -15,7 +15,7 @@ parser = ArgumentParser(description='train.py')
 mammoth.opts.model_opts(parser)
 mammoth.opts._add_train_general_opts(parser)
 
-DEFAULT_ARGS = '-tasks dummy -node_rank 0 -model_dim 500 -seed 1'
+DEFAULT_ARGS = '-tasks dummy -node_rank 0 -model_dim 500 -seed 1 -max_length 256'
 
 VOCABS = {
     ('src', 'a'): Vocab(None, items=['a'], tag='dummy', specials=list(DEFAULT_SPECIALS)),

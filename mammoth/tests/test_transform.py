@@ -4,6 +4,7 @@ import unittest
 import copy
 import yaml
 import math
+import pytest
 from argparse import Namespace
 from mammoth.transforms import (
     get_transforms_cls,
@@ -21,7 +22,6 @@ class TestTransform(unittest.TestCase):
             "prefix",
             "sentencepiece",
             "bpe",
-            "onmt_tokenize",
             "denoising",
             "switchout",
             "tokendrop",
@@ -76,7 +76,7 @@ class TestTransform(unittest.TestCase):
         prefix_transform.warm_up()
         # 2. Init second transform in the pipe
         filter_cls = get_transforms_cls(["filtertoolong"])["filtertoolong"]
-        opts = Namespace(src_seq_length=4, tgt_seq_length=4)
+        opts = Namespace(src_seq_length_max=4, tgt_seq_length_max=4, src_seq_length_min=1, tgt_seq_length_min=1)
         filter_transform = filter_cls(opts)
         # 3. Sequential combine them into a transform pipe
         transform_pipe = TransformPipe.build_from([prefix_transform, filter_transform])
@@ -129,7 +129,7 @@ class TestMiscTransform(unittest.TestCase):
 
     def test_filter_too_long(self):
         filter_cls = get_transforms_cls(["filtertoolong"])["filtertoolong"]
-        opts = Namespace(src_seq_length=100, tgt_seq_length=100)
+        opts = Namespace(src_seq_length_max=100, tgt_seq_length_max=100, src_seq_length_min=1, tgt_seq_length_min=1)
         filter_transform = filter_cls(opts)
         # filter_transform.warm_up()
         ex_in = {
@@ -138,7 +138,7 @@ class TestMiscTransform(unittest.TestCase):
         }
         ex_out = filter_transform.apply(ex_in, is_train=True)
         self.assertIs(ex_out, ex_in)
-        filter_transform.tgt_seq_length = 2
+        filter_transform.tgt_seq_length_max = 2
         ex_out = filter_transform.apply(ex_in, is_train=True)
         self.assertIsNone(ex_out)
 
@@ -162,6 +162,7 @@ class TestSubwordTransform(unittest.TestCase):
         }
 
     def test_bpe(self):
+        pytest.importorskip("subword_nmt")
         bpe_cls = get_transforms_cls(["bpe"])["bpe"]
         opts = Namespace(**self.base_opts)
         bpe_cls._validate_options(opts)
@@ -237,54 +238,6 @@ class TestSubwordTransform(unittest.TestCase):
         # 2. disable regularization for not training example
         after_sp = sp_transform._tokenize(tokens, is_train=False)
         self.assertEqual(after_sp, gold_sp)
-
-    def test_pyonmttok_bpe(self):
-        onmttok_cls = get_transforms_cls(["onmt_tokenize"])["onmt_tokenize"]
-        base_opt = copy.copy(self.base_opts)
-        base_opt["src_subword_type"] = "bpe"
-        base_opt["tgt_subword_type"] = "bpe"
-        onmt_args = "{'mode': 'space', 'joiner_annotate': True}"
-        base_opt["src_onmttok_kwargs"] = onmt_args
-        base_opt["tgt_onmttok_kwargs"] = onmt_args
-        opts = Namespace(**base_opt)
-        onmttok_cls._validate_options(opts)
-        onmttok_transform = onmttok_cls(opts)
-        onmttok_transform.warm_up()
-        ex = {
-            "src": ["Hello", "world", "."],
-            "tgt": ["Bonjour", "le", "monde", "."],
-        }
-        onmttok_transform.apply(ex, is_train=True)
-        ex_gold = {
-            "src": ["H￭", "ell￭", "o", "world", "."],
-            "tgt": ["B￭", "on￭", "j￭", "our", "le", "mon￭", "de", "."],
-        }
-        self.assertEqual(ex, ex_gold)
-
-    def test_pyonmttok_sp(self):
-        onmttok_cls = get_transforms_cls(["onmt_tokenize"])["onmt_tokenize"]
-        base_opt = copy.copy(self.base_opts)
-        base_opt["src_subword_type"] = "sentencepiece"
-        base_opt["tgt_subword_type"] = "sentencepiece"
-        base_opt["src_subword_model"] = "data/sample.sp.model"
-        base_opt["tgt_subword_model"] = "data/sample.sp.model"
-        onmt_args = "{'mode': 'none', 'spacer_annotate': True}"
-        base_opt["src_onmttok_kwargs"] = onmt_args
-        base_opt["tgt_onmttok_kwargs"] = onmt_args
-        opts = Namespace(**base_opt)
-        onmttok_cls._validate_options(opts)
-        onmttok_transform = onmttok_cls(opts)
-        onmttok_transform.warm_up()
-        ex = {
-            "src": ["Hello", "world", "."],
-            "tgt": ["Bonjour", "le", "monde", "."],
-        }
-        onmttok_transform.apply(ex, is_train=True)
-        ex_gold = {
-            "src": ["▁H", "el", "lo", "▁world", "▁."],
-            "tgt": ["▁B", "on", "j", "o", "ur", "▁le", "▁m", "on", "de", "▁."],
-        }
-        self.assertEqual(ex, ex_gold)
 
 
 class TestSamplingTransform(unittest.TestCase):

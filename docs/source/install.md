@@ -4,7 +4,7 @@ This guide covers installing MAMMOTH on a local machine or a generic GPU server.
 
 ## Requirements
 
-- Python 3.9 or newer
+- Python 3.10 or newer
 - PyTorch 2.8 or newer (the test suite is verified on 2.8.0). A GPU build is needed for real training. CPU-only is fine for tests and small experiments.
 - A Unix-like OS (Linux or macOS)
 

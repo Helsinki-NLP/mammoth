@@ -33,12 +33,13 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+# fp32 so the exact-logit comparison is meaningful; bf16 (the converter default) differs by rounding.
 @pytest.fixture(scope="module")
 def converted():
     sys.path.insert(0, CONVERTER_DIR)
     from convert_gemma3_decoder_only import convert
 
-    mammoth_model, hf_model, tqm = convert(HF_MODEL_PATH, save_path=None)
+    mammoth_model, hf_model, tqm = convert(HF_MODEL_PATH, save_path=None, dtype="fp32")
     mammoth_model.eval()
     hf_model.eval()
     return mammoth_model, hf_model, tqm
@@ -102,6 +103,7 @@ def test_custom_task_id_decoder_group_and_lang():
         task_id="fin-lm",
         decoder_group="my_dec_group",
         lang="fin",
+        dtype="fp32",
     )
     mammoth_model.eval()
     hf_model.eval()

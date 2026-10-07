@@ -68,7 +68,12 @@ def get_text_config(hf_model_path):
     return config.text_config if hasattr(config, "text_config") else config
 
 
-def build_model_opts(config, enc_layers=1, enc_model_dim=64):
+# Mammoth's model_dtype string -> torch dtype used for the HF reference model. Both sides must use
+# the same dtype: a mismatch silently downcasts/upcasts weights during the copy.
+DTYPES = {"fp32": torch.float32, "bf16": torch.bfloat16}
+
+
+def build_model_opts(config, enc_layers=1, enc_model_dim=64, dtype="bf16"):
     """
     Mammoth model_opts matching Gemma3's decoder exactly, plus a tiny fake
     encoder (see module docstring). `enc_model_dim` can be much smaller than
@@ -81,7 +86,7 @@ def build_model_opts(config, enc_layers=1, enc_model_dim=64):
 
     opts = Namespace()
     opts.seed = 1
-    opts.model_dtype = "bf16"
+    opts.model_dtype = dtype
     opts.log_model_structure = False
     # Always weighted_sampling (see build_task_queue_manager) -- recorded
     # here too so the opts Namespace we save alongside the checkpoint is
@@ -275,6 +280,7 @@ def convert(
     src_lang=DEFAULT_LANG,
     tgt_lang=DEFAULT_LANG,
     weight=1.0,
+    dtype="bf16",
 ):
     """
     task_id: Mammoth corpus/task id. Defaults to "<src_lang>-<tgt_lang>".
@@ -284,19 +290,21 @@ def convert(
     src_lang / tgt_lang: language tags for the fake encoder's vocab/embedding
         and Gemma3's vocab/embedding respectively (tgt_lang is the
         meaningful one -- it owns the real converted weights).
+        dtype: "bf16" (default) or "fp32". Applied to both the HF model and the
+        Mammoth model. Use fp32 to compare logits exactly; bf16 differs by rounding.
     """
     if task_id is None:
         task_id = f"{src_lang}-{tgt_lang}"
 
     config = get_text_config(hf_model_path)
     hf_model = AutoModelForCausalLM.from_pretrained(
-        hf_model_path, dtype=torch.bfloat16, local_files_only=True,
+        hf_model_path, dtype=DTYPES[dtype], local_files_only=True,
     ).eval()
 
     tokenizer_path = prepare_text_only_tokenizer(hf_model_path, config.vocab_size)
     vocabs_dict = build_vocabs_dict(tokenizer_path, src_lang, tgt_lang)
 
-    model_opts = build_model_opts(config, enc_layers=enc_layers, enc_model_dim=enc_model_dim)
+    model_opts = build_model_opts(config, enc_layers=enc_layers, enc_model_dim=enc_model_dim, dtype=dtype)
     tqm = build_task_queue_manager(
         model_opts, vocabs_dict, task_id, encoder_group, decoder_group, src_lang, tgt_lang, weight=weight,
     )
@@ -355,6 +363,10 @@ def main():
         help="Language tag for Gemma3's vocab/embedding (the meaningful side).",
     )
     parser.add_argument("--weight", type=float, default=1.0, help="Task weight for weighted_sampling.")
+    parser.add_argument(
+        "--dtype", default="bf16", choices=sorted(DTYPES),
+        help="Dtype for the HF reference model and the converted Mammoth model.",
+    )
     args = parser.parse_args()
     convert(
         args.hf_model_path,
@@ -367,6 +379,7 @@ def main():
         src_lang=args.src_lang,
         tgt_lang=args.tgt_lang,
         weight=args.weight,
+        dtype=args.dtype,
     )
 
 

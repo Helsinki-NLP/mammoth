@@ -46,8 +46,11 @@ import torch
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
 sys.path.insert(0, REPO_ROOT)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from transformers import AutoConfig, AutoModelForCausalLM  # noqa: E402
+
+from gemma3_rope import get_gemma3_rope_thetas  # noqa: E402
 
 from mammoth.distributed.contexts import DeviceContextEnum, WorldContext  # noqa: E402
 from mammoth.distributed.tasks import (  # noqa: E402
@@ -105,8 +108,7 @@ def build_model_opts(config):
     opts.dec_scaled_embeddings = True
     opts.dec_sliding_window = config.sliding_window
     opts.dec_global_attn_every_n_layers = getattr(config, "_sliding_window_pattern", 6)
-    opts.dec_global_rope_theta = config.rope_theta
-    opts.dec_local_rope_theta = config.rope_local_base_freq
+    opts.dec_global_rope_theta, opts.dec_local_rope_theta = get_gemma3_rope_thetas(config)
 
     opts.rotary_pos_emb = True
     opts.post_emb_norm = False

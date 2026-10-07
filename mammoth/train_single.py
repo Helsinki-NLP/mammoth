@@ -346,6 +346,8 @@ def main(
 
     def _train_iter():
         profiler_range = get_profiler_range()
+        # Pinned memory only makes sense (and only works) when there is a GPU to transfer to
+        pin_memory = device_context.is_gpu()
 
         while True:
             with profiler_range("batch_queue_get"):
@@ -354,8 +356,8 @@ def main(
             # Reconstruct tensors from NumPy arrays (inverse of _detach_batch_tensors)
             # Pin memory for faster async GPU transfers
             with profiler_range("batch_tensor_reattach_from_cpu"):
-                batch = _reattach_batch_tensors(batch, pin_memory=True)
-                metadata = _reattach_batch_tensors(metadata, pin_memory=True)
+                batch = _reattach_batch_tensors(batch, pin_memory=pin_memory)
+                metadata = _reattach_batch_tensors(metadata, pin_memory=pin_memory)
             semaphore.release()
             # TODO: confirm that batch-providing corpus has already been to'd to the correct place
             yield batch, metadata, communication_batch_id

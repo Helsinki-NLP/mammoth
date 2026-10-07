@@ -123,8 +123,8 @@ seed: 3435
 # Only text is supported for now
 model_type: text
 #### filtertoolong transform parameters
-src_seq_length: 200
-tgt_seq_length: 200
+src_seq_length_max: 200
+tgt_seq_length_max: 200
 #### denoising transform parameters (not used in this configuration)
 mask_length: span-poisson
 poisson_lambda: 3.0
@@ -133,14 +133,12 @@ replace_length: 1
 denoising_objective: bart
 
 #######################################
-# Opts passed through to x-transformers
-x_transformers_opts:
-  # Use flash attention
-  attn_flash: True
-  # The number of attention heads
-  heads: 16
-  # Use rotary positional embeddings.
-  # This seems to be the only type of positional embedding that works properly in Mammoth.
-  rotary_pos_emb: True
-  # Tie the input and output embeddings of the decoder
-  tie_embedding: True
+# Model architecture (native PyTorch transformer)
+# The number of attention heads. model_dim must be divisible by heads.
+heads: 16
+# Use rotary positional embeddings.
+# This seems to be the only type of positional embedding that works properly in Mammoth.
+rotary_pos_emb: True
+
+# Maximum length of generated translations (required by mammoth_train and mammoth_translate)
+max_length: 200

@@ -46,7 +46,6 @@ You can pass through opts to the training config:
 
 ```yaml
 heads: 16              # attention heads (model_dim must be divisible by heads)
-rotary_pos_emb: true   # rotary positional embeddings (RoPE, currently the only option)
 ff_activation: swiglu  # choose between "swiglu" and "gelu", "swiglu" by default
 ```
 Note `RMSNorm` is the only normalisation function used by Mammoth for now. 
@@ -64,5 +63,4 @@ There are multiple benefits to the latter approach of using Mammoth transforms:
 - The transformation is applied online, and the result is not saved to disk. 
   This saves storage, which is especially relevant when using very large corpora and sampling different variations for each minibatch.
 - It is easy to apply sampling of different variations for each minibatch, e.g. subword regularization or denoising autoencoder.
-- It is easy to use the same corpus files symmetrically (e.g. the same files for English->Finnish and Finnish->English)
-  by prefixing the source data with language selection tokens.
+- It is easy to use the same corpus files symmetrically (e.g. the same files for English->Finnish and Finnish->English) by prefixing the source data with language selection tokens.

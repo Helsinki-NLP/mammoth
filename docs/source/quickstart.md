@@ -1,196 +1,186 @@
-
-
 # Quickstart
 
-MAMMOTH is specifically designed for distributed training of modular systems in multi-GPUs SLURM environments.
+This quickstart trains a small English→German translation model on [Multi30k](https://github.com/multi30k/dataset) on a single GPU (or on CPU, only to test your setup). It covers the whole workflow:
 
-In the example below, we will show you how to configure Mammoth.
-We will use two small experiments as examples
+1. Download the data.
+2. Train a tokenizer for each language.
+3. Write a training config.
+4. Train.
+5. Translate and score.
 
-1. A simple set of toy tasks with synthetic data. Easy and fast, requiring no resources except for the Mammoth package.
-2. A machine translation model with language-specific encoders and decoders.
+The result is a small baseline, not a production model. The point is to see how the pieces fit together.
 
-### Step 0: Install mammoth
+For running on the CSC supercomputers (LUMI, Roihu), see the [LUMI & Roihu quickstart](CSC_quickstart.md) instead.
 
-```bash
-pip install mammoth-nlp
-```
+## Before you start
 
-Check out the [installation guide](install) to install in specific clusters.
+- Install MAMMOTH from source by following the [installation guide](install.md). Activate the environment you created there.
+- A GPU (NVIDIA or AMD) is recommended. MAMMOTH also trains and translates on CPU, which is enough to check your setup but too slow for a useful model. To use the CPU, change the hardware settings as shown in Step 3.
+- Run every command below from the root of the MAMMOTH repository.
 
-## Experiment 1: Synthetic toy data
+## Step 1: Download the data
 
-A simple set of toy tasks with synthetic data. 
-Easy and fast, requiring no resources except for the Mammoth git repo.
-This example uses a very small vocabulary, so we can use a "word level" model without sentencepiece.
-The opts `--n_nodes`, `--n_gpus_per_node`, `--node_rank`, and `--gpu_rank` are set to use a single GPU.
-
-### Step 1: Activate your virtual env
+Multi30k is a small parallel corpus of image captions (about 29,000 training sentences per language).
 
 ```bash
-source ~/venvs/mammoth/bin/activate
-```
-
-### Step 2: Copy the config template from the Mammoth repo
-
-```bash
-mkdir config
-pushd config
-wget "https://raw.githubusercontent.com/Helsinki-NLP/mammoth/refs/heads/main/examples/synthdata.template.yaml"
-popd 
-```
-
-### Step 3: Generate synthetic data
-
-(this might take about 5 min)
-
-```bash
-mammoth_generate_synth_data \
-    --config_path config/synthdata.template.yaml \
-    --shared_vocab data/synthdata/shared_vocab
-```
-
-### Step 4: Generate the actual config from the config template 
-
-(this should only take a few seconds)
-
-```bash
-mammoth_config_config \
-    config_all \
-    --in_config config/synthdata.template.yaml \
-    --out_config config/synthdata.yaml \
-    --n_nodes 1 \
-    --n_gpus_per_node 1
-```
-
-### Step 5: Train the model
-
-(This might take about 1h. To speed things up, train for a shorter time, e.g. `--train_steps 5000 --warmup_steps 600`)
-
-```bash
-mammoth_train --config config/synthdata.yaml --node_rank 0 --gpu_rank 0
-```
-
-### Step 6: Translate
-
-(this might take a few minutes)
-
-  - `--model` takes a prefix of the checkpoint files, of the form `{save_model}_step_{step}`.
-  - `--random_sampling_topk 1` turns on greedy decoding.
-  - If you get `CUDA out of memory` try reducing the batch size, e.g. `--batch_size 50`.
-
-```bash
-mammoth_translate \
-    --config config/synthdata.yaml \
-    --node_rank 0 --gpu_rank 0 \
-    --model models/synthdata_step_50000 \
-    --random_sampling_topk 1 \
-    --max_length 200 \
-    --task_id copy_source-copy_source \
-    --src data/synthdata/test.copy_source-copy_source.src \
-    --output translations/synthdata/test.copy_source-copy_source.greedy.trans
-```
-
-## Experiment 2: Machine translation with multi30k
-
-### Step 1: Activate your virtual env
-
-```bash
-source ~/venvs/mammoth/bin/activate
-```
-
-### Step 2: Download data
-
-```bash
-mkdir data/multi30k
-pushd data/multi30k
-
-for language in cs en de fr; do
-    wget "https://github.com/multi30k/dataset/raw/refs/heads/master/data/task1/raw/test_2016_flickr.${language}.gz"
-    wget "https://github.com/multi30k/dataset/raw/refs/heads/master/data/task1/raw/val.${language}.gz"
-    wget "https://github.com/multi30k/dataset/raw/refs/heads/master/data/task1/raw/train.${language}.gz"
-done
-popd
-```
-
-### Step 3: Train sentencepiece models
-
-```bash
-mkdir -p models/spm
-for language in cs en de fr; do
-    zcat data/multi30k/train.${language}.gz > /tmp/spm_train_${language}.txt
-    spm_train --input /tmp/spm_train_${language}.txt --model_prefix=models/spm/spm.${language} --vocab_size 8000
-    rm /tmp/spm_train_${language}.txt
-done
-```
-
-### Step 4: Copy the config template from the Mammoth repo
-
-```bash
-mkdir config
-pushd config
-wget "https://raw.githubusercontent.com/Helsinki-NLP/mammoth/refs/heads/main/examples/multi30k.template.yaml"
-popd 
-```
-
-### Step 5: Generate the actual config from the config template 
-
-(this should only take a few seconds)
-
-```bash
-mammoth_config_config \
-    config_all \
-    --in_config config/multi30k.template.yaml \
-    --out_config config/multi30k.yaml \
-    --n_nodes 1 \
-    --n_gpus_per_node 1
-```
-
-### Step 6: Train the model
-
-(this might take a while)
-
-```bash
-mammoth_train --config config/multi30k.yaml --node_rank 0 --gpu_rank 0
-```
-
-### Step 7: Translate
-
-(this might take a while)
-
-  - `--model` takes a prefix of the checkpoint files, of the form `{save_model}_step_{step}`.
-  - `--random_sampling_topk 1` turns on greedy decoding.
-  - If you get `CUDA out of memory` try reducing the batch size, e.g. `--batch_size 50`.
-
-Note that this time there are 16 language pairs, so we use the `iterate_tasks` and a loop to translate all language pairs in one command.
-  - The `iterate_tasks` tool prints strings to use as parts of a command line. The strings contain spaces, so use a while-read-do loop.
-
-```bash
-export EXP_NAME=multi30k
-export STEP=50000
-CONFIG="config/${EXP_NAME}.yaml"
-MODEL="models/${EXP_NAME}_step_${STEP}"
-
-# Translate all language pairs
-mkdir -p "translations/${EXP_NAME}/"
-mammoth_iterate_tasks --config ${CONFIG} \
-    --src "data/${EXP_NAME}/test_2016_flickr.{src_lang}.gz" \
-    --output "translations/${EXP_NAME}/test_2016_flickr.{task_id}.greedy.trans" \
-    | while read task_flags; do \
-        mammoth_translate --config ${CONFIG} --node_rank 0 --gpu_rank 0 --model ${MODEL} --random_sampling_topk 1 --max_length 200       ${task_flags}; \
+mkdir -p data/multi30k
+cd data/multi30k
+for language in en de; do
+    for split in train val test_2016_flickr; do
+        wget "https://github.com/multi30k/dataset/raw/refs/heads/master/data/task1/raw/${split}.${language}.gz"
     done
+done
+cd ../..
 ```
 
-Congratulations! You've successfully translated text using your Mammoth model. Adjust the parameters as needed for your specific translation tasks.
+This gives you `train`, `val` (validation) and `test_2016_flickr` files for each language. The files are gzipped, one sentence per line, and MAMMOTH reads `.gz` files directly.
 
-### Further reading
+## Step 2: Train the tokenizers
 
-[Best practices for training](training_tips.md).
+MAMMOTH uses [Hugging Face tokenizers](HF_TOKENIZERS.md). Each language gets its own tokenizer, trained with `mammoth/bin/build_vocab.py`. The script reads plain text, so decompress the training data first (`gzip -dc` works on both Linux and macOS):
 
-Reference documentation for the `config_config` tool can be found at [The config_config tool](config_config.md).
+```bash
+for language in en de; do
+    gzip -dc data/multi30k/train.${language}.gz > data/multi30k/train.${language}.txt
+    python mammoth/bin/build_vocab.py \
+        --input_file data/multi30k/train.${language}.txt \
+        --output_dir models/tokenizers/${language} \
+        --vocab_size 8000
+done
+```
 
-A complete example for configuring different parameter sharing schemes is available at [MAMMOTH sharing schemes](examples/sharing_schemes.md).
+Each output directory contains a `tokenizer.json`, which is the file you point the config at.
 
-An older complete example of training on the Europarl dataset is available at [MAMMOTH101](examples/train_mammoth_101.md).
+A tokenizer only splits text into subwords. MAMMOTH adds the beginning and end of sequence tokens itself.
 
-An [older version of the quickstart](old_quickstart.md) describes a manual procedure for configuring Mammoth. It may be difficult to adapt to your use case.
+## Step 3: Write the training config
+
+Save the following as `multi30k_en_de.yaml`. It defines one translation task and a small Transformer.
+
+```yaml
+# ---- Task ----
+tasks:
+  en-de:
+    src_tgt: en-de
+    path_src: data/multi30k/train.en.gz
+    path_tgt: data/multi30k/train.de.gz
+    path_valid_src: data/multi30k/val.en.gz
+    path_valid_tgt: data/multi30k/val.de.gz
+    # Parameter-sharing groups: which encoder and decoder stack this task uses.
+    enc_sharing_group: [en]
+    dec_sharing_group: [de]
+    # Run this task on node 0, GPU 0.
+    node_gpu: "0:0"
+    transforms: [filtertoolong]
+    weight: 1
+    introduce_at_training_step: 0
+
+# ---- Tokenizers (one per language) ----
+src_vocab:
+  en: models/tokenizers/en/tokenizer.json
+tgt_vocab:
+  de: models/tokenizers/de/tokenizer.json
+use_hf_tokenizer: true
+
+# ---- Hardware ----
+# One GPU. For CPU-only, use `world_size: 0` and `gpu_ranks: []`.
+n_nodes: 1
+world_size: 1
+gpu_ranks: [0]
+
+# ---- Model ----
+model_dim: 256
+heads: 4
+enc_layers: [3]
+dec_layers: [3]
+rotary_pos_emb: true
+dropout: 0.1
+label_smoothing: 0.1
+
+# ---- Data ----
+batch_size: 4096
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 2048
+src_seq_length_max: 100
+tgt_seq_length_max: 100
+
+# ---- Optimization ----
+optim: adam
+adam_beta1: 0.9
+adam_beta2: 0.998
+learning_rate: 0.0005
+decay_method: linear_warmup
+warmup_steps: 1000
+max_grad_norm: 1.0
+train_steps: 10000
+valid_steps: 1000
+report_every: 100
+save_checkpoint_steps: 2500
+keep_checkpoint: 3
+seed: 3435
+
+# ---- Output ----
+save_model: models/multi30k_en_de
+max_length: 200
+```
+
+The keys worth knowing about:
+
+- **`tasks`**: every translation direction is a task. The task id (`en-de`) is what you pass to `--task_id` when translating. A multilingual setup lists many tasks, and tasks that name the same sharing group share parameters. That sharing is MAMMOTH's main feature. See [Modular model](modular_model.md) and [Sharing schemes](examples/sharing_schemes.md).
+- **`enc_sharing_group` / `dec_sharing_group`**: one entry per layer stack. Here there is one encoder stack (`en`) and one decoder stack (`de`), so `enc_layers` and `dec_layers` each have one number.
+- **`src_vocab` / `tgt_vocab`**: one tokenizer per language. The tokenizer for a language must be the same one used at translation time.
+- **`gpu_ranks`, `world_size`, `n_nodes`**: these must describe the same hardware. `gpu_ranks: [0]` means one GPU in this node. An empty `gpu_ranks` with `world_size: 0` selects the CPU, and both training and translation then run on CPU.
+- **`src_seq_length_max` / `tgt_seq_length_max`**: used by the `filtertoolong` transform, which drops training pairs longer than this many tokens.
+
+On a small GPU, lower `batch_size`. To check that everything works before a full run (or when using the CPU), set `train_steps: 200` and `save_checkpoint_steps: 200`. A model trained for so few steps will produce poor or empty translations, which is expected.
+
+## Step 4: Train
+
+```bash
+mammoth_train --config multi30k_en_de.yaml --node_rank 0
+```
+
+`--node_rank` is always required. It is `0` when you train on a single machine.
+
+Training prints statistics every `report_every` steps and runs validation every `valid_steps`. Checkpoints are written under `models/`, named from `save_model` and the step number. The tokenizer files in `models/tokenizers/` are also updated in place if the config adds language tokens, so keep them next to the model.
+
+## Step 5: Translate
+
+Point `--model` at the checkpoint directory. MAMMOTH loads the best checkpoint if there is one, and otherwise the latest.
+
+```bash
+mkdir -p translations
+mammoth_translate \
+    --config multi30k_en_de.yaml \
+    --model models/ \
+    --task_id en-de \
+    --src data/multi30k/test_2016_flickr.en.gz \
+    --output translations/test_2016_flickr.en-de.trans \
+    --beam_size 5
+```
+
+Translation uses the hardware settings from the config (the GPU, or the CPU if `gpu_ranks` is empty).
+
+- `--task_id` selects which task's encoder, decoder and tokenizers to use.
+- `--random_sampling_topk 1` switches to greedy decoding (instead of beam search).
+- If you get `CUDA out of memory`, add `--batch_size 50`.
+
+### Score the output
+
+`sacrebleu` is installed with MAMMOTH's requirements.
+
+```bash
+gzip -dc data/multi30k/test_2016_flickr.de.gz > translations/test_2016_flickr.de.ref
+sacrebleu translations/test_2016_flickr.de.ref -i translations/test_2016_flickr.en-de.trans
+```
+
+## Where to go next
+
+- **More languages.** Add one entry per direction under `tasks`, one tokenizer per language under `src_vocab` / `tgt_vocab`, and choose sharing groups. For a multilingual model, add the `prefix` transform so the model knows the target language. See [Sharing schemes](examples/sharing_schemes.md).
+- **More GPUs or nodes.** Set `n_nodes`, `world_size` and `gpu_ranks`, and give each task a `node_gpu` of the form `"<node>:<gpu>"`. See [Modular model](modular_model.md).
+- [Best practices for training](training_tips.md).
+- [Preparing your own data](prepare_data.md).
+- [Hugging Face tokenizers guide](HF_TOKENIZERS.md).
+- [Export a trained model to Hugging Face](exporting_to_huggingface.md).
+- A multi-task, multi-GPU walkthrough on Europarl, including multi-node training: [MAMMOTH 101](examples/train_mammoth_101.md).

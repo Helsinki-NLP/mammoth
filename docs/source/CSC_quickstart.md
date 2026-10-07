@@ -205,19 +205,7 @@ python train.py \
 
 ### Inference (Roihu)
 
-On Roihu, run translation directly without a container:
-
-```bash
-module purge
-module load python-pytorch/2.10
-source <Path to Python venv>
-
-python mammoth/translate.py \
-    -config inference.yaml \
-    --gpu_ranks 0
-```
-
-Or submit as a SLURM job (single GPU is usually enough):
+Submit as a SLURM job (single GPU is usually enough), for example:
 
 ```bash
 #SBATCH --partition=gpupilot
@@ -225,17 +213,11 @@ Or submit as a SLURM job (single GPU is usually enough):
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:gh200:1
 #SBATCH --time=0-00:30:00
+
+module purge
+module load python-pytorch/2.10
+export TOKENIZERS_PARALLELISM=False
+export MAMMOTH_PLATFORM=nvidia
+/scratch/<your_project>/mammoth-shared/.venv/bin/python /scratch/<your_project>/mammoth-shared/mammoth_pytorch/mammoth/translate.py -config <your_inference_config_yaml>
 ```
-
-Use the same `csc_env/inference.yaml` template as LUMI. Fill in `model`, `src`, `output`, and `task_id`. 
-
 ---
-
-## Monitoring Jobs
-
-```bash
-squeue -u $USER                         # list your running jobs
-scontrol show job <job_id>              # job details
-tail -f ./log/training.<job_id>.out    # live stdout
-tail -f ./log/training.<job_id>.err    # live stderr
-```

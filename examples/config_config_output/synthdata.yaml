@@ -11,12 +11,14 @@ enc_layers:
 - 3
 gpu_ranks:
 - 0
+heads: 16
 keep_checkpoint: 3
 label_smoothing: 0.2
 learning_rate: 3.0e-05
 mask_length: span-poisson
 mask_ratio: 0.2
 max_grad_norm: 1.0
+max_length: 200
 model_dim: 256
 model_type: text
 n_nodes: 1
@@ -25,10 +27,11 @@ optim: sgd
 poisson_lambda: 3.0
 replace_length: 1
 report_every: 1000
+rotary_pos_emb: true
 save_checkpoint_steps: 10000
 save_model: models/synthdata
 seed: 3435
-src_seq_length: 200
+src_seq_length_max: 200
 src_vocab:
   copy_source: data/synthdata/shared_vocab
   counting: data/synthdata/shared_vocab
@@ -191,7 +194,7 @@ tasks:
     transforms:
     - filtertoolong
     weight: 1
-tgt_seq_length: 200
+tgt_seq_length_max: 200
 tgt_vocab:
   copy_source: data/synthdata/shared_vocab
   counting: data/synthdata/shared_vocab
@@ -209,9 +212,4 @@ valid_steps: 1000
 warmup_steps: 3000
 weight_decay: 0.05
 world_size: 1
-x_transformers_opts:
-  attn_flash: true
-  heads: 16
-  rotary_pos_emb: true
-  tie_embedding: true
 

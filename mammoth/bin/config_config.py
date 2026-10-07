@@ -64,8 +64,9 @@ def external_linecount(file_path):
     Transparently supports gzip files based on .gz ending.
     """
     if file_path.endswith('.gz'):
+        # gzip -dc rather than zcat: macOS zcat only accepts .Z files
         ext_lc = subprocess.check_output(
-            ['zcat {} | wc -l'.format(file_path)], shell=True).split()[0]
+            ['gzip -dc {} | wc -l'.format(file_path)], shell=True).split()[0]
     else:
         ext_lc = subprocess.check_output(['wc', '-l', file_path]).split()[0]
     ext_lc = int(ext_lc.decode('utf-8'))

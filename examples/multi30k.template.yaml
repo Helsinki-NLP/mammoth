@@ -19,7 +19,6 @@ config_config:
   zero_shot: False
   # Transforms for translation tasks.
   transforms:
-    - sentencepiece
     - prefix
     - filtertoolong
     - denoising
@@ -46,17 +45,17 @@ config_config:
     de: "de"
     fr: "fr"
 
-# Paths to vocabulary files. Also specifies which languages to consider as source and target languages
+# Paths to Hugging Face tokenizer files (see docs/source/HF_TOKENIZERS.md). Also specifies which languages to consider as source and target languages
 src_vocab: 
-    cs: "models/spm/spm.cs.vocab"
-    en: "models/spm/spm.en.vocab"
-    de: "models/spm/spm.de.vocab"
-    fr: "models/spm/spm.fr.vocab"
+    cs: "models/tokenizers/cs/tokenizer.json"
+    en: "models/tokenizers/en/tokenizer.json"
+    de: "models/tokenizers/de/tokenizer.json"
+    fr: "models/tokenizers/fr/tokenizer.json"
 tgt_vocab:
-    cs: "models/spm/spm.cs.vocab"
-    en: "models/spm/spm.en.vocab"
-    de: "models/spm/spm.de.vocab"
-    fr: "models/spm/spm.fr.vocab"
+    cs: "models/tokenizers/cs/tokenizer.json"
+    en: "models/tokenizers/en/tokenizer.json"
+    de: "models/tokenizers/de/tokenizer.json"
+    fr: "models/tokenizers/fr/tokenizer.json"
 
 ################################
 # Opts passed through to Mammoth
@@ -111,16 +110,11 @@ max_grad_norm: 1.0
 seed: 3435
 # Only text is supported for now
 model_type: text
-#### sentencepiece transform parameters
-src_subword_model: models/spm/spm.{src_lang}.model
-src_subword_nbest: 5
-src_subword_type: sentencepiece
-tgt_subword_model: models/spm/spm.{tgt_lang}.model
-tgt_subword_nbest: 5
-tgt_subword_type: sentencepiece
+# Use Hugging Face tokenizers. Tokenization is done by the tokenizer files given in src_vocab and tgt_vocab
+use_hf_tokenizer: True
 #### filtertoolong transform parameters
-src_seq_length: 200
-tgt_seq_length: 200
+src_seq_length_max: 200
+tgt_seq_length_max: 200
 #### denoising transform parameters
 mask_length: span-poisson
 poisson_lambda: 3.0
@@ -129,14 +123,12 @@ replace_length: 1
 denoising_objective: bart
 
 #######################################
-# Opts passed through to x-transformers
-x_transformers_opts:
-  # Use flash attention
-  attn_flash: True
-  # The number of attention heads
-  heads: 16
-  # Use rotary positional embeddings.
-  # This seems to be the only type of positional embedding that works properly in Mammoth.
-  rotary_pos_emb: True
-  # Tie the input and output embeddings of the decoder
-  tie_embedding: True
+# Model architecture (native PyTorch transformer)
+# The number of attention heads. model_dim must be divisible by heads.
+heads: 16
+# Use rotary positional embeddings.
+# This seems to be the only type of positional embedding that works properly in Mammoth.
+rotary_pos_emb: True
+
+# Maximum length of generated translations (required by mammoth_train and mammoth_translate)
+max_length: 200

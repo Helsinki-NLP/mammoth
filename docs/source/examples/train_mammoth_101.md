@@ -1,1566 +1,378 @@
-
 # Training MAMMOTH 101
 
+This walkthrough trains a multilingual translation model with language-specific encoders and decoders on the [Europarl parallel corpus](https://www.statmt.org/europarl/), a multilingual resource extracted from European Parliament proceedings that covers 21 European languages. If you use the data in your research, please cite Philipp Koehn, "Europarl: A Parallel Corpus for Statistical Machine Translation," MT Summit 2005.
 
-This example uses the [Europarl parallel corpus](https://www.statmt.org/europarl/) - a multilingual resource extracted from European Parliament proceedings, containing text in 21 European languages. If you use the data in your research, please cite the paper by Philipp Koehn, "Europarl: A Parallel Corpus for Statistical Machine Translation," presented at the MT Summit 2005.
-The tokenization is done with [sentencepiece](https://github.com/google/sentencepiece).
+It is the multi-GPU follow-up to the [Quickstart](../quickstart.md), which trains one language pair on one GPU. Here you will:
 
-## Step 0: Download the data and SentencePiece model
+1. Download and split the data.
+2. Train a tokenizer.
+3. Write a config with several tasks and assign them to GPUs.
+4. Scale the config to more languages and to several nodes.
+5. Launch training.
 
-Download the Release v7 - a further expanded and improved version of the Europarl corpus on 15 May 2012 - from the original website or download the processed data by us:
+Tokenization uses [Hugging Face tokenizers](../HF_TOKENIZERS.md), and the model is MAMMOTH's native PyTorch Transformer. Run every command from the root of the MAMMOTH repository, with the environment from the [installation guide](../install.md) active.
+
+## The model you will train
+
+Every language gets its own encoder stack and its own decoder stack. A task such as `bg-en` uses the Bulgarian encoder and the English decoder, so each stack is trained by every task that uses it. The English decoder, for example, learns from all the `xx-en` tasks. This is the "language-specific" sharing scheme described in [Sharing schemes](sharing_schemes.md).
+
+For each non-English language `xx` there are three tasks:
+
+| Task | Encoder | Decoder | Data | Transforms |
+|---|---|---|---|---|
+| `xx-en` | `xx` | `en` | Europarl `xx`→`en` | `filtertoolong` |
+| `en-xx` | `en` | `xx` | Europarl `en`→`xx` | `filtertoolong` |
+| `xx-xx` | `xx` | `xx` | `xx` side of Europarl, as both source and target | `filtertoolong`, `denoising` |
+
+The `xx-xx` task is an autoencoder: the `denoising` transform corrupts the source (BART-style masking) and the model learns to reconstruct it. It trains the `xx` encoder and decoder on text from their own language, without needing a translation.
+
+To keep things small we start with two languages next to English (`bg` and `cs`, 6 tasks, 2 GPUs). [Step 4](#step-4-scale-up-more-languages-more-nodes) scales the same config to all 21 languages on several nodes.
+
+## Step 1: Download and split the data
+
+Download Europarl Release v7 (the version of 15 May 2012) from the original website, or use our processed copy. The three-language archive (about 666 MB) covers this walkthrough, and the full archive needs about 30 GB:
+
 ```bash
-wget https://mammoth101.a3s.fi/europarl.tar.gz
+wget https://mammoth101.a3s.fi/europarl-3langs.tar.gz   # or europarl.tar.gz for all languages
+mkdir europarl_data
+tar -xvzf europarl-3langs.tar.gz -C europarl_data
 ```
 
-We use a SentencePiece model trained on OPUS Tatoeba Challenge data with 64k vocabulary size. Download the SentencePiece model and the vocabulary:
+The next step is to check that source and target are line-aligned, clean the pairs, shuffle, and hold out a validation set. This is done by the `prepare_parallel.py` script from [Preparing your data](../prepare_data.md#step-2-check-clean-and-split-trainvalid). Save that script, then run:
+
 ```bash
-# Download the SentencePiece model
-wget https://mammoth101.a3s.fi/opusTC.mul.64k.spm
-# Download the vocabulary
-wget https://mammoth101.a3s.fi/opusTC.mul.vocab.onmt
+for lang in bg cs; do
+    python prepare_parallel.py \
+        --src europarl_data/europarl/${lang}-en/europarl-v7.${lang}-en.${lang} \
+        --tgt europarl_data/europarl/${lang}-en/europarl-v7.${lang}-en.en \
+        --src_lang ${lang} --tgt_lang en \
+        --out_dir europarl_data/split/${lang}-en \
+        --valid_size 1000
+done
 ```
 
-## Step 1: Prepare the data
+You end up with `europarl_data/split/bg-en/{train,val}.{bg,en}` and the same for `cs-en`. See [Preparing your data](../prepare_data.md) for details on what the script does.
 
-Then, read parallel text data, processes it, and generate output files for training and validation sets. 
-Here's a high-level summary of the main processing steps. For each language in 'langs,' 
-- read parallel data files.
-- clean the data by removing empty lines.
-- shuffle the data randomly.
-- tokenizes the text using SentencePiece and writes the tokenized data to separate output files for training and validation sets.
+## Step 2: Train the tokenizer
 
-We use a positional argument 'lang' that can accept one or more values, for specifying the languages (e.g., `bg` and `cs` as used in Europarl) to process.
+All languages share one BPE tokenizer here, trained on the training files of every language. `build_vocab.py` accepts any number of input files:
 
-You're free to skip this step if you directly download the processed data. For details, see [this page](../prepare_data.md#europarl).
+```bash
+python mammoth/bin/build_vocab.py \
+    --input_file europarl_data/split/bg-en/train.bg europarl_data/split/bg-en/train.en \
+                 europarl_data/split/cs-en/train.cs europarl_data/split/cs-en/train.en \
+    --output_dir tokenizer \
+    --vocab_size 32000
+```
 
-## Step 3: Configuration
+The result is `tokenizer/tokenizer.json`. MAMMOTH adds the beginning and end of sequence tokens itself, so the tokenizer only splits text into subwords. For 21 languages, a larger vocabulary such as `--vocab_size 64000` is a better fit. See the [HF tokenizers guide](../HF_TOKENIZERS.md) for details.
 
-We can define a configuration for the model, sharing scheme, and training arguments. You can choose to manually write your config in a yaml file, or use our automatic config generation tool.
-Here, we provide two configuration examples for training a dummy transformer model in single-node and multi-node settings.
+You can instead train one tokenizer per language and point each language at its own file in `src_vocab` / `tgt_vocab`.
+
+## Step 3: Write the config
+
+Save the following as `europarl_2langs.yaml`. The tasks run on one node with two GPUs: all three Bulgarian tasks on GPU `0:0` and all three Czech tasks on GPU `0:1`.
 
 <details>
-<summary>Single-node configuration</summary>
+<summary>Single-node configuration (2 GPUs)</summary>
 
 ```yaml
-src_vocab:
-  'bg': path_to_vocab/opusTC.mul.vocab.onmt
-  'cs': path_to_vocab/opusTC.mul.vocab.onmt
-  'da': path_to_vocab/opusTC.mul.vocab.onmt
-  'de': path_to_vocab/opusTC.mul.vocab.onmt
-  'el': path_to_vocab/opusTC.mul.vocab.onmt
-  'en': path_to_vocab/opusTC.mul.vocab.onmt
-  'es': path_to_vocab/opusTC.mul.vocab.onmt
-  'et': path_to_vocab/opusTC.mul.vocab.onmt
-  'fi': path_to_vocab/opusTC.mul.vocab.onmt
-  'fr': path_to_vocab/opusTC.mul.vocab.onmt
-  'hu': path_to_vocab/opusTC.mul.vocab.onmt
-  'it': path_to_vocab/opusTC.mul.vocab.onmt
-  'lt': path_to_vocab/opusTC.mul.vocab.onmt
-  'lv': path_to_vocab/opusTC.mul.vocab.onmt
-  'nl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pt': path_to_vocab/opusTC.mul.vocab.onmt
-  'ro': path_to_vocab/opusTC.mul.vocab.onmt
-  'sk': path_to_vocab/opusTC.mul.vocab.onmt
-  'sl': path_to_vocab/opusTC.mul.vocab.onmt
-  'sv': path_to_vocab/opusTC.mul.vocab.onmt
-tgt_vocab:
-  'bg': path_to_vocab/opusTC.mul.vocab.onmt
-  'cs': path_to_vocab/opusTC.mul.vocab.onmt
-  'da': path_to_vocab/opusTC.mul.vocab.onmt
-  'de': path_to_vocab/opusTC.mul.vocab.onmt
-  'el': path_to_vocab/opusTC.mul.vocab.onmt
-  'en': path_to_vocab/opusTC.mul.vocab.onmt
-  'es': path_to_vocab/opusTC.mul.vocab.onmt
-  'et': path_to_vocab/opusTC.mul.vocab.onmt
-  'fi': path_to_vocab/opusTC.mul.vocab.onmt
-  'fr': path_to_vocab/opusTC.mul.vocab.onmt
-  'hu': path_to_vocab/opusTC.mul.vocab.onmt
-  'it': path_to_vocab/opusTC.mul.vocab.onmt
-  'lt': path_to_vocab/opusTC.mul.vocab.onmt
-  'lv': path_to_vocab/opusTC.mul.vocab.onmt
-  'nl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pt': path_to_vocab/opusTC.mul.vocab.onmt
-  'ro': path_to_vocab/opusTC.mul.vocab.onmt
-  'sk': path_to_vocab/opusTC.mul.vocab.onmt
-  'sl': path_to_vocab/opusTC.mul.vocab.onmt
-  'sv': path_to_vocab/opusTC.mul.vocab.onmt
+use_hf_tokenizer: true
 
+# ---- Tokenizers (one entry per language; here they all share one file) ----
+src_vocab:
+  bg: tokenizer/tokenizer.json
+  cs: tokenizer/tokenizer.json
+  en: tokenizer/tokenizer.json
+tgt_vocab:
+  bg: tokenizer/tokenizer.json
+  cs: tokenizer/tokenizer.json
+  en: tokenizer/tokenizer.json
+
+# ---- Tasks ----
 tasks:
   # GPU 0:0
   train_bg-en:
     src_tgt: bg-en
     enc_sharing_group: [bg]
     dec_sharing_group: [en]
-    node_gpu: 0:0
-    path_src: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_tgt: path_to_europarl/bg-en/train.bg-en.en.sp
-    path_valid_src: path_to_europarl/bg-en/valid.bg-en.bg.sp
-    path_valid_tgt: path_to_europarl/bg-en/valid.bg-en.en.sp
+    node_gpu: "0:0"
+    path_src: europarl_data/split/bg-en/train.bg
+    path_tgt: europarl_data/split/bg-en/train.en
+    path_valid_src: europarl_data/split/bg-en/val.bg
+    path_valid_tgt: europarl_data/split/bg-en/val.en
     transforms: [filtertoolong]
+    weight: 1
   train_bg-bg:
     src_tgt: bg-bg
     enc_sharing_group: [bg]
     dec_sharing_group: [bg]
-    node_gpu: 0:0
-    path_src: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_tgt: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_valid_src: path_to_europarl/bg-en/valid.bg-en.bg.sp
-    path_valid_tgt: path_to_europarl/bg-en/valid.bg-en.bg.sp
+    node_gpu: "0:0"
+    path_src: europarl_data/split/bg-en/train.bg
+    path_tgt: europarl_data/split/bg-en/train.bg
+    path_valid_src: europarl_data/split/bg-en/val.bg
+    path_valid_tgt: europarl_data/split/bg-en/val.bg
     transforms: [filtertoolong, denoising]
+    weight: 1
   train_en-bg:
     src_tgt: en-bg
     enc_sharing_group: [en]
     dec_sharing_group: [bg]
-    node_gpu: 0:0
-    path_src: path_to_europarl/bg-en/train.bg-en.en.sp
-    path_tgt: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_valid_src: path_to_europarl/bg-en/valid.bg-en.en.sp
-    path_valid_tgt: path_to_europarl/bg-en/valid.bg-en.bg.sp
+    node_gpu: "0:0"
+    path_src: europarl_data/split/bg-en/train.en
+    path_tgt: europarl_data/split/bg-en/train.bg
+    path_valid_src: europarl_data/split/bg-en/val.en
+    path_valid_tgt: europarl_data/split/bg-en/val.bg
     transforms: [filtertoolong]
+    weight: 1
   # GPU 0:1
   train_cs-en:
     src_tgt: cs-en
     enc_sharing_group: [cs]
     dec_sharing_group: [en]
-    node_gpu: 0:1
-    path_src: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_tgt: path_to_europarl/cs-en/train.cs-en.en.sp
-    path_valid_src: path_to_europarl/cs-en/valid.cs-en.cs.sp
-    path_valid_tgt: path_to_europarl/cs-en/valid.cs-en.en.sp
+    node_gpu: "0:1"
+    path_src: europarl_data/split/cs-en/train.cs
+    path_tgt: europarl_data/split/cs-en/train.en
+    path_valid_src: europarl_data/split/cs-en/val.cs
+    path_valid_tgt: europarl_data/split/cs-en/val.en
     transforms: [filtertoolong]
+    weight: 1
   train_cs-cs:
     src_tgt: cs-cs
     enc_sharing_group: [cs]
     dec_sharing_group: [cs]
-    node_gpu: 0:1
-    path_src: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_tgt: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_valid_src: path_to_europarl/cs-en/valid.cs-en.cs.sp
-    path_valid_tgt: path_to_europarl/cs-en/valid.cs-en.cs.sp
+    node_gpu: "0:1"
+    path_src: europarl_data/split/cs-en/train.cs
+    path_tgt: europarl_data/split/cs-en/train.cs
+    path_valid_src: europarl_data/split/cs-en/val.cs
+    path_valid_tgt: europarl_data/split/cs-en/val.cs
     transforms: [filtertoolong, denoising]
+    weight: 1
   train_en-cs:
     src_tgt: en-cs
     enc_sharing_group: [en]
     dec_sharing_group: [cs]
-    node_gpu: 0:1
-    path_src: path_to_europarl/cs-en/train.cs-en.en.sp
-    path_tgt: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_valid_src: path_to_europarl/cs-en/valid.cs-en.en.sp
-    path_valid_tgt: path_to_europarl/cs-en/valid.cs-en.cs.sp
+    node_gpu: "0:1"
+    path_src: europarl_data/split/cs-en/train.en
+    path_tgt: europarl_data/split/cs-en/train.cs
+    path_valid_src: europarl_data/split/cs-en/val.en
+    path_valid_tgt: europarl_data/split/cs-en/val.cs
     transforms: [filtertoolong]
-  # GPU 0:2
-  train_da-en:
-    src_tgt: da-en
-    enc_sharing_group: [da]
-    dec_sharing_group: [en]
-    node_gpu: 0:2
-    path_src: path_to_europarl/da-en/train.da-en.da.sp
-    path_tgt: path_to_europarl/da-en/train.da-en.en.sp
-    path_valid_src: path_to_europarl/da-en/valid.da-en.da.sp
-    path_valid_tgt: path_to_europarl/da-en/valid.da-en.en.sp
-    transforms: [filtertoolong]
-  train_da-da:
-    src_tgt: da-da
-    enc_sharing_group: [da]
-    dec_sharing_group: [da]
-    node_gpu: 0:2
-    path_src: path_to_europarl/da-en/train.da-en.da.sp
-    path_tgt: path_to_europarl/da-en/train.da-en.da.sp
-    path_valid_src: path_to_europarl/da-en/valid.da-en.da.sp
-    path_valid_tgt: path_to_europarl/da-en/valid.da-en.da.sp
-    transforms: [filtertoolong, denoising]
-  train_en-da:
-    src_tgt: en-da
-    enc_sharing_group: [en]
-    dec_sharing_group: [da]
-    node_gpu: 0:2
-    path_src: path_to_europarl/da-en/train.da-en.en.sp
-    path_tgt: path_to_europarl/da-en/train.da-en.da.sp
-    path_valid_src: path_to_europarl/da-en/valid.da-en.en.sp
-    path_valid_tgt: path_to_europarl/da-en/valid.da-en.da.sp
-    transforms: [filtertoolong]
-  # GPU 0:3
-  train_de-en:
-    src_tgt: de-en
-    enc_sharing_group: [de]
-    dec_sharing_group: [en]
-    node_gpu: 0:3
-    path_src: path_to_europarl/de-en/train.de-en.de.sp
-    path_tgt: path_to_europarl/de-en/train.de-en.en.sp
-    path_valid_src: path_to_europarl/de-en/valid.de-en.de.sp
-    path_valid_tgt: path_to_europarl/de-en/valid.de-en.en.sp
-    transforms: [filtertoolong]
-  train_de-de:
-    src_tgt: de-de
-    enc_sharing_group: [de]
-    dec_sharing_group: [de]
-    node_gpu: 0:3
-    path_src: path_to_europarl/de-en/train.de-en.de.sp
-    path_tgt: path_to_europarl/de-en/train.de-en.de.sp
-    path_valid_src: path_to_europarl/de-en/valid.de-en.de.sp
-    path_valid_tgt: path_to_europarl/de-en/valid.de-en.de.sp
-    transforms: [filtertoolong, denoising]
-  train_en-de:
-    src_tgt: en-de
-    enc_sharing_group: [en]
-    dec_sharing_group: [de]
-    node_gpu: 0:3
-    path_src: path_to_europarl/de-en/train.de-en.en.sp
-    path_tgt: path_to_europarl/de-en/train.de-en.de.sp
-    path_valid_src: path_to_europarl/de-en/valid.de-en.en.sp
-    path_valid_tgt: path_to_europarl/de-en/valid.de-en.de.sp
-    transforms: [filtertoolong]
-  # GPU 0:0
-  train_el-en:
-    src_tgt: el-en
-    enc_sharing_group: [el]
-    dec_sharing_group: [en]
-    node_gpu: 0:0
-    path_src: path_to_europarl/el-en/train.el-en.el.sp
-    path_tgt: path_to_europarl/el-en/train.el-en.en.sp
-    path_valid_src: path_to_europarl/el-en/valid.el-en.el.sp
-    path_valid_tgt: path_to_europarl/el-en/valid.el-en.en.sp
-    transforms: [filtertoolong]
-  train_el-el:
-    src_tgt: el-el
-    enc_sharing_group: [el]
-    dec_sharing_group: [el]
-    node_gpu: 0:0
-    path_src: path_to_europarl/el-en/train.el-en.el.sp
-    path_tgt: path_to_europarl/el-en/train.el-en.el.sp
-    path_valid_src: path_to_europarl/el-en/valid.el-en.el.sp
-    path_valid_tgt: path_to_europarl/el-en/valid.el-en.el.sp
-    transforms: [filtertoolong, denoising]
-  train_en-el:
-    src_tgt: en-el
-    enc_sharing_group: [en]
-    dec_sharing_group: [el]
-    node_gpu: 0:0
-    path_src: path_to_europarl/el-en/train.el-en.en.sp
-    path_tgt: path_to_europarl/el-en/train.el-en.el.sp
-    path_valid_src: path_to_europarl/el-en/valid.el-en.en.sp
-    path_valid_tgt: path_to_europarl/el-en/valid.el-en.el.sp
-    transforms: [filtertoolong]
-  # GPU 0:1
-  train_es-en:
-    src_tgt: es-en
-    enc_sharing_group: [es]
-    dec_sharing_group: [en]
-    node_gpu: 0:1
-    path_src: path_to_europarl/es-en/train.es-en.es.sp
-    path_tgt: path_to_europarl/es-en/train.es-en.en.sp
-    path_valid_src: path_to_europarl/es-en/valid.es-en.es.sp
-    path_valid_tgt: path_to_europarl/es-en/valid.es-en.en.sp
-    transforms: [filtertoolong]
-  train_es-es:
-    src_tgt: es-es
-    enc_sharing_group: [es]
-    dec_sharing_group: [es]
-    node_gpu: 0:1
-    path_src: path_to_europarl/es-en/train.es-en.es.sp
-    path_tgt: path_to_europarl/es-en/train.es-en.es.sp
-    path_valid_src: path_to_europarl/es-en/valid.es-en.es.sp
-    path_valid_tgt: path_to_europarl/es-en/valid.es-en.es.sp
-    transforms: [filtertoolong, denoising]
-  train_en-es:
-    src_tgt: en-es
-    enc_sharing_group: [en]
-    dec_sharing_group: [es]
-    node_gpu: 0:1
-    path_src: path_to_europarl/es-en/train.es-en.en.sp
-    path_tgt: path_to_europarl/es-en/train.es-en.es.sp
-    path_valid_src: path_to_europarl/es-en/valid.es-en.en.sp
-    path_valid_tgt: path_to_europarl/es-en/valid.es-en.es.sp
-    transforms: [filtertoolong]
-  # GPU 0:2
-  train_et-en:
-    src_tgt: et-en
-    enc_sharing_group: [et]
-    dec_sharing_group: [en]
-    node_gpu: 0:2
-    path_src: path_to_europarl/et-en/train.et-en.et.sp
-    path_tgt: path_to_europarl/et-en/train.et-en.en.sp
-    path_valid_src: path_to_europarl/et-en/valid.et-en.et.sp
-    path_valid_tgt: path_to_europarl/et-en/valid.et-en.en.sp
-    transforms: [filtertoolong]
-  train_et-et:
-    src_tgt: et-et
-    enc_sharing_group: [et]
-    dec_sharing_group: [et]
-    node_gpu: 0:2
-    path_src: path_to_europarl/et-en/train.et-en.et.sp
-    path_tgt: path_to_europarl/et-en/train.et-en.et.sp
-    path_valid_src: path_to_europarl/et-en/valid.et-en.et.sp
-    path_valid_tgt: path_to_europarl/et-en/valid.et-en.et.sp
-    transforms: [filtertoolong, denoising]
-  train_en-et:
-    src_tgt: en-et
-    enc_sharing_group: [en]
-    dec_sharing_group: [et]
-    node_gpu: 0:2
-    path_src: path_to_europarl/et-en/train.et-en.en.sp
-    path_tgt: path_to_europarl/et-en/train.et-en.et.sp
-    path_valid_src: path_to_europarl/et-en/valid.et-en.en.sp
-    path_valid_tgt: path_to_europarl/et-en/valid.et-en.et.sp
-    transforms: [filtertoolong]
-  # GPU 0:3
-  train_fi-en:
-    src_tgt: fi-en
-    enc_sharing_group: [fi]
-    dec_sharing_group: [en]
-    node_gpu: 0:3
-    path_src: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_tgt: path_to_europarl/fi-en/train.fi-en.en.sp
-    path_valid_src: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    path_valid_tgt: path_to_europarl/fi-en/valid.fi-en.en.sp
-    transforms: [filtertoolong]
-  train_fi-fi:
-    src_tgt: fi-fi
-    enc_sharing_group: [fi]
-    dec_sharing_group: [fi]
-    node_gpu: 0:3
-    path_src: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_tgt: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_valid_src: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    path_valid_tgt: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    transforms: [filtertoolong, denoising]
-  train_en-fi:
-    src_tgt: en-fi
-    enc_sharing_group: [en]
-    dec_sharing_group: [fi]
-    node_gpu: 0:3
-    path_src: path_to_europarl/fi-en/train.fi-en.en.sp
-    path_tgt: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_valid_src: path_to_europarl/fi-en/valid.fi-en.en.sp
-    path_valid_tgt: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    transforms: [filtertoolong]
-  # GPU 0:0
-  train_fr-en:
-    src_tgt: fr-en
-    enc_sharing_group: [fr]
-    dec_sharing_group: [en]
-    node_gpu: 0:0
-    path_src: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_tgt: path_to_europarl/fr-en/train.fr-en.en.sp
-    path_valid_src: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    path_valid_tgt: path_to_europarl/fr-en/valid.fr-en.en.sp
-    transforms: [filtertoolong]
-  train_fr-fr:
-    src_tgt: fr-fr
-    enc_sharing_group: [fr]
-    dec_sharing_group: [fr]
-    node_gpu: 0:0
-    path_src: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_tgt: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_valid_src: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    path_valid_tgt: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    transforms: [filtertoolong, denoising]
-  train_en-fr:
-    src_tgt: en-fr
-    enc_sharing_group: [en]
-    dec_sharing_group: [fr]
-    node_gpu: 0:0
-    path_src: path_to_europarl/fr-en/train.fr-en.en.sp
-    path_tgt: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_valid_src: path_to_europarl/fr-en/valid.fr-en.en.sp
-    path_valid_tgt: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    transforms: [filtertoolong]  
-  # GPU 0:1
-  train_hu-en:
-    src_tgt: hu-en
-    enc_sharing_group: [hu]
-    dec_sharing_group: [en]
-    node_gpu: 0:1
-    path_src: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_tgt: path_to_europarl/hu-en/train.hu-en.en.sp
-    path_valid_src: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    path_valid_tgt: path_to_europarl/hu-en/valid.hu-en.en.sp
-    transforms: [filtertoolong]
-  train_hu-hu:
-    src_tgt: hu-hu
-    enc_sharing_group: [hu]
-    dec_sharing_group: [hu]
-    node_gpu: 0:1
-    path_src: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_tgt: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_valid_src: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    path_valid_tgt: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    transforms: [filtertoolong, denoising]
-  train_en-hu:
-    src_tgt: en-hu
-    enc_sharing_group: [en]
-    dec_sharing_group: [hu]
-    node_gpu: 0:1
-    path_src: path_to_europarl/hu-en/train.hu-en.en.sp
-    path_tgt: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_valid_src: path_to_europarl/hu-en/valid.hu-en.en.sp
-    path_valid_tgt: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    transforms: [filtertoolong]
-  # GPU 0:2
-  train_it-en:
-    src_tgt: it-en
-    enc_sharing_group: [it]
-    dec_sharing_group: [en]
-    node_gpu: 0:2
-    path_src: path_to_europarl/it-en/train.it-en.it.sp
-    path_tgt: path_to_europarl/it-en/train.it-en.en.sp
-    path_valid_src: path_to_europarl/it-en/valid.it-en.it.sp
-    path_valid_tgt: path_to_europarl/it-en/valid.it-en.en.sp
-    transforms: [filtertoolong]
-  train_it-it:
-    src_tgt: it-it
-    enc_sharing_group: [it]
-    dec_sharing_group: [it]
-    node_gpu: 0:2
-    path_src: path_to_europarl/it-en/train.it-en.it.sp
-    path_tgt: path_to_europarl/it-en/train.it-en.it.sp
-    path_valid_src: path_to_europarl/it-en/valid.it-en.it.sp
-    path_valid_tgt: path_to_europarl/it-en/valid.it-en.it.sp
-    transforms: [filtertoolong, denoising]
-  train_en-it:
-    src_tgt: en-it
-    enc_sharing_group: [en]
-    dec_sharing_group: [it]
-    node_gpu: 0:2
-    path_src: path_to_europarl/it-en/train.it-en.en.sp
-    path_tgt: path_to_europarl/it-en/train.it-en.it.sp
-    path_valid_src: path_to_europarl/it-en/valid.it-en.en.sp
-    path_valid_tgt: path_to_europarl/it-en/valid.it-en.it.sp
-    transforms: [filtertoolong]
-  # GPU 0:3
-  train_lt-en:
-    src_tgt: lt-en
-    enc_sharing_group: [lt]
-    dec_sharing_group: [en]
-    node_gpu: 0:3
-    path_src: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_tgt: path_to_europarl/lt-en/train.lt-en.en.sp
-    path_valid_src: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    path_valid_tgt: path_to_europarl/lt-en/valid.lt-en.en.sp
-    transforms: [filtertoolong]
-  train_lt-lt:
-    src_tgt: lt-lt
-    enc_sharing_group: [lt]
-    dec_sharing_group: [lt]
-    node_gpu: 0:3
-    path_src: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_tgt: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_valid_src: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    path_valid_tgt: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    transforms: [filtertoolong, denoising]
-  train_en-lt:
-    src_tgt: en-lt
-    enc_sharing_group: [en]
-    dec_sharing_group: [lt]
-    node_gpu: 0:3
-    path_src: path_to_europarl/lt-en/train.lt-en.en.sp
-    path_tgt: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_valid_src: path_to_europarl/lt-en/valid.lt-en.en.sp
-    path_valid_tgt: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    transforms: [filtertoolong]
-  # GPU 0:0
-  train_lv-en:
-    src_tgt: lv-en
-    enc_sharing_group: [lv]
-    dec_sharing_group: [en]
-    node_gpu: 0:0
-    path_src: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_tgt: path_to_europarl/lv-en/train.lv-en.en.sp
-    path_valid_src: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    path_valid_tgt: path_to_europarl/lv-en/valid.lv-en.en.sp
-    transforms: [filtertoolong]
-  train_lv-lv:
-    src_tgt: lv-lv
-    enc_sharing_group: [lv]
-    dec_sharing_group: [lv]
-    node_gpu: 0:0
-    path_src: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_tgt: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_valid_src: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    path_valid_tgt: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    transforms: [filtertoolong, denoising]
-  train_en-lv:
-    src_tgt: en-lv
-    enc_sharing_group: [en]
-    dec_sharing_group: [lv]
-    node_gpu: 0:0
-    path_src: path_to_europarl/lv-en/train.lv-en.en.sp
-    path_tgt: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_valid_src: path_to_europarl/lv-en/valid.lv-en.en.sp
-    path_valid_tgt: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    transforms: [filtertoolong]
-  # GPU 0:1
-  train_nl-en:
-    src_tgt: nl-en
-    enc_sharing_group: [nl]
-    dec_sharing_group: [en]
-    node_gpu: 0:1
-    path_src: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_tgt: path_to_europarl/nl-en/train.nl-en.en.sp
-    path_valid_src: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    path_valid_tgt: path_to_europarl/nl-en/valid.nl-en.en.sp
-    transforms: [filtertoolong]
-  train_nl-nl:
-    src_tgt: nl-nl
-    enc_sharing_group: [nl]
-    dec_sharing_group: [nl]
-    node_gpu: 0:1
-    path_src: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_tgt: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_valid_src: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    path_valid_tgt: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    transforms: [filtertoolong, denoising]
-  train_en-nl:
-    src_tgt: en-nl
-    enc_sharing_group: [en]
-    dec_sharing_group: [nl]
-    node_gpu: 0:1
-    path_src: path_to_europarl/nl-en/train.nl-en.en.sp
-    path_tgt: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_valid_src: path_to_europarl/nl-en/valid.nl-en.en.sp
-    path_valid_tgt: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    transforms: [filtertoolong]
-  # GPU 0:2
-  train_pl-en:
-    src_tgt: pl-en
-    enc_sharing_group: [pl]
-    dec_sharing_group: [en]
-    node_gpu: 0:2
-    path_src: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_tgt: path_to_europarl/pl-en/train.pl-en.en.sp
-    path_valid_src: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    path_valid_tgt: path_to_europarl/pl-en/valid.pl-en.en.sp
-    transforms: [filtertoolong]
-  train_pl-pl:
-    src_tgt: pl-pl
-    enc_sharing_group: [pl]
-    dec_sharing_group: [pl]
-    node_gpu: 0:2
-    path_src: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_tgt: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_valid_src: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    path_valid_tgt: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    transforms: [filtertoolong, denoising]
-  train_en-pl:
-    src_tgt: en-pl
-    enc_sharing_group: [en]
-    dec_sharing_group: [pl]
-    node_gpu: 0:2
-    path_src: path_to_europarl/pl-en/train.pl-en.en.sp
-    path_tgt: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_valid_src: path_to_europarl/pl-en/valid.pl-en.en.sp
-    path_valid_tgt: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    transforms: [filtertoolong]
-  # GPU 0:3
-  train_pt-en:
-    src_tgt: pt-en
-    enc_sharing_group: [pt]
-    dec_sharing_group: [en]
-    node_gpu: 0:3
-    path_src: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_tgt: path_to_europarl/pt-en/train.pt-en.en.sp
-    path_valid_src: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    path_valid_tgt: path_to_europarl/pt-en/valid.pt-en.en.sp
-    transforms: [filtertoolong]
-  train_pt-pt:
-    src_tgt: pt-pt
-    enc_sharing_group: [pt]
-    dec_sharing_group: [pt]
-    node_gpu: 0:3
-    path_src: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_tgt: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_valid_src: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    path_valid_tgt: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    transforms: [filtertoolong, denoising]
-  train_en-pt:
-    src_tgt: en-pt
-    enc_sharing_group: [en]
-    dec_sharing_group: [pt]
-    node_gpu: 0:3
-    path_src: path_to_europarl/pt-en/train.pt-en.en.sp
-    path_tgt: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_valid_src: path_to_europarl/pt-en/valid.pt-en.en.sp
-    path_valid_tgt: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    transforms: [filtertoolong]
-  # GPU 0:0
-  train_ro-en:
-    src_tgt: ro-en
-    enc_sharing_group: [ro]
-    dec_sharing_group: [en]
-    node_gpu: 0:0
-    path_src: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_tgt: path_to_europarl/ro-en/train.ro-en.en.sp
-    path_valid_src: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    path_valid_tgt: path_to_europarl/ro-en/valid.ro-en.en.sp
-    transforms: [filtertoolong]
-  train_ro-ro:
-    src_tgt: ro-ro
-    enc_sharing_group: [ro]
-    dec_sharing_group: [ro]
-    node_gpu: 0:0
-    path_src: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_tgt: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_valid_src: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    path_valid_tgt: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    transforms: [filtertoolong, denoising]
-  train_en-ro:
-    src_tgt: en-ro
-    enc_sharing_group: [en]
-    dec_sharing_group: [ro]
-    node_gpu: 0:0
-    path_src: path_to_europarl/ro-en/train.ro-en.en.sp
-    path_tgt: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_valid_src: path_to_europarl/ro-en/valid.ro-en.en.sp
-    path_valid_tgt: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    transforms: [filtertoolong]
-  # GPU 0:1
-  train_sk-en:
-    src_tgt: sk-en
-    enc_sharing_group: [sk]
-    dec_sharing_group: [en]
-    node_gpu: 0:1
-    path_src: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_tgt: path_to_europarl/sk-en/train.sk-en.en.sp
-    path_valid_src: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    path_valid_tgt: path_to_europarl/sk-en/valid.sk-en.en.sp
-    transforms: [filtertoolong]
-  train_sk-sk:
-    src_tgt: sk-sk
-    enc_sharing_group: [sk]
-    dec_sharing_group: [sk]
-    node_gpu: 0:1
-    path_src: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_tgt: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_valid_src: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    path_valid_tgt: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    transforms: [filtertoolong, denoising]
-  train_en-sk:
-    src_tgt: en-sk
-    enc_sharing_group: [en]
-    dec_sharing_group: [sk]
-    node_gpu: 0:1
-    path_src: path_to_europarl/sk-en/train.sk-en.en.sp
-    path_tgt: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_valid_src: path_to_europarl/sk-en/valid.sk-en.en.sp
-    path_valid_tgt: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    transforms: [filtertoolong]
-  # GPU 0:2
-  train_sl-en:
-    src_tgt: sl-en
-    enc_sharing_group: [sl]
-    dec_sharing_group: [en]
-    node_gpu: 0:2
-    path_src: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_tgt: path_to_europarl/sl-en/train.sl-en.en.sp
-    path_valid_src: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    path_valid_tgt: path_to_europarl/sl-en/valid.sl-en.en.sp
-    transforms: [filtertoolong]
-  train_sl-sl:
-    src_tgt: sl-sl
-    enc_sharing_group: [sl]
-    dec_sharing_group: [sl]
-    node_gpu: 0:2
-    path_src: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_tgt: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_valid_src: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    path_valid_tgt: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    transforms: [filtertoolong, denoising]
-  train_en-sl:
-    src_tgt: en-sl
-    enc_sharing_group: [en]
-    dec_sharing_group: [sl]
-    node_gpu: 0:2
-    path_src: path_to_europarl/sl-en/train.sl-en.en.sp
-    path_tgt: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_valid_src: path_to_europarl/sl-en/valid.sl-en.en.sp
-    path_valid_tgt: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    transforms: [filtertoolong]
-  # GPU 0:3
-  train_sv-en:
-    src_tgt: sv-en
-    enc_sharing_group: [sv]
-    dec_sharing_group: [en]
-    node_gpu: 0:3
-    path_src: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_tgt: path_to_europarl/sv-en/train.sv-en.en.sp
-    path_valid_src: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    path_valid_tgt: path_to_europarl/sv-en/valid.sv-en.en.sp
-    transforms: [filtertoolong]
-  train_sv-sv:
-    src_tgt: sv-sv
-    enc_sharing_group: [sv]
-    dec_sharing_group: [sv]
-    node_gpu: 0:3
-    path_src: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_tgt: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_valid_src: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    path_valid_tgt: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    transforms: [filtertoolong, denoising]
-  train_en-sv:
-    src_tgt: en-sv
-    enc_sharing_group: [en]
-    dec_sharing_group: [sv]
-    node_gpu: 0:3
-    path_src: path_to_europarl/sv-en/train.sv-en.en.sp
-    path_tgt: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_valid_src: path_to_europarl/sv-en/valid.sv-en.en.sp
-    path_valid_tgt: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    transforms: [filtertoolong]
+    weight: 1
 
-        
-### Transform related opts:
-#### Filter
-src_seq_length: 200
-tgt_seq_length: 200
-#### Bart
-src_subword_type: sentencepiece
-tgt_subword_type: sentencepiece
-mask_ratio: 0.2
-replace_length: 1
+# ---- Hardware ----
+n_nodes: 1
+world_size: 2
+gpu_ranks: [0, 1]
 
-# silently ignore empty lines in the data
-skip_empty_level: silent
+# ---- Model ----
+model_dim: 512
+heads: 8
+ff_mult: 4
+enc_layers: [6]
+dec_layers: [6]
+rotary_pos_emb: true
+dropout: 0.1
+label_smoothing: 0.1
 
+# ---- Data ----
 batch_size: 4096
 batch_type: tokens
 normalization: tokens
 valid_batch_size: 4096
-max_generator_batches: 2
-src_vocab_size: 100000
-tgt_vocab_size: 100000
-model_dim: 512
-transformer_ff: 2048
-heads: 8
-enc_layers: [6]
-dec_layers: [6]
-dropout: 0.1
-label_smoothing: 0.1
-param_init: 0.0
-param_init_glorot: true
-valid_steps: 10000
-warmup_steps: 10000
+src_seq_length_max: 200
+tgt_seq_length_max: 200
+
+# ---- Denoising (used by the xx-xx autoencoder tasks) ----
+mask_ratio: 0.2
+mask_length: span-poisson
+poisson_lambda: 3.0
+replace_length: 1
+denoising_objective: bart
+
+# ---- Optimization ----
+optim: adam
+adam_beta1: 0.9
+adam_beta2: 0.998
+learning_rate: 0.0005
+decay_method: linear_warmup
+warmup_steps: 4000
+max_grad_norm: 1.0
+train_steps: 100000
+valid_steps: 5000
 report_every: 100
-save_checkpoint_steps: 5000000
-# save_checkpoint_steps: 50000
-keep_checkpoint: -1
-accum_count: 1
-optim: adafactor
-decay_method: none
-learning_rate: 3.0
-max_grad_norm: 0.0
-seed: 3435
-model_type: text
-
-world_size: 4
-gpu_ranks: [0, 1, 2, 3]
-node_rank: 0
-
 early_stopping: 5
 early_stopping_criteria: accuracy
+seed: 3435
+
+# ---- Output ----
+save_model: models/europarl
+save_checkpoint_steps: 10000
+keep_checkpoint: 3
+max_length: 200
 ```
 </details>
 
-<details>
-<summary>Multi-node configuration</summary>
+### What the config says
+
+**Data and tokenizers**
+- `src_vocab` / `tgt_vocab` list one tokenizer per language. The keys also define which languages exist. With `use_hf_tokenizer: true`, MAMMOTH loads each `.json` file as a Hugging Face tokenizer and tokenizes on the fly, so the data files are plain text.
+- `src_seq_length_max` / `tgt_seq_length_max` are used by the `filtertoolong` transform, which drops training pairs longer than this many tokens.
+- The denoising options (`mask_ratio`, `mask_length`, ...) only affect tasks that list the `denoising` transform.
+
+**Tasks**
+- Each entry under `tasks` is one translation direction, with the paths to its training and validation files, the transforms to apply, and a sampling `weight`.
+- `enc_sharing_group` / `dec_sharing_group` name the encoder and decoder stack the task uses (one entry per layer stack). Tasks that name the same group share those parameters. Here the encoder group `[en]` is shared by all the `en-xx` tasks, and the decoder group `[en]` is shared by all the `xx-en` tasks.
+- `node_gpu: "<node>:<gpu>"` assigns the task to a device, e.g. `"0:1"` is the second GPU of the first node. Keep the quotes. Tasks that share a GPU are sampled by `weight`.
+
+**Hardware.** `n_nodes`, `world_size` and `gpu_ranks` must describe the same hardware: `world_size` is the total number of GPUs, and `gpu_ranks` lists the GPUs on one node. Every `node_gpu` must be one of those GPUs.
+
+**Model.** A 6-layer, 512-dimensional Transformer with rotary position embeddings. `enc_layers: [6]` is a single layer stack of 6 layers. See [Modular model](../modular_model.md) for several stacks per side.
+
+**Optimization.** Adam with a linear warmup and decay, gradient clipping per component, and early stopping on validation accuracy after 5 validations without improvement. These are reasonable starting values for a model of this size, not tuned ones. See [Training tips](../training_tips.md).
+
+## Step 4: Scale up (more languages, more nodes)
+
+Writing the tasks for 20 languages by hand is 60 entries. Because each language follows the same three-task pattern, generate them instead. The script below keeps everything that is not language-specific (model, optimization, ...) in a base file, and fills in the vocabularies, the tasks, and the hardware section.
+
+First save the settings you want to share as `europarl_base.yaml`. It holds the `use_hf_tokenizer: true` line and the Model, Data, Denoising, Optimization and Output sections of the config above. The script adds the `src_vocab`, `tgt_vocab`, `tasks`, `n_nodes`, `world_size` and `gpu_ranks` keys. Then save this as `make_config.py`:
+
+```python
+"""Write a MAMMOTH config with one en->xx, xx->en and xx->xx (denoising) task per language."""
+import argparse
+
+import yaml
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--base", required=True, help="YAML file with the settings shared by all setups")
+parser.add_argument("--langs", nargs="+", required=True, help="non-English languages, e.g. bg cs da")
+parser.add_argument("--data_dir", default="europarl_data/split")
+parser.add_argument("--tokenizer", default="tokenizer/tokenizer.json")
+parser.add_argument("--n_nodes", type=int, default=1)
+parser.add_argument("--gpus_per_node", type=int, default=1)
+parser.add_argument("--output", required=True)
+args = parser.parse_args()
+
+with open(args.base) as f:
+    config = yaml.safe_load(f)
+
+all_langs = sorted(args.langs + ["en"])
+config["src_vocab"] = {lang: args.tokenizer for lang in all_langs}
+config["tgt_vocab"] = {lang: args.tokenizer for lang in all_langs}
+
+n_gpus = args.n_nodes * args.gpus_per_node
+tasks = {}
+for i, lang in enumerate(args.langs):
+    # All three tasks of a language share one GPU; languages are spread over the GPUs round-robin.
+    slot = i % n_gpus
+    node_gpu = f"{slot // args.gpus_per_node}:{slot % args.gpus_per_node}"
+    pair_dir = f"{args.data_dir}/{lang}-en"
+    for src, tgt, src_file, tgt_file, transforms in [
+        (lang, "en", lang, "en", ["filtertoolong"]),
+        (lang, lang, lang, lang, ["filtertoolong", "denoising"]),
+        ("en", lang, "en", lang, ["filtertoolong"]),
+    ]:
+        tasks[f"train_{src}-{tgt}"] = {
+            "src_tgt": f"{src}-{tgt}",
+            "enc_sharing_group": [src],
+            "dec_sharing_group": [tgt],
+            "node_gpu": node_gpu,
+            "path_src": f"{pair_dir}/train.{src_file}",
+            "path_tgt": f"{pair_dir}/train.{tgt_file}",
+            "path_valid_src": f"{pair_dir}/val.{src_file}",
+            "path_valid_tgt": f"{pair_dir}/val.{tgt_file}",
+            "transforms": transforms,
+            "weight": 1,
+        }
+config["tasks"] = tasks
+config["n_nodes"] = args.n_nodes
+config["world_size"] = n_gpus
+config["gpu_ranks"] = list(range(args.gpus_per_node))
+
+with open(args.output, "w") as f:
+    yaml.safe_dump(config, f, sort_keys=False)
+print(f"wrote {len(tasks)} tasks to {args.output}")
+```
+
+Run it for the setup you want. For example, the two-language config from Step 3 (one node, two GPUs):
+
+```bash
+python make_config.py --base europarl_base.yaml --langs bg cs --gpus_per_node 2 --output europarl_2langs.yaml
+```
+
+And all 21 languages (20 plus English) on 5 nodes with 4 GPUs each, which puts one language's three tasks on each of the 20 GPUs:
+
+```bash
+python make_config.py --base europarl_base.yaml \
+    --langs bg cs da de el es et fi fr hu it lt lv nl pl pt ro sk sl sv \
+    --n_nodes 5 --gpus_per_node 4 \
+    --output europarl_21langs_5nodes.yaml
+```
+
+Before running the full set, you need the data split (Step 1) for every language, and a tokenizer trained on all of them (Step 2, with every language's training files and a larger vocabulary).
+
+When there are more languages than GPUs, the script puts several languages on the same GPU, and that GPU samples among its tasks according to `weight`. You can also write `node_gpu` by hand to balance the load differently, for example by giving large corpora a GPU of their own.
+
+The relevant lines of a multi-node config are these (the rest is unchanged):
 
 ```yaml
-
-src_vocab:
-  'bg': path_to_vocab/opusTC.mul.vocab.onmt
-  'cs': path_to_vocab/opusTC.mul.vocab.onmt
-  'da': path_to_vocab/opusTC.mul.vocab.onmt
-  'de': path_to_vocab/opusTC.mul.vocab.onmt
-  'el': path_to_vocab/opusTC.mul.vocab.onmt
-  'en': path_to_vocab/opusTC.mul.vocab.onmt
-  'es': path_to_vocab/opusTC.mul.vocab.onmt
-  'et': path_to_vocab/opusTC.mul.vocab.onmt
-  'fi': path_to_vocab/opusTC.mul.vocab.onmt
-  'fr': path_to_vocab/opusTC.mul.vocab.onmt
-  'hu': path_to_vocab/opusTC.mul.vocab.onmt
-  'it': path_to_vocab/opusTC.mul.vocab.onmt
-  'lt': path_to_vocab/opusTC.mul.vocab.onmt
-  'lv': path_to_vocab/opusTC.mul.vocab.onmt
-  'nl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pt': path_to_vocab/opusTC.mul.vocab.onmt
-  'ro': path_to_vocab/opusTC.mul.vocab.onmt
-  'sk': path_to_vocab/opusTC.mul.vocab.onmt
-  'sl': path_to_vocab/opusTC.mul.vocab.onmt
-  'sv': path_to_vocab/opusTC.mul.vocab.onmt
-tgt_vocab:
-  'bg': path_to_vocab/opusTC.mul.vocab.onmt
-  'cs': path_to_vocab/opusTC.mul.vocab.onmt
-  'da': path_to_vocab/opusTC.mul.vocab.onmt
-  'de': path_to_vocab/opusTC.mul.vocab.onmt
-  'el': path_to_vocab/opusTC.mul.vocab.onmt
-  'en': path_to_vocab/opusTC.mul.vocab.onmt
-  'es': path_to_vocab/opusTC.mul.vocab.onmt
-  'et': path_to_vocab/opusTC.mul.vocab.onmt
-  'fi': path_to_vocab/opusTC.mul.vocab.onmt
-  'fr': path_to_vocab/opusTC.mul.vocab.onmt
-  'hu': path_to_vocab/opusTC.mul.vocab.onmt
-  'it': path_to_vocab/opusTC.mul.vocab.onmt
-  'lt': path_to_vocab/opusTC.mul.vocab.onmt
-  'lv': path_to_vocab/opusTC.mul.vocab.onmt
-  'nl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pl': path_to_vocab/opusTC.mul.vocab.onmt
-  'pt': path_to_vocab/opusTC.mul.vocab.onmt
-  'ro': path_to_vocab/opusTC.mul.vocab.onmt
-  'sk': path_to_vocab/opusTC.mul.vocab.onmt
-  'sl': path_to_vocab/opusTC.mul.vocab.onmt
-  'sv': path_to_vocab/opusTC.mul.vocab.onmt
-
-tasks:
-  # GPU 0:0
-  train_bg-en:
-    src_tgt: bg-en
-    enc_sharing_group: [bg]
-    dec_sharing_group: [en]
-    node_gpu: "0:0"
-    path_src: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_tgt: path_to_europarl/bg-en/train.bg-en.en.sp
-    path_valid_src: path_to_europarl/bg-en/valid.bg-en.bg.sp
-    path_valid_tgt: path_to_europarl/bg-en/valid.bg-en.en.sp
-    transforms: [filtertoolong]
-  train_bg-bg:
-    src_tgt: bg-bg
-    enc_sharing_group: [bg]
-    dec_sharing_group: [bg]
-    node_gpu: "0:0"
-    path_src: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_tgt: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_valid_src: path_to_europarl/bg-en/valid.bg-en.bg.sp
-    path_valid_tgt: path_to_europarl/bg-en/valid.bg-en.bg.sp
-    transforms: [filtertoolong, denoising]
-  train_en-bg:
-    src_tgt: en-bg
-    enc_sharing_group: [en]
-    dec_sharing_group: [bg]
-    node_gpu: "0:0"
-    path_src: path_to_europarl/bg-en/train.bg-en.en.sp
-    path_tgt: path_to_europarl/bg-en/train.bg-en.bg.sp
-    path_valid_src: path_to_europarl/bg-en/valid.bg-en.en.sp
-    path_valid_tgt: path_to_europarl/bg-en/valid.bg-en.bg.sp
-    transforms: [filtertoolong]
-  # GPU 0:1
-  train_cs-en:
-    src_tgt: cs-en
-    enc_sharing_group: [cs]
-    dec_sharing_group: [en]
-    node_gpu: "0:1"
-    path_src: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_tgt: path_to_europarl/cs-en/train.cs-en.en.sp
-    path_valid_src: path_to_europarl/cs-en/valid.cs-en.cs.sp
-    path_valid_tgt: path_to_europarl/cs-en/valid.cs-en.en.sp
-    transforms: [filtertoolong]
-  train_cs-cs:
-    src_tgt: cs-cs
-    enc_sharing_group: [cs]
-    dec_sharing_group: [cs]
-    node_gpu: "0:1"
-    path_src: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_tgt: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_valid_src: path_to_europarl/cs-en/valid.cs-en.cs.sp
-    path_valid_tgt: path_to_europarl/cs-en/valid.cs-en.cs.sp
-    transforms: [filtertoolong, denoising]
-  train_en-cs:
-    src_tgt: en-cs
-    enc_sharing_group: [en]
-    dec_sharing_group: [cs]
-    node_gpu: "0:1"
-    path_src: path_to_europarl/cs-en/train.cs-en.en.sp
-    path_tgt: path_to_europarl/cs-en/train.cs-en.cs.sp
-    path_valid_src: path_to_europarl/cs-en/valid.cs-en.en.sp
-    path_valid_tgt: path_to_europarl/cs-en/valid.cs-en.cs.sp
-    transforms: [filtertoolong]
-  # GPU 0:2
-  train_da-en:
-    src_tgt: da-en
-    enc_sharing_group: [da]
-    dec_sharing_group: [en]
-    node_gpu: "0:2"
-    path_src: path_to_europarl/da-en/train.da-en.da.sp
-    path_tgt: path_to_europarl/da-en/train.da-en.en.sp
-    path_valid_src: path_to_europarl/da-en/valid.da-en.da.sp
-    path_valid_tgt: path_to_europarl/da-en/valid.da-en.en.sp
-    transforms: [filtertoolong]
-  train_da-da:
-    src_tgt: da-da
-    enc_sharing_group: [da]
-    dec_sharing_group: [da]
-    node_gpu: "0:2"
-    path_src: path_to_europarl/da-en/train.da-en.da.sp
-    path_tgt: path_to_europarl/da-en/train.da-en.da.sp
-    path_valid_src: path_to_europarl/da-en/valid.da-en.da.sp
-    path_valid_tgt: path_to_europarl/da-en/valid.da-en.da.sp
-    transforms: [filtertoolong, denoising]
-  train_en-da:
-    src_tgt: en-da
-    enc_sharing_group: [en]
-    dec_sharing_group: [da]
-    node_gpu: "0:2"
-    path_src: path_to_europarl/da-en/train.da-en.en.sp
-    path_tgt: path_to_europarl/da-en/train.da-en.da.sp
-    path_valid_src: path_to_europarl/da-en/valid.da-en.en.sp
-    path_valid_tgt: path_to_europarl/da-en/valid.da-en.da.sp
-    transforms: [filtertoolong]
-  # GPU 0:3
-  train_de-en:
-    src_tgt: de-en
-    enc_sharing_group: [de]
-    dec_sharing_group: [en]
-    node_gpu: "0:3"
-    path_src: path_to_europarl/de-en/train.de-en.de.sp
-    path_tgt: path_to_europarl/de-en/train.de-en.en.sp
-    path_valid_src: path_to_europarl/de-en/valid.de-en.de.sp
-    path_valid_tgt: path_to_europarl/de-en/valid.de-en.en.sp
-    transforms: [filtertoolong]
-  train_de-de:
-    src_tgt: de-de
-    enc_sharing_group: [de]
-    dec_sharing_group: [de]
-    node_gpu: "0:3"
-    path_src: path_to_europarl/de-en/train.de-en.de.sp
-    path_tgt: path_to_europarl/de-en/train.de-en.de.sp
-    path_valid_src: path_to_europarl/de-en/valid.de-en.de.sp
-    path_valid_tgt: path_to_europarl/de-en/valid.de-en.de.sp
-    transforms: [filtertoolong, denoising]
-  train_en-de:
-    src_tgt: en-de
-    enc_sharing_group: [en]
-    dec_sharing_group: [de]
-    node_gpu: "0:3"
-    path_src: path_to_europarl/de-en/train.de-en.en.sp
-    path_tgt: path_to_europarl/de-en/train.de-en.de.sp
-    path_valid_src: path_to_europarl/de-en/valid.de-en.en.sp
-    path_valid_tgt: path_to_europarl/de-en/valid.de-en.de.sp
-    transforms: [filtertoolong]
-  # GPU 1:0
-  train_el-en:
-    src_tgt: el-en
-    enc_sharing_group: [el]
-    dec_sharing_group: [en]
-    node_gpu: "1:0"
-    path_src: path_to_europarl/el-en/train.el-en.el.sp
-    path_tgt: path_to_europarl/el-en/train.el-en.en.sp
-    path_valid_src: path_to_europarl/el-en/valid.el-en.el.sp
-    path_valid_tgt: path_to_europarl/el-en/valid.el-en.en.sp
-    transforms: [filtertoolong]
-  train_el-el:
-    src_tgt: el-el
-    enc_sharing_group: [el]
-    dec_sharing_group: [el]
-    node_gpu: "1:0"
-    path_src: path_to_europarl/el-en/train.el-en.el.sp
-    path_tgt: path_to_europarl/el-en/train.el-en.el.sp
-    path_valid_src: path_to_europarl/el-en/valid.el-en.el.sp
-    path_valid_tgt: path_to_europarl/el-en/valid.el-en.el.sp
-    transforms: [filtertoolong, denoising]
-  train_en-el:
-    src_tgt: en-el
-    enc_sharing_group: [en]
-    dec_sharing_group: [el]
-    node_gpu: "1:0"
-    path_src: path_to_europarl/el-en/train.el-en.en.sp
-    path_tgt: path_to_europarl/el-en/train.el-en.el.sp
-    path_valid_src: path_to_europarl/el-en/valid.el-en.en.sp
-    path_valid_tgt: path_to_europarl/el-en/valid.el-en.el.sp
-    transforms: [filtertoolong]
-  # GPU 1:1
-  train_es-en:
-    src_tgt: es-en
-    enc_sharing_group: [es]
-    dec_sharing_group: [en]
-    node_gpu: "1:1"
-    path_src: path_to_europarl/es-en/train.es-en.es.sp
-    path_tgt: path_to_europarl/es-en/train.es-en.en.sp
-    path_valid_src: path_to_europarl/es-en/valid.es-en.es.sp
-    path_valid_tgt: path_to_europarl/es-en/valid.es-en.en.sp
-    transforms: [filtertoolong]
-  train_es-es:
-    src_tgt: es-es
-    enc_sharing_group: [es]
-    dec_sharing_group: [es]
-    node_gpu: "1:1"
-    path_src: path_to_europarl/es-en/train.es-en.es.sp
-    path_tgt: path_to_europarl/es-en/train.es-en.es.sp
-    path_valid_src: path_to_europarl/es-en/valid.es-en.es.sp
-    path_valid_tgt: path_to_europarl/es-en/valid.es-en.es.sp
-    transforms: [filtertoolong, denoising]
-  train_en-es:
-    src_tgt: en-es
-    enc_sharing_group: [en]
-    dec_sharing_group: [es]
-    node_gpu: "1:1"
-    path_src: path_to_europarl/es-en/train.es-en.en.sp
-    path_tgt: path_to_europarl/es-en/train.es-en.es.sp
-    path_valid_src: path_to_europarl/es-en/valid.es-en.en.sp
-    path_valid_tgt: path_to_europarl/es-en/valid.es-en.es.sp
-    transforms: [filtertoolong]
-  # GPU 1:2
-  train_et-en:
-    src_tgt: et-en
-    enc_sharing_group: [et]
-    dec_sharing_group: [en]
-    node_gpu: "1:2"
-    path_src: path_to_europarl/et-en/train.et-en.et.sp
-    path_tgt: path_to_europarl/et-en/train.et-en.en.sp
-    path_valid_src: path_to_europarl/et-en/valid.et-en.et.sp
-    path_valid_tgt: path_to_europarl/et-en/valid.et-en.en.sp
-    transforms: [filtertoolong]
-  train_et-et:
-    src_tgt: et-et
-    enc_sharing_group: [et]
-    dec_sharing_group: [et]
-    node_gpu: "1:2"
-    path_src: path_to_europarl/et-en/train.et-en.et.sp
-    path_tgt: path_to_europarl/et-en/train.et-en.et.sp
-    path_valid_src: path_to_europarl/et-en/valid.et-en.et.sp
-    path_valid_tgt: path_to_europarl/et-en/valid.et-en.et.sp
-    transforms: [filtertoolong, denoising]
-  train_en-et:
-    src_tgt: en-et
-    enc_sharing_group: [en]
-    dec_sharing_group: [et]
-    node_gpu: "1:2"
-    path_src: path_to_europarl/et-en/train.et-en.en.sp
-    path_tgt: path_to_europarl/et-en/train.et-en.et.sp
-    path_valid_src: path_to_europarl/et-en/valid.et-en.en.sp
-    path_valid_tgt: path_to_europarl/et-en/valid.et-en.et.sp
-    transforms: [filtertoolong]
-  # GPU 1:3
-  train_fi-en:
-    src_tgt: fi-en
-    enc_sharing_group: [fi]
-    dec_sharing_group: [en]
-    node_gpu: "1:3"
-    path_src: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_tgt: path_to_europarl/fi-en/train.fi-en.en.sp
-    path_valid_src: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    path_valid_tgt: path_to_europarl/fi-en/valid.fi-en.en.sp
-    transforms: [filtertoolong]
-  train_fi-fi:
-    src_tgt: fi-fi
-    enc_sharing_group: [fi]
-    dec_sharing_group: [fi]
-    node_gpu: "1:3"
-    path_src: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_tgt: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_valid_src: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    path_valid_tgt: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    transforms: [filtertoolong, denoising]
-  train_en-fi:
-    src_tgt: en-fi
-    enc_sharing_group: [en]
-    dec_sharing_group: [fi]
-    node_gpu: "1:3"
-    path_src: path_to_europarl/fi-en/train.fi-en.en.sp
-    path_tgt: path_to_europarl/fi-en/train.fi-en.fi.sp
-    path_valid_src: path_to_europarl/fi-en/valid.fi-en.en.sp
-    path_valid_tgt: path_to_europarl/fi-en/valid.fi-en.fi.sp
-    transforms: [filtertoolong]
-  # GPU 2:0
-  train_fr-en:
-    src_tgt: fr-en
-    enc_sharing_group: [fr]
-    dec_sharing_group: [en]
-    node_gpu: "2:0"
-    path_src: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_tgt: path_to_europarl/fr-en/train.fr-en.en.sp
-    path_valid_src: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    path_valid_tgt: path_to_europarl/fr-en/valid.fr-en.en.sp
-    transforms: [filtertoolong]
-  train_fr-fr:
-    src_tgt: fr-fr
-    enc_sharing_group: [fr]
-    dec_sharing_group: [fr]
-    node_gpu: "2:0"
-    path_src: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_tgt: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_valid_src: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    path_valid_tgt: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    transforms: [filtertoolong, denoising]
-  train_en-fr:
-    src_tgt: en-fr
-    enc_sharing_group: [en]
-    dec_sharing_group: [fr]
-    node_gpu: "2:0"
-    path_src: path_to_europarl/fr-en/train.fr-en.en.sp
-    path_tgt: path_to_europarl/fr-en/train.fr-en.fr.sp
-    path_valid_src: path_to_europarl/fr-en/valid.fr-en.en.sp
-    path_valid_tgt: path_to_europarl/fr-en/valid.fr-en.fr.sp
-    transforms: [filtertoolong]  
-  # GPU 2:1
-  train_hu-en:
-    src_tgt: hu-en
-    enc_sharing_group: [hu]
-    dec_sharing_group: [en]
-    node_gpu: "2:1"
-    path_src: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_tgt: path_to_europarl/hu-en/train.hu-en.en.sp
-    path_valid_src: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    path_valid_tgt: path_to_europarl/hu-en/valid.hu-en.en.sp
-    transforms: [filtertoolong]
-  train_hu-hu:
-    src_tgt: hu-hu
-    enc_sharing_group: [hu]
-    dec_sharing_group: [hu]
-    node_gpu: "2:1"
-    path_src: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_tgt: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_valid_src: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    path_valid_tgt: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    transforms: [filtertoolong, denoising]
-  train_en-hu:
-    src_tgt: en-hu
-    enc_sharing_group: [en]
-    dec_sharing_group: [hu]
-    node_gpu: "2:1"
-    path_src: path_to_europarl/hu-en/train.hu-en.en.sp
-    path_tgt: path_to_europarl/hu-en/train.hu-en.hu.sp
-    path_valid_src: path_to_europarl/hu-en/valid.hu-en.en.sp
-    path_valid_tgt: path_to_europarl/hu-en/valid.hu-en.hu.sp
-    transforms: [filtertoolong]
-  # GPU 2:2
-  train_it-en:
-    src_tgt: it-en
-    enc_sharing_group: [it]
-    dec_sharing_group: [en]
-    node_gpu: "2:2"
-    path_src: path_to_europarl/it-en/train.it-en.it.sp
-    path_tgt: path_to_europarl/it-en/train.it-en.en.sp
-    path_valid_src: path_to_europarl/it-en/valid.it-en.it.sp
-    path_valid_tgt: path_to_europarl/it-en/valid.it-en.en.sp
-    transforms: [filtertoolong]
-  train_it-it:
-    src_tgt: it-it
-    enc_sharing_group: [it]
-    dec_sharing_group: [it]
-    node_gpu: "2:2"
-    path_src: path_to_europarl/it-en/train.it-en.it.sp
-    path_tgt: path_to_europarl/it-en/train.it-en.it.sp
-    path_valid_src: path_to_europarl/it-en/valid.it-en.it.sp
-    path_valid_tgt: path_to_europarl/it-en/valid.it-en.it.sp
-    transforms: [filtertoolong, denoising]
-  train_en-it:
-    src_tgt: en-it
-    enc_sharing_group: [en]
-    dec_sharing_group: [it]
-    node_gpu: "2:2"
-    path_src: path_to_europarl/it-en/train.it-en.en.sp
-    path_tgt: path_to_europarl/it-en/train.it-en.it.sp
-    path_valid_src: path_to_europarl/it-en/valid.it-en.en.sp
-    path_valid_tgt: path_to_europarl/it-en/valid.it-en.it.sp
-    transforms: [filtertoolong]
-  # GPU 2:3
-  train_lt-en:
-    src_tgt: lt-en
-    enc_sharing_group: [lt]
-    dec_sharing_group: [en]
-    node_gpu: "2:3"
-    path_src: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_tgt: path_to_europarl/lt-en/train.lt-en.en.sp
-    path_valid_src: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    path_valid_tgt: path_to_europarl/lt-en/valid.lt-en.en.sp
-    transforms: [filtertoolong]
-  train_lt-lt:
-    src_tgt: lt-lt
-    enc_sharing_group: [lt]
-    dec_sharing_group: [lt]
-    node_gpu: "2:3"
-    path_src: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_tgt: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_valid_src: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    path_valid_tgt: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    transforms: [filtertoolong, denoising]
-  train_en-lt:
-    src_tgt: en-lt
-    enc_sharing_group: [en]
-    dec_sharing_group: [lt]
-    node_gpu: "2:3"
-    path_src: path_to_europarl/lt-en/train.lt-en.en.sp
-    path_tgt: path_to_europarl/lt-en/train.lt-en.lt.sp
-    path_valid_src: path_to_europarl/lt-en/valid.lt-en.en.sp
-    path_valid_tgt: path_to_europarl/lt-en/valid.lt-en.lt.sp
-    transforms: [filtertoolong]
-  # GPU 3:0
-  train_lv-en:
-    src_tgt: lv-en
-    enc_sharing_group: [lv]
-    dec_sharing_group: [en]
-    node_gpu: "3:0"
-    path_src: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_tgt: path_to_europarl/lv-en/train.lv-en.en.sp
-    path_valid_src: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    path_valid_tgt: path_to_europarl/lv-en/valid.lv-en.en.sp
-    transforms: [filtertoolong]
-  train_lv-lv:
-    src_tgt: lv-lv
-    enc_sharing_group: [lv]
-    dec_sharing_group: [lv]
-    node_gpu: "3:0"
-    path_src: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_tgt: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_valid_src: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    path_valid_tgt: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    transforms: [filtertoolong, denoising]
-  train_en-lv:
-    src_tgt: en-lv
-    enc_sharing_group: [en]
-    dec_sharing_group: [lv]
-    node_gpu: "3:0"
-    path_src: path_to_europarl/lv-en/train.lv-en.en.sp
-    path_tgt: path_to_europarl/lv-en/train.lv-en.lv.sp
-    path_valid_src: path_to_europarl/lv-en/valid.lv-en.en.sp
-    path_valid_tgt: path_to_europarl/lv-en/valid.lv-en.lv.sp
-    transforms: [filtertoolong]
-  # GPU 3:1
-  train_nl-en:
-    src_tgt: nl-en
-    enc_sharing_group: [nl]
-    dec_sharing_group: [en]
-    node_gpu: "3:1"
-    path_src: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_tgt: path_to_europarl/nl-en/train.nl-en.en.sp
-    path_valid_src: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    path_valid_tgt: path_to_europarl/nl-en/valid.nl-en.en.sp
-    transforms: [filtertoolong]
-  train_nl-nl:
-    src_tgt: nl-nl
-    enc_sharing_group: [nl]
-    dec_sharing_group: [nl]
-    node_gpu: "3:1"
-    path_src: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_tgt: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_valid_src: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    path_valid_tgt: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    transforms: [filtertoolong, denoising]
-  train_en-nl:
-    src_tgt: en-nl
-    enc_sharing_group: [en]
-    dec_sharing_group: [nl]
-    node_gpu: "3:1"
-    path_src: path_to_europarl/nl-en/train.nl-en.en.sp
-    path_tgt: path_to_europarl/nl-en/train.nl-en.nl.sp
-    path_valid_src: path_to_europarl/nl-en/valid.nl-en.en.sp
-    path_valid_tgt: path_to_europarl/nl-en/valid.nl-en.nl.sp
-    transforms: [filtertoolong]
-  # GPU 3:2
-  train_pl-en:
-    src_tgt: pl-en
-    enc_sharing_group: [pl]
-    dec_sharing_group: [en]
-    node_gpu: "3:2"
-    path_src: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_tgt: path_to_europarl/pl-en/train.pl-en.en.sp
-    path_valid_src: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    path_valid_tgt: path_to_europarl/pl-en/valid.pl-en.en.sp
-    transforms: [filtertoolong]
-  train_pl-pl:
-    src_tgt: pl-pl
-    enc_sharing_group: [pl]
-    dec_sharing_group: [pl]
-    node_gpu: "3:2"
-    path_src: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_tgt: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_valid_src: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    path_valid_tgt: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    transforms: [filtertoolong, denoising]
-  train_en-pl:
-    src_tgt: en-pl
-    enc_sharing_group: [en]
-    dec_sharing_group: [pl]
-    node_gpu: "3:2"
-    path_src: path_to_europarl/pl-en/train.pl-en.en.sp
-    path_tgt: path_to_europarl/pl-en/train.pl-en.pl.sp
-    path_valid_src: path_to_europarl/pl-en/valid.pl-en.en.sp
-    path_valid_tgt: path_to_europarl/pl-en/valid.pl-en.pl.sp
-    transforms: [filtertoolong]
-  # GPU 3:3
-  train_pt-en:
-    src_tgt: pt-en
-    enc_sharing_group: [pt]
-    dec_sharing_group: [en]
-    node_gpu: "3:3"
-    path_src: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_tgt: path_to_europarl/pt-en/train.pt-en.en.sp
-    path_valid_src: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    path_valid_tgt: path_to_europarl/pt-en/valid.pt-en.en.sp
-    transforms: [filtertoolong]
-  train_pt-pt:
-    src_tgt: pt-pt
-    enc_sharing_group: [pt]
-    dec_sharing_group: [pt]
-    node_gpu: "3:3"
-    path_src: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_tgt: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_valid_src: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    path_valid_tgt: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    transforms: [filtertoolong, denoising]
-  train_en-pt:
-    src_tgt: en-pt
-    enc_sharing_group: [en]
-    dec_sharing_group: [pt]
-    node_gpu: "3:3"
-    path_src: path_to_europarl/pt-en/train.pt-en.en.sp
-    path_tgt: path_to_europarl/pt-en/train.pt-en.pt.sp
-    path_valid_src: path_to_europarl/pt-en/valid.pt-en.en.sp
-    path_valid_tgt: path_to_europarl/pt-en/valid.pt-en.pt.sp
-    transforms: [filtertoolong]
-  # GPU 4:0
-  train_ro-en:
-    src_tgt: ro-en
-    enc_sharing_group: [ro]
-    dec_sharing_group: [en]
-    node_gpu: "4:0"
-    path_src: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_tgt: path_to_europarl/ro-en/train.ro-en.en.sp
-    path_valid_src: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    path_valid_tgt: path_to_europarl/ro-en/valid.ro-en.en.sp
-    transforms: [filtertoolong]
-  train_ro-ro:
-    src_tgt: ro-ro
-    enc_sharing_group: [ro]
-    dec_sharing_group: [ro]
-    node_gpu: "4:0"
-    path_src: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_tgt: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_valid_src: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    path_valid_tgt: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    transforms: [filtertoolong, denoising]
-  train_en-ro:
-    src_tgt: en-ro
-    enc_sharing_group: [en]
-    dec_sharing_group: [ro]
-    node_gpu: "4:0"
-    path_src: path_to_europarl/ro-en/train.ro-en.en.sp
-    path_tgt: path_to_europarl/ro-en/train.ro-en.ro.sp
-    path_valid_src: path_to_europarl/ro-en/valid.ro-en.en.sp
-    path_valid_tgt: path_to_europarl/ro-en/valid.ro-en.ro.sp
-    transforms: [filtertoolong]
-  # GPU 4:1
-  train_sk-en:
-    src_tgt: sk-en
-    enc_sharing_group: [sk]
-    dec_sharing_group: [en]
-    node_gpu: "4:1"
-    path_src: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_tgt: path_to_europarl/sk-en/train.sk-en.en.sp
-    path_valid_src: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    path_valid_tgt: path_to_europarl/sk-en/valid.sk-en.en.sp
-    transforms: [filtertoolong]
-  train_sk-sk:
-    src_tgt: sk-sk
-    enc_sharing_group: [sk]
-    dec_sharing_group: [sk]
-    node_gpu: "4:1"
-    path_src: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_tgt: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_valid_src: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    path_valid_tgt: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    transforms: [filtertoolong, denoising]
-  train_en-sk:
-    src_tgt: en-sk
-    enc_sharing_group: [en]
-    dec_sharing_group: [sk]
-    node_gpu: "4:1"
-    path_src: path_to_europarl/sk-en/train.sk-en.en.sp
-    path_tgt: path_to_europarl/sk-en/train.sk-en.sk.sp
-    path_valid_src: path_to_europarl/sk-en/valid.sk-en.en.sp
-    path_valid_tgt: path_to_europarl/sk-en/valid.sk-en.sk.sp
-    transforms: [filtertoolong]
-  # GPU 4:2
-  train_sl-en:
-    src_tgt: sl-en
-    enc_sharing_group: [sl]
-    dec_sharing_group: [en]
-    node_gpu: "4:2"
-    path_src: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_tgt: path_to_europarl/sl-en/train.sl-en.en.sp
-    path_valid_src: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    path_valid_tgt: path_to_europarl/sl-en/valid.sl-en.en.sp
-    transforms: [filtertoolong]
-  train_sl-sl:
-    src_tgt: sl-sl
-    enc_sharing_group: [sl]
-    dec_sharing_group: [sl]
-    node_gpu: "4:2"
-    path_src: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_tgt: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_valid_src: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    path_valid_tgt: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    transforms: [filtertoolong, denoising]
-  train_en-sl:
-    src_tgt: en-sl
-    enc_sharing_group: [en]
-    dec_sharing_group: [sl]
-    node_gpu: "4:2"
-    path_src: path_to_europarl/sl-en/train.sl-en.en.sp
-    path_tgt: path_to_europarl/sl-en/train.sl-en.sl.sp
-    path_valid_src: path_to_europarl/sl-en/valid.sl-en.en.sp
-    path_valid_tgt: path_to_europarl/sl-en/valid.sl-en.sl.sp
-    transforms: [filtertoolong]
-  # GPU 4:3
-  train_sv-en:
-    src_tgt: sv-en
-    enc_sharing_group: [sv]
-    dec_sharing_group: [en]
-    node_gpu: "4:3"
-    path_src: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_tgt: path_to_europarl/sv-en/train.sv-en.en.sp
-    path_valid_src: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    path_valid_tgt: path_to_europarl/sv-en/valid.sv-en.en.sp
-    transforms: [filtertoolong]
-  train_sv-sv:
-    src_tgt: sv-sv
-    enc_sharing_group: [sv]
-    dec_sharing_group: [sv]
-    node_gpu: "4:3"
-    path_src: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_tgt: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_valid_src: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    path_valid_tgt: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    transforms: [filtertoolong, denoising]
-  train_en-sv:
-    src_tgt: en-sv
-    enc_sharing_group: [en]
-    dec_sharing_group: [sv]
-    node_gpu: "4:3"
-    path_src: path_to_europarl/sv-en/train.sv-en.en.sp
-    path_tgt: path_to_europarl/sv-en/train.sv-en.sv.sp
-    path_valid_src: path_to_europarl/sv-en/valid.sv-en.en.sp
-    path_valid_tgt: path_to_europarl/sv-en/valid.sv-en.sv.sp
-    transforms: [filtertoolong]
-
-        
-### Transform related opts:
-#### Filter
-src_seq_length: 200
-tgt_seq_length: 200
-#### Bart
-src_subword_type: sentencepiece
-tgt_subword_type: sentencepiece
-mask_ratio: 0.2
-replace_length: 1
-
-# silently ignore empty lines in the data
-skip_empty_level: silent
-
-batch_size: 4096
-batch_type: tokens
-normalization: tokens
-valid_batch_size: 4096
-max_generator_batches: 2
-src_vocab_size: 100000
-tgt_vocab_size: 100000
-model_dim: 512
-transformer_ff: 2048
-heads: 8
-enc_layers: [6]
-dec_layers: [6]
-dropout: 0.1
-label_smoothing: 0.1
-param_init: 0.0
-param_init_glorot: true
-valid_steps: 10000
-warmup_steps: 10000
-report_every: 100
-save_checkpoint_steps: 50000
-keep_checkpoint: -1
-accum_count: 1
-optim: adafactor
-decay_method: none
-learning_rate: 3.0
-max_grad_norm: 0.0
-seed: 3435
-model_type: text
-
 n_nodes: 5
-world_size: 20
-gpu_ranks: [0, 1, 2, 3]
-
-early_stopping: 5
-early_stopping_criteria: accuracy
+world_size: 20          # 5 nodes x 4 GPUs
+gpu_ranks: [0, 1, 2, 3] # the GPUs on each node
+# ... and node_gpu values from "0:0" to "4:3"
 ```
-</details>
 
+## Step 5: Train
 
-### Data Configuration:
-- Vocabularies for the source and target languages is need to be specified. In the example, we used a shared vocabulary.
-- Specifies options related to data transformation, including filtering and BART-specific denoising parameters.
-
-### Task Configuration:
-- Translation tasks are defined in this section, such as `bg-en` for Bulgarian to English translation. 
-- Each task includes details such as source and target file paths, sharing groups, GPU assignments, and data transforms.
-- For GPU assignments, the task defines the ranks of nodes and GPUs. For example, `4:0` indicates the first GPU on the fifth node.
-
-### Training Configuration:
-- Batch size, normalization, and other training parameters are set.
-- Model parameters such as dimensions, transformer layers, dropout, label smoothing, and more are specified.
-- The training uses the Adafactor optimizer with a learning rate of 3.0 and no gradient clipping.
-- Early stopping is enabled with a criterion of accuracy and a patience of 5 steps.
-- The training process is distributed across 4 GPUs (`world_size: 4`, `gpu_ranks: [0, 1, 2, 3]`) on a single node (`node_rank: 0`) for single node job. For the 5-node job, job is distributed across 20 GPUs. 
-
-## Step 4: Train your MAMMOTH model
-
-Finally, we can start the training process now. Here we provide an example script that sets several environment variables, creates necessary directories, and then runs a training job for a MAMMOTH machine translation model. 
+On a single machine (here, the 2-GPU config), `--node_rank` is always `0`:
 
 ```bash
-export PYTHONUSERBASE=/path_to_your_env/mammoth/
-
-# pointer to codebase
-export MAMMOTH=/path_to_codebase/mammoth
-
-# pointer to config file
-export CONFIG_DIR=path_to_europarl/config
-
-# pointer to slurm multinode wrapper.
-export SCRIPT_DIR=path_to_europarl/scripts/
-
-# info for model and log saving
-export SAVE_DIR=your_path/models/europarl
-export LOG_DIR=${SAVE_DIR}/logs
-export EXP_ID=example-1-node
-
-mkdir -p  ${SAVE_DIR}/{logs,models}
-
-srun ${SCRIPT_DIR}/wrapper.sh -u ${MAMMOTH}/train.py \
-    -config ${CONFIG_DIR}/europarl-1node-4gpu.yml \
-    -save_model ${SAVE_DIR}/models/${EXP_ID} \
-    -master_port 9973 \
-    -tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}
+mammoth_train --config europarl_2langs.yaml --node_rank 0 \
+    --tensorboard --tensorboard_log_dir models/logs
 ```
 
+Checkpoints are written under `models/`, named from `save_model` and the step number. Keep the tokenizer files next to the model, because you need them to translate.
 
-### Environment Variable Setup:
-   - `PYTHONUSERBASE`: Specifies the base directory for Python user-specific packages. You can also specify the python environment in your favorite way and check the installation guide for more information.
-   - `MAMMOTH`: Points to the codebase directory for a project named "mammoth."
-   - `CONFIG_DIR`: Points to a directory containing configuration files.
-   - `SCRIPT_DIR`: Points to a directory containing Slurm multinode wrapper scripts.
-   - `SAVE_DIR`: Specifies the base directory for saving model-related files.
-   - `LOG_DIR`: Specifies the directory for saving logs related to the model training.
-   - `EXP_ID`: Represents an experiment identifier, set to "example-1-node."
+### Several nodes with Slurm
 
-### Directory Creation:
-   - Creates the "logs" and "models" directories inside `SAVE_DIR` if they do not already exist. You will find the logs and saved models there.
+Start the same command once per node, each with its own `--node_rank`, and point every node at the same master address. With Slurm, `srun` starts one wrapper per node, and the wrapper reads the rank from the environment. Save this as `train_multinode.sh`:
 
-### Training Job Submission:
-   - We utilize Slurm for resource allocation. `srun`: Initiates a Slurm job.
-   - `${SCRIPT_DIR}/wrapper.sh`: Calls a wrapper script for managing Slurm settings, monitoring GPU usage, and etc.
-An example of wrapper script can be:
 ```bash
-export CUDA_VISIBLE_DEVICES=0,1,2,3
-nvidia-smi dmon -s mu -d 5 -o TD > "${LOG_DIR}/gpu_load-${EXP_ID}-${PPID}.log" &
-echo python -u "$@" --node_rank $SLURM_NODEID
-python -u "$@" --node_rank $SLURM_NODEID
+#!/bin/bash
+#SBATCH --nodes=5
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:4
+#SBATCH --time=72:00:00
+
+MASTER_NODE=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
+MASTER_PORT=9973
+
+srun bash -c "mammoth_train \
+    --config europarl_21langs_5nodes.yaml \
+    --node_rank \${SLURM_NODEID} \
+    --master_ip ${MASTER_NODE} \
+    --master_port ${MASTER_PORT}"
 ```
-   - `-u ${MAMMOTH}/train.py`: Specifies the Python script for training, located in the "mammoth" codebase.
-   - `-config ${CONFIG_DIR}/europarl-1node-4gpu.yml`: Specifies the configuration file for the training job.
-   - `-save_model ${SAVE_DIR}/models/${EXP_ID}`: Specifies the directory to save the trained model.
-   - `-master_port 9973`: Specifies the master port for communication.
-   - `-tensorboard -tensorboard_log_dir ${LOG_DIR}/${EXP_ID}`: Enables TensorBoard logging and specifies the directory for TensorBoard logs.
 
+Then submit it with `sbatch train_multinode.sh`.
 
-Hooray! Take a moment to celebrate the progress you've made. Wait for hours and the model training should be completed soon.
+- `n_nodes` in the config must equal the number of Slurm nodes, and `--node_rank` must equal the node's index. MAMMOTH checks both against `SLURM_NNODES` / `SLURM_NODEID` and stops with an error if they differ.
+- The partition, account, modules or container, and GPU-type options in the `#SBATCH` header depend on your cluster. For LUMI and Roihu, see the [CSC quickstart](../CSC_quickstart.md).
+
+## Step 6: Translate
+
+Translate with the task you want, using the same config:
+
+```bash
+mammoth_translate \
+    --config europarl_2langs.yaml \
+    --model models/ \
+    --task_id train_bg-en \
+    --src europarl_data/split/bg-en/val.bg \
+    --output val.bg-en.trans \
+    --beam_size 5
+```
+
+`--task_id` selects the task's encoder, decoder and tokenizers; it is the key under `tasks`. See the [Quickstart](../quickstart.md#step-5-translate) for scoring the output.
+
+Hooray! Take a moment to celebrate the progress you've made. Wait for hours (or days, for the full set) and the model training should be completed soon.

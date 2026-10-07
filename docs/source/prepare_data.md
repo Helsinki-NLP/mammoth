@@ -154,7 +154,7 @@ Transforms such as `filtertoolong` still work with this setup, since they run on
 
 ## Option 2: SentencePiece (legacy)
 
-SentencePiece is the older way of tokenizing in MAMMOTH. It is kept here for reproducing the [MAMMOTH 101](examples/train_mammoth_101.md) example and for models that already use a SentencePiece vocabulary. For new projects, use Option 1.
+SentencePiece is the older way of tokenizing in MAMMOTH. It is kept here for models that already use a SentencePiece vocabulary. The [MAMMOTH 101](examples/train_mammoth_101.md) example now uses Hugging Face tokenizers (Option 1). For new projects, use Option 1.
 
 With SentencePiece, the data is tokenized ahead of time with the scripts below.
 

@@ -1,120 +1,437 @@
 
 
-
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Index &mdash; MAMMOTH  documentation</title>
-  
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
 
   
-  
-  
-  
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script type="module">import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11.12.1/dist/mermaid.esm.min.mjs";
 
-  
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
-  
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
 
-    
 
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+
+const initStyles = () => {
+    const defaultStyle = document.createElement('style');
+    defaultStyle.textContent = "pre.mermaid {\n    /* Same as .mermaid-container > pre */\n    display: block;\n    width: 100%;\n}\n\npre.mermaid > svg {\n    /* Same as .mermaid-container > pre > svg */\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}";
+    document.head.appendChild(defaultStyle);
+
+    const fullscreenStyle = document.createElement('style');
+    fullscreenStyle.textContent = ".mermaid-container {\n    position: relative;\n    display: flex;\n    flex-direction: row;\n    width: 100%;\n}\n\n.mermaid-container > pre {\n    display: block;\n    width: 100%;\n}\n\n.mermaid-container > pre > svg {\n    height: 500px;\n    width: 100%;\n    max-width: 100% !important;\n}\n\n.mermaid-fullscreen-btn {\n    position: absolute;\n    width: 28px;\n    height: 28px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.3);\n    border-radius: 4px;\n    cursor: pointer;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    transition: all 0.2s;\n    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);\n    font-size: 14px;\n    line-height: 1;\n    padding: 0;\n    color: #333;\n}\n\n.mermaid-fullscreen-btn:hover {\n    opacity: 100% !important;\n    background: rgba(255, 255, 255, 1);\n    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-btn.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.3);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-btn.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 3px 10px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal {\n    display: none;\n    position: fixed !important;\n    top: 0 !important;\n    left: 0 !important;\n    width: 95vw;\n    height: 100vh;\n    background: rgba(255, 255, 255, 0.98);\n    z-index: 9999;\n    padding: 20px;\n    overflow: auto;\n}\n\n.mermaid-fullscreen-modal.dark-theme {\n    background: rgba(0, 0, 0, 0.98);\n}\n\n.mermaid-fullscreen-modal.active {\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen {\n    position: relative;\n    width: 95vw;\n    height: 90vh;\n    max-width: 95vw;\n    max-height: 90vh;\n    background: white;\n    border-radius: 8px;\n    padding: 20px;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);\n    overflow: auto;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen.dark-theme {\n    background: #1a1a1a;\n    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);\n}\n\n.mermaid-container-fullscreen pre.mermaid {\n    width: 100%;\n    height: 100%;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n}\n\n.mermaid-container-fullscreen .mermaid svg {\n    height: 100% !important;\n    width: 100% !important;\n    cursor: grab;\n}\n\n.mermaid-fullscreen-close {\n    position: fixed !important;\n    top: 20px !important;\n    right: 20px !important;\n    width: 40px;\n    height: 40px;\n    background: rgba(255, 255, 255, 0.95);\n    border: 1px solid rgba(0, 0, 0, 0.2);\n    border-radius: 50%;\n    cursor: pointer;\n    z-index: 10000;\n    display: flex;\n    align-items: center;\n    justify-content: center;\n    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);\n    transition: all 0.2s;\n    font-size: 24px;\n    line-height: 1;\n    color: #333;\n}\n\n.mermaid-fullscreen-close:hover {\n    background: white;\n    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);\n    transform: scale(1.1);\n}\n\n.mermaid-fullscreen-close.dark-theme {\n    background: rgba(50, 50, 50, 0.95);\n    border: 1px solid rgba(255, 255, 255, 0.2);\n    color: #e0e0e0;\n}\n\n.mermaid-fullscreen-close.dark-theme:hover {\n    background: rgba(60, 60, 60, 1);\n    box-shadow: 0 6px 16px rgba(255, 255, 255, 0.2);\n}\n\n.mermaid-fullscreen-modal .mermaid-fullscreen-btn {\n    display: none !important;\n}";
+    document.head.appendChild(fullscreenStyle);
+}
+
+// Detect if page has dark background
+const isDarkTheme = () => {
+    // We use a set of heuristics:
+    // 1. Check for common dark mode classes or attributes
+    // 2. Check computed background color brightness
+    if (document.documentElement.classList.contains('dark') ||
+        document.documentElement.getAttribute('data-theme') === 'dark' ||
+        document.body.classList.contains('dark') ||
+        document.body.getAttribute('data-theme') === 'dark') {
+        // console.log("Dark theme detected via class/attribute");
+        return true;
+    }
+    if (document.documentElement.classList.contains('light') ||
+        document.documentElement.getAttribute('data-theme') === 'light' ||
+        document.body.classList.contains('light') ||
+        document.body.getAttribute('data-theme') === 'light') {
+        // console.log("Light theme detected via class/attribute");
+        return false;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        // console.log("Dark theme detected via prefers-color-scheme");
+        return true;
+    }
+    const bgColor = window.getComputedStyle(document.body).backgroundColor;
+    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)/);
+    if (match) {
+        const r = parseInt(match[1]);
+        const g = parseInt(match[2]);
+        const b = parseInt(match[3]);
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+        // console.log("Background color brightness:", brightness);
+        return brightness < 128;
+    }
+    // console.log("No dark or light theme detected, defaulting to light theme");
+    return false;
+};
+
+let darkTheme = isDarkTheme();
+let modal = null;
+let modalContent = null;
+let previousScrollOffset = [window.scrollX, window.scrollY];
+let _lazyObserver = null;
+let _renderQueue = Promise.resolve();
+let closeModal = () => {};
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('active')) {
+        closeModal();
+    }
+});
+
+// Apply d3 zoom to each SVG. Idempotent: an SVG already wrapped is skipped,
+// so this is safe to call both for the initial batch and for diagrams that
+// render lazily once they become visible.
+const addZoomToSvgs = (svgs) => {
+    svgs.each(function() {
+        if (this.getAttribute('data-zoom-applied') === 'true') return;
+        var svg = d3.select(this);
+        svg.html("<g class='wrapper'>" + svg.html() + "</g>");
+        var inner = svg.select("g");
+        var zoom = d3.zoom().on("zoom", function(event) {
+            inner.attr("transform", event.transform);
+        });
+        svg.call(zoom);
+        this.setAttribute('data-zoom-applied', 'true');
+    });
+};
+
+const runMermaid = async (rerun) => {
+    console.log("Running mermaid diagrams, rerun =", rerun);
+    // clear all existing mermaid charts
+    let all_mermaids = document.querySelectorAll(".mermaid");
+
+    if (rerun) {
+        // Disconnect any previous lazy rendering observer
+        if (_lazyObserver) {
+            _lazyObserver.disconnect();
+            _lazyObserver = null;
+        }
+
+        all_mermaids.forEach((el) => {
+            el.removeAttribute('data-mermaid-deferred');
+            el.removeAttribute('data-mermaid-render-failed');
+            if(!el.hasAttribute("data-original-code")) {
+                // store original code
+                // console.log(`Storing original code for first run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+            if(el.getAttribute("data-processed") === "true") {
+                // remove and restore original
+                el.removeAttribute("data-processed");
+                // console.log(`Restoring original code for re-run: `, el.getAttribute('data-original-code'));
+                el.innerHTML = el.getAttribute('data-original-code');
+            } else {
+                // store original code
+                // console.log(`Storing original code for re-run: `, el.innerHTML);
+                el.setAttribute('data-original-code', el.innerHTML);
+            }
+        });
+
+        // Separate visible and hidden elements. Mermaid's layout engine measures
+        // text dimensions via the DOM, which fails for elements hidden by a parent
+        // (e.g., Reveal.js non-active slides, sphinx-design unopened tabs),
+        // producing broken SVGs. Render visible elements now, defer hidden ones.
+        const visible = [];
+        const hidden = [];
+        all_mermaids.forEach((el) => {
+            // offsetParent is null for display:none ancestors.
+            // getClientRects().length > 0 catches position:fixed elements
+            // (which also have null offsetParent but are still visible).
+            if (el.offsetParent !== null || el.getClientRects().length > 0) {
+                visible.push(el);
+            } else {
+                hidden.push(el);
+                el.setAttribute('data-mermaid-deferred', 'true');
+            }
+        });
+
+        if (visible.length > 0) {
+            try {
+                await mermaid.run({ nodes: visible });
+            } catch (e) {
+                console.error("Mermaid rendering failed:", e);
+            }
+        }
+
+        // Lazily render hidden elements when they become visible.
+        // Uses a promise chain (_renderQueue) to serialize rendering,
+        // since IntersectionObserver may report multiple entries at once
+        // and mermaid.run() is not safe to call concurrently.
+        if (hidden.length > 0) {
+            if (typeof IntersectionObserver === 'undefined') {
+                console.warn("IntersectionObserver not available; hidden mermaid diagrams will not render.");
+            } else {
+                _renderQueue = Promise.resolve();
+                _lazyObserver = new IntersectionObserver((entries) => {
+                    for (const entry of entries) {
+                        if (entry.isIntersecting && entry.target.getAttribute("data-processed") !== "true") {
+                            _lazyObserver.unobserve(entry.target);
+                            const el = entry.target;
+                            _renderQueue = _renderQueue.then(async () => {
+                                try {
+                                    await mermaid.run({ nodes: [el] });
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    // Apply zoom to the now-rendered diagram, matching
+                                    // the decoration visible diagrams receive.
+                                    if (false) {
+                                        addZoomToSvgs(d3.selectAll("").select(function() {
+                                            return this.querySelector("svg");
+                                        }));
+                                    }
+                                } catch (e) {
+                                    console.error("Mermaid deferred rendering failed:", e);
+                                    el.removeAttribute('data-mermaid-deferred');
+                                    el.setAttribute('data-mermaid-render-failed', 'true');
+                                }
+                            });
+                        }
+                    }
+                });
+                hidden.forEach((el) => _lazyObserver.observe(el));
+            }
+        }
+    }
+
+    all_mermaids = document.querySelectorAll(".mermaid");
+    // Exclude deferred (hidden) and render-failed elements from completion checks
+    const mermaids_active = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])");
+    const mermaids_processed = document.querySelectorAll(".mermaid:not([data-mermaid-deferred]):not([data-mermaid-render-failed])[data-processed='true']");
+
+    if (false) {
+        const mermaids_to_add_zoom = 0 === -1 ? mermaids_active.length : 0;
+        if(mermaids_to_add_zoom > 0) {
+            var svgs = d3.selectAll("").select(function() {
+                return this.querySelector("svg");
+            });
+            // Wait until every active (visible) diagram has rendered. Deferred
+            // diagrams are excluded, so a fixed d3_node_count that counts a
+            // hidden diagram no longer loops forever waiting for its SVG.
+            if(mermaids_active.length !== mermaids_processed.length) {
+                setTimeout(() => runMermaid(false), 200);
+                return;
+            }
+            addZoomToSvgs(svgs);
+        }
+    } else if(mermaids_active.length !== mermaids_processed.length) {
+        // Wait for mermaid to process all diagrams
+        setTimeout(() => runMermaid(false), 200);
+        return;
+    }
+
+    // Stop here if not adding fullscreen capability
+    if (!true) return;
+
+    if (modal !== null ) {
+        // Destroy existing modal
+        modal.remove();
+        modal = null;
+        modalContent = null;
+    }
+
+    modal = document.createElement('div');
+    modal.className = 'mermaid-fullscreen-modal' + (darkTheme ? ' dark-theme' : '');
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', 'Fullscreen diagram viewer');
+    modal.innerHTML = `
+        <button class="mermaid-fullscreen-close${darkTheme ? ' dark-theme' : ''}" aria-label="Close fullscreen">✕</button>
+        <div class="mermaid-container-fullscreen${darkTheme ? ' dark-theme' : ''}"></div>
+    `;
+    document.body.appendChild(modal);
+
+    modalContent = modal.querySelector('.mermaid-container-fullscreen');
+    const closeBtn = modal.querySelector('.mermaid-fullscreen-close');
+
+    closeModal = () => {
+        modal.classList.remove('active');
+        modalContent.innerHTML = '';
+        document.body.style.overflow = ''
+        window.scrollTo({left: previousScrollOffset[0], top: previousScrollOffset[1], behavior: 'instant'});
+    };
+
+    closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+    });
+    document.querySelectorAll('.mermaid').forEach((mermaidDiv) => {
+        if (mermaidDiv.parentNode.classList.contains('mermaid-container') ||
+            mermaidDiv.closest('.mermaid-fullscreen-modal')) {
+            // Already processed, adjust button class if needed
+            const existingBtn = mermaidDiv.parentNode.querySelector('.mermaid-fullscreen-btn');
+            if (existingBtn) {
+                existingBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+            }
+            return;
+        }
+
+        const container = document.createElement('div');
+        container.className = 'mermaid-container';
+        mermaidDiv.parentNode.insertBefore(container, mermaidDiv);
+        container.appendChild(mermaidDiv);
+
+        const fullscreenBtn = document.createElement('button');
+        fullscreenBtn.className = 'mermaid-fullscreen-btn' + (darkTheme ? ' dark-theme' : '');
+        fullscreenBtn.setAttribute('aria-label', 'View diagram in fullscreen');
+        fullscreenBtn.textContent = "\u26f6";
+        fullscreenBtn.style.opacity = "50%";
+
+        // Calculate dynamic position based on diagram's margin and padding
+        const diagramStyle = window.getComputedStyle(mermaidDiv);
+        const marginTop = parseFloat(diagramStyle.marginTop) || 0;
+        const marginRight = parseFloat(diagramStyle.marginRight) || 0;
+        const paddingTop = parseFloat(diagramStyle.paddingTop) || 0;
+        const paddingRight = parseFloat(diagramStyle.paddingRight) || 0;
+        fullscreenBtn.style.top = `${marginTop + paddingTop + 4}px`;
+        fullscreenBtn.style.right = `${marginRight + paddingRight + 4}px`;
+
+        fullscreenBtn.addEventListener('click', () => {
+            previousScrollOffset = [window.scrollX, window.scrollY];
+            const clone = mermaidDiv.cloneNode(true);
+            modalContent.innerHTML = '';
+            modalContent.appendChild(clone);
+
+            const svg = clone.querySelector('svg');
+            if (svg) {
+                svg.removeAttribute('width');
+                svg.removeAttribute('height');
+                svg.style.width = '100%';
+                svg.style.height = 'auto';
+                svg.style.maxWidth = '100%';
+                svg.style.display = 'block';
+
+                if (false) {
+                    setTimeout(() => {
+                        const g = svg.querySelector('g');
+                        if (g) {
+                            var svgD3 = d3.select(svg);
+                            svgD3.html("<g class='wrapper'>" + svgD3.html() + "</g>");
+                            var inner = svgD3.select("g");
+                            var zoom = d3.zoom().on("zoom", function(event) {
+                                inner.attr("transform", event.transform);
+                            });
+                            svgD3.call(zoom);
+                        }
+                    }, 100);
+                }
+            }
+
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        });
+        container.appendChild(fullscreenBtn);
+    });
+};
+
+
+
+const load = async () => {
+    initStyles();
+
+
+    await runMermaid(true);
+
+    const reRunIfThemeChanges = async () => {
+        const newDarkTheme = isDarkTheme();
+        if (newDarkTheme !== darkTheme) {
+            darkTheme = newDarkTheme;
+            console.log("Theme change detected, re-running mermaid with", darkTheme ? "dark" : "default", "theme");
+            await mermaid.initialize(
+                {...{"startOnLoad": false},
+                ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+                }
+            );
+            await runMermaid(true);
+        }
+    };
+
+    // Update theme classes when theme changes
+    const themeObserver = new MutationObserver(reRunIfThemeChanges);
+    themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+    themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['class', 'style', 'data-theme']
+    });
+};
+
+
+
+
+
+console.log("Initializing mermaid with", darkTheme ? "dark" : "default", "theme");
+mermaid.initialize(
+    {...{"startOnLoad": false},
+    ...{ darkMode: darkTheme, theme: darkTheme ? "dark" : "default" },
+    }
+);
+
+window.addEventListener("load", load);
+window.runMermaid = runMermaid;</script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="#" />
     <link rel="search" title="Search" href="search.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home"> MAMMOTH
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Getting Started</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html">About MAMMOTH</a></li>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
 </ul>
-<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Tutorials</span></p>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CSC_quickstart.html">LUMI &amp; Roihu Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HF_TOKENIZERS.html">HuggingFace Tokenizers Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Scripts</span></p>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="options/build_vocab.html">Build Vocab</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
 </ul>
-<p class="caption"><span class="caption-text">API</span></p>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
@@ -123,66 +440,29 @@
 <li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">MAMMOTH</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Index</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Index</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
+             
 
 <h1 id="index">Index</h1>
 
@@ -205,7 +485,6 @@
  | <a href="#T"><strong>T</strong></a>
  | <a href="#U"><strong>U</strong></a>
  | <a href="#V"><strong>V</strong></a>
- | <a href="#W"><strong>W</strong></a>
  | <a href="#X"><strong>X</strong></a>
  | <a href="#Z"><strong>Z</strong></a>
  
@@ -213,14 +492,12 @@
 <h2 id="A">A</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="mammoth.html#mammoth.utils.Statistics.accumulate_device">accumulate_device() (mammoth.utils.Statistics method)</a>
+</li>
       <li><a href="mammoth.html#mammoth.utils.Statistics.accuracy">accuracy() (mammoth.utils.Statistics method)</a>
 </li>
-      <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.add_adapter">add_adapter() (mammoth.modules.layer_stack_decoder.LayerStackDecoder method)</a>
-
-      <ul>
-        <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_encoder.LayerStackEncoder.add_adapter">(mammoth.modules.layer_stack_encoder.LayerStackEncoder method)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.AdaFactorFairSeq">AdaFactorFairSeq (class in mammoth.utils.optimizers)</a>
 </li>
-      </ul></li>
       <li><a href="mammoth.translation.html#mammoth.translate.DecodeStrategy.advance">advance() (mammoth.translate.DecodeStrategy method)</a>
 
       <ul>
@@ -233,7 +510,7 @@
 </li>
       <li><a href="mammoth.html#mammoth.utils.Statistics.all_gather_stats_list">all_gather_stats_list() (mammoth.utils.Statistics static method)</a>
 </li>
-      <li><a href="mammoth.html#mammoth.utils.Optimizer.amp">amp() (mammoth.utils.Optimizer property)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.MultipleOptimizer.amp">amp (mammoth.utils.optimizers.MultipleOptimizer property)</a>
 </li>
       <li><a href="mammoth.modules.html#mammoth.modules.attention_bridge.AttentionBridge">AttentionBridge (class in mammoth.modules.attention_bridge)</a>
 </li>
@@ -245,15 +522,13 @@
 <h2 id="B">B</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.html#mammoth.utils.Optimizer.backward">backward() (mammoth.utils.Optimizer method)</a>
+      <li><a href="mammoth.modules.html#mammoth.modules.attention_bridge.BaseAttentionBridgeLayer">BaseAttentionBridgeLayer (class in mammoth.modules.attention_bridge)</a>
 </li>
       <li><a href="mammoth.translation.html#mammoth.translate.BeamSearch">BeamSearch (class in mammoth.translate)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.translation.html#mammoth.translate.DecodeStrategy.block_ngram_repeats">block_ngram_repeats() (mammoth.translate.DecodeStrategy method)</a>
-</li>
-      <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing.bucket_is_empty">bucket_is_empty() (mammoth.inputters.dataloader.LookAheadBucketing method)</a>
 </li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.build_tokenizer">build_tokenizer() (mammoth.translate.translation_server.ServerModel method)</a>
 </li>
@@ -285,14 +560,12 @@
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.modules.html#mammoth.modules.decoder.DecoderBase">DecoderBase (class in mammoth.modules.decoder)</a>
-</li>
       <li><a href="mammoth.translation.html#mammoth.translate.DecodeStrategy">DecodeStrategy (class in mammoth.translate)</a>
+</li>
+      <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.detokenize">detokenize() (mammoth.translate.translation_server.ServerModel method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.detokenize">detokenize() (mammoth.translate.translation_server.ServerModel method)</a>
-</li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.do_timeout">do_timeout() (mammoth.translate.translation_server.ServerModel method)</a>
 </li>
       <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.DynamicDatasetIter">DynamicDatasetIter (class in mammoth.inputters.dataloader)</a>
@@ -305,15 +578,13 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.html#mammoth.utils.Statistics.elapsed_time">elapsed_time() (mammoth.utils.Statistics method)</a>
 </li>
-      <li><a href="mammoth.modules.html#mammoth.modules.Embeddings.emb_luts">emb_luts() (mammoth.modules.Embeddings property)</a>
+      <li><a href="mammoth.modules.html#mammoth.modules.encoder.EncoderBase">EncoderBase (class in mammoth.modules.encoder)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.modules.html#mammoth.modules.Embeddings">Embeddings (class in mammoth.modules)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.exponential_decay">exponential_decay() (in module mammoth.utils.optimizers)</a>
 </li>
-      <li><a href="mammoth.modules.html#mammoth.modules.encoder.EncoderBase">EncoderBase (class in mammoth.modules.encoder)</a>
-</li>
-      <li><a href="mammoth.modules.html#mammoth.modules.decoder_ensemble.EnsembleModel">EnsembleModel (class in mammoth.modules.decoder_ensemble)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.MultipleOptimizer.externally_managed_step">externally_managed_step() (mammoth.utils.optimizers.MultipleOptimizer method)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -328,13 +599,7 @@
 </li>
         <li><a href="mammoth.modules.html#mammoth.modules.average_attn.AverageAttention.forward">(mammoth.modules.average_attn.AverageAttention method)</a>
 </li>
-        <li><a href="mammoth.modules.html#mammoth.modules.Embeddings.forward">(mammoth.modules.Embeddings method)</a>
-</li>
         <li><a href="mammoth.modules.html#mammoth.modules.encoder.EncoderBase.forward">(mammoth.modules.encoder.EncoderBase method)</a>
-</li>
-        <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.forward">(mammoth.modules.layer_stack_decoder.LayerStackDecoder method)</a>
-</li>
-        <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_encoder.LayerStackEncoder.forward">(mammoth.modules.layer_stack_encoder.LayerStackEncoder method)</a>
 </li>
         <li><a href="mammoth.modules.html#mammoth.modules.mean_encoder.MeanEncoder.forward">(mammoth.modules.mean_encoder.MeanEncoder method)</a>
 </li>
@@ -342,35 +607,21 @@
 </li>
         <li><a href="mammoth.modules.html#mammoth.modules.position_ffn.PositionwiseFeedForward.forward">(mammoth.modules.position_ffn.PositionwiseFeedForward method)</a>
 </li>
-        <li><a href="mammoth.modules.html#mammoth.modules.transformer_decoder.TransformerDecoder.forward">(mammoth.modules.transformer_decoder.TransformerDecoder method)</a>
-</li>
         <li><a href="mammoth.modules.html#mammoth.modules.transformer_encoder.TransformerEncoder.forward">(mammoth.modules.transformer_encoder.TransformerEncoder method)</a>
 </li>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="mammoth.html#mammoth.utils.Statistics.from_loss_logits_target">from_loss_logits_target() (mammoth.utils.Statistics class method)</a>
+</li>
       <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.DynamicDatasetIter.from_opts">from_opts() (mammoth.inputters.dataloader.DynamicDatasetIter class method)</a>
 
       <ul>
         <li><a href="mammoth.modules.html#mammoth.modules.attention_bridge.AttentionBridge.from_opts">(mammoth.modules.attention_bridge.AttentionBridge class method)</a>
 </li>
-        <li><a href="mammoth.modules.html#mammoth.modules.decoder.DecoderBase.from_opts">(mammoth.modules.decoder.DecoderBase class method)</a>
-</li>
-        <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.from_opts">(mammoth.modules.layer_stack_decoder.LayerStackDecoder class method)</a>
-</li>
-        <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_encoder.LayerStackEncoder.from_opts">(mammoth.modules.layer_stack_encoder.LayerStackEncoder class method)</a>
-</li>
         <li><a href="mammoth.modules.html#mammoth.modules.mean_encoder.MeanEncoder.from_opts">(mammoth.modules.mean_encoder.MeanEncoder class method)</a>
 </li>
         <li><a href="mammoth.modules.html#mammoth.modules.transformer_encoder.TransformerEncoder.from_opts">(mammoth.modules.transformer_encoder.TransformerEncoder class method)</a>
-</li>
-        <li><a href="mammoth.html#mammoth.utils.Optimizer.from_opts">(mammoth.utils.Optimizer class method)</a>
-</li>
-      </ul></li>
-      <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.from_trans_opt">from_trans_opt() (mammoth.modules.layer_stack_decoder.LayerStackDecoder class method)</a>
-
-      <ul>
-        <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_encoder.LayerStackEncoder.from_trans_opt">(mammoth.modules.layer_stack_encoder.LayerStackEncoder class method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -379,12 +630,8 @@
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.get_submodule">get_submodule() (mammoth.modules.layer_stack_decoder.LayerStackDecoder method)</a>
-
-      <ul>
-        <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_encoder.LayerStackEncoder.get_submodule">(mammoth.modules.layer_stack_encoder.LayerStackEncoder method)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.get_base_optimizer">get_base_optimizer() (in module mammoth.utils.optimizers)</a>
 </li>
-      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.translation.html#mammoth.translate.GNMTGlobalScorer">GNMTGlobalScorer (class in mammoth.translate)</a>
@@ -399,8 +646,6 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.InferenceBatcher">InferenceBatcher (class in mammoth.inputters.dataloader)</a>
 </li>
-      <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder.init_state">init_state() (mammoth.modules.layer_stack_decoder.LayerStackDecoder method)</a>
-</li>
       <li><a href="mammoth.translation.html#mammoth.translate.BeamSearch.initialize">initialize() (mammoth.translate.BeamSearch method)</a>
 
       <ul>
@@ -411,7 +656,7 @@
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing.is_empty">is_empty() (mammoth.inputters.dataloader.LookAheadBucketing method)</a>
+      <li><a href="mammoth.modules.html#mammoth.modules.attention_bridge.BaseAttentionBridgeLayer.is_fixed_length">is_fixed_length (mammoth.modules.attention_bridge.BaseAttentionBridgeLayer property)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -419,11 +664,7 @@
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_decoder.LayerStackDecoder">LayerStackDecoder (class in mammoth.modules.layer_stack_decoder)</a>
-</li>
-      <li><a href="mammoth.modules.html#mammoth.modules.layer_stack_encoder.LayerStackEncoder">LayerStackEncoder (class in mammoth.modules.layer_stack_encoder)</a>
-</li>
-      <li><a href="mammoth.html#mammoth.utils.Optimizer.learning_rate">learning_rate() (mammoth.utils.Optimizer method)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.SubOptimizer.learning_rate">learning_rate() (mammoth.utils.optimizers.SubOptimizer method)</a>
 </li>
       <li><a href="mammoth.translation.html#mammoth.translate.penalties.PenaltyBuilder.length_average">length_average() (mammoth.translate.penalties.PenaltyBuilder method)</a>
 </li>
@@ -437,15 +678,11 @@
 </li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.TranslationServer.load_model">load_model() (mammoth.translate.translation_server.TranslationServer method)</a>
 </li>
-      <li><a href="mammoth.modules.html#mammoth.modules.Embeddings.load_pretrained_vectors">load_pretrained_vectors() (mammoth.modules.Embeddings method)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.MultipleOptimizer.load_state_dict">load_state_dict() (mammoth.utils.optimizers.MultipleOptimizer method)</a>
 </li>
       <li><a href="mammoth.translation.html#mammoth.translate.Translation.log">log() (mammoth.translate.Translation method)</a>
 </li>
       <li><a href="mammoth.html#mammoth.utils.Statistics.log_tensorboard">log_tensorboard() (mammoth.utils.Statistics method)</a>
-</li>
-      <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing">LookAheadBucketing (class in mammoth.inputters.dataloader)</a>
-</li>
-      <li><a href="mammoth.html#mammoth.utils.loss.LossComputeBase">LossComputeBase (class in mammoth.utils.loss)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -453,6 +690,17 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.make_learning_rate_decay_fn">make_learning_rate_decay_fn() (in module mammoth.utils.optimizers)</a>
+</li>
+      <li>
+    mammoth.utils.optimizers
+
+      <ul>
+        <li><a href="mammoth.html#module-mammoth.utils.optimizers">module</a>
+</li>
+      </ul></li>
+      <li><a href="mammoth.html#mammoth.utils.Statistics.materialize">materialize() (mammoth.utils.Statistics method)</a>
+</li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.maybe_convert_align">maybe_convert_align() (mammoth.translate.translation_server.ServerModel method)</a>
 </li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.maybe_detokenize">maybe_detokenize() (mammoth.translate.translation_server.ServerModel method)</a>
@@ -462,8 +710,6 @@
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.maybe_postprocess">maybe_postprocess() (mammoth.translate.translation_server.ServerModel method)</a>
 </li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.maybe_preprocess">maybe_preprocess() (mammoth.translate.translation_server.ServerModel method)</a>
-</li>
-      <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.LookAheadBucketing.maybe_replenish">maybe_replenish() (mammoth.inputters.dataloader.LookAheadBucketing method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -477,7 +723,16 @@
 </li>
       <li><a href="mammoth.inputters.html#mammoth.inputters.vocab.Vocab.merge">merge() (mammoth.inputters.vocab.Vocab class method)</a>
 </li>
+      <li>
+    module
+
+      <ul>
+        <li><a href="mammoth.html#module-mammoth.utils.optimizers">mammoth.utils.optimizers</a>
+</li>
+      </ul></li>
       <li><a href="mammoth.modules.html#mammoth.modules.multi_headed_attn.MultiHeadedAttention">MultiHeadedAttention (class in mammoth.modules.multi_headed_attn)</a>
+</li>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.MultipleOptimizer">MultipleOptimizer (class in mammoth.utils.optimizers)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -488,14 +743,16 @@
       <li><a href="mammoth.html#mammoth.models.NMTModel">NMTModel (class in mammoth.models)</a>
 </li>
   </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.noam_decay">noam_decay() (in module mammoth.utils.optimizers)</a>
+</li>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.noamwd_decay">noamwd_decay() (in module mammoth.utils.optimizers)</a>
+</li>
+  </ul></td>
 </tr></table>
 
 <h2 id="O">O</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.html#mammoth.utils.Optimizer">Optimizer (class in mammoth.utils)</a>
-</li>
-  </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.html#mammoth.utils.Statistics.output">output() (mammoth.utils.Statistics method)</a>
 </li>
@@ -531,8 +788,12 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModel.rebuild_seg_packages">rebuild_seg_packages() (mammoth.translate.translation_server.ServerModel method)</a>
 </li>
+      <li><a href="mammoth.translation.html#mammoth.translate.DecodeStrategy.reorder_cache">reorder_cache() (mammoth.translate.DecodeStrategy method)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.rsqrt_decay">rsqrt_decay() (in module mammoth.utils.optimizers)</a>
+</li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.TranslationServer.run">run() (mammoth.translate.translation_server.TranslationServer method)</a>
 </li>
   </ul></td>
@@ -547,13 +808,25 @@
 </li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.ServerModelError">ServerModelError</a>
 </li>
+      <li><a href="mammoth.inputters.html#mammoth.inputters.dataloader.SimpleLookAheadBucketing">SimpleLookAheadBucketing (class in mammoth.inputters.dataloader)</a>
+</li>
+      <li><a href="mammoth.modules.html#mammoth.modules.layer_stack.StackXcoder">StackXcoder (class in mammoth.modules.layer_stack)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.TranslationServer.start">start() (mammoth.translate.translation_server.TranslationServer method)</a>
 </li>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.MultipleOptimizer.state_dict">state_dict() (mammoth.utils.optimizers.MultipleOptimizer method)</a>
+</li>
       <li><a href="mammoth.html#mammoth.utils.Statistics">Statistics (class in mammoth.utils)</a>
 </li>
-      <li><a href="mammoth.html#mammoth.utils.Optimizer.step">step() (mammoth.utils.Optimizer method)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.AdaFactorFairSeq.step">step() (mammoth.utils.optimizers.AdaFactorFairSeq method)</a>
+
+      <ul>
+        <li><a href="mammoth.html#mammoth.utils.optimizers.SubOptimizer.step">(mammoth.utils.optimizers.SubOptimizer method)</a>
+</li>
+      </ul></li>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.SubOptimizer">SubOptimizer (class in mammoth.utils.optimizers)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -562,6 +835,8 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="mammoth.translation.html#mammoth.translate.DecodeStrategy.target_prefixing">target_prefixing() (mammoth.translate.DecodeStrategy method)</a>
+</li>
+      <li><a href="mammoth.html#mammoth.utils.Statistics.tflops">tflops() (mammoth.utils.Statistics method)</a>
 </li>
       <li><a href="mammoth.translate.translation_server.html#mammoth.translate.translation_server.Timer">Timer (class in mammoth.translate.translation_server)</a>
 </li>
@@ -577,10 +852,12 @@
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.html#mammoth.utils.Optimizer.training_step">training_step() (mammoth.utils.Optimizer property)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.MultipleOptimizer.training_step">training_step (mammoth.utils.optimizers.MultipleOptimizer property)</a>
+
+      <ul>
+        <li><a href="mammoth.html#mammoth.utils.optimizers.SubOptimizer.training_step">(mammoth.utils.optimizers.SubOptimizer property)</a>
 </li>
-      <li><a href="mammoth.modules.html#mammoth.modules.transformer_decoder.TransformerDecoder">TransformerDecoder (class in mammoth.modules.transformer_decoder)</a>
-</li>
+      </ul></li>
       <li><a href="mammoth.modules.html#mammoth.modules.transformer_encoder.TransformerEncoder">TransformerEncoder (class in mammoth.modules.transformer_encoder)</a>
 </li>
       <li><a href="mammoth.translation.html#mammoth.translate.Translator.translate_batch">translate_batch() (mammoth.translate.Translator method)</a>
@@ -611,6 +888,8 @@
         <li><a href="mammoth.translation.html#mammoth.translate.GreedySearch.update_finished">(mammoth.translate.GreedySearch method)</a>
 </li>
       </ul></li>
+      <li><a href="mammoth.translation.html#mammoth.translate.DecodeStrategy.update_finished_in_cache">update_finished_in_cache() (mammoth.translate.DecodeStrategy method)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -626,14 +905,6 @@
   </ul></td>
 </tr></table>
 
-<h2 id="W">W</h2>
-<table style="width: 100%" class="indextable genindextable"><tr>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.modules.html#mammoth.modules.Embeddings.word_lut">word_lut() (mammoth.modules.Embeddings property)</a>
-</li>
-  </ul></td>
-</tr></table>
-
 <h2 id="X">X</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
@@ -645,50 +916,42 @@
 <h2 id="Z">Z</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="mammoth.html#mammoth.utils.Optimizer.zero_grad">zero_grad() (mammoth.utils.Optimizer method)</a>
+      <li><a href="mammoth.html#mammoth.utils.optimizers.MultipleOptimizer.zero_grad">zero_grad() (mammoth.utils.optimizers.MultipleOptimizer method)</a>
+
+      <ul>
+        <li><a href="mammoth.html#mammoth.utils.optimizers.SubOptimizer.zero_grad">(mammoth.utils.optimizers.SubOptimizer method)</a>
 </li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
 
 
            </div>
-           
           </div>
           <footer>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2023, HelsinkiNLP
-
-    </p>
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>

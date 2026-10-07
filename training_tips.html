@@ -1,0 +1,203 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tips and tricks for training &mdash; MAMMOTH  documentation</title>
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CSC_quickstart.html">LUMI &amp; Roihu Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HF_TOKENIZERS.html">HuggingFace Tokenizers Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MAMMOTH</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Tips and tricks for training</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/training_tips.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="tips-and-tricks-for-training">
+<h1>Tips and tricks for training<a class="headerlink" href="#tips-and-tricks-for-training" title="Link to this heading">¶</a></h1>
+<section id="speed-up-training-with-token-based-minibatches-and-gradient-accumulation-maxibatching">
+<h2>Speed up training with token-based minibatches and gradient accumulation/maxibatching<a class="headerlink" href="#speed-up-training-with-token-based-minibatches-and-gradient-accumulation-maxibatching" title="Link to this heading">¶</a></h2>
+<p>Waiting for synchronization is a common reason for inefficiency in distributed training across multiple devices.
+Each device performs its forward and backward pass computation independently,
+but there is a synchronization point in communicating the gradients before the optimizer can be stepped.
+If just one device is still computing its contribution to the gradient,
+all other devices have to wait idly even though they have already finished their work.
+There are two approaches to maximize throughput:</p>
+<ol class="simple">
+<li><p>Balance the workload between devices by using token-based minibatch size <code class="docutils literal notranslate"><span class="pre">batch_type:</span> <span class="pre">tokens</span></code></p></li>
+<li><p>Perform more work before communicating the gradient.</p>
+<ul class="simple">
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">accum_count:</span> <span class="pre">10</span></code> to accumulate the gradient over 10 minibatches before communicating.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">lookahead_minibatches:</span> <span class="pre">10</span></code> to the same value as <code class="docutils literal notranslate"><span class="pre">accum_count</span></code> to make the dataloader read in one maxibatch at a time,
+and locally sort the contents by length. This minimizes padding waste (only works with <code class="docutils literal notranslate"><span class="pre">batch_type:</span> <span class="pre">tokens</span></code>).</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="use-decay-method-linear-warmup-for-learning-rate-scheduling">
+<h2>Use <code class="docutils literal notranslate"><span class="pre">decay_method:</span> <span class="pre">linear_warmup</span></code> for learning rate scheduling<a class="headerlink" href="#use-decay-method-linear-warmup-for-learning-rate-scheduling" title="Link to this heading">¶</a></h2>
+<p>Select a decay method before tuning the learning rate.
+The recommended method is <code class="docutils literal notranslate"><span class="pre">linear_warmup</span></code>,
+which ramps up learning rate linearly for <code class="docutils literal notranslate"><span class="pre">warmup_steps</span></code>, then decays it linearly until <code class="docutils literal notranslate"><span class="pre">train_steps</span></code>.</p>
+<p>Note that the OpenNMT legacy decay methods have inconsistent scaling of the maximum learning rate.
+Changing the decay method also rescales the learning rate in unintuitive ways.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rsqrt</span></code> method doesn’t apply warmup, making it unsuitable for Transformers with SGD or Adam.</p>
+<p>Note that <code class="docutils literal notranslate"><span class="pre">exponential_decay</span></code> is not a selectable <code class="docutils literal notranslate"><span class="pre">decay_method</span></code>. It is used as a fallback whenever <code class="docutils literal notranslate"><span class="pre">start_decay_steps</span></code> is set,
+and <code class="docutils literal notranslate"><span class="pre">start_decay_steps</span></code> defaults to 50000. With the default <code class="docutils literal notranslate"><span class="pre">decay_method:</span> <span class="pre">none</span></code> the learning rate is therefore still multiplied by
+<code class="docutils literal notranslate"><span class="pre">learning_rate_decay</span></code> (0.5) every <code class="docutils literal notranslate"><span class="pre">decay_steps</span></code> (10000) steps after step 50000, and this decay does not apply warmup either.</p>
+</section>
+<section id="don-t-rely-on-max-grad-norm-to-save-you-from-too-high-learning-rate">
+<h2>Don’t rely on <code class="docutils literal notranslate"><span class="pre">max_grad_norm</span></code> to save you from too high learning rate<a class="headerlink" href="#don-t-rely-on-max-grad-norm-to-save-you-from-too-high-learning-rate" title="Link to this heading">¶</a></h2>
+<p>The norm of the gradient of each distributed component is clipped, if it exceeds <code class="docutils literal notranslate"><span class="pre">max_grad_norm</span></code> (1.0 by default).
+Don’t rely on max_grad_norm to save you from too high learning rate:
+as each component is clipped individually (after the gradient sync), renormalization does NOT preserve the direction of the global gradient.</p>
+</section>
+<section id="recommended-minimal-opts-for-the-native-transformer">
+<h2>Recommended minimal opts for the native transformer<a class="headerlink" href="#recommended-minimal-opts-for-the-native-transformer" title="Link to this heading">¶</a></h2>
+<p>You can pass through opts to the training config:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">heads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">16</span><span class="w">              </span><span class="c1"># attention heads (model_dim must be divisible by heads)</span>
+<span class="nt">ff_activation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">swiglu</span><span class="w">  </span><span class="c1"># choose between "swiglu" and "gelu", "swiglu" by default</span>
+</pre></div>
+</div>
+<p>Note <code class="docutils literal notranslate"><span class="pre">RMSNorm</span></code> is the only normalisation function used by Mammoth for now.</p>
+</section>
+<section id="save-storage-and-speed-up-config-config-by-using-transforms-instead-of-external-preprocessing">
+<h2>Save storage and speed up config-config by using transforms instead of external preprocessing<a class="headerlink" href="#save-storage-and-speed-up-config-config-by-using-transforms-instead-of-external-preprocessing" title="Link to this heading">¶</a></h2>
+<p>There are two approaches to preprocessing (e.g. subword tokenization, prefixing, autoencoder noise, …)</p>
+<ol class="simple">
+<li><p>Pre-apply the transforms using an external tool. Write the results to disk. Point Mammoth at the transformed files.</p></li>
+<li><p>Apply the transforms at run time using Mammoth. Point Mammoth at the raw original files.</p></li>
+</ol>
+<p>There are multiple benefits to the latter approach of using Mammoth transforms:</p>
+<ul class="simple">
+<li><p>The transformation is applied online, and the result is not saved to disk.
+This saves storage, which is especially relevant when using very large corpora and sampling different variations for each minibatch.</p></li>
+<li><p>It is easy to apply sampling of different variations for each minibatch, e.g. subword regularization or denoising autoencoder.</p></li>
+<li><p>It is easy to use the same corpus files symmetrically (e.g. the same files for English-&gt;Finnish and Finnish-&gt;English) by prefixing the source data with language selection tokens.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

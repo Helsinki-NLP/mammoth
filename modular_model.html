@@ -1,129 +1,89 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Component-level Modularity &mdash; MAMMOTH  documentation</title>
-  
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
 
   
-  
-  
-  
-
-  
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
-  
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Config-config Tool" href="config_config.html" />
-    <link rel="prev" title="About MAMMOTH" href="FAQ.html" /> 
+    <link rel="prev" title="Frequently Asked Questions" href="FAQ.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home"> MAMMOTH
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Getting Started</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html">About MAMMOTH</a></li>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
 </ul>
-<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Component-level Modularity</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#anatomy-of-parameter-sharing">Anatomy of Parameter Sharing</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#flexible-modularity">Flexible Modularity</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#bridges-and-structures-for-sharing">Bridges and Structures for Sharing</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#custom-model-parallelism">Custom Model Parallelism</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Tutorials</span></p>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CSC_quickstart.html">LUMI &amp; Roihu Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HF_TOKENIZERS.html">HuggingFace Tokenizers Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Scripts</span></p>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="options/build_vocab.html">Build Vocab</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
 </ul>
-<p class="caption"><span class="caption-text">API</span></p>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
@@ -132,79 +92,40 @@
 <li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">MAMMOTH</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Component-level Modularity</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Component-level Modularity</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/modular_model.md.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="component-level-modularity">
-<h1>Component-level Modularity<a class="headerlink" href="#component-level-modularity" title="Permalink to this headline">¶</a></h1>
-<p>Building a scalable modular Neural Machine Translation (mNMT) system involves considering various features to ensure flexibility, efficiency, and ease of expansion.
-MAMMOTH allows for flexible parameter sharing among modules. This includes sharing at different levels such as word embeddings, encoder states, or attention mechanisms.
-It implements efficient GPU allocation strategies to make the most of available hardware resources. This involves optimizing the distribution of model components across GPUs, minimizing data transfer between GPUs, and leveraging parallel processing capabilities for training and inference.</p>
+             
+  <section id="component-level-modularity">
+<h1>Component-level Modularity<a class="headerlink" href="#component-level-modularity" title="Link to this heading">¶</a></h1>
+<p>Building a scalable modular Neural Machine Translation (mNMT) system involves considering various features to ensure flexibility, efficiency, and ease of expansion.</p>
+<p>It implements efficient GPU allocation strategies to make the most of available hardware resources. This involves optimizing the distribution of model components across GPUs, minimizing data transfer between GPUs, and leveraging parallel processing capabilities for training.</p>
 <p>MAMMOTH offers component-level modularity for machine translation and flexibility in designing different sharing schemes for its modules.
 The toolkit focuses on architectures where modular components can be
 defined a priori and operate as separable units to enable flexible modular configuration.
 Each task definition must explicitly state the sequence of modules to be used for the encoders and decoders (or “sharing groups”).</p>
-<div class="section" id="anatomy-of-parameter-sharing">
-<h2>Anatomy of Parameter Sharing<a class="headerlink" href="#anatomy-of-parameter-sharing" title="Permalink to this headline">¶</a></h2>
+<section id="anatomy-of-parameter-sharing">
+<h2>Anatomy of Parameter Sharing<a class="headerlink" href="#anatomy-of-parameter-sharing" title="Link to this heading">¶</a></h2>
 <p>The trichotomy of parameter sharing is (1) full sharing, (2) no sharing, and (3) partial sharing (or everything in between).
 Partial sharing includes:</p>
 <ul class="simple">
@@ -215,73 +136,54 @@ Partial sharing includes:</p>
 <p>The training process is organized into a series of smaller “tasks,” each of which is characterized by distinct attributes to enhance modularity and efficiency.
 We break down mNMT training into a series of smaller “tasks”</p>
 <ul class="simple">
-<li><p>A task requires specific modules</p></li>
-<li><p>A task is done on a specific device</p></li>
+<li><p>A task requires specific modules (encoder and decoder layers)</p></li>
+<li><p>A task is done on a specific device or across multiple devices</p></li>
 <li><p>A task corresponds to a specific (parallel) corpus</p></li>
 </ul>
 <p>In short, a task corresponds to a specific model behavior.
 In translation settings, a task will therefore correspond to a specific translation direction (say translating from Swahili to Catalan):
-All training datapoints for this direction  (i) must involve the same modules (pertaining to Swahili encoding and Catalan decoding); (ii) must be preprocessed with the same tokenizers; and (iii) can be grouped into a single bitext.
+All training datapoints for this task  (i) must involve the same modules (pertaining to Swahili encoding and Catalan decoding); (ii) must be preprocessed with the same tokenizers; and (iii) can be grouped into a single bitext.
 A centralized manager handles tasks synchronization.
 This manager oversees the parallel execution of tasks, coordinating the flow of information between different modules, devices, and corpora to ensure a cohesive and synchronized training process.</p>
-<div class="section" id="flexible-modularity">
-<h3>Flexible Modularity<a class="headerlink" href="#flexible-modularity" title="Permalink to this headline">¶</a></h3>
+<section id="flexible-modularity">
+<h3>Flexible Modularity<a class="headerlink" href="#flexible-modularity" title="Link to this heading">¶</a></h3>
 <p>Let’s break down the key aspects of modularity by design:</p>
-<ol class="simple">
-<li><p><strong>Depth of Encoder &amp; Decoder</strong>:</p>
-<ul class="simple">
-<li><p><strong>Balanced</strong>: The encoder and decoder have the same depths.</p></li>
-<li><p><strong>Deep-enc-shallow-dec</strong>: The encoder is deep, while the decoder is relatively shallow.</p></li>
-</ul>
-</li>
+<ol>
 <li><p><strong>Layerwise Parameter Sharing Schemes</strong>:</p>
 <ul class="simple">
 <li><p><strong>Fully Shared Encoder and Fully Shared Decoder</strong>: Both the encoder and decoder have shared parameters, meaning they are common across all languages or translation pairs.</p></li>
-<li><p><strong>Fully Shared Encoder and Target-Specific Decoder</strong>: The encoder is shared, but each target language has its own decoder.</p></li>
-<li><p><strong>Apple-Style Learning Language-specific Layers</strong>: The encoder contains both source and target-specific layers.</p></li>
-<li><p><strong>Adapter-Like Low-Rank Residual Layers</strong>: To facilitate adaptation for different languages or translation tasks.</p></li>
+<li><p><strong>Partially Shared Encoder / Decoder</strong>: Within each encoder or decoder, individual layers can be selectively shared or made language-specific. For example, the bottom encoder layers can be shared across languages while the top layers are language-specific, or the encoder can be fully shared while each target language gets its own decoder. Same applies to the decoders.</p></li>
 </ul>
 </li>
-<li><p><strong>Groupwise Sharing Schemes</strong>:</p>
+<li><p><strong>Groupwise Sharing Schemes</strong>:
+MAMMOTH supports grouping languages into clusters, where languages in the same cluster share parameters. Clusters are computed using hierarchical clustering (<code class="docutils literal notranslate"><span class="pre">AgglomerativeClustering</span></code> from scikit-learn) on a user-provided <strong>distance matrix</strong>. You can define the distance matrix using any criterion:</p>
 <ul class="simple">
-<li><p><strong>Phylogenetic</strong>: Parameters could be shared among languages that are phylogenetically related, meaning they share a common ancestry.</p></li>
-<li><p><strong>Clustering Based on Typological Database</strong>: Sharing could be determined based on linguistic typological features or characteristics.</p></li>
-<li><p><strong>Clustering Based on Language Embeddings</strong>: This could involve sharing parameters based on the embeddings of languages in a common vector space.</p></li>
+<li><p><strong>Phylogenetic</strong>: Distance based on language family trees (languages sharing a common ancestry are closer).</p></li>
+<li><p><strong>Typological</strong>: Distance based on linguistic features from typological databases (e.g., word order, morphology).</p></li>
+<li><p><strong>Language Embeddings</strong>: Distance based on language representations in a shared vector space.</p></li>
 </ul>
-</li>
-<li><p><strong>Subword Vocabularies</strong>:</p>
-<ul class="simple">
-<li><p><strong>Fully Shared</strong>: a fully shared subword vocabulary for all languages</p></li>
-<li><p><strong>Language-Specific</strong>: language-specific subword vocabularies for each separate language</p></li>
-</ul>
+<p>See the <a class="reference internal" href="config_config.html"><span class="doc">config_config documentation</span></a> for how to provide the distance matrix.</p>
 </li>
 </ol>
-</div>
-</div>
-<div class="section" id="bridges-and-structures-for-sharing">
-<h2>Bridges and Structures for Sharing<a class="headerlink" href="#bridges-and-structures-for-sharing" title="Permalink to this headline">¶</a></h2>
-<p>Structures for the shared parameters consider two key approaches: fully-shared layers and adapters.</p>
-<ul class="simple">
-<li><p>Fully-shared layers</p>
-<ul>
-<li><p>Transformer layers</p></li>
-<li><p>Feed-forward layers</p></li>
-<li><p><a class="reference internal" href="attention_bridges.html"><span class="doc">Attention bridges</span></a>, shared across all tasks as the visual representation as below</p></li>
-</ul>
-</li>
-</ul>
-<p><img alt="attention-bridges" src="_images/attention-bridge.png" /></p>
-<ul class="simple">
-<li><p><a class="reference external" href="https://aclanthology.org/D19-1165/">Adapters</a> for finer-grained sharing by adapting specific components</p></li>
-</ul>
-<p>By combining these structures, MAMMOTH achieves a balance between broad parameter sharing through fully-shared layers and targeted adaptability through adapters.</p>
-</div>
-<div class="section" id="custom-model-parallelism">
-<h2>Custom Model Parallelism<a class="headerlink" href="#custom-model-parallelism" title="Permalink to this headline">¶</a></h2>
+<!-- ## Bridges and Structures for Sharing
+
+
+Structures for the shared parameters consider key approaches such as fully-shared layers and attention bridges.
+
+- Fully-shared layers
+  - Transformer layers
+  - [Attention bridges](attention_bridges.md), shared across all tasks as the visual representation as below
+
+![attention-bridges](assets/attention-bridge.png)
+
+By combining these structures, MAMMOTH achieves broad parameter sharing across languages and tasks. --></section>
+</section>
+<section id="custom-model-parallelism">
+<h2>Custom Model Parallelism<a class="headerlink" href="#custom-model-parallelism" title="Link to this heading">¶</a></h2>
 <p>MAMMOTH enables scaling-up a mNMT to a (very) large number of languages.
 It deals with the task2gpu allocation problem as illustrated below.</p>
 <p><img alt="task2gpu-allocation" src="_images/task2gpu-allocations.png" /></p>
-<p>It allow for custom model parallelism across nodes and GPUs to ensure optimal utilization of resources.
+<p>It allows for custom model parallelism across nodes and GPUs to ensure optimal utilization of resources.
 Modules allocated in more than 1 GPU have to be synced at all times.
 The figure below illustrates the distribution of modules across multiple nodes:</p>
 <p><img alt="multi-model-parallelism" src="_images/multiple-nodes.png" /></p>
@@ -298,60 +200,41 @@ The figure below illustrates the distribution of modules across multiple nodes:<
 <li><p>Lightweight inference is achieved by loading only the modules relevant to the translation task at hand (e.g., DE-&gt;FR).</p></li>
 </ul>
 <p><img alt="Custom model parallelism increases inference efficiency" src="_images/inference.png" /></p>
-<p>At training time, [^1]coder communication is based on layer stacks (and adapters).
+<p>At training time, encoder-decoder communication is based on layer stacks.
 Gradients are broadcasted only for modules currently in use, optimizing communication and reducing computational overhead.</p>
 <p>In conclusion, the custom model parallelism in MAMMOTH is implemented to overcome the task-to-GPU allocation challenge, enhance parameter sharing versatility, and optimize both training and inference efficiency.</p>
-<p>[^1]: Thanks to CSC infrastructure</p>
-</div>
-</div>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="config_config.html" class="btn btn-neutral float-right" title="Config-config Tool" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="FAQ.html" class="btn btn-neutral float-left" title="About MAMMOTH" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="FAQ.html" class="btn btn-neutral float-left" title="Frequently Asked Questions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="config_config.html" class="btn btn-neutral float-right" title="Config-config Tool" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2023, HelsinkiNLP
-
-    </p>
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>

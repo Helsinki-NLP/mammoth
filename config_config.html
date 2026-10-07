@@ -1,101 +1,56 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Config-config Tool &mdash; MAMMOTH  documentation</title>
-  
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
 
   
-  
-  
-  
-
-  
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
-  
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Attention Bridge" href="attention_bridges.html" />
     <link rel="prev" title="Component-level Modularity" href="modular_model.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home"> MAMMOTH
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Getting Started</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html">About MAMMOTH</a></li>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
 </ul>
-<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Config-config Tool</a><ul>
@@ -103,22 +58,27 @@
 <li class="toctree-l2"><a class="reference internal" href="#inputs">Inputs</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#input-yaml">Input yaml</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#src-path-and-tgt-path"><code class="docutils literal notranslate"><span class="pre">src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_path</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#valid-src-path-and-valid-tgt-path"><code class="docutils literal notranslate"><span class="pre">valid_src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">valid_tgt_path</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#ae-path"><code class="docutils literal notranslate"><span class="pre">ae_path</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#autoencoder"><code class="docutils literal notranslate"><span class="pre">autoencoder</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#distance-matrix"><code class="docutils literal notranslate"><span class="pre">distance_matrix</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#n-groups"><code class="docutils literal notranslate"><span class="pre">n_groups</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#use-weight"><code class="docutils literal notranslate"><span class="pre">use_weight</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#temperature"><code class="docutils literal notranslate"><span class="pre">temperature</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#use-introduce-at-training-step"><code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#use-src-lang-token"><code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#translation-config-dir"><code class="docutils literal notranslate"><span class="pre">translation_config_dir</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#zero-shot"><code class="docutils literal notranslate"><span class="pre">zero_shot</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#id1"><code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#transforms-and-ae-transforms"><code class="docutils literal notranslate"><span class="pre">transforms</span></code> and <code class="docutils literal notranslate"><span class="pre">ae_transforms</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#enc-sharing-groups-and-dec-sharing-groups"><code class="docutils literal notranslate"><span class="pre">enc_sharing_groups</span></code> and <code class="docutils literal notranslate"><span class="pre">dec_sharing_groups</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#n-nodes-and-n-gpus-per-node"><code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> and <code class="docutils literal notranslate"><span class="pre">n_gpus_per_node</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#other-top-level-keys-than-config-config">Other top-level keys than <code class="docutils literal notranslate"><span class="pre">config_config</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#id1">Distance matrix</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Distance matrix</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#alternative-specify-language-groups-manually">Alternative: specify language groups manually</a></li>
 </ul>
 </li>
@@ -137,6 +97,9 @@
 <li class="toctree-l4"><a class="reference internal" href="#translation-configs"><code class="docutils literal notranslate"><span class="pre">translation_configs</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#remove-temporary-keys"><code class="docutils literal notranslate"><span class="pre">remove_temporary_keys</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#config-all"><code class="docutils literal notranslate"><span class="pre">config_all</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extra-cpu"><code class="docutils literal notranslate"><span class="pre">extra_cpu</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extra-fully-shared-hack"><code class="docutils literal notranslate"><span class="pre">extra_fully_shared_hack</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extra-copy-gpu-assignment"><code class="docutils literal notranslate"><span class="pre">extra_copy_gpu_assignment</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#command-line-overrides">Command line overrides</a></li>
@@ -146,20 +109,27 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Tutorials</span></p>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CSC_quickstart.html">LUMI &amp; Roihu Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HF_TOKENIZERS.html">HuggingFace Tokenizers Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Scripts</span></p>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="options/build_vocab.html">Build Vocab</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
 </ul>
-<p class="caption"><span class="caption-text">API</span></p>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
@@ -168,70 +138,32 @@
 <li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">MAMMOTH</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Config-config Tool</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Config-config Tool</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/config_config.md.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="config-config-tool">
-<h1>Config-config Tool<a class="headerlink" href="#config-config-tool" title="Permalink to this headline">¶</a></h1>
+             
+  <section id="config-config-tool">
+<h1>Config-config Tool<a class="headerlink" href="#config-config-tool" title="Link to this heading">¶</a></h1>
 <p>A meta-configuration tool, or config generator for MAMMOTH.</p>
 <p>The MAMMOTH configuration options have become unwieldy as complexity has increased.
 Especially the introduction of LayerStacks (the mechanism for dividing encoders and decoders into several subcomponents with different parameter sharing) and Adapters has made specifying parameters on the command line into a total nightmare, and even writing yaml configs by hand is cumbersome.
@@ -242,25 +174,25 @@ Other functionality that is cumbersome to specify by hand includes:</p>
 <li><p>Parameter sharing groups based on language similarity.</p></li>
 </ul>
 <p>To ease the creation of configs, the config-config tool reads in a human-writable configuration template, and computes the specific values expected by OpenNMT, writing them out as a less-readable yaml file.</p>
-<div class="section" id="command">
-<h2>Command<a class="headerlink" href="#command" title="Permalink to this headline">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>mammoth/tools/config_config.py<span class="w"> </span>config_all<span class="w"> </span>--in_config<span class="w"> </span>input.yaml<span class="w"> </span>--out_config<span class="w"> </span>output.yaml
+<section id="command">
+<h2>Command<a class="headerlink" href="#command" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mammoth_config_config<span class="w"> </span>config_all<span class="w"> </span>--in_config<span class="w"> </span>input.yaml<span class="w"> </span>--out_config<span class="w"> </span>output.yaml
 </pre></div>
 </div>
-</div>
-<div class="section" id="inputs">
-<h2>Inputs<a class="headerlink" href="#inputs" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="inputs">
+<h2>Inputs<a class="headerlink" href="#inputs" title="Link to this heading">¶</a></h2>
 <p>The primary input is a yaml file, which contains two types of parameters</p>
 <ul class="simple">
 <li><p>Passed through parameters: values copied from the input into the output, i.e. an OpenNMT yaml config file.</p></li>
 <li><p>Meta-parameters, defining what config-config should do. These are contained under the <code class="docutils literal notranslate"><span class="pre">config_config</span></code> key.</p></li>
 </ul>
-<div class="section" id="input-yaml">
-<h3>Input yaml<a class="headerlink" href="#input-yaml" title="Permalink to this headline">¶</a></h3>
+<section id="input-yaml">
+<h3>Input yaml<a class="headerlink" href="#input-yaml" title="Link to this heading">¶</a></h3>
 <p>See the example in <code class="docutils literal notranslate"><span class="pre">mammoth/examples/config_config.yaml</span></code></p>
 <p>The meta-parameters under the <code class="docutils literal notranslate"><span class="pre">config_config</span></code> key:</p>
-<div class="section" id="src-path-and-tgt-path">
-<h4><code class="docutils literal notranslate"><span class="pre">src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_path</span></code><a class="headerlink" href="#src-path-and-tgt-path" title="Permalink to this headline">¶</a></h4>
+<section id="src-path-and-tgt-path">
+<h4><code class="docutils literal notranslate"><span class="pre">src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_path</span></code><a class="headerlink" href="#src-path-and-tgt-path" title="Link to this heading">¶</a></h4>
 <p>Path templates for source and target corpora, respectively.
 The path templates can contain the following variables that will be substituted by <code class="docutils literal notranslate"><span class="pre">config_config</span></code>:</p>
 <ul class="simple">
@@ -281,67 +213,149 @@ The path templates can contain the following variables that will be substituted 
 </ul>
 </li>
 </ul>
-<p>So for example, let’s say your corpus contains the files <code class="docutils literal notranslate"><span class="pre">eng-ben/train.src.gz</span></code> (English side) and <code class="docutils literal notranslate"><span class="pre">eng-ben/train.trg.gz</span></code> (Bengali side).
+<p>As a practical example, let’s say your corpus contains the following files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="o">+</span> <span class="n">afr</span><span class="o">-</span><span class="n">eng</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">train</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">train</span><span class="o">.</span><span class="n">trg</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">valid</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">valid</span><span class="o">.</span><span class="n">trg</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">+</span> <span class="n">ben</span><span class="o">-</span><span class="n">eng</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">train</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">train</span><span class="o">.</span><span class="n">trg</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">valid</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">valid</span><span class="o">.</span><span class="n">trg</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">+</span> <span class="n">eng</span><span class="o">-</span><span class="n">urd</span>
+  <span class="o">+</span> <span class="n">train</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">gz</span>
+  <span class="o">+</span> <span class="n">train</span><span class="o">.</span><span class="n">trg</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">valid</span><span class="o">.</span><span class="n">src</span><span class="o">.</span><span class="n">gz</span>
+<span class="o">|</span> <span class="o">+</span> <span class="n">valid</span><span class="o">.</span><span class="n">trg</span><span class="o">.</span><span class="n">gz</span>
+</pre></div>
+</div>
+<p>For example, there is data for Bengali-to-English translation in <code class="docutils literal notranslate"><span class="pre">ben-eng/train.src.gz</span></code> (English side) and <code class="docutils literal notranslate"><span class="pre">ben-eng/train.trg.gz</span></code> (Bengali side).
 You want to use the data symmetrically for both ben-to-eng and eng-to-ben directions.
 For the first, <code class="docutils literal notranslate"><span class="pre">{lang_pair}</span></code> and <code class="docutils literal notranslate"><span class="pre">{sorted_pair}</span></code> are the same.
 For the second, <code class="docutils literal notranslate"><span class="pre">{lang_pair}</span></code> is “eng-ben”, but <code class="docutils literal notranslate"><span class="pre">{sorted_pair}</span></code> is “ben-eng”.
 In order to use the files in the correct order, you should use the template <code class="docutils literal notranslate"><span class="pre">{sorted_pair}/train.{side_a}.gz</span></code> for the source template, and <code class="docutils literal notranslate"><span class="pre">{sorted_pair}/train.{side_b}.gz</span></code> for the target template.</p>
-</div>
-<div class="section" id="ae-path">
-<h4><code class="docutils literal notranslate"><span class="pre">ae_path</span></code><a class="headerlink" href="#ae-path" title="Permalink to this headline">¶</a></h4>
+<table border="1" class="docutils">
+<thead>
+<tr>
+<th>task</th>
+<th>lang_pair</th>
+<th>sorted_pair</th>
+<th>side_a</th>
+<th>side_b</th>
+<th>src_path (template)</th>
+<th>src_path (filled in)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ben-to-eng</td>
+<td>ben-eng</td>
+<td>ben-eng</td>
+<td>src</td>
+<td>trg</td>
+<td>{sorted_pair}/train.{side_a}.gz</td>
+<td>ben-eng/train.src.gz</td>
+</tr>
+<tr>
+<td>eng-to-ben</td>
+<td>eng-ben</td>
+<td>ben-eng</td>
+<td>trg</td>
+<td>src</td>
+<td>{sorted_pair}/train.{side_a}.gz</td>
+<td>ben-eng/train.trg.gz</td>
+</tr>
+</tbody>
+</table></section>
+<section id="valid-src-path-and-valid-tgt-path">
+<h4><code class="docutils literal notranslate"><span class="pre">valid_src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">valid_tgt_path</span></code><a class="headerlink" href="#valid-src-path-and-valid-tgt-path" title="Link to this heading">¶</a></h4>
+<p>Path templates for validation sets.
+The path templates can contain the same variables as <code class="docutils literal notranslate"><span class="pre">src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_path</span></code>.</p>
+<p>For the corpus in the example above, <code class="docutils literal notranslate"><span class="pre">valid_src_path</span></code> should be set to <code class="docutils literal notranslate"><span class="pre">{sorted_pair}/valid.{side_a}.gz</span></code>.</p>
+</section>
+<section id="ae-path">
+<h4><code class="docutils literal notranslate"><span class="pre">ae_path</span></code><a class="headerlink" href="#ae-path" title="Link to this heading">¶</a></h4>
 <p>Path templates for monolingual data for autoencoder tasks.
 The same data will be used as both the source and target for the task: noise is introduced using transforms.
 The path templates can contain the following variables that will be substituted by <code class="docutils literal notranslate"><span class="pre">config_config</span></code>:
 <code class="docutils literal notranslate"><span class="pre">{src_lang}</span></code>, <code class="docutils literal notranslate"><span class="pre">{tgt_lang}</span></code>, and <code class="docutils literal notranslate"><span class="pre">{sorted_pair}</span></code>.
 If unset, autoencoder pairs will use <code class="docutils literal notranslate"><span class="pre">src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_path</span></code> instead.</p>
-</div>
-<div class="section" id="autoencoder">
-<h4><code class="docutils literal notranslate"><span class="pre">autoencoder</span></code><a class="headerlink" href="#autoencoder" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="autoencoder">
+<h4><code class="docutils literal notranslate"><span class="pre">autoencoder</span></code><a class="headerlink" href="#autoencoder" title="Link to this heading">¶</a></h4>
 <p>If set to <code class="docutils literal notranslate"><span class="pre">True</span></code>, autoencoder tasks will be added.</p>
-</div>
-<div class="section" id="distance-matrix">
-<h4><code class="docutils literal notranslate"><span class="pre">distance_matrix</span></code><a class="headerlink" href="#distance-matrix" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="distance-matrix">
+<h4><code class="docutils literal notranslate"><span class="pre">distance_matrix</span></code><a class="headerlink" href="#distance-matrix" title="Link to this heading">¶</a></h4>
 <p>Path to the distance matrix comma-separated value (csv) file.</p>
-</div>
-<div class="section" id="n-groups">
-<h4><code class="docutils literal notranslate"><span class="pre">n_groups</span></code><a class="headerlink" href="#n-groups" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="n-groups">
+<h4><code class="docutils literal notranslate"><span class="pre">n_groups</span></code><a class="headerlink" href="#n-groups" title="Link to this heading">¶</a></h4>
 <p>The number of language groups to create when clustering.</p>
-</div>
-<div class="section" id="use-weight">
-<h4><code class="docutils literal notranslate"><span class="pre">use_weight</span></code><a class="headerlink" href="#use-weight" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="use-weight">
+<h4><code class="docutils literal notranslate"><span class="pre">use_weight</span></code><a class="headerlink" href="#use-weight" title="Link to this heading">¶</a></h4>
 <p>If set to <code class="docutils literal notranslate"><span class="pre">True</span></code>, use corpus weights based on temperature-adjusted corpus size.</p>
 <p>Note that the actual weight is proportional to the weights of the the other tasks assigned to the same GPU. E.g. if only one task is assigned to a GPU, it will receive 100% weight regardless of what the computed weight is.</p>
-</div>
-<div class="section" id="use-introduce-at-training-step">
-<h4><code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code><a class="headerlink" href="#use-introduce-at-training-step" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="temperature">
+<h4><code class="docutils literal notranslate"><span class="pre">temperature</span></code><a class="headerlink" href="#temperature" title="Link to this heading">¶</a></h4>
+<p>Temperature specified in inverted form (1/T)
+Setting temperature to 1.0 results in the empirical distribution, i.e. tasks are sampled according to their unweighted corpus size.
+Setting temperature to 0.0 results in the uniform distribution, i.e. all tasks are equally likely.</p>
+</section>
+<section id="use-introduce-at-training-step">
+<h4><code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code><a class="headerlink" href="#use-introduce-at-training-step" title="Link to this heading">¶</a></h4>
 <p>If set to <code class="docutils literal notranslate"><span class="pre">True</span></code>, use a curriculum introducing corpora based on temperature-adjusted corpus size.</p>
 <p>Note that if both <code class="docutils literal notranslate"><span class="pre">use_weight</span></code> and <code class="docutils literal notranslate"><span class="pre">use_introduce_at_training_step</span></code> are specified, the weight is distributed to the two according to the square root, so that when both of them are applied (multiplicatively), the desired weight is achieved.</p>
 <p>Note that high-resource language pairs (would train for over 75% of the training time) all start at 0. This avoids starting training with only one GPU doing work, while the other GPUs are idle waiting for their LPs to start.</p>
-</div>
-<div class="section" id="use-src-lang-token">
-<h4><code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code><a class="headerlink" href="#use-src-lang-token" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="use-src-lang-token">
+<h4><code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code><a class="headerlink" href="#use-src-lang-token" title="Link to this heading">¶</a></h4>
 <p>Only has an effect when using the <code class="docutils literal notranslate"><span class="pre">prefix</span></code> transform.
 Normally, the prefix transform only includes a target language selector token: <code class="docutils literal notranslate"><span class="pre">&lt;to_yyy&gt;</span></code> where <code class="docutils literal notranslate"><span class="pre">yyy</span></code> is the code of the target language.
 If this flag is set, then also the source language is specified, e.g. <code class="docutils literal notranslate"><span class="pre">&lt;from_xxx&gt;</span> <span class="pre">&lt;to_yyy&gt;</span></code>.</p>
-</div>
-<div class="section" id="translation-config-dir">
-<h4><code class="docutils literal notranslate"><span class="pre">translation_config_dir</span></code><a class="headerlink" href="#translation-config-dir" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="translation-config-dir">
+<h4><code class="docutils literal notranslate"><span class="pre">translation_config_dir</span></code><a class="headerlink" href="#translation-config-dir" title="Link to this heading">¶</a></h4>
 <p>The directory in which to generate translation configs.
 One config per language pair will be generated.
 Only supervised pairs are generated, unless <code class="docutils literal notranslate"><span class="pre">zero_shot</span></code> is True.</p>
-</div>
-<div class="section" id="zero-shot">
-<h4><code class="docutils literal notranslate"><span class="pre">zero_shot</span></code><a class="headerlink" href="#zero-shot" title="Permalink to this headline">¶</a></h4>
-<p>Generate translation configs for zero-shot directions.</p>
-</div>
-<div class="section" id="transforms-and-ae-transforms">
-<h4><code class="docutils literal notranslate"><span class="pre">transforms</span></code> and <code class="docutils literal notranslate"><span class="pre">ae_transforms</span></code><a class="headerlink" href="#transforms-and-ae-transforms" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="zero-shot">
+<h4><code class="docutils literal notranslate"><span class="pre">zero_shot</span></code><a class="headerlink" href="#zero-shot" title="Link to this heading">¶</a></h4>
+<p>Generate translation configs for zero-shot directions.
+(TODO: temporarily disabled)</p>
+</section>
+</section>
+<section id="id1">
+<h3><code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code><a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<p>Only has an effect if the <code class="docutils literal notranslate"><span class="pre">prefix</span></code> transform is used.
+If <code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code> is unset or False, then only a target language token <code class="docutils literal notranslate"><span class="pre">&lt;to_{tgt}&gt;</span></code> is prefixed to the source.
+If <code class="docutils literal notranslate"><span class="pre">use_src_lang_token</span></code> is True, then a source language token is also prefixed: <code class="docutils literal notranslate"><span class="pre">&lt;from_{src}&gt;</span> <span class="pre">&lt;to_{tgt}&gt;</span></code>.</p>
+<section id="transforms-and-ae-transforms">
+<h4><code class="docutils literal notranslate"><span class="pre">transforms</span></code> and <code class="docutils literal notranslate"><span class="pre">ae_transforms</span></code><a class="headerlink" href="#transforms-and-ae-transforms" title="Link to this heading">¶</a></h4>
 <p>A list of transforms, for translation tasks and autoencoder tasks, respectively.
-Use this to apply subword segmentation, e.g. using <code class="docutils literal notranslate"><span class="pre">sentencepiece</span></code>, and <code class="docutils literal notranslate"><span class="pre">denoising</span></code> noise for autoencoder.
-Both of these may change the sequence length, necessitating a <code class="docutils literal notranslate"><span class="pre">filtertoolong</span></code> transform.</p>
+Use transforms to apply subword segmentation, e.g. using <code class="docutils literal notranslate"><span class="pre">sentencepiece</span></code>, and <code class="docutils literal notranslate"><span class="pre">denoising</span></code> noise for autoencoder.
+Both of these may change the sequence length, necessitating a <code class="docutils literal notranslate"><span class="pre">filtertoolong</span></code> transform.
+Use the <code class="docutils literal notranslate"><span class="pre">prefix</span></code> transform to add task selection tokens in front of the source sentence.</p>
+<p>A typical configuration for a fully shared architecture with task selection token:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">transforms</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sentencepiece</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">filtertoolong</span>
+<span class="w">  </span><span class="nt">ae_transforms</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sentencepiece</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prefix</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">filtertoolong</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">denoising</span>
+</pre></div>
 </div>
-<div class="section" id="enc-sharing-groups-and-dec-sharing-groups">
-<h4><code class="docutils literal notranslate"><span class="pre">enc_sharing_groups</span></code> and <code class="docutils literal notranslate"><span class="pre">dec_sharing_groups</span></code><a class="headerlink" href="#enc-sharing-groups-and-dec-sharing-groups" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="enc-sharing-groups-and-dec-sharing-groups">
+<h4><code class="docutils literal notranslate"><span class="pre">enc_sharing_groups</span></code> and <code class="docutils literal notranslate"><span class="pre">dec_sharing_groups</span></code><a class="headerlink" href="#enc-sharing-groups-and-dec-sharing-groups" title="Link to this heading">¶</a></h4>
 <p>A list of parameter sharing patterns, one for each LayerStack in the (enc|dec)oder.
 Each list element takes one of 7 values:</p>
 <ul class="simple">
@@ -354,28 +368,88 @@ Each list element takes one of 7 values:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">LANGUAGE</span></code>: language specific parameters. Same as <code class="docutils literal notranslate"><span class="pre">SRC_LANGUAGE</span></code> for encoder and <code class="docutils literal notranslate"><span class="pre">TGT_LANGUAGE</span></code> for decoder.</p></li>
 </ul>
 <p>Note that it is possible to have target-language-dependent components in the encoder, by using <code class="docutils literal notranslate"><span class="pre">TGT_LANGUAGE</span></code> or <code class="docutils literal notranslate"><span class="pre">TGT_GROUP</span></code> in the <code class="docutils literal notranslate"><span class="pre">enc_sharing_groups</span></code>.</p>
+<p>For example, this configuration creates</p>
+<ul class="simple">
+<li><p>a two-part encoder beginning with 3 groupwise shared layers followed by 3 fully shared layers,</p></li>
+<li><p>a three-part “hamburger” decoder beginning with 2 language-specific layers, then 3 fully shared layers, and finally 1 more language specific layer.</p></li>
+</ul>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="nt">enc_sharing_groups</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">GROUP</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FULL</span>
+<span class="w">  </span><span class="nt">dec_sharing_groups</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LANGUAGE</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FULL</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LANGUAGE</span>
+
+<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">]</span>
+</pre></div>
 </div>
-<div class="section" id="n-nodes-and-n-gpus-per-node">
-<h4><code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> and <code class="docutils literal notranslate"><span class="pre">n_gpus_per_node</span></code><a class="headerlink" href="#n-nodes-and-n-gpus-per-node" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="n-nodes-and-n-gpus-per-node">
+<h4><code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> and <code class="docutils literal notranslate"><span class="pre">n_gpus_per_node</span></code><a class="headerlink" href="#n-nodes-and-n-gpus-per-node" title="Link to this heading">¶</a></h4>
 <p>The number of nodes and GPUs, for assignment of tasks to devices.
 Note that you also need to separately specify this information to slurm.</p>
+</section>
+<section id="other-top-level-keys-than-config-config">
+<h4>Other top-level keys than <code class="docutils literal notranslate"><span class="pre">config_config</span></code><a class="headerlink" href="#other-top-level-keys-than-config-config" title="Link to this heading">¶</a></h4>
+<section id="adapters">
+<h5>Adapters<a class="headerlink" href="#adapters" title="Link to this heading">¶</a></h5>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">adapters</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">encoder</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">{</span><span class="nv">adapter_name</span><span class="p p-Indicator">}:</span>
+<span class="w">      </span><span class="nt">adapter_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lora</span>
+<span class="w">      </span><span class="nt">layer_stack_index</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">      </span><span class="nt">layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">hidden_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+<span class="w">      </span><span class="nt">ids</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LANGUAGE</span>
+<span class="w">    </span><span class="p p-Indicator">{</span><span class="nv">adapter_name</span><span class="p p-Indicator">}:</span>
+<span class="w">      </span><span class="nt">adapter_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lora</span>
+<span class="w">      </span><span class="nt">layer_stack_index</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">      </span><span class="nt">layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">hidden_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+<span class="w">      </span><span class="nt">ids</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LANGUAGE</span>
+<span class="w">  </span><span class="nt">decoder</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">{</span><span class="nv">adapter_name</span><span class="p p-Indicator">}:</span>
+<span class="w">      </span><span class="nt">adapter_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ff</span>
+<span class="w">      </span><span class="nt">layer_stack_index</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">      </span><span class="nt">layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">]</span>
+<span class="w">      </span><span class="nt">hidden_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">16</span>
+<span class="w">      </span><span class="nt">ids</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">LANGUAGE</span>
+</pre></div>
 </div>
-<div class="section" id="other-top-level-keys-than-config-config">
-<h4>Other top-level keys than <code class="docutils literal notranslate"><span class="pre">config_config</span></code><a class="headerlink" href="#other-top-level-keys-than-config-config" title="Permalink to this headline">¶</a></h4>
-<div class="section" id="parameter-sharing-in-adapters">
-<h5>Parameter sharing in adapters<a class="headerlink" href="#parameter-sharing-in-adapters" title="Permalink to this headline">¶</a></h5>
-<p>The key <code class="docutils literal notranslate"><span class="pre">adapters.encoder.{adapter_name}.ids</span></code> takes one of 3 values:</p>
+<section id="adapter-types">
+<h6>Adapter types<a class="headerlink" href="#adapter-types" title="Link to this heading">¶</a></h6>
+<p>The keys <code class="docutils literal notranslate"><span class="pre">adapters.encoder.{adapter_name}.adapter_type</span></code> and <code class="docutils literal notranslate"><span class="pre">adapters.decoder.{adapter_name}.adapter_type</span></code> take one of 2 values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">lora</span></code>: LoRA adaptation wraps the feedforward sublayer of existing Transformer layers.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ff</span></code>: A separate feedforward adapter layer injected after the feedforward sublayer of existing Transformer layers. The adapter layer has its own norms.</p></li>
+</ul>
+</section>
+<section id="adapter-size-and-location">
+<h6>Adapter size and location<a class="headerlink" href="#adapter-size-and-location" title="Link to this heading">¶</a></h6>
+<p>The keys <code class="docutils literal notranslate"><span class="pre">adapters.encoder.{adapter_name}.layer_stack_index</span></code> and <code class="docutils literal notranslate"><span class="pre">adapters.decoder.{adapter_name}.layer_stack_index</span></code>
+specify the index (counting from 0) of the LayerStack in which the adapters should be placed.</p>
+<p>The keys <code class="docutils literal notranslate"><span class="pre">adapters.encoder.{adapter_name}.layers</span></code> and <code class="docutils literal notranslate"><span class="pre">adapters.decoder.{adapter_name}.layers</span></code>
+specify the index of the layers (counting from 0) <em>within</em> the LayerStack. Note that each new LayerStack restarts the count from zero.</p>
+<p>The keys <code class="docutils literal notranslate"><span class="pre">adapters.encoder.{adapter_name}.hidden_dim</span></code> and <code class="docutils literal notranslate"><span class="pre">adapters.decoder.{adapter_name}.hidden_dim</span></code>
+specify the hidden (bottleneck) size of the adapter.</p>
+</section>
+<section id="parameter-sharing-in-adapters">
+<h6>Parameter sharing in adapters<a class="headerlink" href="#parameter-sharing-in-adapters" title="Link to this heading">¶</a></h6>
+<p>The keys <code class="docutils literal notranslate"><span class="pre">adapters.encoder.{adapter_name}.ids</span></code> and <code class="docutils literal notranslate"><span class="pre">adapters.decoder.{adapter_name}.ids</span></code> take one of 3 values:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">FULL</span></code>: fully shared parameters. Will be named using the constant “full”.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">GROUP</span></code>: groupwise shared parameters. Will be named according to the cluster id.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">LANGUAGE</span></code>: language specific parameters. Will be named according to the language code.</p></li>
 </ul>
 <p>(Adapters do not currently support the SRC_ and TGT_ prefixes)</p>
-</div>
-</div>
-</div>
-<div class="section" id="id1">
-<h3>Distance matrix<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+</section>
+</section>
+<section id="id2">
+<h3>Distance matrix<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
 <p>See the example distance matrix in <code class="docutils literal notranslate"><span class="pre">mammoth/examples/config_config.distance.csv</span></code>.</p>
 <p>The distance matrix is given as a csv file, with a column <code class="docutils literal notranslate"><span class="pre">lang</span></code> and one column per language.
 There should be one row per language, with the language code in the first <code class="docutils literal notranslate"><span class="pre">lang</span></code> column, followed by a float giving the distance to the language specified by the column.
@@ -383,32 +457,32 @@ The rows should appear in the same order as the columns.
 This means that the matrix must be square and symmetrical.
 The upper and lower triangle are redundant, but both must be given.</p>
 <p>Note that the values are distances: the distance of a language to itself (the diagonal) should be 0.</p>
-<div class="section" id="alternative-specify-language-groups-manually">
-<h4>Alternative: specify language groups manually<a class="headerlink" href="#alternative-specify-language-groups-manually" title="Permalink to this headline">¶</a></h4>
+<section id="alternative-specify-language-groups-manually">
+<h4>Alternative: specify language groups manually<a class="headerlink" href="#alternative-specify-language-groups-manually" title="Link to this heading">¶</a></h4>
 <p>To specify groups manually instead of using clustering, you must do two things:</p>
 <ol class="simple">
 <li><p>Leave <code class="docutils literal notranslate"><span class="pre">distance_matrix</span></code> unset.</p></li>
 <li><p>Specify a mapping of languages to groups: <code class="docutils literal notranslate"><span class="pre">config_config.groups.{lang}:</span> <span class="pre">{group}</span></code>.</p></li>
 </ol>
-</div>
-</div>
-<div class="section" id="the-actual-corpora">
-<h3>The actual corpora<a class="headerlink" href="#the-actual-corpora" title="Permalink to this headline">¶</a></h3>
+</section>
+</section>
+<section id="the-actual-corpora">
+<h3>The actual corpora<a class="headerlink" href="#the-actual-corpora" title="Link to this heading">¶</a></h3>
 <p>The actual corpus files are used in two ways:</p>
 <ul class="simple">
 <li><p>The presence of the files for a language pair determine if it is included or not.</p></li>
 <li><p>Line counts from the files are used for weighting.</p></li>
 </ul>
 <p>Because of this, you need to run <code class="docutils literal notranslate"><span class="pre">config_config</span></code> so that it can access the corpora using the specified <code class="docutils literal notranslate"><span class="pre">src_path</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_path</span></code>.</p>
-</div>
-</div>
-<div class="section" id="usage">
-<h2>Usage<a class="headerlink" href="#usage" title="Permalink to this headline">¶</a></h2>
+</section>
+</section>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading">¶</a></h2>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">mammoth</span><span class="o">/</span><span class="n">tools</span><span class="o">/</span><span class="n">config_config</span><span class="o">.</span><span class="n">py</span> <span class="n">config_all</span> <span class="o">--</span><span class="n">in_config</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="nb">input</span><span class="o">.</span><span class="n">yaml</span> <span class="o">--</span><span class="n">out_config</span> <span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">output</span><span class="o">.</span><span class="n">yaml</span>
 </pre></div>
 </div>
-<div class="section" id="stages">
-<h3>Stages<a class="headerlink" href="#stages" title="Permalink to this headline">¶</a></h3>
+<section id="stages">
+<h3>Stages<a class="headerlink" href="#stages" title="Link to this heading">¶</a></h3>
 <p>The tool runs in multiple stages. The meta-stage <code class="docutils literal notranslate"><span class="pre">config_all</span></code> runs all of the stages in order.</p>
 <p>It is possible to run the steps individually, by feeding in the output of the previous step as the input of the next step.
 This allows more control:</p>
@@ -416,106 +490,116 @@ This allows more control:</p>
 <li><p>Skipping unnecessary steps.</p></li>
 <li><p>Overriding what a particular step does by specifying its output manually.</p></li>
 </ul>
-<div class="section" id="complete-language-pairs">
-<h4><code class="docutils literal notranslate"><span class="pre">complete_language_pairs</span></code><a class="headerlink" href="#complete-language-pairs" title="Permalink to this headline">¶</a></h4>
+<section id="complete-language-pairs">
+<h4><code class="docutils literal notranslate"><span class="pre">complete_language_pairs</span></code><a class="headerlink" href="#complete-language-pairs" title="Link to this heading">¶</a></h4>
 <p>Determines which language pairs have data.
 The languages to consider as candidates are determined from the vocabulary keys.</p>
-</div>
-<div class="section" id="corpora-schedule">
-<h4><code class="docutils literal notranslate"><span class="pre">corpora_schedule</span></code><a class="headerlink" href="#corpora-schedule" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="corpora-schedule">
+<h4><code class="docutils literal notranslate"><span class="pre">corpora_schedule</span></code><a class="headerlink" href="#corpora-schedule" title="Link to this heading">¶</a></h4>
 <p>Determine weighting and curriculum for the tasks.</p>
-</div>
-<div class="section" id="cluster-languages">
-<h4><code class="docutils literal notranslate"><span class="pre">cluster_languages</span></code><a class="headerlink" href="#cluster-languages" title="Permalink to this headline">¶</a></h4>
+<p>Note that the first time this step is run for a particular corpus, the lines in the corpus are counted.
+This can take a long time for large corpora.
+The line counts are cached in the file <code class="docutils literal notranslate"><span class="pre">./corpora_length_cache</span></code>, keyed by the path of the corpus file.</p>
+<p>Reusing the same corpus files (without moving, copying, or transforming) in similar training runs will be fast, due to the use of the cached line counts.
+This is one of the benefits of using transforms instead of applying subword segmentation in preprocessing.</p>
+</section>
+<section id="cluster-languages">
+<h4><code class="docutils literal notranslate"><span class="pre">cluster_languages</span></code><a class="headerlink" href="#cluster-languages" title="Link to this heading">¶</a></h4>
 <p>Determine language groups by clustering.
 This step can be easily skipped by leaving the <code class="docutils literal notranslate"><span class="pre">distance_matrix</span></code> unset.
 If the step is skipped, you should define the <code class="docutils literal notranslate"><span class="pre">config_config.groups</span></code> dict in the input yaml.</p>
-</div>
-<div class="section" id="sharing-groups">
-<h4><code class="docutils literal notranslate"><span class="pre">sharing_groups</span></code><a class="headerlink" href="#sharing-groups" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="sharing-groups">
+<h4><code class="docutils literal notranslate"><span class="pre">sharing_groups</span></code><a class="headerlink" href="#sharing-groups" title="Link to this heading">¶</a></h4>
 <p>Apply the parameter sharing groups to tasks.</p>
-</div>
-<div class="section" id="set-transforms">
-<h4><code class="docutils literal notranslate"><span class="pre">set_transforms</span></code><a class="headerlink" href="#set-transforms" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="set-transforms">
+<h4><code class="docutils literal notranslate"><span class="pre">set_transforms</span></code><a class="headerlink" href="#set-transforms" title="Link to this heading">¶</a></h4>
 <p>Apply the transforms to tasks.</p>
-</div>
-<div class="section" id="allocate-devices">
-<h4><code class="docutils literal notranslate"><span class="pre">allocate_devices</span></code><a class="headerlink" href="#allocate-devices" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="allocate-devices">
+<h4><code class="docutils literal notranslate"><span class="pre">allocate_devices</span></code><a class="headerlink" href="#allocate-devices" title="Link to this heading">¶</a></h4>
 <p>Allocate tasks to nodes and gpus.
 A local search procedure is used, taking into account parameter sharing groups and tasks delayed by curriculum weighting.</p>
-</div>
-<div class="section" id="adapter-config">
-<h4><code class="docutils literal notranslate"><span class="pre">adapter_config</span></code><a class="headerlink" href="#adapter-config" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="adapter-config">
+<h4><code class="docutils literal notranslate"><span class="pre">adapter_config</span></code><a class="headerlink" href="#adapter-config" title="Link to this heading">¶</a></h4>
 <p>Determine the adapter configuration.</p>
-</div>
-<div class="section" id="translation-configs">
-<h4><code class="docutils literal notranslate"><span class="pre">translation_configs</span></code><a class="headerlink" href="#translation-configs" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="translation-configs">
+<h4><code class="docutils literal notranslate"><span class="pre">translation_configs</span></code><a class="headerlink" href="#translation-configs" title="Link to this heading">¶</a></h4>
 <p>Generate the translation yaml configs.</p>
-</div>
-<div class="section" id="remove-temporary-keys">
-<h4><code class="docutils literal notranslate"><span class="pre">remove_temporary_keys</span></code><a class="headerlink" href="#remove-temporary-keys" title="Permalink to this headline">¶</a></h4>
+</section>
+<section id="remove-temporary-keys">
+<h4><code class="docutils literal notranslate"><span class="pre">remove_temporary_keys</span></code><a class="headerlink" href="#remove-temporary-keys" title="Link to this heading">¶</a></h4>
 <p>Remove any meta-parameters that are not accepted by OpenNMT. This should always be the last step.</p>
-</div>
-<div class="section" id="config-all">
-<h4><code class="docutils literal notranslate"><span class="pre">config_all</span></code><a class="headerlink" href="#config-all" title="Permalink to this headline">¶</a></h4>
-<p>Meta-stage to run all of the stages in order.</p>
-</div>
-</div>
-<div class="section" id="command-line-overrides">
-<h3>Command line overrides<a class="headerlink" href="#command-line-overrides" title="Permalink to this headline">¶</a></h3>
+</section>
+<section id="config-all">
+<h4><code class="docutils literal notranslate"><span class="pre">config_all</span></code><a class="headerlink" href="#config-all" title="Link to this heading">¶</a></h4>
+<p>Meta-stage to run all of the stages above in order.</p>
+</section>
+<section id="extra-cpu">
+<h4><code class="docutils literal notranslate"><span class="pre">extra_cpu</span></code><a class="headerlink" href="#extra-cpu" title="Link to this heading">¶</a></h4>
+<p>Modifies a GPU config to run on a single CPU, for local smoketesting.
+Deletes <code class="docutils literal notranslate"><span class="pre">gpu_ranks</span></code>, <code class="docutils literal notranslate"><span class="pre">world_size</span></code>, and all <code class="docutils literal notranslate"><span class="pre">node_gpu</span></code>. Sets <code class="docutils literal notranslate"><span class="pre">n_nodes</span></code> to 1.</p>
+<p>This step is not included in <code class="docutils literal notranslate"><span class="pre">config_all</span></code>. Run it separately if needed.</p>
+</section>
+<section id="extra-fully-shared-hack">
+<h4><code class="docutils literal notranslate"><span class="pre">extra_fully_shared_hack</span></code><a class="headerlink" href="#extra-fully-shared-hack" title="Link to this heading">¶</a></h4>
+<p>Modifies config to use the “all” language hack for a truly fully shared decoder, including embeddings.
+Forces the <code class="docutils literal notranslate"><span class="pre">prefix</span></code> transform to use a language selection token.
+Sets the <code class="docutils literal notranslate"><span class="pre">dec_sharing_group</span></code> to <code class="docutils literal notranslate"><span class="pre">['full']</span></code>, i.e. a single fully shared LayerStack.
+Overrides all the language pair definitions <code class="docutils literal notranslate"><span class="pre">src_tgt</span></code> with <code class="docutils literal notranslate"><span class="pre">all-all</span></code>.
+Sets the <code class="docutils literal notranslate"><span class="pre">src_vocab</span></code> and <code class="docutils literal notranslate"><span class="pre">tgt_vocab</span></code> to a single joint vocabulary for the <code class="docutils literal notranslate"><span class="pre">all</span></code> pseudolanguage.</p>
+<p>This step is not included in <code class="docutils literal notranslate"><span class="pre">config_all</span></code>. Run it separately if needed.</p>
+</section>
+<section id="extra-copy-gpu-assignment">
+<h4><code class="docutils literal notranslate"><span class="pre">extra_copy_gpu_assignment</span></code><a class="headerlink" href="#extra-copy-gpu-assignment" title="Link to this heading">¶</a></h4>
+<p>Copies GPU assignment from one fully generated config to another config with exactly matching task ids.</p>
+<p>Copying the GPU assignment is useful, if you want to ensure that tasks are distributed exactly the same in different experiments.</p>
+<p>Also, because GPU assignment can be slow, you can save time by running it only once and then copying to other similar configs.
+Note that because <code class="docutils literal notranslate"><span class="pre">allocate_devices</span></code> is part of <code class="docutils literal notranslate"><span class="pre">config_all</span></code>, you must run config-config stepwise to skip it.</p>
+<p>This step (<code class="docutils literal notranslate"><span class="pre">extra_copy_gpu_assignment</span></code>) is not included in <code class="docutils literal notranslate"><span class="pre">config_all</span></code>. Run it separately if needed.</p>
+</section>
+</section>
+<section id="command-line-overrides">
+<h3>Command line overrides<a class="headerlink" href="#command-line-overrides" title="Link to this heading">¶</a></h3>
 <p>Some parameters can also be given on the command line.
 If a value is given both in the input yaml and on the command line, the command line takes precedence.</p>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="attention_bridges.html" class="btn btn-neutral float-right" title="Attention Bridge" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="modular_model.html" class="btn btn-neutral float-left" title="Component-level Modularity" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="modular_model.html" class="btn btn-neutral float-left" title="Component-level Modularity" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="attention_bridges.html" class="btn btn-neutral float-right" title="Attention Bridge" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2023, HelsinkiNLP
-
-    </p>
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>

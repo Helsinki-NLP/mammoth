@@ -1,131 +1,94 @@
 
 
 <!DOCTYPE html>
-<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<html class="writer-html5" lang="en" data-content_root="./">
 <head>
-  <meta charset="utf-8">
-  
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Quickstart &mdash; MAMMOTH  documentation</title>
-  
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
 
   
-  
-  
-  
-
-  
-  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
-  
-    
-      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
-        <script src="_static/jquery.js"></script>
-        <script src="_static/underscore.js"></script>
-        <script src="_static/doctools.js"></script>
-        <script src="_static/language_data.js"></script>
-        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
-        <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]]}})</script>
-    
-    <script type="text/javascript" src="_static/js/theme.js"></script>
-
-    
-
-  
-  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
-  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
-  <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Contributors" href="CONTRIBUTING.html" />
     <link rel="prev" title="Overview" href="main.html" /> 
 </head>
 
-<body class="wy-body-for-nav">
-
-   
+<body class="wy-body-for-nav"> 
   <div class="wy-grid-for-nav">
-    
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-          
 
           
-            <a href="index.html" class="icon icon-home"> MAMMOTH
           
-
-          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
           </a>
-
-          
-            
-            
-          
-
-          
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
 </div>
-
-          
-        </div>
-
-        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
-          
-            
-            
-              
-            
-            
-              <p class="caption"><span class="caption-text">Getting Started</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#step-0-install-mammoth">Step 0: Install mammoth</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-1-prepare-the-data">Step 1: Prepare the data</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-2-configurations">Step 2: Configurations</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#step-3-start-training">Step 3: Start training</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#step-4-translate">Step 4: Translate</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#further-reading">Further reading</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#before-you-start">Before you start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-1-download-the-data">Step 1: Download the data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-2-train-the-tokenizers">Step 2: Train the tokenizers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-3-write-the-training-config">Step 3: Write the training config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-4-train">Step 4: Train</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#step-5-translate">Step 5: Translate</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#score-the-output">Score the output</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="#where-to-go-next">Where to go next</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Frequently Asked Questions</span></p>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html">About MAMMOTH</a></li>
-<li class="toctree-l1"><a class="reference internal" href="FAQ.html#mammoth-and-opennmt">MAMMOTH and OpenNMT</a></li>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
 </ul>
-<p class="caption"><span class="caption-text">MAMMOTH features</span></p>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
 <li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
 <li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Tutorials</span></p>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CSC_quickstart.html">LUMI &amp; Roihu Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HF_TOKENIZERS.html">HuggingFace Tokenizers Integration</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
 <li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
 </ul>
-<p class="caption"><span class="caption-text">Scripts</span></p>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="options/build_vocab.html">Build Vocab</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
 <li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
 </ul>
-<p class="caption"><span class="caption-text">API</span></p>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
 <li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
@@ -134,337 +97,239 @@
 <li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
 </ul>
 
-            
-          
         </div>
       </div>
     </nav>
 
-    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
-
-      
-      <nav class="wy-nav-top" aria-label="top navigation">
-        
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
           <a href="index.html">MAMMOTH</a>
-        
       </nav>
 
-
       <div class="wy-nav-content">
-        
         <div class="rst-content">
-        
-          
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div role="navigation" aria-label="breadcrumbs navigation">
-
+          <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-    
-      <li><a href="index.html">Docs</a> &raquo;</li>
-        
-      <li>Quickstart</li>
-    
-    
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Quickstart</li>
       <li class="wy-breadcrumbs-aside">
-        
-            
             <a href="_sources/quickstart.md.txt" rel="nofollow"> View page source</a>
-          
-        
       </li>
-    
   </ul>
-
-  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
-            
-  <div class="section" id="quickstart">
-<h1>Quickstart<a class="headerlink" href="#quickstart" title="Permalink to this headline">¶</a></h1>
-<p>MAMMOTH is specifically designed for distributed training of modular systems in multi-GPUs SLURM environments.</p>
-<p>In the example below, we will show you how to configure Mammoth to train a machine translation model with language-specific encoders and decoders.</p>
-<div class="section" id="step-0-install-mammoth">
-<h2>Step 0: Install mammoth<a class="headerlink" href="#step-0-install-mammoth" title="Permalink to this headline">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>mammoth-nlp
-</pre></div>
-</div>
-<p>Check out the <a class="reference internal" href="install.html"><span class="doc">installation guide</span></a> to install in specific clusters.</p>
-</div>
-<div class="section" id="step-1-prepare-the-data">
-<h2>Step 1: Prepare the data<a class="headerlink" href="#step-1-prepare-the-data" title="Permalink to this headline">¶</a></h2>
-<p>Before running the training, we will download data for chosen pairs of languages and create a sentencepiece tokenizer for the model.</p>
-<p><strong>Refer to the data preparation <a class="reference internal" href="prepare_data.html"><span class="doc">tutorial</span></a> for more details.</strong></p>
-<p>In the following steps, we assume that you already have an encoded dataset containing <code class="docutils literal notranslate"><span class="pre">*.sp</span></code> file for <code class="docutils literal notranslate"><span class="pre">europarl</span></code> dataset, and languages <code class="docutils literal notranslate"><span class="pre">cs</span></code> and <code class="docutils literal notranslate"><span class="pre">bg</span></code>. Thus, your data directory <code class="docutils literal notranslate"><span class="pre">europarl_data/encoded</span></code> should contain 8 files in a format <code class="docutils literal notranslate"><span class="pre">{train/valid}.{cs/bg}-en.{cs/bg}.sp</span></code>. If you use other datasets, please update the paths in the configurations below.</p>
-</div>
-<div class="section" id="step-2-configurations">
-<h2>Step 2: Configurations<a class="headerlink" href="#step-2-configurations" title="Permalink to this headline">¶</a></h2>
-<p>Mamooth uses configurations to build a new transformer model and configure your training settings, such as which modules are trained with the data from which languages.</p>
-<p>Below are a few examples of training configurations that will work for you out-of-box in a one-node, two-GPU environment.</p>
-<details>
-<summary>Task-specific encoders and decoders</summary><p>In this example, we create a model with encoders and decoders <strong>unshared</strong> for the specified languages. This is defined by <code class="docutils literal notranslate"><span class="pre">enc_sharing_group</span></code> and <code class="docutils literal notranslate"><span class="pre">enc_sharing_group</span></code>.
-Note that the configs expect you have access to 2 GPUs.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># TRAINING CONFIG</span>
-<span class="nt">world_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
-<span class="nt">gpu_ranks</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">]</span>
-
-<span class="nt">batch_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tokens</span>
-<span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4096</span>
-
-<span class="c1"># INPUT/OUTPUT VOCABULARY CONFIG</span>
-
-<span class="nt">src_vocab</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">bg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="w">  </span><span class="nt">cs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="w">  </span><span class="nt">en</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="nt">tgt_vocab</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">cs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="w">  </span><span class="nt">en</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-
-<span class="c1"># MODEL CONFIG</span>
-
-<span class="nt">model_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
-
-<span class="nt">tasks</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">train_bg-en</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bg-en</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">bg</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:0&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.bg-en.bg.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.bg-en.en.sp</span>
-<span class="w">  </span><span class="nt">train_cs-en</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cs-en</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.cs.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.en.sp</span>
-<span class="w">  </span><span class="nt">train_en-cs</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">en-cs</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.en.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.cs.sp</span>
-
-<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
-<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
-</pre></div>
-</div>
-</details><details>
-<summary>Arbitrarily shared layers in encoders and task-specific decoders</summary><p>The training and vocab config is the same as in the previous example.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># TRAINING CONFIG</span>
-<span class="nt">world_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
-<span class="nt">gpu_ranks</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">]</span>
-
-<span class="nt">batch_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tokens</span>
-<span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4096</span>
-
-<span class="c1"># INPUT/OUTPUT VOCABULARY CONFIG</span>
-
-<span class="nt">src_vocab</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">bg</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="w">  </span><span class="nt">cs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="w">  </span><span class="nt">en</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="nt">tgt_vocab</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">cs</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="w">  </span><span class="nt">en</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-
-<span class="c1"># MODEL CONFIG</span>
-
-<span class="nt">model_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
-
-<span class="nt">tasks</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">train_bg-en</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">bg-en</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">bg</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">all</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:0&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.bg-en.bg.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.bg-en.en.sp</span>
-<span class="w">  </span><span class="nt">train_cs-en</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">cs-en</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">all</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.cs.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.en.sp</span>
-<span class="w">  </span><span class="nt">train_en-cs</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">en-cs</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">all</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">cs</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.en.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.cs.sp</span>
-
-<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">4</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4</span><span class="p p-Indicator">]</span>
-<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">4</span><span class="p p-Indicator">]</span>
-</pre></div>
-</div>
-</details><details>
-<summary>Non-modular multilingual system </summary><p>In this example, we share the input/output vocabulary over all languages. Hence, we define a vocabulary for an <code class="docutils literal notranslate"><span class="pre">all</span></code> language, that we use in the definition of the model.</p>
-<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># TRAINING CONFIG</span>
-<span class="nt">world_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
-<span class="nt">gpu_ranks</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">]</span>
-
-<span class="nt">batch_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tokens</span>
-<span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4096</span>
-
-<span class="c1"># INPUT/OUTPUT VOCABULARY CONFIG</span>
-
-<span class="nt">src_vocab</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">all</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-<span class="nt">tgt_vocab</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">all</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">vocab/opusTC.mul.vocab.onmt</span>
-
-<span class="c1"># MODEL CONFIG</span>
-
-<span class="nt">model_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span>
-
-<span class="nt">tasks</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">train_bg-en</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all-all</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">shared_enc</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">shared_dec</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:0&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.bg-en.bg.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.bg-en.en.sp</span>
-<span class="w">  </span><span class="nt">train_cs-en</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all-all</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">shared_enc</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">shared_dec</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.cs.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.en.sp</span>
-<span class="w">  </span><span class="nt">train_en-cs</span><span class="p">:</span>
-<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">all-all</span>
-<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">shared_enc</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">shared_dec</span><span class="p p-Indicator">]</span>
-<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;0:1&quot;</span>
-<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.en.sp</span>
-<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">europarl_data/encoded/train.cs-en.cs.sp</span>
-
-<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
-<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">6</span><span class="p p-Indicator">]</span>
-</pre></div>
-</div>
-</details><p><strong>To proceed, copy-paste one of these configurations into a new file named <code class="docutils literal notranslate"><span class="pre">my_config.yaml</span></code>.</strong></p>
-<p>For further information, check out the documentation of all parameters in <strong><a class="reference internal" href="options/train.html"><span class="doc">train.py</span></a></strong>.</p>
-<p>For more complex scenarios, we recommend our <a class="reference internal" href="config_config.html"><span class="doc">automatic configuration generation tool</span></a> for generating your configurations.</p>
-</div>
-<div class="section" id="step-3-start-training">
-<h2>Step 3: Start training<a class="headerlink" href="#step-3-start-training" title="Permalink to this headline">¶</a></h2>
-<p>You can start your training on a single machine, by simply running a python script <code class="docutils literal notranslate"><span class="pre">train.py</span></code>, possibly with a definition of your desired GPUs.
-Note that the example config above assumes two GPUs available on one machine.</p>
-<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="nv">CUDA_VISIBLE_DEVICES</span><span class="o">=</span><span class="m">0</span>,1<span class="w"> </span>python3<span class="w"> </span>train.py<span class="w"> </span>-config<span class="w"> </span>my_config.yaml<span class="w"> </span>-save_model<span class="w"> </span>output_dir<span class="w"> </span>-tensorboard<span class="w"> </span>-tensorboard_log_dir<span class="w"> </span>log_dir
-</pre></div>
-</div>
-<p>Note that when running <code class="docutils literal notranslate"><span class="pre">train.py</span></code>, you can use all the parameters from <a class="reference internal" href="options/train.html"><span class="doc">train.py</span></a> as cmd arguments. In the case of duplicate arguments, the cmd parameters override the ones found in your config.yaml.</p>
-<div class="section" id="step-4-translate">
-<h3>Step 4: Translate<a class="headerlink" href="#step-4-translate" title="Permalink to this headline">¶</a></h3>
-<p>Now that you have successfully trained your multilingual machine translation model using Mammoth, it’s time to put it to use for translation.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-u<span class="w"> </span><span class="nv">$MAMMOTH</span>/translate.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--config<span class="w"> </span><span class="s2">&quot;my_config.yml&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--model<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$model_checkpoint</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--task_id<span class="w">  </span><span class="s2">&quot;train_</span><span class="nv">$src_lang</span><span class="s2">-</span><span class="nv">$tgt_lang</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--src<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$path_to_src_language</span><span class="s2">/</span><span class="nv">$lang_pair</span><span class="s2">.</span><span class="nv">$src_lang</span><span class="s2">.sp&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--output<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$out_path</span><span class="s2">/</span><span class="nv">$src_lang</span><span class="s2">-</span><span class="nv">$tgt_lang</span><span class="s2">.hyp.sp&quot;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--gpu<span class="w"> </span><span class="m">0</span><span class="w"> </span>--shard_size<span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--batch_size<span class="w"> </span><span class="m">512</span>
-</pre></div>
-</div>
-<p>Follow these configs to translate text with your trained model.</p>
-<ul>
-<li><p>Provide necessary details using the following options:</p>
+             
+  <section id="quickstart">
+<h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">¶</a></h1>
+<p>This quickstart trains a small English→German translation model on <a class="reference external" href="https://github.com/multi30k/dataset">Multi30k</a> on a single GPU (or on CPU, only to test your setup). It covers the whole workflow:</p>
+<ol class="simple">
+<li><p>Download the data.</p></li>
+<li><p>Train a tokenizer for each language.</p></li>
+<li><p>Write a training config.</p></li>
+<li><p>Train.</p></li>
+<li><p>Translate and score.</p></li>
+</ol>
+<p>The result is a small baseline, not a production model. The point is to see how the pieces fit together.</p>
+<p>For running on the CSC supercomputers (LUMI, Roihu), see the <a class="reference internal" href="CSC_quickstart.html"><span class="doc">LUMI &amp; Roihu quickstart</span></a> instead.</p>
+<section id="before-you-start">
+<h2>Before you start<a class="headerlink" href="#before-you-start" title="Link to this heading">¶</a></h2>
 <ul class="simple">
-<li><p>Configuration File: <code class="docutils literal notranslate"><span class="pre">--config</span> <span class="pre">&quot;my_config.yml&quot;</span></code></p></li>
-<li><p>Model Checkpoint: <code class="docutils literal notranslate"><span class="pre">--model</span> <span class="pre">&quot;$model_checkpoint&quot;</span></code></p></li>
-<li><p>Translation Task: <code class="docutils literal notranslate"><span class="pre">--task_id</span> <span class="pre">&quot;train_$src_lang-$tgt_lang&quot;</span></code></p></li>
+<li><p>Install MAMMOTH from source by following the <a class="reference internal" href="install.html"><span class="doc">installation guide</span></a>. Activate the environment you created there.</p></li>
+<li><p>A GPU (NVIDIA or AMD) is recommended. MAMMOTH also trains and translates on CPU, which is enough to check your setup but too slow for a useful model. To use the CPU, change the hardware settings as shown in Step 3.</p></li>
+<li><p>Run every command below from the root of the MAMMOTH repository.</p></li>
 </ul>
-</li>
-<li><p>Point to the source language file for translation:
-<code class="docutils literal notranslate"><span class="pre">--src</span> <span class="pre">&quot;$path_to_src_language/$lang_pair.$src_lang.sp&quot;</span></code></p></li>
-<li><p>Define the path for saving the translated output: <code class="docutils literal notranslate"><span class="pre">--output</span> <span class="pre">&quot;$out_path/$src_lang-$tgt_lang.hyp.sp&quot;</span></code></p></li>
-<li><p>Adjust GPU and batch size settings based on your requirements: <code class="docutils literal notranslate"><span class="pre">--gpu</span> <span class="pre">0</span> <span class="pre">--shard_size</span> <span class="pre">0</span> <span class="pre">--batch_size</span> <span class="pre">512</span></code></p></li>
-<li><p>We provide the model checkpoint trained using the encoder shared scheme described in <a class="reference internal" href="examples/sharing_schemes.html"><span class="doc">this tutorial</span></a>.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>wget<span class="w"> </span>https://mammoth-share.a3s.fi/encoder-shared-models.tar.gz
+</section>
+<section id="step-1-download-the-data">
+<h2>Step 1: Download the data<a class="headerlink" href="#step-1-download-the-data" title="Link to this heading">¶</a></h2>
+<p>Multi30k is a small parallel corpus of image captions (about 29,000 training sentences per language).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>data/multi30k
+<span class="nb">cd</span><span class="w"> </span>data/multi30k
+<span class="k">for</span><span class="w"> </span>language<span class="w"> </span><span class="k">in</span><span class="w"> </span>en<span class="w"> </span>de<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span>split<span class="w"> </span><span class="k">in</span><span class="w"> </span>train<span class="w"> </span>val<span class="w"> </span>test_2016_flickr<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">        </span>wget<span class="w"> </span><span class="s2">"https://github.com/multi30k/dataset/raw/refs/heads/master/data/task1/raw/</span><span class="si">${</span><span class="nv">split</span><span class="si">}</span><span class="s2">.</span><span class="si">${</span><span class="nv">language</span><span class="si">}</span><span class="s2">.gz"</span>
+<span class="w">    </span><span class="k">done</span>
+<span class="k">done</span>
+<span class="nb">cd</span><span class="w"> </span>../..
 </pre></div>
 </div>
-</li>
+<p>This gives you <code class="docutils literal notranslate"><span class="pre">train</span></code>, <code class="docutils literal notranslate"><span class="pre">val</span></code> (validation) and <code class="docutils literal notranslate"><span class="pre">test_2016_flickr</span></code> files for each language. The files are gzipped, one sentence per line, and MAMMOTH reads <code class="docutils literal notranslate"><span class="pre">.gz</span></code> files directly.</p>
+</section>
+<section id="step-2-train-the-tokenizers">
+<h2>Step 2: Train the tokenizers<a class="headerlink" href="#step-2-train-the-tokenizers" title="Link to this heading">¶</a></h2>
+<p>MAMMOTH uses <a class="reference internal" href="HF_TOKENIZERS.html"><span class="doc">Hugging Face tokenizers</span></a>. Each language gets its own tokenizer, trained with <code class="docutils literal notranslate"><span class="pre">mammoth/bin/build_vocab.py</span></code>. The script reads plain text, so decompress the training data first (<code class="docutils literal notranslate"><span class="pre">gzip</span> <span class="pre">-dc</span></code> works on both Linux and macOS):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="w"> </span>language<span class="w"> </span><span class="k">in</span><span class="w"> </span>en<span class="w"> </span>de<span class="p">;</span><span class="w"> </span><span class="k">do</span>
+<span class="w">    </span>gzip<span class="w"> </span>-dc<span class="w"> </span>data/multi30k/train.<span class="si">${</span><span class="nv">language</span><span class="si">}</span>.gz<span class="w"> </span>&gt;<span class="w"> </span>data/multi30k/train.<span class="si">${</span><span class="nv">language</span><span class="si">}</span>.txt
+<span class="w">    </span>python<span class="w"> </span>mammoth/bin/build_vocab.py<span class="w"> </span><span class="se">\</span>
+<span class="w">        </span>--input_file<span class="w"> </span>data/multi30k/train.<span class="si">${</span><span class="nv">language</span><span class="si">}</span>.txt<span class="w"> </span><span class="se">\</span>
+<span class="w">        </span>--output_dir<span class="w"> </span>models/tokenizers/<span class="si">${</span><span class="nv">language</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">        </span>--vocab_size<span class="w"> </span><span class="m">8000</span>
+<span class="k">done</span>
+</pre></div>
+</div>
+<p>Each output directory contains a <code class="docutils literal notranslate"><span class="pre">tokenizer.json</span></code>, which is the file you point the config at.</p>
+<p>A tokenizer only splits text into subwords. MAMMOTH adds the beginning and end of sequence tokens itself.</p>
+</section>
+<section id="step-3-write-the-training-config">
+<h2>Step 3: Write the training config<a class="headerlink" href="#step-3-write-the-training-config" title="Link to this heading">¶</a></h2>
+<p>Save the following as <code class="docutils literal notranslate"><span class="pre">multi30k_en_de.yaml</span></code>. It defines one translation task and a small Transformer.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># ---- Task ----</span>
+<span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">en-de</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">en-de</span>
+<span class="w">    </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data/multi30k/train.en.gz</span>
+<span class="w">    </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data/multi30k/train.de.gz</span>
+<span class="w">    </span><span class="nt">path_valid_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data/multi30k/val.en.gz</span>
+<span class="w">    </span><span class="nt">path_valid_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">data/multi30k/val.de.gz</span>
+<span class="w">    </span><span class="c1"># Parameter-sharing groups: which encoder and decoder stack this task uses.</span>
+<span class="w">    </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">en</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">de</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="c1"># Run this task on node 0, GPU 0.</span>
+<span class="w">    </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">"0:0"</span>
+<span class="w">    </span><span class="nt">transforms</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">filtertoolong</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="w">    </span><span class="nt">introduce_at_training_step</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+
+<span class="c1"># ---- Tokenizers (one per language) ----</span>
+<span class="nt">src_vocab</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">en</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">models/tokenizers/en/tokenizer.json</span>
+<span class="nt">tgt_vocab</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">de</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">models/tokenizers/de/tokenizer.json</span>
+<span class="nt">use_hf_tokenizer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="c1"># ---- Hardware ----</span>
+<span class="c1"># One GPU. For CPU-only, use `world_size: 0` and `gpu_ranks: []`.</span>
+<span class="nt">n_nodes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">world_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1</span>
+<span class="nt">gpu_ranks</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">]</span>
+
+<span class="c1"># ---- Model ----</span>
+<span class="nt">model_dim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">256</span>
+<span class="nt">heads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4</span>
+<span class="nt">enc_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="nt">dec_layers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">3</span><span class="p p-Indicator">]</span>
+<span class="nt">rotary_pos_emb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="nt">dropout</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+<span class="nt">label_smoothing</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.1</span>
+
+<span class="c1"># ---- Data ----</span>
+<span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">4096</span>
+<span class="nt">batch_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tokens</span>
+<span class="nt">normalization</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">tokens</span>
+<span class="nt">valid_batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048</span>
+<span class="nt">src_seq_length_max</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="nt">tgt_seq_length_max</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+
+<span class="c1"># ---- Optimization ----</span>
+<span class="nt">optim</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">adam</span>
+<span class="nt">adam_beta1</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.9</span>
+<span class="nt">adam_beta2</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.998</span>
+<span class="nt">learning_rate</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0005</span>
+<span class="nt">decay_method</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">linear_warmup</span>
+<span class="nt">warmup_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="nt">max_grad_norm</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+<span class="nt">train_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10000</span>
+<span class="nt">valid_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1000</span>
+<span class="nt">report_every</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">100</span>
+<span class="nt">save_checkpoint_steps</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2500</span>
+<span class="nt">keep_checkpoint</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="nt">seed</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3435</span>
+
+<span class="c1"># ---- Output ----</span>
+<span class="nt">save_model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">models/multi30k_en_de</span>
+<span class="nt">max_length</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">200</span>
+</pre></div>
+</div>
+<p>The keys worth knowing about:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">tasks</span></code></strong>: every translation direction is a task. The task id (<code class="docutils literal notranslate"><span class="pre">en-de</span></code>) is what you pass to <code class="docutils literal notranslate"><span class="pre">--task_id</span></code> when translating. A multilingual setup lists many tasks, and tasks that name the same sharing group share parameters. That sharing is MAMMOTH’s main feature. See <a class="reference internal" href="modular_model.html"><span class="doc">Modular model</span></a> and <a class="reference internal" href="examples/sharing_schemes.html"><span class="doc">Sharing schemes</span></a>.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">enc_sharing_group</span></code> / <code class="docutils literal notranslate"><span class="pre">dec_sharing_group</span></code></strong>: one entry per layer stack. Here there is one encoder stack (<code class="docutils literal notranslate"><span class="pre">en</span></code>) and one decoder stack (<code class="docutils literal notranslate"><span class="pre">de</span></code>), so <code class="docutils literal notranslate"><span class="pre">enc_layers</span></code> and <code class="docutils literal notranslate"><span class="pre">dec_layers</span></code> each have one number.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">src_vocab</span></code> / <code class="docutils literal notranslate"><span class="pre">tgt_vocab</span></code></strong>: one tokenizer per language. The tokenizer for a language must be the same one used at translation time.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">gpu_ranks</span></code>, <code class="docutils literal notranslate"><span class="pre">world_size</span></code>, <code class="docutils literal notranslate"><span class="pre">n_nodes</span></code></strong>: these must describe the same hardware. <code class="docutils literal notranslate"><span class="pre">gpu_ranks:</span> <span class="pre">[0]</span></code> means one GPU in this node. An empty <code class="docutils literal notranslate"><span class="pre">gpu_ranks</span></code> with <code class="docutils literal notranslate"><span class="pre">world_size:</span> <span class="pre">0</span></code> selects the CPU, and both training and translation then run on CPU.</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">src_seq_length_max</span></code> / <code class="docutils literal notranslate"><span class="pre">tgt_seq_length_max</span></code></strong>: used by the <code class="docutils literal notranslate"><span class="pre">filtertoolong</span></code> transform, which drops training pairs longer than this many tokens.</p></li>
 </ul>
-<p>Congratulations! You’ve successfully translated text using your Mammoth model. Adjust the parameters as needed for your specific translation tasks.</p>
+<p>On a small GPU, lower <code class="docutils literal notranslate"><span class="pre">batch_size</span></code>. To check that everything works before a full run (or when using the CPU), set <code class="docutils literal notranslate"><span class="pre">train_steps:</span> <span class="pre">200</span></code> and <code class="docutils literal notranslate"><span class="pre">save_checkpoint_steps:</span> <span class="pre">200</span></code>. A model trained for so few steps will produce poor or empty translations, which is expected.</p>
+</section>
+<section id="step-4-train">
+<h2>Step 4: Train<a class="headerlink" href="#step-4-train" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mammoth_train<span class="w"> </span>--config<span class="w"> </span>multi30k_en_de.yaml<span class="w"> </span>--node_rank<span class="w"> </span><span class="m">0</span>
+</pre></div>
 </div>
-<div class="section" id="further-reading">
-<h3>Further reading<a class="headerlink" href="#further-reading" title="Permalink to this headline">¶</a></h3>
-<p>A complete example of training on the Europarl dataset is available at <a class="reference internal" href="examples/train_mammoth_101.html"><span class="doc">MAMMOTH101</span></a>, and a complete example for configuring different sharing schemes is available at <a class="reference internal" href="examples/sharing_schemes.html"><span class="doc">MAMMOTH sharing schemes</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">--node_rank</span></code> is always required. It is <code class="docutils literal notranslate"><span class="pre">0</span></code> when you train on a single machine.</p>
+<p>Training prints statistics every <code class="docutils literal notranslate"><span class="pre">report_every</span></code> steps and runs validation every <code class="docutils literal notranslate"><span class="pre">valid_steps</span></code>. Checkpoints are written under <code class="docutils literal notranslate"><span class="pre">models/</span></code>, named from <code class="docutils literal notranslate"><span class="pre">save_model</span></code> and the step number. The tokenizer files in <code class="docutils literal notranslate"><span class="pre">models/tokenizers/</span></code> are also updated in place if the config adds language tokens, so keep them next to the model.</p>
+</section>
+<section id="step-5-translate">
+<h2>Step 5: Translate<a class="headerlink" href="#step-5-translate" title="Link to this heading">¶</a></h2>
+<p>Point <code class="docutils literal notranslate"><span class="pre">--model</span></code> at the checkpoint directory. MAMMOTH loads the best checkpoint if there is one, and otherwise the latest.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir<span class="w"> </span>-p<span class="w"> </span>translations
+mammoth_translate<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--config<span class="w"> </span>multi30k_en_de.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--model<span class="w"> </span>models/<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--task_id<span class="w"> </span>en-de<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--src<span class="w"> </span>data/multi30k/test_2016_flickr.en.gz<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--output<span class="w"> </span>translations/test_2016_flickr.en-de.trans<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--beam_size<span class="w"> </span><span class="m">5</span>
+</pre></div>
 </div>
+<p>Translation uses the hardware settings from the config (the GPU, or the CPU if <code class="docutils literal notranslate"><span class="pre">gpu_ranks</span></code> is empty).</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--task_id</span></code> selects which task’s encoder, decoder and tokenizers to use.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--random_sampling_topk</span> <span class="pre">1</span></code> switches to greedy decoding (instead of beam search).</p></li>
+<li><p>If you get <code class="docutils literal notranslate"><span class="pre">CUDA</span> <span class="pre">out</span> <span class="pre">of</span> <span class="pre">memory</span></code>, add <code class="docutils literal notranslate"><span class="pre">--batch_size</span> <span class="pre">50</span></code>.</p></li>
+</ul>
+<section id="score-the-output">
+<h3>Score the output<a class="headerlink" href="#score-the-output" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">sacrebleu</span></code> is installed with MAMMOTH’s requirements.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>gzip<span class="w"> </span>-dc<span class="w"> </span>data/multi30k/test_2016_flickr.de.gz<span class="w"> </span>&gt;<span class="w"> </span>translations/test_2016_flickr.de.ref
+sacrebleu<span class="w"> </span>translations/test_2016_flickr.de.ref<span class="w"> </span>-i<span class="w"> </span>translations/test_2016_flickr.en-de.trans
+</pre></div>
 </div>
-</div>
+</section>
+</section>
+<section id="where-to-go-next">
+<h2>Where to go next<a class="headerlink" href="#where-to-go-next" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>More languages.</strong> Add one entry per direction under <code class="docutils literal notranslate"><span class="pre">tasks</span></code>, one tokenizer per language under <code class="docutils literal notranslate"><span class="pre">src_vocab</span></code> / <code class="docutils literal notranslate"><span class="pre">tgt_vocab</span></code>, and choose sharing groups. For a multilingual model, add the <code class="docutils literal notranslate"><span class="pre">prefix</span></code> transform so the model knows the target language. See <a class="reference internal" href="examples/sharing_schemes.html"><span class="doc">Sharing schemes</span></a>.</p></li>
+<li><p><strong>More GPUs or nodes.</strong> Set <code class="docutils literal notranslate"><span class="pre">n_nodes</span></code>, <code class="docutils literal notranslate"><span class="pre">world_size</span></code> and <code class="docutils literal notranslate"><span class="pre">gpu_ranks</span></code>, and give each task a <code class="docutils literal notranslate"><span class="pre">node_gpu</span></code> of the form <code class="docutils literal notranslate"><span class="pre">&quot;&lt;node&gt;:&lt;gpu&gt;&quot;</span></code>. See <a class="reference internal" href="modular_model.html"><span class="doc">Modular model</span></a>.</p></li>
+<li><p><a class="reference internal" href="training_tips.html"><span class="doc">Best practices for training</span></a>.</p></li>
+<li><p><a class="reference internal" href="prepare_data.html"><span class="doc">Preparing your own data</span></a>.</p></li>
+<li><p><a class="reference internal" href="HF_TOKENIZERS.html"><span class="doc">Hugging Face tokenizers guide</span></a>.</p></li>
+<li><p><a class="reference internal" href="exporting_to_huggingface.html"><span class="doc">Export a trained model to Hugging Face</span></a>.</p></li>
+<li><p>A multi-task, multi-GPU walkthrough on Europarl, including multi-node training: <a class="reference internal" href="examples/train_mammoth_101.html"><span class="doc">MAMMOTH 101</span></a>.</p></li>
+</ul>
+</section>
+</section>
 
 
            </div>
-           
           </div>
-          <footer>
-  
-    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
-      
-        <a href="CONTRIBUTING.html" class="btn btn-neutral float-right" title="Contributors" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
-      
-      
-        <a href="main.html" class="btn btn-neutral float-left" title="Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
-      
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="main.html" class="btn btn-neutral float-left" title="Overview" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="CONTRIBUTING.html" class="btn btn-neutral float-right" title="Contributors" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
-  
 
   <hr/>
 
   <div role="contentinfo">
-    <p>
-        &copy; Copyright 2023, HelsinkiNLP
-
-    </p>
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
   </div>
-  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
 
 </footer>
-
         </div>
       </div>
-
     </section>
-
   </div>
-  
-
-
-  <script type="text/javascript">
+  <script>
       jQuery(function () {
           SphinxRtdTheme.Navigation.enable(true);
       });
-  </script>
-
-  
-  
-    
-   
+  </script> 
 
 </body>
 </html>

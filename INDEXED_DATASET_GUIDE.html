@@ -1,0 +1,217 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>&lt;no title&gt; &mdash; MAMMOTH  documentation</title>
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training MAMMOTH 101" href="examples/train_mammoth_101.html" />
+    <link rel="prev" title="HuggingFace Tokenizers Integration" href="HF_TOKENIZERS.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CSC_quickstart.html">LUMI &amp; Roihu Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HF_TOKENIZERS.html">HuggingFace Tokenizers Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MAMMOTH</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">&lt;no title&gt;</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/INDEXED_DATASET_GUIDE.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <p>Mammoth now supports pretokenization (automatic/manual) before training starts:</p>
+<ul class="simple">
+<li><p>Add <code class="docutils literal notranslate"><span class="pre">data_type:</span> <span class="pre">indexed</span></code> to enable pretokenization. For each text file, pretokenization will produce a <code class="docutils literal notranslate"><span class="pre">idx</span></code> file and a <code class="docutils literal notranslate"><span class="pre">bin</span></code> file.</p></li>
+<li><p>Pretokenization is incompatible with on-the-fly transforms.</p></li>
+<li><p>Currently, length filtering is not included in the pretokenization process. Please keep the length of the training data less than or equal to <code class="docutils literal notranslate"><span class="pre">max_length:</span> <span class="pre">512</span></code> otherwise training will crash. A template script for using HF tokenizer for length filtering is provided below.</p></li>
+<li><p>To use automatic pretokenization, assign the paths with the filtered text data. Mammoth will first check if the provided text data has been pretokenized (looking for <code class="docutils literal notranslate"><span class="pre">idx</span></code> and <code class="docutils literal notranslate"><span class="pre">bin</span></code> files in the same directory). If not, pretokenization will run automatically and process this data for training, saving the results to the same directory.</p></li>
+<li><p>To use manual pretokenization, run the script <code class="docutils literal notranslate"><span class="pre">mammoth/scripts/preprocess_indexed.py</span></code>. This is a template script:</p></li>
+</ul>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>mammoth/scripts/preprocess_indexed.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--input<span class="w"> </span>/scratch/project_462000964/members/wangchao/training/test_pretokenization/train_ar_filtered.txt<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output_prefix<span class="w"> </span>train_ar_tok<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--vocab_path<span class="w"> </span>hf_tokenizer.json<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--workers<span class="w"> </span><span class="m">8</span>
+</pre></div>
+</div>
+<p>During training, provide the output prefix <code class="docutils literal notranslate"><span class="pre">train_ar_tok</span></code> as the data paths for Mammoth to load the correct input data.</p>
+<p>Configuration example:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">task_ar-eng</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="s">"ara-eng"</span>
+<span class="w">  </span><span class="nt">data_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">indexed</span><span class="w"> </span><span class="c1"># Enables automatic pretokenization/training with pretokenized data </span>
+<span class="w">  </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+<span class="w">  </span><span class="nt">introduce_at_training_step</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">  </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">"0:0"</span>
+<span class="w">  </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"ara"</span><span class="p p-Indicator">,</span><span class="s">"all"</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"all"</span><span class="p p-Indicator">,</span><span class="s">"eng"</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="c1"># transforms: [denoising,filtertoolong] # Do not use any transforms here</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="c1"># When using automatic pretokenization, provide the paths to the text files:</span>
+<span class="w">  </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar_filtered.txt</span>
+<span class="w">  </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en_filtered.txt</span>
+<span class="w">  </span><span class="nt">path_valid_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar_filtered.txt</span>
+<span class="w">  </span><span class="nt">path_valid_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en_filtered.txt</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="c1"># When using manual pretokenization, provide the output prefix (Mammoth will locate the .bin and .idx files):</span>
+<span class="w">  </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_ar_tok</span><span class="w"> </span><span class="c1"># the `output_prefix` value</span>
+<span class="w">  </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/train_en_tok</span><span class="w"> </span><span class="c1"># the `output_prefix` value</span>
+<span class="w">  </span><span class="nt">path_valid_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_ar_tok</span><span class="w"> </span><span class="c1"># the `output_prefix` value</span>
+<span class="w">  </span><span class="nt">path_valid_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/ar-en.tmx/val_en_tok</span><span class="w"> </span><span class="c1"># the `output_prefix` value</span>
+<span class="w">  </span>
+<span class="w w-Error"> </span><span class="nt">task_fi_fi</span><span class="p">:</span><span class="w"> </span>
+<span class="w">  </span><span class="nt">src_tgt</span><span class="p">:</span><span class="w"> </span><span class="s">"fin-fin"</span>
+<span class="w">  </span><span class="nt">weight</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">1.0</span>
+<span class="w">  </span><span class="nt">introduce_at_training_step</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0</span>
+<span class="w">  </span><span class="nt">node_gpu</span><span class="p">:</span><span class="w"> </span><span class="s">"0:1"</span>
+<span class="w">  </span><span class="nt">enc_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"fin"</span><span class="p p-Indicator">,</span><span class="s">"all"</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">dec_sharing_group</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">"all"</span><span class="p p-Indicator">,</span><span class="s">"fin"</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">transforms</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">denoising</span><span class="p p-Indicator">,</span><span class="nv">filtertoolong</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># Transforms work only with non-indexed datasets </span>
+<span class="w">  </span><span class="nt">path_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi_filtered.txt</span>
+<span class="w">  </span><span class="nt">path_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/train_fi_filtered.txt</span>
+<span class="w">  </span><span class="nt">path_valid_src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi_filtered.txt</span>
+<span class="w">  </span><span class="nt">path_valid_tgt</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/val_fi_filtered.txt</span>
+<span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">...</span>
+
+<span class="nt">src_seq_length_max</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span><span class="w"> </span>
+<span class="nt">tgt_seq_length_max</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span><span class="w"> </span>
+<span class="nt">src_seq_length_min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w"> </span>
+<span class="nt">tgt_seq_length_min</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span><span class="w"> </span>
+<span class="nt">max_length</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">512</span><span class="w"> </span><span class="c1"># Input sentence length must be less than or equal to this value when `filtertoolong` transform is not used!</span>
+</pre></div>
+</div>
+<p>The template script for using HF tokenizer for length filtering:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>mammoth/scripts/filter_by_length.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--src_input<span class="w"> </span><span class="si">${</span><span class="nv">SRC_INPUT</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tgt_input<span class="w"> </span><span class="si">${</span><span class="nv">TGT_INPUT</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--src_output<span class="w"> </span><span class="si">${</span><span class="nv">SRC_OUTPUT</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tgt_output<span class="w"> </span><span class="si">${</span><span class="nv">TGT_OUTPUT</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--src_tokenizer<span class="w"> </span><span class="si">${</span><span class="nv">SRC_TOKENIZER</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--tgt_tokenizer<span class="w"> </span><span class="si">${</span><span class="nv">TGT_TOKENIZER</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--min_length<span class="w"> </span><span class="m">10</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--max_length<span class="w"> </span><span class="m">512</span>
+</pre></div>
+</div>
+<p>For separate source and target tokenizers, use <code class="docutils literal notranslate"><span class="pre">--src_tokenizer</span></code> and <code class="docutils literal notranslate"><span class="pre">--tgt_tokenizer</span></code> instead of <code class="docutils literal notranslate"><span class="pre">--tokenizer</span></code>.</p>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="HF_TOKENIZERS.html" class="btn btn-neutral float-left" title="HuggingFace Tokenizers Integration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="examples/train_mammoth_101.html" class="btn btn-neutral float-right" title="Training MAMMOTH 101" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,17 +1,13 @@
 Modules
 =============
 
-Embeddings
-----------
-
-.. autoclass:: mammoth.modules.Embeddings
-    :members:
-
-
 Attention Bridge
 ----------------
 
 .. autoclass:: mammoth.modules.attention_bridge.AttentionBridge
+    :members:
+
+.. autoclass:: mammoth.modules.attention_bridge.BaseAttentionBridgeLayer
     :members:
 
 
@@ -27,23 +23,7 @@ Encoders
 .. autoclass:: mammoth.modules.mean_encoder.MeanEncoder
     :members:
 
-.. autoclass:: mammoth.modules.layer_stack_encoder.LayerStackEncoder
-    :members:
-
-
-Decoders
---------
-
-.. autoclass:: mammoth.modules.decoder.DecoderBase
-    :members:
-
-.. autoclass:: mammoth.modules.layer_stack_decoder.LayerStackDecoder
-    :members:
-
-.. autoclass:: mammoth.modules.decoder_ensemble.EnsembleModel
-    :members:
-
-.. autoclass:: mammoth.modules.transformer_decoder.TransformerDecoder
+.. autoclass:: mammoth.modules.layer_stack.StackXcoder
     :members:
 
 

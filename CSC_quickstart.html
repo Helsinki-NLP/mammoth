@@ -1,0 +1,352 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LUMI &amp; Roihu Quickstart &mdash; MAMMOTH  documentation</title>
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Prepare Data" href="prepare_data.html" />
+    <link rel="prev" title="Installation" href="install.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">LUMI &amp; Roihu Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#lumi-amd-mi250x">LUMI (AMD MI250X)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#environment-setup">Environment Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#single-node-training">Single-Node Training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#multi-node-training">Multi-Node Training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#inference-lumi">Inference (LUMI)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#roihu-nvidia-gh200">Roihu (NVIDIA GH200)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Environment Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id2">Single-Node Training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id3">Multi-Node Training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#inference-roihu">Inference (Roihu)</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1"><a class="reference internal" href="HF_TOKENIZERS.html">HuggingFace Tokenizers Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MAMMOTH</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">LUMI &amp; Roihu Quickstart</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/CSC_quickstart.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="lumi-roihu-quickstart">
+<h1>LUMI &amp; Roihu Quickstart<a class="headerlink" href="#lumi-roihu-quickstart" title="Link to this heading">¶</a></h1>
+<p>This guide covers how to set up and run MAMMOTH training jobs on two CSC supercomputers:</p>
+<ul class="simple">
+<li><p><strong><a class="reference external" href="https://www.lumi.csc.fi/public/">LUMI</a></strong> — AMD MI250X GPU cluster</p></li>
+<li><p><strong><a class="reference external" href="https://docs.csc.fi/computing/systems-roihu/">Roihu</a></strong> — NVIDIA GH200 GPU cluster</p></li>
+</ul>
+<p>Both use SLURM for job scheduling. The main difference is that LUMI requires a Singularity container while Roihu runs with native modules.</p>
+<hr class="docutils" />
+<section id="lumi-amd-mi250x">
+<h2>LUMI (AMD MI250X)<a class="headerlink" href="#lumi-amd-mi250x" title="Link to this heading">¶</a></h2>
+<section id="environment-setup">
+<h3>Environment Setup<a class="headerlink" href="#environment-setup" title="Link to this heading">¶</a></h3>
+<p>LUMI requires running inside a Singularity container. A shared container image and virtual environment are maintained at:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">Container</span><span class="p">:</span> <span class="o">/</span><span class="n">appl</span><span class="o">/</span><span class="n">local</span><span class="o">/</span><span class="n">laifs</span><span class="o">/</span><span class="n">containers</span><span class="o">/</span><span class="n">lumi</span><span class="o">-</span><span class="n">multitorch</span><span class="o">-</span><span class="n">u24r64f21m43t29</span><span class="o">-</span><span class="mi">20260319_153422</span><span class="o">/</span><span class="n">lumi</span><span class="o">-</span><span class="n">multitorch</span><span class="o">-</span><span class="n">full</span><span class="o">-</span><span class="n">u24r64f21m43t29</span><span class="o">-</span><span class="mf">20260319_153422.</span><span class="n">sif</span>
+</pre></div>
+</div>
+<p>To set up the virtual environment for the first time, use the setup script:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sbatch<span class="w"> </span>csc_env/lumi/env_setup.sh
+</pre></div>
+</div>
+<p>This creates a venv inside the container with all dependencies. Edit the script first to set <code class="docutils literal notranslate"><span class="pre">PROJECT_PATH</span></code> and <code class="docutils literal notranslate"><span class="pre">VENV_PATH</span></code> to your project’s paths.</p>
+</section>
+<section id="single-node-training">
+<h3>Single-Node Training<a class="headerlink" href="#single-node-training" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">csc_env/lumi/single_node/single_node_train.sh</span></code> as a template. Key SLURM options:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#SBATCH --partition=dev-g</span>
+<span class="c1">#SBATCH --nodes=1</span>
+<span class="c1">#SBATCH --gres=gpu:1 # from 1-8</span>
+</pre></div>
+</div>
+<p>The script runs training inside the container:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>singularity<span class="w"> </span><span class="nb">exec</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-B<span class="w"> </span>/scratch/&lt;your_project&gt;:/scratch/&lt;your_project&gt;:rw<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>&lt;Path<span class="w"> </span>to<span class="w"> </span>Python&gt;<span class="w"> </span>mammoth/train.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-config<span class="w"> </span>train.yaml
+</pre></div>
+</div>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">FLASH_ATTENTION_TRITON_AMD_ENABLE=TRUE</span></code> optional flag, for peak throughput (incurs a one-time warmup cost)</p>
+</div></blockquote>
+</section>
+<section id="multi-node-training">
+<h3>Multi-Node Training<a class="headerlink" href="#multi-node-training" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">csc_env/lumi/multi_nodes/two_nodes.sh</span></code> as a template. Key SLURM options for 2 nodes × 4 GPUs:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#SBATCH --partition=dev-g</span>
+<span class="c1">#SBATCH --nodes=2</span>
+<span class="c1">#SBATCH --ntasks=2</span>
+<span class="c1">#SBATCH --cpus-per-task=28 # each GPU takes 7 CPUs, total 56 CPUs for gres=gpu:8</span>
+<span class="c1">#SBATCH --gres=gpu:4 # set from 1-8</span>
+</pre></div>
+</div>
+<p>The script auto-detects the master node and launches training via <code class="docutils literal notranslate"><span class="pre">srun</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">MASTER_NODE</span><span class="o">=</span><span class="k">$(</span>scontrol<span class="w"> </span>show<span class="w"> </span>hostnames<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SLURM_JOB_NODELIST</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span><span class="k">)</span>
+<span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">9973</span>
+
+srun<span class="w"> </span>singularity<span class="w"> </span><span class="nb">exec</span><span class="w"> </span>...<span class="w"> </span>/path/to/wrapper_script.sh
+</pre></div>
+</div>
+<p>Inside the wrapper, each node gets its rank from <code class="docutils literal notranslate"><span class="pre">$SLURM_PROCID</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>mammoth/train.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-config<span class="w"> </span>two_nodes.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--node_rank<span class="w"> </span><span class="si">${</span><span class="nv">SLURM_PROCID</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--master_ip<span class="w"> </span><span class="si">${</span><span class="nv">MASTER_NODE</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--master_port<span class="w"> </span><span class="si">${</span><span class="nv">MASTER_PORT</span><span class="si">}</span>
+</pre></div>
+</div>
+<p>Your config must match the allocation:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">n_nodes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+<span class="nt">world_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">8</span>
+<span class="nt">gpu_ranks</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">0</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">1</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">]</span>
+</pre></div>
+</div>
+</section>
+<section id="inference-lumi">
+<h3>Inference (LUMI)<a class="headerlink" href="#inference-lumi" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">csc_env/translate.sh</span></code> as a template. Edit the SLURM options as needed (inference only supports one GPU at a time):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#SBATCH --partition=dev-g</span>
+<span class="c1">#SBATCH --nodes=1</span>
+<span class="c1">#SBATCH --gres=gpu:1</span>
+<span class="c1">#SBATCH --time=0-00:30:00</span>
+</pre></div>
+</div>
+<p>The script runs translation inside the container:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>singularity<span class="w"> </span><span class="nb">exec</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-B<span class="w"> </span>/scratch/&lt;your_project&gt;:/scratch/&lt;your_project&gt;:rw<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>/appl/local/laifs/containers/.../lumi-multitorch-full-....sif<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>&lt;Path<span class="w"> </span>to<span class="w"> </span>Python&gt;<span class="w"> </span>mammoth/translate.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-config<span class="w"> </span>inference.yaml
+</pre></div>
+</div>
+<p>Use the provided <code class="docutils literal notranslate"><span class="pre">csc_env/inference.yaml</span></code> as a starting point. Key fields to fill in:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">model</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/checkpoints/</span><span class="w">  </span><span class="c1"># directory path to checkpoint (no .pt extension)</span>
+<span class="nt">src</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/input.txt</span><span class="w">                             </span><span class="c1"># source sentences, one per line</span>
+<span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/path/to/output.txt</span><span class="w">                         </span><span class="c1"># translation output</span>
+<span class="nt">task_id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">task_en_fi</span><span class="w">                                  </span><span class="c1"># must match a task from training</span>
+<span class="nt">beam_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w">                                         </span><span class="c1"># beam search width</span>
+<span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
+<span class="nt">batch_type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">sents</span>
+</pre></div>
+</div>
+</section>
+</section>
+<hr class="docutils" />
+<section id="roihu-nvidia-gh200">
+<h2>Roihu (NVIDIA GH200)<a class="headerlink" href="#roihu-nvidia-gh200" title="Link to this heading">¶</a></h2>
+<section id="id1">
+<h3>Environment Setup<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<p>Roihu does not require a container. Load the PyTorch module and activate the shared virtual environment:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>module<span class="w"> </span>purge
+module<span class="w"> </span>load<span class="w"> </span>python-pytorch/2.10
+<span class="nb">source</span><span class="w"> </span>&lt;Path<span class="w"> </span>to<span class="w"> </span>Python<span class="w"> </span>venv&gt;<span class="w"> </span><span class="c1"># activate the virtual environment</span>
+</pre></div>
+</div>
+<p>Set these environment variables before any training run:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">TOKENIZERS_PARALLELISM</span><span class="o">=</span>False
+<span class="nb">export</span><span class="w"> </span><span class="nv">MAMMOTH_PLATFORM</span><span class="o">=</span>nvidia
+</pre></div>
+</div>
+<p>To set up the shared venv for the first time, create it with <code class="docutils literal notranslate"><span class="pre">--system-site-packages</span></code> so it inherits PyTorch and core ML dependencies from the loaded module, then install the extras:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>module<span class="w"> </span>load<span class="w"> </span>python-pytorch/2.10
+python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv<span class="w"> </span>--system-site-packages
+<span class="nb">source</span><span class="w"> </span>&lt;Path<span class="w"> </span>to<span class="w"> </span>Python<span class="w"> </span>venv&gt;/bin/activate<span class="w"> </span><span class="c1"># use your path to the newly created venv</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>&lt;Path<span class="w"> </span>to<span class="w"> </span>Mammoth&gt;/mammoth/csc_env/requirements.txt
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h3>Single-Node Training<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">csc_env/roihu/single-node.sh</span></code> as a template. Key SLURM options:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#SBATCH --partition=gpupilot (only available during Roihu pilot phase, subject to change)</span>
+<span class="c1">#SBATCH --nodes=1</span>
+<span class="c1">#SBATCH --ntasks=1</span>
+<span class="c1">#SBATCH --cpus-per-task=72</span>
+<span class="c1">#SBATCH --mem=120G</span>
+<span class="c1">#SBATCH --gres=gpu:gh200:1 # from 1-4</span>
+</pre></div>
+</div>
+<p>Submit with:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sbatch<span class="w"> </span>csc_env/roihu/single-node.sh
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h3>Multi-Node Training<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<p>Use <code class="docutils literal notranslate"><span class="pre">csc_env/roihu/multi-nodes.sh</span></code> as a template. Each node has 4 GH200 GPUs, so a 2-node job uses 8 GPUs total.</p>
+<p>Key SLURM options:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1">#SBATCH --partition=gpupilot</span>
+<span class="c1">#SBATCH --nodes=2</span>
+<span class="c1">#SBATCH --ntasks=8</span>
+<span class="c1">#SBATCH --cpus-per-task=288</span>
+<span class="c1">#SBATCH --mem=0 # Use up all available memory from one node </span>
+<span class="c1">#SBATCH --gres=gpu:gh200:4</span>
+</pre></div>
+</div>
+<p>The script auto-detects the master node and runs training via <code class="docutils literal notranslate"><span class="pre">srun</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">MASTER_NODE</span><span class="o">=</span><span class="k">$(</span>scontrol<span class="w"> </span>show<span class="w"> </span>hostnames<span class="w"> </span><span class="s2">"</span><span class="si">${</span><span class="nv">SLURM_JOB_NODELIST</span><span class="si">}</span><span class="s2">"</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-n<span class="w"> </span><span class="m">1</span><span class="k">)</span>
+<span class="nv">MASTER_PORT</span><span class="o">=</span><span class="m">9973</span>
+
+srun<span class="w"> </span>./multinode_train_script.sh
+</pre></div>
+</div>
+<p>Inside the wrapper, each node gets its rank from <code class="docutils literal notranslate"><span class="pre">$SLURM_PROCID</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>train.py<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>-config<span class="w"> </span>multi_node_train.yaml<span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--node_rank<span class="w"> </span><span class="si">${</span><span class="nv">SLURM_PROCID</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--master_ip<span class="w"> </span><span class="si">${</span><span class="nv">MASTER_NODE</span><span class="si">}</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span>--master_port<span class="w"> </span><span class="si">${</span><span class="nv">MASTER_PORT</span><span class="si">}</span>
+</pre></div>
+</div>
+</section>
+<section id="inference-roihu">
+<h3>Inference (Roihu)<a class="headerlink" href="#inference-roihu" title="Link to this heading">¶</a></h3>
+<p>Submit as a SLURM job (single GPU is usually enough), for example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1">#SBATCH --partition=gpupilot</span>
+<span class="c1">#SBATCH --nodes=1</span>
+<span class="c1">#SBATCH --ntasks=1</span>
+<span class="c1">#SBATCH --gres=gpu:gh200:1</span>
+<span class="c1">#SBATCH --time=0-00:30:00</span>
+
+module<span class="w"> </span>purge
+module<span class="w"> </span>load<span class="w"> </span>python-pytorch/2.10
+<span class="nb">export</span><span class="w"> </span><span class="nv">TOKENIZERS_PARALLELISM</span><span class="o">=</span>False
+<span class="nb">export</span><span class="w"> </span><span class="nv">MAMMOTH_PLATFORM</span><span class="o">=</span>nvidia
+/scratch/&lt;your_project&gt;/mammoth-shared/.venv/bin/python<span class="w"> </span>/scratch/&lt;your_project&gt;/mammoth-shared/mammoth_pytorch/mammoth/translate.py<span class="w"> </span>-config<span class="w"> </span>&lt;your_inference_config_yaml&gt;
+</pre></div>
+</div>
+<hr class="docutils" />
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="install.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="prepare_data.html" class="btn btn-neutral float-right" title="Prepare Data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,299 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HuggingFace Tokenizers Integration &mdash; MAMMOTH  documentation</title>
+      <link rel="stylesheet" href="_static/theme_overrides.css" type="text/css" />
+
+  
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="&lt;no title&gt;" href="INDEXED_DATASET_GUIDE.html" />
+    <link rel="prev" title="Prepare Data" href="prepare_data.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            MAMMOTH
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="main.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CONTRIBUTING.html">Contributors</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ref.html">References</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Frequently Asked Questions</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="FAQ.html">Frequently Asked Questions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">MAMMOTH features</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modular_model.html">Component-level Modularity</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config_config.html">Config-config Tool</a></li>
+<li class="toctree-l1"><a class="reference internal" href="attention_bridges.html">Attention Bridge</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="install.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="CSC_quickstart.html">LUMI &amp; Roihu Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="prepare_data.html">Prepare Data</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">HuggingFace Tokenizers Integration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#quick-start">Quick Start</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#train-a-tokenizer">1. Train a Tokenizer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#use-the-tokenizer-in-mammoth-training-and-inferencing">2. Use the Tokenizer in Mammoth training and inferencing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#how-it-works">How It Works</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#tokenizer-training">Tokenizer Training</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#integration-with-mammoth">Integration with MAMMOTH</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#tokenizer-formats">Tokenizer Formats</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#sentencepiece-style-default-example">Sentencepiece-style (Default Example)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#other-supported-formats">Other Supported Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-pretrained-tokenizers">Using Pretrained Tokenizers</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples/train_mammoth_101.html">Training MAMMOTH 101</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples/sharing_schemes.html">MAMMOTH Sharing Schemes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html">How We Convert the Model</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#model-conversion">Model Conversion</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#push-the-converted-model-to-model-hub">Push the Converted Model to Model Hub</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#inference">Inference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="exporting_to_huggingface.html#download-models-for-local-use">Download Models for Local Use</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Scripts</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="options/train.html">Train</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/translate.html">Translate</a></li>
+<li class="toctree-l1"><a class="reference internal" href="options/server.html">Server</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.html">Framework</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.modules.html">Modules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translation.html">Translation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.translate.translation_server.html">Server</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mammoth.inputters.html">Data Loaders</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MAMMOTH</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">HuggingFace Tokenizers Integration</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/HF_TOKENIZERS.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="huggingface-tokenizers-integration">
+<h1>HuggingFace Tokenizers Integration<a class="headerlink" href="#huggingface-tokenizers-integration" title="Link to this heading">¶</a></h1>
+<p>This document describes how to use HuggingFace tokenizers library with MAMMOTH for training from scratch.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">¶</a></h2>
+<p>MAMMOTH now supports using HuggingFace’s <code class="docutils literal notranslate"><span class="pre">tokenizers</span></code> library as an alternative to traditional vocabulary files. This enables:</p>
+<ul class="simple">
+<li><p><strong>Increasing compatibility</strong>: Now Mammoth interacts more smoothly with HuggingFace models and tokenizers.</p></li>
+<li><p><strong>Easier implementation</strong>: Users don’t have to worry about separate vocab and tokenizing models.</p></li>
+<li><p><strong>Tokenization algorithms preserved</strong>: BPE, WordPiece, Unigram are still supported.</p></li>
+<li><p><strong>Faster tokenization</strong>: HuggingFace tokenizers are implemented in Rust for speed</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<p>Install the HuggingFace tokenizers library:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>tokenizers
+</pre></div>
+</div>
+</section>
+<section id="quick-start">
+<h2>Quick Start<a class="headerlink" href="#quick-start" title="Link to this heading">¶</a></h2>
+<section id="train-a-tokenizer">
+<h3>1. Train a Tokenizer<a class="headerlink" href="#train-a-tokenizer" title="Link to this heading">¶</a></h3>
+<p>Use the provided example script to train a tokenizer:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>mammoth/bin/build_vocab.py<span class="w"> </span>--input_file<span class="w"> </span>your_corpus<span class="w"> </span>--output_dir<span class="w"> </span>your_output_dir<span class="w"> </span>--vocab_size<span class="w"> </span><span class="m">32000</span>
+</pre></div>
+</div>
+<p><strong>Key Configuration:</strong></p>
+<ul class="simple">
+<li><p><strong>Vocabulary size</strong>: 32,000 tokens (configurable via <code class="docutils literal notranslate"><span class="pre">VOCAB_SIZE</span></code>)</p></li>
+<li><p><strong>Model type</strong>: BPE (Byte Pair Encoding)</p></li>
+<li><p><strong>Special tokens</strong>: <code class="docutils literal notranslate"><span class="pre">&lt;/s&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;pad&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;s&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;unk&gt;</span></code>, <code class="docutils literal notranslate"><span class="pre">&lt;mask&gt;</span></code> (Hard coded for Mammoth by default. Please do not modify unless you know what you are doing.)</p></li>
+<li><p><strong>Pre-tokenizer</strong>: Metaspace (uses <code class="docutils literal notranslate"><span class="pre">▁</span></code> for word boundaries, inherented from sentencepiece style)</p></li>
+</ul>
+</section>
+<section id="use-the-tokenizer-in-mammoth-training-and-inferencing">
+<h3>2. Use the Tokenizer in Mammoth training and inferencing<a class="headerlink" href="#use-the-tokenizer-in-mammoth-training-and-inferencing" title="Link to this heading">¶</a></h3>
+<p>Add the <code class="docutils literal notranslate"><span class="pre">--use_hf_tokenizer</span></code> flag to your training configuration:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># In your training config YAML</span>
+<span class="nt">use_hf_tokenizer</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="nt">src_vocab</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">en</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/members/wangchao/training/hf_models/modernbert/tokenizer.json</span>
+
+<span class="nt">tgt_vocab</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">fi</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json</span>
+</pre></div>
+</div>
+<p>MAMMOTH will automatically detect the <code class="docutils literal notranslate"><span class="pre">.json</span></code> extension and load it as a HuggingFace tokenizer on the fly.</p>
+</section>
+</section>
+<section id="how-it-works">
+<h2>How It Works<a class="headerlink" href="#how-it-works" title="Link to this heading">¶</a></h2>
+<section id="tokenizer-training">
+<h3>Tokenizer Training<a class="headerlink" href="#tokenizer-training" title="Link to this heading">¶</a></h3>
+<p>The example script (<code class="docutils literal notranslate"><span class="pre">mammoth/bin/build_vocab.py</span></code>) demonstrates:</p>
+<ol class="simple">
+<li><p><strong>Initialization</strong>: Create a BPE tokenizer with special tokens</p></li>
+<li><p><strong>Pre-tokenization</strong>: Configure Metaspace pre-tokenizer for word boundaries</p></li>
+<li><p><strong>Training</strong>: Train on your corpus to learn subword vocabulary</p></li>
+<li><p><strong>Decoding</strong>: Set up proper decoder for text reconstruction</p></li>
+<li><p><strong>Padding</strong>: Enable padding for batch processing</p></li>
+</ol>
+<p><strong>Important Design Choice:</strong></p>
+<ul class="simple">
+<li><p>Non-mammoth native HF models often have their input/output templates, hence the special tokens are added during tokenization encoding.</p></li>
+<li><p>Self-trained tokenizers perform <strong>ONLY</strong> subword tokenization. Special tokens (BOS/EOS) are added by MAMMOTH during data loading.</p></li>
+<li><p>This gives flexibility to experiment with different special token strategies</p></li>
+</ul>
+</section>
+<section id="integration-with-mammoth">
+<h3>Integration with MAMMOTH<a class="headerlink" href="#integration-with-mammoth" title="Link to this heading">¶</a></h3>
+<p>The integration happens in several places:</p>
+<p><strong>1. Vocabulary Loading</strong> (<code class="docutils literal notranslate"><span class="pre">mammoth/inputters/vocab.py</span></code>):</p>
+<ul class="simple">
+<li><p>New <code class="docutils literal notranslate"><span class="pre">HFTokenizerVocab</span></code> class wraps HuggingFace tokenizers</p></li>
+<li><p>Provides the same interface as MAMMOTH’s traditional <code class="docutils literal notranslate"><span class="pre">Vocab</span></code> class</p></li>
+<li><p>Factory function <code class="docutils literal notranslate"><span class="pre">get_vocab()</span></code> automatically detects <code class="docutils literal notranslate"><span class="pre">.json</span></code> files</p></li>
+</ul>
+<p><strong>2. Dataset Processing</strong> (<code class="docutils literal notranslate"><span class="pre">mammoth/inputters/dataset.py</span></code>):</p>
+<ul class="simple">
+<li><p>Modified to handle both traditional vocabs and HF tokenizers</p></li>
+<li><p>Tokenization happens transparently during data loading</p></li>
+<li><p>Special tokens (BOS/EOS/PAD) are added by MAMMOTH</p></li>
+</ul>
+<p><strong>3. Translation</strong> (<code class="docutils literal notranslate"><span class="pre">mammoth/translate/translation.py</span></code>):</p>
+<ul class="simple">
+<li><p>Decoding adapted to use tokenizer’s built-in decoder</p></li>
+<li><p>Properly handles BPE merging and special token removal</p></li>
+<li><p>Maintains compatibility with traditional vocab files</p></li>
+</ul>
+<p><strong>4. Configuration</strong> (<code class="docutils literal notranslate"><span class="pre">mammoth/opts.py</span></code>):</p>
+<ul class="simple">
+<li><p>New <code class="docutils literal notranslate"><span class="pre">--use_hf_tokenizer</span></code> flag to enable HF tokenizer mode</p></li>
+<li><p>Backward compatible: omit flag to use traditional spm model and vocabs</p></li>
+</ul>
+</section>
+</section>
+<section id="tokenizer-formats">
+<h2>Tokenizer Formats<a class="headerlink" href="#tokenizer-formats" title="Link to this heading">¶</a></h2>
+<section id="sentencepiece-style-default-example">
+<h3>Sentencepiece-style (Default Example)<a class="headerlink" href="#sentencepiece-style-default-example" title="Link to this heading">¶</a></h3>
+<p>Uses <code class="docutils literal notranslate"><span class="pre">▁</span></code> (U+2581 LOWER ONE EIGHTH BLOCK) to mark word boundaries:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Input:  "Hello, world!"</span>
+<span class="c1"># Tokens: ['▁Hello', ',', '▁world', '!']</span>
+<span class="c1"># IDs:    [1234, 45, 5678, 90]</span>
+</pre></div>
+</div>
+<p>Note: punctuations are not pretokenized.</p>
+</section>
+<section id="other-supported-formats">
+<h3>Other Supported Formats<a class="headerlink" href="#other-supported-formats" title="Link to this heading">¶</a></h3>
+<p>You can customize the tokenizer training script to use:</p>
+<ul class="simple">
+<li><p><strong>WordPiece</strong>: Used by BERT (<code class="docutils literal notranslate"><span class="pre">##</span></code> prefix for continuations)</p></li>
+<li><p><strong>Unigram</strong>: SentencePiece unigram model</p></li>
+<li><p><strong>Character</strong>: Character-level tokenization</p></li>
+</ul>
+<p>See the <a class="reference external" href="https://huggingface.co/docs/tokenizers/index">HuggingFace tokenizers documentation</a> for more options.</p>
+</section>
+<section id="using-pretrained-tokenizers">
+<h3>Using Pretrained Tokenizers<a class="headerlink" href="#using-pretrained-tokenizers" title="Link to this heading">¶</a></h3>
+<p>Download and use tokenizers from HuggingFace hub:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">tokenizers</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tokenizer</span>
+
+<span class="c1"># Download from hub</span>
+<span class="n">tokenizer</span> <span class="o">=</span> <span class="n">Tokenizer</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">"bert-base-uncased"</span><span class="p">)</span>
+<span class="n">tokenizer</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"my_tokenizer.json"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Then use <code class="docutils literal notranslate"><span class="pre">my_tokenizer.json</span></code> in your MAMMOTH config.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="prepare_data.html" class="btn btn-neutral float-left" title="Prepare Data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="INDEXED_DATASET_GUIDE.html" class="btn btn-neutral float-right" title="&lt;no title&gt;" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, HelsinkiNLP.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

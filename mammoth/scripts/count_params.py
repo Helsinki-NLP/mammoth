@@ -160,9 +160,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--checkpoint-dir', required=True)
     ap.add_argument('-v', '--verbose', action='store_true',
-                    help='list every component shard that adds up to the total, before the task table')
+                    help='list every component shard that adds up to the total, before the task table '
+                         '(with --task: that one task\'s per-component detail instead)')
     ap.add_argument('--task', default=None, metavar='TASK_ID',
-                    help='show the per-component detail of this one task instead of the all-task table')
+                    help='report only this task (add -v for its per-component detail)')
     ap.add_argument('--json', default=None, help='also write results to this file')
     args = ap.parse_args()
 
@@ -211,12 +212,14 @@ def main():
         print(f'  (+ {total_buf:,} buffer elements, e.g. rotary inv_freq, not counted)')
     print(f'Component shards: {len(shards)}   Tasks: {len(rows)}\n')
 
-    if args.verbose:
+    if args.verbose and args.task is None:
         print_breakdown(shards, users, total)
 
-    if args.task is not None:
+    if args.task is not None and args.verbose:
         print_task_detail(args.task, tasks[args.task], per_task_shards[args.task], shards, users)
     elif rows:
+        if args.task is not None:
+            rows = [r for r in rows if r['task'] == args.task]
         w = max(len(r['task']) for r in rows)
         print(f"{'task':<{w}}  {'full':>24}  {'exclusive':>24}  {'shared':>24}")
         for r in rows:

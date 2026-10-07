@@ -9,13 +9,15 @@
 Optimizer shards (*_optim.pt) are ignored.
 
 Usage:
-    python tools/count_params.py --checkpoint-dir path/to/ckpt [--json out.json]
+    python count_params.py --checkpoint-dir path/to/ckpt [--task TASK_ID] [-v] [--json out.json]
 """
 import argparse
 import glob
 import json
 import os
+import pickle
 import re
+import types
 from collections import defaultdict
 
 import torch
@@ -35,11 +37,38 @@ def resolve_prefix(ckpt_dir):
     return f'_step_{max(steps)}'
 
 
+class _Stub:
+    """Inert stand-in for a class pickled in a checkpoint frame whose module can't be imported."""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __setstate__(self, state):
+        self.__dict__['_state'] = state
+
+
+class _StubUnpickler(pickle.Unpickler):
+    """Real classes whenever importable; stubs for the rest. Lets this script run without mammoth installed."""
+
+    def find_class(self, module, name):
+        try:
+            return super().find_class(module, name)
+        except (ImportError, AttributeError):
+            return _Stub
+
+
+# torch.load(pickle_module=...) wants a module exposing the pickle API.
+_stub_pickle = types.ModuleType('stub_pickle')
+_stub_pickle.__dict__.update({k: v for k, v in vars(pickle).items() if not k.startswith('__')})
+_stub_pickle.Unpickler = _StubUnpickler
+
+
 def _load(path):
     try:
         return torch.load(path, map_location='cpu', mmap=True, weights_only=True)
     except Exception:
-        return torch.load(path, map_location='cpu', weights_only=False)
+        # The frame pickles mammoth objects (e.g. tokenizer vocabs) that this script never reads.
+        return torch.load(path, map_location='cpu', weights_only=False, pickle_module=_stub_pickle)
 
 
 def shard_numel(path):
@@ -102,11 +131,38 @@ def print_breakdown(shards, users, total):
     print(f'\n  sum of all components: {fmt(check)}\n')
 
 
+def print_task_detail(tid, spec, names, shards, users):
+    """One task's shards grouped by kind; each marked exclusive or shared (and with whom)."""
+    full = sum(shards[n][0] for n in names if n in shards)
+    groups = defaultdict(list)
+    for n in names:
+        groups[component_kind(n)].append(n)
+
+    w = max(len(n) for n in names)
+    print(f"Task {tid!r} ({spec['src_tgt']}): every shard its forward pass uses")
+    for kind, items in sorted(groups.items(), key=lambda kv: -sum(shards[n][0] for n in kv[1] if n in shards)):
+        sub = sum(shards[n][0] for n in items if n in shards)
+        print(f'\n  {kind}: {len(items)} shard(s), {fmt(sub)}  {100 * sub / full:5.1f}%')
+        for n in sorted(items):
+            if n not in shards:
+                print(f'    {n:<{w}}  [WARN] not found on disk')
+                continue
+            others = sorted(users[n] - {tid})
+            note = f"shared with {', '.join(others)}" if others else 'exclusive'
+            print(f'    {n:<{w}}  {fmt(shards[n][0])}  {100 * shards[n][0] / full:5.1f}%  {note}')
+    excl = sum(shards[n][0] for n in names if n in shards and len(users[n]) == 1)
+    print(f'\n  full:      {fmt(full)}')
+    print(f'  exclusive: {fmt(excl)}')
+    print(f'  shared:    {fmt(full - excl)}\n')
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--checkpoint-dir', required=True)
     ap.add_argument('-v', '--verbose', action='store_true',
                     help='list every component shard that adds up to the total, before the task table')
+    ap.add_argument('--task', default=None, metavar='TASK_ID',
+                    help='show the per-component detail of this one task instead of the all-task table')
     ap.add_argument('--json', default=None, help='also write results to this file')
     args = ap.parse_args()
 
@@ -115,6 +171,8 @@ def main():
 
     frame = _load(os.path.join(args.checkpoint_dir, f'{prefix}_frame.pt'))
     tasks = getattr(frame['opts'], 'tasks', None) or {}
+    if args.task is not None and args.task not in tasks:
+        raise SystemExit(f'Unknown task {args.task!r}. Available tasks: {", ".join(tasks) or "(none found in frame opts)"}')
 
     # Every non-optimizer component shard on disk: name -> (params, buffers)
     shard_re = re.compile(rf'^{re.escape(prefix)}_(.+)\.pt$')
@@ -156,7 +214,9 @@ def main():
     if args.verbose:
         print_breakdown(shards, users, total)
 
-    if rows:
+    if args.task is not None:
+        print_task_detail(args.task, tasks[args.task], per_task_shards[args.task], shards, users)
+    elif rows:
         w = max(len(r['task']) for r in rows)
         print(f"{'task':<{w}}  {'full':>24}  {'exclusive':>24}  {'shared':>24}")
         for r in rows:
@@ -164,7 +224,7 @@ def main():
             if r['missing_shards']:
                 print(f"  [WARN] shards not found on disk: {r['missing_shards']}")
 
-    if unclaimed:
+    if unclaimed and args.task is None:
         print(f'\nShards not attributed to any task (adapters, attention bridge, or unexpected): '
               f'{fmt(sum(unclaimed.values()))}')
         for n, c in unclaimed.items():

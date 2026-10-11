@@ -12,29 +12,42 @@ Usage:
     python count_params.py --checkpoint-dir path/to/ckpt [--task TASK_ID] [-v] [--json out.json]
 """
 import argparse
+import collections
 import glob
+import io
 import json
+import math
 import os
 import pickle
 import re
+import sys
+import time
 import types
+import zipfile
 from collections import defaultdict
 
 import torch
 
 
 def resolve_prefix(ckpt_dir):
-    """Best checkpoint if present, else the latest step (counts are identical across steps)."""
-    if glob.glob(os.path.join(ckpt_dir, '*_best_frame.pt')):
-        return '_best'
-    steps = [
-        int(m.group(1))
-        for f in glob.glob(os.path.join(ckpt_dir, '*_step_*_frame.pt'))
-        if (m := re.search(r'_step_(\d+)_frame\.pt$', f))
-    ]
+    """Best checkpoint if present, else the latest step (counts are identical across steps).
+
+    Returns the full file-name prefix including any leading model name, e.g. '_best', 'model_best'
+    or 'model_step_1000', so that f'{prefix}_frame.pt' is the frame file.
+    """
+    best = sorted(os.path.basename(f)[:-len('_frame.pt')]
+                  for f in glob.glob(os.path.join(ckpt_dir, '*_best_frame.pt')))
+    if best:
+        if len(best) > 1:
+            print(f'[WARN] several best checkpoints {best}; using {best[0]!r}', file=sys.stderr)
+        return best[0]
+    steps = []
+    for f in glob.glob(os.path.join(ckpt_dir, '*_step_*_frame.pt')):
+        if m := re.search(r'^(.*_step_(\d+))_frame\.pt$', os.path.basename(f)):
+            steps.append((int(m.group(2)), m.group(1)))
     if not steps:
         raise FileNotFoundError(f'No *_frame.pt found in {ckpt_dir}')
-    return f'_step_{max(steps)}'
+    return max(steps)[1]
 
 
 class _Stub:
@@ -63,24 +76,77 @@ _stub_pickle.__dict__.update({k: v for k, v in vars(pickle).items() if not k.sta
 _stub_pickle.Unpickler = _StubUnpickler
 
 
+_VERBOSE = False  # set from -v/--verbose in main(); gates the per-file timing lines on stderr
+
+
 def _load(path):
+    name = os.path.basename(path)
+    size_mb = os.path.getsize(path) / 1e6
+    t0 = time.perf_counter()
     try:
-        return torch.load(path, map_location='cpu', mmap=True, weights_only=True)
-    except Exception:
+        out = torch.load(path, map_location='cpu', mmap=True, weights_only=True)
+        mode = 'mmap'
+    except Exception as e:
         # The frame pickles mammoth objects (e.g. tokenizer vocabs) that this script never reads.
-        return torch.load(path, map_location='cpu', weights_only=False, pickle_module=_stub_pickle)
+        out = torch.load(path, map_location='cpu', weights_only=False, pickle_module=_stub_pickle)
+        mode = f'FALLBACK full read ({type(e).__name__}: {str(e).splitlines()[0][:100]})'
+    if _VERBOSE:
+        print(f'[load] {name}: {time.perf_counter() - t0:7.2f}s  {size_mb:10.1f} MB  {mode}', file=sys.stderr)
+    return out
+
+
+class _Meta:
+    """Stand-in for a tensor while unpickling headers: remembers the element count, never the data."""
+
+    def __init__(self, numel):
+        self.numel = numel
+
+
+def _rebuild_meta(storage, storage_offset, size, *rest):
+    return _Meta(math.prod(size))
+
+
+class _HeaderUnpickler(pickle.Unpickler):
+    """Unpickles a torch zip checkpoint's data.pkl without touching any tensor storage."""
+
+    def find_class(self, module, name):
+        if module == 'torch._utils' and name == '_rebuild_tensor_v2':
+            return _rebuild_meta
+        if module == 'torch._utils' and name == '_rebuild_parameter':
+            return lambda data, *rest: data
+        if module == 'collections' and name == 'OrderedDict':
+            return collections.OrderedDict
+        return _Stub  # storage classes etc.: ignored (we only read shapes)
+
+    def persistent_load(self, pid):
+        return None  # storage reference; its bytes are never needed
+
+
+def _shard_header(path):
+    """{key: numel} for a torch zip checkpoint, reading only data.pkl (a few KB, independent of file size)."""
+    with zipfile.ZipFile(path) as z:
+        pkl = next(n for n in z.namelist() if n.endswith('/data.pkl') or n == 'data.pkl')
+        state = _HeaderUnpickler(io.BytesIO(z.read(pkl))).load()
+    return {k: v.numel for k, v in state.items() if isinstance(v, _Meta)}
 
 
 def shard_numel(path):
     """(parameter count, buffer count) of one shard; rotary inv_freq-style buffers are split out."""
+    t0 = time.perf_counter()
+    try:
+        counts = _shard_header(path)
+        if _VERBOSE:
+            print(f'[hdr]  {os.path.basename(path)}: {time.perf_counter() - t0:7.2f}s', file=sys.stderr)
+    except Exception as e:
+        print(f'[hdr]  {os.path.basename(path)}: header parse failed ({type(e).__name__}: {e}); using torch.load',
+              file=sys.stderr)
+        counts = {k: v.numel() for k, v in _load(path).items() if torch.is_tensor(v)}
     params = buffers = 0
-    for k, v in _load(path).items():
-        if not torch.is_tensor(v):
-            continue
+    for k, n in counts.items():
         if 'inv_freq' in k:
-            buffers += v.numel()
+            buffers += n
         else:
-            params += v.numel()
+            params += n
     return params, buffers
 
 
@@ -166,6 +232,8 @@ def main():
                     help='report only this task (add -v for its per-component detail)')
     ap.add_argument('--json', default=None, help='also write results to this file')
     args = ap.parse_args()
+    global _VERBOSE
+    _VERBOSE = args.verbose
 
     prefix = resolve_prefix(args.checkpoint_dir)
     print(f'Checkpoint prefix: {prefix!r} in {args.checkpoint_dir}')

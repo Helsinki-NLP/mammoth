@@ -24,7 +24,7 @@ Usage:
         --step 500 \
         --output-dir path/to/hf_output
 
-Checkpoint shard naming:
+Checkpoint shard naming (an optional model name may precede these, e.g. model_best_frame.pt):
     Best:  _best_frame.pt, _best_src_embeddings_{src}.pt, ...
     Step:  _step_{N}_frame.pt, _step_{N}_src_embeddings_{src}.pt, ...
 """
@@ -98,34 +98,47 @@ def config_from_opts(
 # ---------------------------------------------------------------------------
 
 def resolve_prefix(ckpt_dir: str, step: int | None) -> str:
-    """Return the shard filename prefix to use (_step_N or _best).
+    """Return the shard filename prefix to use, e.g. '_best', 'model_best' or 'model_step_1000'.
+
+    The prefix includes any leading model name, so f'{prefix}_frame.pt' is the frame file.
 
     Priority:
-      1. --step N  → _step_N  (explicit, always wins)
+      1. --step N  → the checkpoint whose frame is *_step_N_frame.pt (explicit, always wins)
       2. best checkpoint (*_best_frame.pt) if it exists
-      3. fallback  → _step_<largest N found>
+      3. fallback  → the checkpoint with the largest step found
     """
+    suffix = '_frame.pt'
+
+    def prefixes(pattern: str) -> list[str]:
+        return sorted(
+            os.path.basename(f)[:-len(suffix)]
+            for f in glob_module.glob(os.path.join(ckpt_dir, pattern))
+        )
+
     if step is not None:
-        return f'_step_{step}'
+        matches = prefixes(f'*_step_{step}{suffix}')
+        if not matches:
+            raise FileNotFoundError(f"No *_step_{step}{suffix} found in {ckpt_dir}")
+        if len(matches) > 1:
+            print(f"[WARN] several step-{step} checkpoints {matches}; using {matches[0]!r}")
+        return matches[0]
 
-    best_frames = glob_module.glob(os.path.join(ckpt_dir, '*_best_frame.pt'))
-    if best_frames:
-        print(f"Loading best checkpoint: {os.path.basename(best_frames[0])}")
-        return '_best'
+    best = prefixes(f'*_best{suffix}')
+    if best:
+        if len(best) > 1:
+            print(f"[WARN] several best checkpoints {best}; using {best[0]!r}")
+        print(f"Loading best checkpoint: {best[0]}{suffix}")
+        return best[0]
 
-    frames = glob_module.glob(os.path.join(ckpt_dir, '*_step_*_frame.pt'))
-    if not frames:
-        raise FileNotFoundError(f"No checkpoint files found in {ckpt_dir}")
-    steps = [
-        int(m.group(1))
-        for f in frames
-        if (m := re.search(r'_step_(\d+)_frame\.pt$', os.path.basename(f)))
-    ]
+    steps = []
+    for name in prefixes(f'*_step_*{suffix}'):
+        if m := re.search(r'_step_(\d+)$', name):
+            steps.append((int(m.group(1)), name))
     if not steps:
-        raise FileNotFoundError(f"Could not parse step numbers from frame files in {ckpt_dir}")
-    best_step = max(steps)
+        raise FileNotFoundError(f"No checkpoint files found in {ckpt_dir}")
+    best_step, prefix = max(steps)
     print(f"No best checkpoint found, loading last checkpoint: step {best_step}")
-    return f'_step_{best_step}'
+    return prefix
 
 
 # ---------------------------------------------------------------------------

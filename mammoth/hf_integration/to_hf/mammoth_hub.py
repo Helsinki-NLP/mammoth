@@ -2,7 +2,7 @@
 
 Quickstart (no mammoth package needed):
 
-    pip install transformers torch huggingface_hub einops
+    pip install transformers torch huggingface_hub
 
     python - <<'EOF'
     from huggingface_hub import hf_hub_download
@@ -121,8 +121,7 @@ class MammothHub:
 
             # Symlink code files
             for fname in ("configuration_mammoth.py", "modeling_mammoth.py",
-                          "native_transformer.py",
-                          "x_transformers.py", "attend.py", "autoregressive_wrapper.py"):
+                          "native_transformer.py"):
                 src = os.path.join(repo_path, fname)
                 if os.path.exists(src):
                     os.symlink(src, os.path.join(tmp_dir, fname))

@@ -4,7 +4,11 @@ We provide scripts to convert Mammoth pre-trained models to Hugging Face Model H
 
 ## How We Convert the Model
 
-Since Mammoth uses [x-transformers](https://github.com/lucidrains/x-transformers/tree/main/x_transformers) as its transformer backend, converting a Mammoth pre-trained model perfectly into Hugging Face format would require rewriting all transformer-related implementations in Hugging Face format. As a practical alternative, we bundle the Mammoth model together with its backend (x-transformers related files) and upload the bundle to Model Hub, so users can use the model without worrying about the dependencies.
+Mammoth's transformer is built from plain `torch.nn` modules (the native PyTorch backend in `mammoth/modules/transformer/`). The converter loads the sharded checkpoint, assembles the weights for one task (source embeddings, encoder and decoder stacks, target embeddings, output projection), and writes them as a `MammothForConditionalGeneration` Hugging Face model (`PreTrainedModel` + `GenerationMixin`).
+
+The model code is shipped inside the artifact, so users can run it with `trust_remote_code=True` and do not need Mammoth installed. `native_transformer.py` is a self-contained copy of `mammoth/modules/transformer/*.py` that depends only on `torch`; `modeling_mammoth.py` and `configuration_mammoth.py` wrap it in the Hugging Face interface.
+
+Mammoth uses **separate source and target vocabularies**, so each artifact contains two tokenizers. Always encode inputs with `src_tokenizer` and decode outputs with `tgt_tokenizer`; decoding with the wrong one produces wrong translation.
 
 ## Model Conversion
 
@@ -24,14 +28,12 @@ The output directory will have the following structure:
 
 ```
 hf_single_task_model/
-├── attend.py                     # vendored: attention mechanism from x-transformers
-├── autoregressive_wrapper.py     # vendored: wraps model for autoregressive decoding
 ├── config.json                   # model architecture hyperparameters (HF format)
 ├── configuration_mammoth.py      # custom HF Config class definition for Mammoth
-├── generation_config.json        # generation settings (beam size, max length, etc.)
+├── generation_config.json        # special token ids (bos/eos/pad/decoder start) for generate()
 ├── model.safetensors             # model weights
 ├── modeling_mammoth.py           # custom HF Model class (forward pass and generate)
-├── x_transformers.py             # vendored: core transformer implementation
+├── native_transformer.py         # vendored: self-contained copy of Mammoth's native transformer modules
 ├── src_tokenizer/                # source language tokenizer
 │   ├── special_tokens_map.json   # maps special token names to their string values
 │   ├── tokenizer_config.json     # tokenizer class and settings
@@ -64,14 +66,12 @@ Each task gets its own subdirectory:
 ```
 hf_multi_task/
 ├── task1/                        # one subdirectory per task (named by task ID)
-│   ├── attend.py
-│   ├── autoregressive_wrapper.py
 │   ├── config.json
 │   ├── configuration_mammoth.py
 │   ├── generation_config.json
 │   ├── model.safetensors
 │   ├── modeling_mammoth.py
-│   ├── x_transformers.py
+│   ├── native_transformer.py
 │   ├── src_tokenizer/
 │   │   ├── special_tokens_map.json
 │   │   ├── tokenizer_config.json
@@ -108,13 +108,11 @@ The output directory will have the following structure:
 
 ```
 hf_single_artifact/
-├── attend.py
-├── autoregressive_wrapper.py
-├── config.json                       # shared model architecture config for all tasks
+├── config.json                       # manifest: per-task architecture config for all tasks
 ├── configuration_mammoth.py
 ├── mammoth_hub.py                    # entry point: routes inference to the correct task
 ├── modeling_mammoth.py
-├── x_transformers.py
+├── native_transformer.py
 ├── bul-eng.safetensors               # weights for bul-eng (one .safetensors per task)
 ├── bul-eng_src_tokenizer/            # source tokenizer for bul-eng
 │   ├── special_tokens_map.json
@@ -151,9 +149,7 @@ No Mammoth installation is required. Set up a fresh environment with the minimum
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install transformers torch einops einx loguru packaging
-# optional: faster attention on supported GPUs
-pip install flash-attn
+pip install transformers torch huggingface_hub
 ```
 
 ### Standalone Model

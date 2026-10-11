@@ -23,9 +23,7 @@ copied into the artifact, which supports both local paths and HF Hub repo ids.
 
 Install:
 
-    pip install transformers torch einops einx loguru packaging
-    # optional, for faster attention on supported GPUs:
-    pip install flash-attn
+    pip install transformers torch huggingface_hub
 
 Minimal snippet — single-task (paste-and-go):
 

@@ -46,10 +46,55 @@ hf_single_task_model/
 
 ### Multi-Task Model
 
-If the pre-trained Mammoth model has more than one task, there are two approaches:
+If the pre-trained Mammoth model has more than one task, there are three approaches:
 
+- **Modular (recommended)** — Every Mammoth component (language embedding, encoder/decoder layer stack, wrapper) is stored once; a model is assembled at load time from the components a task needs, exactly like Mammoth inference does. Shared components are not duplicated, and users can combine components into untrained (zero-shot) directions.
 - **Per-task standalone** — Each task is converted as a separate, standalone model.
-- **Single artifact** — All tasks are bundled into one artifact; users specify `--task` to select the model for inference.
+- **Single artifact** — All tasks are bundled into one artifact; users specify `--task` to select the model for inference. Shared components are copied into every task's weight file.
+
+#### Modular
+
+```bash
+python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
+  --checkpoint-dir <path> \
+  --output-dir <path> \
+  --modular
+```
+
+The output directory will have the following structure:
+
+```
+hf_modular/
+├── config.json                        # manifest: architecture, components, tokenizers, trained tasks
+├── configuration_mammoth.py
+├── mammoth_hub.py                     # entry point: assembles a model from components
+├── modeling_mammoth.py
+├── native_transformer.py
+├── components/                        # each component stored once, whichever tasks share it
+│   ├── src_emb__eng.safetensors       # source embedding per language
+│   ├── tgt_emb__spa.safetensors       # target embedding per language
+│   ├── enc__0__eng.safetensors        # encoder layer stack <index>__<xcoder_id>
+│   ├── enc__1__all.safetensors
+│   ├── dec__0__spa.safetensors        # decoder layer stack <index>__<xcoder_id>
+│   ├── enc_wrapper__eng__all.safetensors   # post_emb_norm for an encoder path
+│   ├── dec_wrapper__spa__all.safetensors   # post_emb_norm + to_logits for a decoder path
+│   └── ...
+└── tokenizers/
+    ├── src/eng/                       # one tokenizer per side and language
+    └── tgt/spa/
+```
+
+A model is defined by its source and target language plus one `xcoder_id` per layer stack on each side (the task's `enc_sharing_group` / `dec_sharing_group`):
+
+```python
+model = MammothHub.from_pretrained("org/repo", task="eng-spa")           # a trained task
+model = MammothHub.from_pretrained("org/repo", src="deu", tgt="fra")     # paths inferred from trained tasks
+model = MammothHub.from_pretrained("org/repo", src="deu", tgt="fra",
+                                   encoder=["deu", "all"], decoder=["fra", "all"])
+MammothHub.list_tasks("org/repo"); MammothHub.list_components("org/repo")
+```
+
+Only the components the model needs are downloaded. **Limitation:** the wrapper modules (`post_emb_norm`, `to_logits`) are trained per complete encoder/decoder path, so an encoder path and a decoder path can only be used if some trained task used them. Any trained encoder path can be combined with any trained decoder path; a path no task trained (e.g. a new mix of layer stacks) is rejected with an error listing the trained paths. Adapters are not exported.
 
 #### Per-Task Standalone
 
@@ -138,7 +183,7 @@ python mammoth/hf_integration/to_hf/push_to_hub.py \
   [--token YOUR_HF_TOKEN]
 ```
 
-This script uploads the entire directory, so it works for single-task, multi-task, and single-artifact models alike.
+This script uploads the entire directory, so it works for single-task, multi-task, single-artifact, and modular models alike.
 
 ## Inference
 
@@ -149,7 +194,7 @@ No Mammoth installation is required. Set up a fresh environment with the minimum
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install transformers torch huggingface_hub
+pip install transformers torch huggingface_hub safetensors
 ```
 
 ### Standalone Model
@@ -168,6 +213,17 @@ python inference.py \
   --task <task-id> \
   --input-file <path>
 ```
+
+### Model from a Modular Artifact
+
+```bash
+python inference.py --model-dir <repo_id_on_HF> --task <task-id> --input-file <path>
+python inference.py --model-dir <repo_id_on_HF> --src deu --tgt fra --input-file <path>
+python inference.py --model-dir <repo_id_on_HF> --src deu --tgt fra \
+  --encoder deu all --decoder fra all --input-file <path>
+```
+
+`--encoder` / `--decoder` take one `xcoder_id` per layer stack. If omitted, they are taken from the trained tasks with the same source / target language.
 
 ### Additional Parameters
 
@@ -193,4 +249,7 @@ python model_downloader.py --repo-id org/my-bundle --local-dir ./my_bundle
 
 # Multi-task single artifact — download ONE task only (saves disk space / bandwidth)
 python model_downloader.py --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
+
+# Modular artifact — download only the components ONE task is assembled from
+python model_downloader.py --repo-id org/my-modular --local-dir ./eng_spa --task eng-spa
 ```

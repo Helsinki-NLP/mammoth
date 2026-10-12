@@ -18,6 +18,13 @@ Usage:
         --task eng-spa \
         --output-dir path/to/hf_output
 
+    # Modular export: every component stored once, assembled per task at load time
+    # (MammothHub.from_pretrained(dir, task=...) or src=/tgt=/encoder=/decoder=):
+    python convert_mammoth_to_hf.py \
+        --checkpoint-dir path/to/checkpoint_dir \
+        --modular \
+        --output-dir path/to/hf_output
+
     # Load a specific step instead of the best checkpoint:
     python convert_mammoth_to_hf.py \
         --checkpoint-dir path/to/checkpoint_dir \
@@ -46,6 +53,9 @@ from transformers import PreTrainedTokenizerFast
 from mammoth.constants import DefaultTokens
 from mammoth.hf_integration.to_hf.configuration_mammoth import MammothConfig
 from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalGeneration
+from mammoth.hf_integration.to_hf.mammoth_hub import (
+    MODULAR_MODEL_TYPE, component_name, component_to_hf, filter_component_state,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -197,6 +207,21 @@ def _infer_xcoder_ids_from_shards(ckpt_dir: str, prefix: str, src: str, tgt: str
     return [src], [tgt]
 
 
+def task_shards(src: str, tgt: str, encoder_id: list, decoder_id: list):
+    """Yield (component kind, Mammoth shard name, stack index) for every shard a task uses.
+
+    Shard names are DistributedComponent.get_name(); the file is f'{prefix}_{name}.pt'.
+    """
+    yield 'src_emb', f'src_embeddings_{src}', None
+    yield 'enc_wrapper', f"encoder_wrapper_{'_'.join(encoder_id)}", None
+    for stack_idx, xcoder_id in enumerate(encoder_id):
+        yield 'enc_stack', f'encoder_{stack_idx}_{xcoder_id}', stack_idx
+    yield 'tgt_emb', f'tgt_embeddings_{tgt}', None
+    yield 'dec_wrapper', f"decoder_wrapper_{'_'.join(decoder_id)}", None
+    for stack_idx, xcoder_id in enumerate(decoder_id):
+        yield 'dec_stack', f'decoder_{stack_idx}_{xcoder_id}', stack_idx
+
+
 def assemble_state_dict(
     ckpt_dir: str, prefix: str, src: str, tgt: str,
     encoder_id: list, decoder_id: list,
@@ -226,7 +251,6 @@ def assemble_state_dict(
         decoder_{i}_{xcoder_id}.pt           blocks.*        → decoder.stacks.{i}.blocks.*
                                              final_norm.*    → decoder.stacks.{i}.final_norm.*
     """
-    sd = {}
     p = prefix
 
     def load_shard(filename: str) -> dict:
@@ -236,43 +260,47 @@ def assemble_state_dict(
             return {}
         return _load(path)
 
-    # --- Encoder token embedding ---
-    shard = load_shard(f'{p}_src_embeddings_{src}.pt')
-    if 'weight' in shard:
-        sd['encoder.token_emb.weight'] = shard['weight']
-
-    # --- Encoder wrapper (post_emb_norm) ---
-    enc_key = '_'.join(encoder_id)
-    shard = load_shard(f'{p}_encoder_wrapper_{enc_key}.pt')
-    if 'post_emb_norm.weight' in shard:
-        sd['encoder.post_emb_norm.weight'] = shard['post_emb_norm.weight']
-
-    # --- Encoder stacks ---
-    for stack_idx, xcoder_id in enumerate(encoder_id):
-        shard = load_shard(f'{p}_encoder_{stack_idx}_{xcoder_id}.pt')
-        for k, v in shard.items():
-            sd[f'encoder.stacks.{stack_idx}.{k}'] = v
-
-    # --- Decoder token embedding ---
-    shard = load_shard(f'{p}_tgt_embeddings_{tgt}.pt')
-    if 'weight' in shard:
-        sd['decoder.token_emb.weight'] = shard['weight']
-
-    # --- Decoder wrapper (post_emb_norm, to_logits) ---
-    dec_key = '_'.join(decoder_id)
-    shard = load_shard(f'{p}_decoder_wrapper_{dec_key}.pt')
-    if 'post_emb_norm.weight' in shard:
-        sd['decoder.post_emb_norm.weight'] = shard['post_emb_norm.weight']
-    if 'to_logits.weight' in shard:
-        sd['decoder.to_logits.weight'] = shard['to_logits.weight']
-
-    # --- Decoder stacks ---
-    for stack_idx, xcoder_id in enumerate(decoder_id):
-        shard = load_shard(f'{p}_decoder_{stack_idx}_{xcoder_id}.pt')
-        for k, v in shard.items():
-            sd[f'decoder.stacks.{stack_idx}.{k}'] = v
-
+    sd = {}
+    for kind, shard_name, stack in task_shards(src, tgt, encoder_id, decoder_id):
+        sd.update(component_to_hf(kind, load_shard(f'{p}_{shard_name}.pt'), stack=stack))
     return sd
+
+
+def vocab_special_ids(vocab_obj) -> dict:
+    """BOS/EOS/PAD/UNK ids of a Mammoth vocab (defaults match Mammoth's DEFAULT_SPECIALS order)."""
+    specials = vocab_obj.specials
+    return dict(
+        bos=specials.get(DefaultTokens.BOS, 2),
+        eos=specials.get(DefaultTokens.EOS, 0),
+        pad=specials.get(DefaultTokens.PAD, 1),
+        unk=specials.get(DefaultTokens.UNK, 3),
+    )
+
+
+def save_tokenizer(vocab_obj, save_path: str, ids: dict, label: str, add_bos_eos: bool = False):
+    """Write a Mammoth vocab's HF tokenizer as a PreTrainedTokenizerFast directory.
+
+    ids: {bos, eos, pad, unk} token ids. With add_bos_eos the tokenizer wraps every
+    input as BOS ... EOS, which is what the Mammoth encoder was trained on.
+    """
+    _rev = {v: k for k, v in vocab_obj.specials.items()}
+    tok = PreTrainedTokenizerFast(
+        tokenizer_object=vocab_obj.tokenizer,
+        bos_token=_rev.get(ids['bos'], DefaultTokens.BOS),
+        eos_token=_rev.get(ids['eos'], DefaultTokens.EOS),
+        unk_token=_rev.get(ids['unk'], DefaultTokens.UNK),
+        pad_token=_rev.get(ids['pad'], DefaultTokens.PAD),
+    )
+    if add_bos_eos:
+        from tokenizers.processors import TemplateProcessing
+        tok._tokenizer.post_processor = TemplateProcessing(
+            single=f"{DefaultTokens.BOS}:0 $A:0 {DefaultTokens.EOS}:0",
+            special_tokens=[(DefaultTokens.BOS, ids['bos']), (DefaultTokens.EOS, ids['eos'])],
+        )
+    os.makedirs(save_path, exist_ok=True)
+    tok.save_pretrained(save_path)
+    print(f"{label} tokenizer saved → {save_path} ({len(tok)} tokens)"
+          + (" [with BOS/EOS post-processor]" if add_bos_eos else ""))
 
 
 # ---------------------------------------------------------------------------
@@ -354,30 +382,11 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     }
     model.save_pretrained(output_dir)
 
-    def _save_tokenizer(vocab_obj, subdir: str, label: str, add_bos_eos: bool = False):
-        specials = vocab_obj.specials
-        _rev = {v: k for k, v in specials.items()}
-        tok = PreTrainedTokenizerFast(
-            tokenizer_object=vocab_obj.tokenizer,
-            bos_token=_rev.get(config.bos_token_id, bos_str),
-            eos_token=_rev.get(config.eos_token_id, eos_str),
-            unk_token=_rev.get(getattr(config, 'unk_token_id', 3), '<unk>'),
-            pad_token=_rev.get(config.pad_token_id, DefaultTokens.PAD),
-        )
-        if add_bos_eos:
-            from tokenizers.processors import TemplateProcessing
-            tok._tokenizer.post_processor = TemplateProcessing(
-                single=f"{bos_str}:0 $A:0 {eos_str}:0",
-                special_tokens=[(bos_str, bos_id), (eos_str, eos_id)],
-            )
-        save_path = os.path.join(output_dir, subdir)
-        os.makedirs(save_path, exist_ok=True)
-        tok.save_pretrained(save_path)
-        print(f"{label} tokenizer saved → {subdir}/ ({len(tok)} tokens)"
-              + (" [with BOS/EOS post-processor]" if add_bos_eos else ""))
-
-    _save_tokenizer(src_vocab_obj, config.src_tokenizer_dir, 'src', add_bos_eos=True)
-    _save_tokenizer(tgt_vocab_obj, config.tgt_tokenizer_dir, 'tgt')
+    ids = dict(bos=config.bos_token_id, eos=config.eos_token_id,
+               pad=config.pad_token_id, unk=getattr(config, 'unk_token_id', 3))
+    save_tokenizer(src_vocab_obj, os.path.join(output_dir, config.src_tokenizer_dir), ids,
+                   'src', add_bos_eos=True)
+    save_tokenizer(tgt_vocab_obj, os.path.join(output_dir, config.tgt_tokenizer_dir), ids, 'tgt')
 
     here = os.path.dirname(os.path.abspath(__file__))
     for fname in ("configuration_mammoth.py", "modeling_mammoth.py", "native_transformer.py"):
@@ -471,6 +480,115 @@ def convert_multi_task_artifact(
         print(f"  {t}")
 
 
+def convert_modular(
+    ckpt_dir: str,
+    output_dir: str,
+    step: int | None = None,
+) -> None:
+    """Export every Mammoth component once, so models can be assembled per task at load time.
+
+    Output layout:
+        config.json                      manifest: architecture, components, tokenizers, tasks
+        components/<name>.safetensors    one per language embedding, (stack, xcoder_id)
+                                         stack, and encoder/decoder wrapper path
+        tokenizers/{src,tgt}/<lang>/     one tokenizer per side and language
+        *.py                             vendored model code + mammoth_hub.py (the loader)
+
+    Unlike --single-artifact, a component shared by several tasks is written once.
+    Load with MammothHub.from_pretrained(output_dir, task=...) or with src/tgt/encoder/decoder.
+    """
+    import json
+    from safetensors.torch import save_file
+
+    prefix = resolve_prefix(ckpt_dir, step)
+    frame = _load(os.path.join(ckpt_dir, f'{prefix}_frame.pt'))
+    opts, vocab = frame['opts'], frame['vocab']
+    pairs = _discover_tasks(opts)
+    if not pairs:
+        raise ValueError(f"No tasks found in checkpoint opts at {ckpt_dir}")
+
+    os.makedirs(os.path.join(output_dir, 'components'), exist_ok=True)
+
+    tasks, components, tokenizers = {}, {}, {'src': {}, 'tgt': {}}
+    for src, tgt in pairs:
+        encoder_id, decoder_id = _task_xcoder_ids(opts, src, tgt)
+        tasks[f'{src}-{tgt}'] = dict(src=src, tgt=tgt, encoder=encoder_id, decoder=decoder_id)
+
+        for kind, shard_name, stack in task_shards(src, tgt, encoder_id, decoder_id):
+            if kind in ('src_emb', 'tgt_emb'):
+                lang = src if kind == 'src_emb' else tgt
+                name = component_name(kind, lang=lang)
+                meta = dict(kind=kind, lang=lang)
+            elif kind in ('enc_stack', 'dec_stack'):
+                xcoder_id = (encoder_id if kind == 'enc_stack' else decoder_id)[stack]
+                name = component_name(kind, stack=stack, xcoder_id=xcoder_id)
+                meta = dict(kind=kind, stack=stack, xcoder_id=xcoder_id)
+            else:
+                path = encoder_id if kind == 'enc_wrapper' else decoder_id
+                name = component_name(kind, path=path)
+                meta = dict(kind=kind, path=list(path))
+            if name in components:
+                continue  # shared with an earlier task: already exported
+
+            shard_path = os.path.join(ckpt_dir, f'{prefix}_{shard_name}.pt')
+            if not os.path.exists(shard_path):
+                raise FileNotFoundError(f"Task {src}-{tgt} needs missing shard {shard_path}")
+            state = filter_component_state(kind, _load(shard_path))
+            if not state:
+                raise ValueError(f"Shard {shard_path} has no weights usable for {kind}")
+            # safetensors refuses shared/non-contiguous storage; components are small enough to copy.
+            state = {k: v.detach().contiguous().clone() for k, v in state.items()}
+
+            if kind in ('src_emb', 'tgt_emb'):
+                meta['vocab_size'] = len(vocab[(kind[:3], meta['lang'])])
+            elif kind == 'dec_wrapper' and 'to_logits.weight' in state:
+                meta['vocab_size'] = state['to_logits.weight'].shape[0]
+
+            meta['file'] = f'components/{name}.safetensors'
+            save_file(state, os.path.join(output_dir, meta['file']))
+            components[name] = meta
+            print(f"  {name:<40} ← {os.path.basename(shard_path)} ({len(state)} tensors)")
+
+        for side, lang in (('src', src), ('tgt', tgt)):
+            if lang in tokenizers[side]:
+                continue
+            vocab_obj = vocab[(side, lang)]
+            ids = vocab_special_ids(vocab_obj)
+            tok_dir = f'tokenizers/{side}/{lang}'
+            save_tokenizer(vocab_obj, os.path.join(output_dir, tok_dir), ids, f'{side} {lang}',
+                           add_bos_eos=(side == 'src'))
+            tokenizers[side][lang] = {
+                'dir': tok_dir,
+                'bos_token_id': ids['bos'], 'eos_token_id': ids['eos'],
+                'pad_token_id': ids['pad'], 'unk_token_id': ids['unk'],
+            }
+
+    # Architecture only: vocab sizes, token ids and sharing groups are filled in per model at load time.
+    arch = config_from_opts(opts, src_vocab_size=0, tgt_vocab_size=0).to_dict()
+    arch_keys = ('model_dim', 'heads', 'ff_mult', 'ff_swiglu', 'enc_layers', 'dec_layers',
+                 'attn_dropout', 'ff_dropout', 'emb_dropout', 'rotary_pos_emb', 'post_emb_norm',
+                 'use_cache')
+    manifest = {
+        'model_type': MODULAR_MODEL_TYPE,
+        'format_version': 1,
+        'architecture': {k: arch[k] for k in arch_keys},
+        'components': components,
+        'tokenizers': tokenizers,
+        'tasks': tasks,
+    }
+    with open(os.path.join(output_dir, 'config.json'), 'w') as f:
+        json.dump(manifest, f, indent=2)
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    for fname in ("configuration_mammoth.py", "modeling_mammoth.py",
+                  "native_transformer.py", "mammoth_hub.py"):
+        shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
+
+    print(f"\nExported {len(components)} components for {len(tasks)} tasks into {output_dir}")
+    for name, t in tasks.items():
+        print(f"  {name}: encoder={t['encoder']} decoder={t['decoder']}")
+
+
 def convert_checkpoint(
     ckpt_dir: str,
     output_dir: str,
@@ -527,10 +645,21 @@ def main():
                              "Default: best checkpoint, or last step if no best exists.")
     parser.add_argument('--single-artifact', action='store_true',
                         help="Bundle all tasks into a single HF directory with per-task shards.")
+    parser.add_argument('--modular', action='store_true',
+                        help="Export each Mammoth component (embeddings, layer stacks, wrappers) "
+                             "once; models are assembled per task at load time by MammothHub.")
 
     args = parser.parse_args()
+    if args.modular and args.single_artifact:
+        parser.error("--modular and --single-artifact are mutually exclusive")
 
-    if args.single_artifact:
+    if args.modular:
+        convert_modular(
+            ckpt_dir=args.checkpoint_dir,
+            output_dir=args.output_dir,
+            step=args.step,
+        )
+    elif args.single_artifact:
         convert_multi_task_artifact(
             ckpt_dir=args.checkpoint_dir,
             output_dir=args.output_dir,

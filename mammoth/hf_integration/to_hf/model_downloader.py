@@ -9,7 +9,8 @@ Three use-cases:
     # 2. Multi-task bundle — download everything
     python model_downloader.py --repo-id org/my-bundle --local-dir ./my_bundle
 
-    # 3. Multi-task bundle — download ONE task only (saves disk space / bandwidth)
+    # 3. Multi-task bundle or modular repo — download ONE task only (saves disk space /
+    #    bandwidth; for a modular repo, only the components that task is assembled from)
     python model_downloader.py --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
 
 After downloading, run inference from local:
@@ -25,21 +26,49 @@ import json
 from huggingface_hub import hf_hub_download, snapshot_download
 
 
-def _is_bundle(repo_id: str) -> bool:
-    """Fetch config.json from the Hub and check if it's a multi-task bundle."""
+def _model_type(repo_id: str) -> str | None:
+    """Fetch config.json from the Hub and return its model_type."""
     try:
         cfg_path = hf_hub_download(repo_id, "config.json")
         with open(cfg_path) as f:
-            cfg = json.load(f)
-        return cfg.get("model_type") == "mammoth_hub"
+            return json.load(f).get("model_type")
     except Exception:
-        return False
+        return None
+
+
+def _modular_file_patterns(repo_id: str):
+    """modular_file_patterns from mammoth_hub.py (sibling file, dev install, or the repo itself)."""
+    try:
+        from mammoth_hub import modular_file_patterns
+        return modular_file_patterns
+    except ImportError:
+        pass
+    try:
+        from mammoth.hf_integration.to_hf.mammoth_hub import modular_file_patterns
+        return modular_file_patterns
+    except ImportError:
+        pass
+    import importlib.util
+    path = hf_hub_download(repo_id, "mammoth_hub.py")
+    spec = importlib.util.spec_from_file_location("mammoth_hub", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.modular_file_patterns
 
 
 def download(repo_id: str, local_dir: str, task: str | None) -> None:
-    bundle = _is_bundle(repo_id)
+    model_type = _model_type(repo_id)
+    bundle = model_type in ("mammoth_hub", "mammoth_modular")
 
-    if bundle and task:
+    if model_type == "mammoth_modular" and task:
+        # Download only the components this task is assembled from
+        with open(hf_hub_download(repo_id, "config.json")) as f:
+            manifest = json.load(f)
+        allow_patterns = _modular_file_patterns(repo_id)(manifest, task=task)
+        print(f"Modular repo — downloading the components of task '{task}' "
+              f"from '{repo_id}' → '{local_dir}'")
+        snapshot_download(repo_id=repo_id, local_dir=local_dir, allow_patterns=allow_patterns)
+    elif bundle and task:
         # Download only what's needed for this one task
         allow_patterns = [
             "config.json",
@@ -74,8 +103,8 @@ def main():
     parser.add_argument("--local-dir", required=True, help="Local directory to save the model")
     parser.add_argument(
         "--task", default=None,
-        help="For bundles: download only this task's files (e.g. eng-spa). "
-             "Omit to download the full bundle.",
+        help="For bundles and modular repos: download only this task's files "
+             "(e.g. eng-spa). Omit to download the full repo.",
     )
     args = parser.parse_args()
     download(repo_id=args.repo_id, local_dir=args.local_dir, task=args.task)

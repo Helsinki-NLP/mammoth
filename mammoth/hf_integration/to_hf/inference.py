@@ -78,6 +78,12 @@ Run as a script:
     # Multi-task bundle:
     python example_inference.py --model-dir ./bundled_model --task eng-spa
     python example_inference.py --model-dir ./bundled_model --task eng-fra --device cuda
+
+    # Modular repo (--modular): trained task, or any combination of trained paths
+    python example_inference.py --model-dir ./modular_model --task eng-spa
+    python example_inference.py --model-dir ./modular_model --src deu --tgt fra
+    python example_inference.py --model-dir ./modular_model --src deu --tgt fra \
+        --encoder deu all --decoder fra all
 """
 
 import argparse
@@ -89,6 +95,9 @@ from transformers import AutoConfig, AutoModelForSeq2SeqLM, PreTrainedTokenizerF
 
 
 DEFAULT_MODEL_DIR = "./converted_model"
+# config.json model_type of multi-task repos loaded through MammothHub:
+# per-task bundle (--single-artifact) and component repo (--modular).
+BUNDLE_MODEL_TYPES = ("mammoth_hub", "mammoth_modular")
 DEFAULT_SENTENCES = [
     "Helsinki is the capital of Finland.",
     "Beijing is the capital of China",
@@ -101,7 +110,7 @@ def _is_bundle(model_dir: str) -> bool:
     if os.path.isfile(config_path):
         with open(config_path) as f:
             cfg = json.load(f)
-        return cfg.get("model_type") == "mammoth_hub"
+        return cfg.get("model_type") in BUNDLE_MODEL_TYPES
     # HF Hub repo id: fetch config.json remotely
     if not os.path.exists(model_dir):
         try:
@@ -109,7 +118,7 @@ def _is_bundle(model_dir: str) -> bool:
             _cfg_path = hf_hub_download(model_dir, "config.json")
             with open(_cfg_path) as f:
                 cfg = json.load(f)
-            return cfg.get("model_type") == "mammoth_hub"
+            return cfg.get("model_type") in BUNDLE_MODEL_TYPES
         except Exception:
             return False
     return False
@@ -156,10 +165,11 @@ def _load_mammoth_hub(model_id: str):
     return _mod.MammothHub
 
 
-def load_bundle(model_dir: str, task: str, device: str):
-    """Load a specific task from a multi-task bundled model."""
+def load_bundle(model_dir: str, task: str | None, device: str, **components):
+    """Load a model from a multi-task repo: a trained task, or (modular repos)
+    a src/tgt/encoder/decoder combination."""
     MammothHub = _load_mammoth_hub(model_dir)
-    model = MammothHub.from_pretrained(model_dir, task=task, device=device)
+    model = MammothHub.from_pretrained(model_dir, task=task, device=device, **components)
     return model.src_tokenizer, model.tgt_tokenizer, model
 
 
@@ -185,6 +195,14 @@ def main():
     parser.add_argument("--task", default=None,
                         help="Task name for multi-task bundles (e.g. eng-spa). "
                              "Ignored for single-task models.")
+    parser.add_argument("--src", default=None,
+                        help="Modular repos: source language (alternative to --task)")
+    parser.add_argument("--tgt", default=None,
+                        help="Modular repos: target language (alternative to --task)")
+    parser.add_argument("--encoder", nargs="+", default=None,
+                        help="Modular repos: encoder xcoder_id per layer stack, e.g. eng all")
+    parser.add_argument("--decoder", nargs="+", default=None,
+                        help="Modular repos: decoder xcoder_id per layer stack, e.g. spa all")
     parser.add_argument("--device", default="cpu", help="cpu / cuda / mps")
     parser.add_argument("--num-beams", type=int, default=4)
     parser.add_argument("--max-new-tokens", type=int, default=128)
@@ -206,13 +224,14 @@ def main():
 
     # Route: auto-detect bundle vs standalone; --task required for bundles only
     if _is_bundle(args.model_dir):
-        if not args.task:
+        if not args.task and not (args.src and args.tgt):
             parser.error(
-                "This is a multi-task bundle. Please specify --task "
-                "(e.g. --task eng-spa)."
+                "This is a multi-task repo. Please specify --task "
+                "(e.g. --task eng-spa), or --src and --tgt for a modular repo."
             )
         src_tokenizer, tgt_tokenizer, model = load_bundle(
-            args.model_dir, args.task, args.device)
+            args.model_dir, args.task, args.device, src=args.src, tgt=args.tgt,
+            encoder=args.encoder, decoder=args.decoder)
     else:
         src_tokenizer, tgt_tokenizer, model = load_single(
             args.model_dir, args.device)

@@ -11,35 +11,10 @@ Two repo formats are supported (detected from config.json "model_type"):
 * ``mammoth_hub`` (convert_mammoth_to_hf.py --single-artifact, legacy): one
   fused weight file per task.
 
-Quickstart (no mammoth package needed):
-
-    pip install transformers torch huggingface_hub safetensors
-
-    from huggingface_hub import hf_hub_download
-    import importlib.util
-
-    # Step 1: fetch just this one file from the Hub
-    _path = hf_hub_download("org/my-mammoth-repo", "mammoth_hub.py")
-    _spec = importlib.util.spec_from_file_location("mammoth_hub", _path)
-    _mod  = importlib.util.module_from_spec(_spec)
-    _spec.loader.exec_module(_mod)
-    MammothHub = _mod.MammothHub
-
-    # Step 2: load a trained task (downloads only the components it uses)
-    model = MammothHub.from_pretrained("org/my-mammoth-repo", task="eng-spa")
-
-    # ...or plug components together yourself (modular repos only). Omitted
-    # encoder/decoder paths are taken from trained tasks with the same src/tgt.
-    model = MammothHub.from_pretrained("org/my-mammoth-repo", src="deu", tgt="fra",
-                                       encoder=["deu", "all"], decoder=["fra", "all"])
-
-    inputs = model.src_tokenizer(["Hello!"], return_tensors="pt")
-    inputs.pop("token_type_ids", None)
-    out = model.generate(**inputs, num_beams=4, max_new_tokens=128)
-    print(model.tgt_tokenizer.batch_decode(out, skip_special_tokens=True))
-
-    MammothHub.list_tasks("org/my-mammoth-repo")
-    MammothHub.list_components("org/my-mammoth-repo")
+Internal loader: users should go through inference.py (shipped in every
+artifact), whose load_model() routes multi-task repos here. Entry points:
+MammothHub.from_pretrained(model_id, task=... | src=, tgt=, encoder=, decoder=),
+MammothHub.list_tasks(model_id), MammothHub.list_components(model_id).
 
 A local directory path works anywhere a Hub repo id does.
 """

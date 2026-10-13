@@ -13,11 +13,11 @@ Three use-cases:
     #    bandwidth; for a modular repo, only the components that task is assembled from)
     python model_downloader.py --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
 
-After downloading, run inference from local:
+After downloading, run inference from local (inference.py is shipped in the artifact):
 
-    python inference.py --model-dir ./my_model
-    python inference.py --model-dir ./my_bundle --task eng-spa
-    python inference.py --model-dir ./eng_spa   --task eng-spa
+    python ./my_model/inference.py  --model-dir ./my_model
+    python ./my_bundle/inference.py --model-dir ./my_bundle --task eng-spa
+    python ./eng_spa/inference.py   --model-dir ./eng_spa   --task eng-spa
 """
 
 import argparse
@@ -90,9 +90,9 @@ def download(repo_id: str, local_dir: str, task: str | None) -> None:
     print(f"\nDone. Run inference with:")
     if bundle:
         task_hint = task or "<task>"
-        print(f"  python inference.py --model-dir {local_dir} --task {task_hint}")
+        print(f"  python {local_dir}/inference.py --model-dir {local_dir} --task {task_hint}")
     else:
-        print(f"  python inference.py --model-dir {local_dir}")
+        print(f"  python {local_dir}/inference.py --model-dir {local_dir}")
 
 
 def main():

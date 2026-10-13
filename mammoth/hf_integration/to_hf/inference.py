@@ -1,60 +1,42 @@
 """
-Inference template for a Mammoth model converted to HuggingFace format.
+Inference script for a Mammoth model converted to HuggingFace format.
 
-Supports two modes:
+This file is shipped inside every converted artifact, so it can be fetched
+without the mammoth repo:
 
-1. **Single-task model** (converted with --src/--tgt or a single-task checkpoint):
-
-       python example_inference.py --model-dir ./my_model
-
-2. **Multi-task bundle** (converted with --single-artifact):
-   Use --task to pick which translation direction to run:
-
-       python example_inference.py --model-dir ./bundled_model --task eng-spa
-
-Mammoth uses separate source and target vocabularies, so two tokenizers are
-stored under the model directory (src_tokenizer/ and tgt_tokenizer/).  The
-subdirectory names are recorded in config.json under `src_tokenizer_dir` /
-`tgt_tokenizer_dir`.
-
-No `mammoth` package required for single-task models. Multi-task bundles need
-the `mammoth` package (for `MammothHub`) — or use the vendored `mammoth_hub.py`
-copied into the artifact, which supports both local paths and HF Hub repo ids.
+    huggingface-cli download <repo_id> inference.py --local-dir .
 
 Install:
 
-    pip install transformers torch huggingface_hub
+    pip install transformers torch huggingface_hub safetensors
 
-Minimal snippet — single-task (paste-and-go):
+Usage (--model-dir takes a HF Hub repo id or a local directory):
 
-    import os
-    from transformers import AutoConfig, AutoModelForSeq2SeqLM, PreTrainedTokenizerFast
+    # Single-task model:
+    python inference.py --model-dir ./my_model
+    python inference.py --model-dir ./my_model --device cuda --num-beams 4
 
-    model_id = "your-org/your-mammoth-model"          # or a local path
-    config = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
-    src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
-        os.path.join(model_id, config.src_tokenizer_dir))
-    tgt_tokenizer = PreTrainedTokenizerFast.from_pretrained(
-        os.path.join(model_id, config.tgt_tokenizer_dir))
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_id, trust_remote_code=True)
+    # Multi-task bundle (--single-artifact):
+    python inference.py --model-dir ./bundled_model --task eng-spa
 
-    inputs = src_tokenizer(["Hola, ¿cómo estás?"], return_tensors="pt", padding=True)
-    inputs.pop("token_type_ids", None)                # not consumed by Mammoth encoder
-    output_ids = model.generate(**inputs, num_beams=4, max_new_tokens=128)
-    print(tgt_tokenizer.batch_decode(output_ids, skip_special_tokens=True))
+    # Modular repo (--modular): trained task, or any combination of trained paths
+    python inference.py --model-dir ./modular_model --task eng-spa
+    python inference.py --model-dir ./modular_model --src deu --tgt fra
+    python inference.py --model-dir ./modular_model --src deu --tgt fra \
+        --encoder deu all --decoder fra all
 
-Minimal snippet — multi-task bundle:
+Use from Python (inference.py must be in the current directory or on sys.path):
 
-    from mammoth_hub import MammothHub  # vendored in the repo — no mammoth package needed
+    from inference import load_model, translate
 
-    model = MammothHub.from_pretrained("your-org/your-bundled-model", task="eng-spa")
-    # model is a standard MammothForConditionalGeneration — use tokenizers from bundle
-    src_tokenizer = model.src_tokenizer   # (if available)
-    tgt_tokenizer = model.tgt_tokenizer   # (if available)
+    src_tok, tgt_tok, model = load_model("org/my-model")                    # standalone
+    src_tok, tgt_tok, model = load_model("org/my-bundle", task="eng-spa")   # multi-task
+    src_tok, tgt_tok, model = load_model("org/my-modular", src="deu", tgt="fra",
+                                         encoder=["deu", "all"], decoder=["fra", "all"])
+    print(translate(src_tok, tgt_tok, model, ["Hello!"], num_beams=4, max_new_tokens=128))
 
-    inputs = src_tokenizer(["Hello!"], return_tensors="pt", padding=True)
-    output_ids = model.generate(**inputs, num_beams=4, max_new_tokens=128)
-    print(tgt_tokenizer.batch_decode(output_ids, skip_special_tokens=True))
+load_model returns a standard MammothForConditionalGeneration, so model.generate()
+works as usual if you need more control.
 
 Why two tokenizers? Mammoth trains with a separate vocabulary per language.
 Source token IDs index into the source vocab; decoder output IDs index into
@@ -63,27 +45,6 @@ the target vocab. Using the source tokenizer to decode output produces garbage.
 Why `trust_remote_code=True`? Mammoth ships its config and model classes as
 sibling .py files in the model directory rather than upstream in
 `transformers`. The flag tells HF to import them.
-
-Why no `use_cache=...`? The converted config sets `use_cache=False` by default,
-because this wrapper does not yet implement KV caching. Generation is correct
-but O(T^2) in decode length. If you load an older checkpoint whose config does
-not pin this, pass `use_cache=False` explicitly into `generate(...)`.
-
-Run as a script:
-
-    # Single-task:
-    python example_inference.py --model-dir ./my_model
-    python example_inference.py --model-dir ./my_model --device cuda --num-beams 4
-
-    # Multi-task bundle:
-    python example_inference.py --model-dir ./bundled_model --task eng-spa
-    python example_inference.py --model-dir ./bundled_model --task eng-fra --device cuda
-
-    # Modular repo (--modular): trained task, or any combination of trained paths
-    python example_inference.py --model-dir ./modular_model --task eng-spa
-    python example_inference.py --model-dir ./modular_model --src deu --tgt fra
-    python example_inference.py --model-dir ./modular_model --src deu --tgt fra \
-        --encoder deu all --decoder fra all
 """
 
 import argparse
@@ -173,9 +134,27 @@ def load_bundle(model_dir: str, task: str | None, device: str, **components):
     return model.src_tokenizer, model.tgt_tokenizer, model
 
 
+def load_model(model_dir: str, task: str | None = None, src: str | None = None,
+               tgt: str | None = None, encoder: list[str] | None = None,
+               decoder: list[str] | None = None, device: str = "cpu"):
+    """Load any Mammoth HF repo (standalone, single-artifact or modular).
+
+    Returns (src_tokenizer, tgt_tokenizer, model). Multi-task repos need `task`,
+    or `src` and `tgt` (plus optional `encoder`/`decoder`) for modular repos.
+    """
+    if not _is_bundle(model_dir):
+        return load_single(model_dir, device)
+    if not task and not (src and tgt):
+        raise ValueError(
+            "This is a multi-task repo: specify a task (e.g. eng-spa), "
+            "or a source and target language for a modular repo.")
+    return load_bundle(model_dir, task, device, src=src, tgt=tgt,
+                       encoder=encoder, decoder=decoder)
+
+
 @torch.inference_mode()
 def translate(src_tokenizer, tgt_tokenizer, model, sentences: list[str],
-              num_beams: int, max_new_tokens: int) -> list[str]:
+              num_beams: int = 4, max_new_tokens: int = 128) -> list[str]:
     inputs = src_tokenizer(sentences, return_tensors="pt", padding=True).to(model.device)
     inputs.pop("token_type_ids", None)
 
@@ -222,19 +201,12 @@ def main():
     else:
         sentences = args.sentences or DEFAULT_SENTENCES
 
-    # Route: auto-detect bundle vs standalone; --task required for bundles only
-    if _is_bundle(args.model_dir):
-        if not args.task and not (args.src and args.tgt):
-            parser.error(
-                "This is a multi-task repo. Please specify --task "
-                "(e.g. --task eng-spa), or --src and --tgt for a modular repo."
-            )
-        src_tokenizer, tgt_tokenizer, model = load_bundle(
-            args.model_dir, args.task, args.device, src=args.src, tgt=args.tgt,
-            encoder=args.encoder, decoder=args.decoder)
-    else:
-        src_tokenizer, tgt_tokenizer, model = load_single(
-            args.model_dir, args.device)
+    try:
+        src_tokenizer, tgt_tokenizer, model = load_model(
+            args.model_dir, task=args.task, src=args.src, tgt=args.tgt,
+            encoder=args.encoder, decoder=args.decoder, device=args.device)
+    except ValueError as e:
+        parser.error(str(e))
 
     out = open(args.output_file, "w") if args.output_file else None
     try:

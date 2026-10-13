@@ -48,7 +48,7 @@ hf_single_task_model/
 
 If the pre-trained Mammoth model has more than one task, there are three approaches:
 
-- **Modular (recommended)** — Every Mammoth component (language embedding, encoder/decoder layer stack, wrapper) is stored once; a model is assembled at load time from the components a task needs, exactly like Mammoth inference does. Shared components are not duplicated, and users can combine components into untrained (zero-shot) directions.
+- **Modular** — Every Mammoth component (language embedding, encoder/decoder layer stack, wrapper) is stored once; a model is assembled at load time from the components a task needs, exactly like Mammoth inference does. Shared components are not duplicated, and users can combine components into untrained (zero-shot) directions.
 - **Per-task standalone** — Each task is converted as a separate, standalone model.
 - **Single artifact** — All tasks are bundled into one artifact; users specify `--task` to select the model for inference. Shared components are copied into every task's weight file.
 
@@ -187,8 +187,6 @@ This script uploads the entire directory, so it works for single-task, multi-tas
 
 ## Inference
 
-Use `mammoth/hf_integration/to_hf/inference.py` to run inference with a converted Mammoth model from Hugging Face Model Hub.
-
 No Mammoth installation is required. Set up a fresh environment with the minimum dependencies:
 
 ```bash
@@ -197,21 +195,22 @@ source .venv/bin/activate
 pip install transformers torch huggingface_hub safetensors
 ```
 
+Every artifact ships `inference.py`. Download it from the repo (if you have the Mammoth repo, it is at `mammoth/hf_integration/to_hf/inference.py`). `--model-dir` takes a Hub repo id or a local directory:
+
+```bash
+huggingface-cli download <repo_id_on_HF> inference.py --local-dir .
+```
+
 ### Standalone Model
 
 ```bash
-python inference.py \
-  --model-dir <repo_id_on_HF> \
-  --input-file <path>
+python inference.py --model-dir <repo_id_on_HF> --input-file <path>
 ```
 
 ### Single Task from a Multi-Task Artifact
 
 ```bash
-python inference.py \
-  --model-dir <repo_id_on_HF> \
-  --task <task-id> \
-  --input-file <path>
+python inference.py --model-dir <repo_id_on_HF> --task <task-id> --input-file <path>
 ```
 
 ### Model from a Modular Artifact
@@ -236,11 +235,26 @@ python inference.py --model-dir <repo_id_on_HF> --src deu --tgt fra \
 --output-file
 ```
 
+### Using the Model from Python
+
+The same downloaded `inference.py` works as a module (it must be in the current directory or on `sys.path`), for every artifact type:
+
+```python
+from inference import load_model, translate
+
+src_tok, tgt_tok, model = load_model("<repo_id_on_HF>", task="<task-id>")  # omit task for a standalone model
+print(translate(src_tok, tgt_tok, model, ["Helsinki is the capital of Finland."]))
+```
+
+`load_model` takes the same selections as the command line (`task`, or `src` / `tgt` / `encoder` / `decoder`) and returns a standard `MammothForConditionalGeneration`, so `model.generate()` works as usual.
+
 ## Download Models for Local Use
 
-By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `mammoth/hf_integration/to_hf/model_downloader.py`:
+By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `model_downloader.py`, which is also shipped in every artifact:
 
 ```bash
+huggingface-cli download <repo_id_on_HF> model_downloader.py --local-dir .
+
 # Single-task model — download everything
 python model_downloader.py --repo-id org/my-model --local-dir ./my_model
 
@@ -252,4 +266,10 @@ python model_downloader.py --repo-id org/my-bundle --local-dir ./eng_spa --task 
 
 # Modular artifact — download only the components ONE task is assembled from
 python model_downloader.py --repo-id org/my-modular --local-dir ./eng_spa --task eng-spa
+```
+
+The downloaded directory contains `inference.py`, so you can run it directly:
+
+```bash
+python ./eng_spa/inference.py --model-dir ./eng_spa --task eng-spa
 ```

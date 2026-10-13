@@ -303,6 +303,18 @@ def save_tokenizer(vocab_obj, save_path: str, ids: dict, label: str, add_bos_eos
           + (" [with BOS/EOS post-processor]" if add_bos_eos else ""))
 
 
+def copy_code_files(output_dir: str, with_hub: bool = False):
+    """Ship the model code plus the inference/download scripts inside the artifact,
+    so users without the mammoth repo can fetch them from the Hub."""
+    fnames = ["configuration_mammoth.py", "modeling_mammoth.py", "native_transformer.py",
+              "inference.py", "model_downloader.py"]
+    if with_hub:
+        fnames.append("mammoth_hub.py")
+    here = os.path.dirname(os.path.abspath(__file__))
+    for fname in fnames:
+        shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
+
+
 # ---------------------------------------------------------------------------
 # Main conversion
 # ---------------------------------------------------------------------------
@@ -388,9 +400,7 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
                    'src', add_bos_eos=True)
     save_tokenizer(tgt_vocab_obj, os.path.join(output_dir, config.tgt_tokenizer_dir), ids, 'tgt')
 
-    here = os.path.dirname(os.path.abspath(__file__))
-    for fname in ("configuration_mammoth.py", "modeling_mammoth.py", "native_transformer.py"):
-        shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
+    copy_code_files(output_dir)
 
     print(f"Saved to {output_dir}")
 
@@ -463,10 +473,7 @@ def convert_multi_task_artifact(
                 if os.path.isdir(tok_src) and not os.path.exists(tok_dst):
                     shutil.copytree(tok_src, tok_dst)
 
-    here = os.path.dirname(os.path.abspath(__file__))
-    for fname in ("configuration_mammoth.py", "modeling_mammoth.py",
-                  "native_transformer.py", "mammoth_hub.py"):
-        shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
+    copy_code_files(output_dir, with_hub=True)
 
     manifest = {
         "model_type": "mammoth_hub",
@@ -579,10 +586,7 @@ def convert_modular(
     with open(os.path.join(output_dir, 'config.json'), 'w') as f:
         json.dump(manifest, f, indent=2)
 
-    here = os.path.dirname(os.path.abspath(__file__))
-    for fname in ("configuration_mammoth.py", "modeling_mammoth.py",
-                  "native_transformer.py", "mammoth_hub.py"):
-        shutil.copy(os.path.join(here, fname), os.path.join(output_dir, fname))
+    copy_code_files(output_dir, with_hub=True)
 
     print(f"\nExported {len(components)} components for {len(tasks)} tasks into {output_dir}")
     for name, t in tasks.items():

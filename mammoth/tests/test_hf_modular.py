@@ -160,7 +160,7 @@ def test_components_stored_once(modular_dir):
     assert set(manifest["tokenizers"]["src"]) == {"eng", "deu"}
     assert set(manifest["tokenizers"]["tgt"]) == {"spa", "fra"}
     for f in ("mammoth_hub.py", "modeling_mammoth.py", "configuration_mammoth.py",
-              "native_transformer.py"):
+              "native_transformer.py", "inference.py", "model_downloader.py"):
         assert (modular_dir / f).exists()
 
 
@@ -223,6 +223,30 @@ def test_generate_with_tokenizers(modular_dir):
     assert inputs["input_ids"][0, 0].item() == 2 and inputs["input_ids"][0, -1].item() == 0
     out = model.generate(**inputs, max_new_tokens=5, num_beams=2)
     assert out.shape[0] == 1 and out.max().item() < VOCAB_SIZES[("tgt", "spa")]
+
+
+def test_shipped_inference_load_model(checkpoint, modular_dir, tmp_path):
+    """The inference.py copied into an artifact is the single user entry point for every repo type."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("shipped_inference", modular_dir / "inference.py")
+    inference = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(inference)
+
+    _, _, model = inference.load_model(str(modular_dir), task="eng-spa")
+    ref = MammothHub.from_pretrained(str(modular_dir), task="eng-spa")
+    assert torch.equal(_logits(model, "eng", "spa"), _logits(ref, "eng", "spa"))
+
+    _, _, model = inference.load_model(str(modular_dir), src="deu", tgt="fra")
+    assert model.mammoth_spec["decoder"] == ["fra", "all"]
+
+    with pytest.raises(ValueError, match="multi-task repo"):
+        inference.load_model(str(modular_dir))
+
+    ckpt, _, _ = checkpoint
+    convert(str(ckpt), PREFIX, "eng", "spa", str(tmp_path))
+    src_tok, tgt_tok, model = inference.load_model(str(tmp_path))
+    hyps = inference.translate(src_tok, tgt_tok, model, ["eng5 eng6 eng7"], num_beams=2, max_new_tokens=5)
+    assert len(hyps) == 1 and isinstance(hyps[0], str)
 
 
 def test_assemble_state_dict_unchanged(checkpoint):

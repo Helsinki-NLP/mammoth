@@ -28,6 +28,7 @@ The output directory will have the following structure:
 
 ```
 hf_single_task_model/
+├── README.md                     # model card: usage guide shown on the Hub repo page
 ├── config.json                   # model architecture hyperparameters (HF format)
 ├── configuration_mammoth.py      # custom HF Config class definition for Mammoth
 ├── generation_config.json        # special token ids (bos/eos/pad/decoder start) for generate()
@@ -65,6 +66,7 @@ The output directory will have the following structure:
 
 ```
 hf_modular/
+├── README.md                          # model card: trained tasks and usage
 ├── config.json                        # manifest: architecture, components, tokenizers, trained tasks
 ├── configuration_mammoth.py
 ├── mammoth_hub.py                     # entry point: assembles a model from components
@@ -111,6 +113,7 @@ Each task gets its own subdirectory:
 ```
 hf_multi_task/
 ├── task1/                        # one subdirectory per task (named by task ID)
+│   ├── README.md
 │   ├── config.json
 │   ├── configuration_mammoth.py
 │   ├── generation_config.json
@@ -153,6 +156,7 @@ The output directory will have the following structure:
 
 ```
 hf_single_artifact/
+├── README.md                         # model card: available tasks and usage
 ├── config.json                       # manifest: per-task architecture config for all tasks
 ├── configuration_mammoth.py
 ├── mammoth_hub.py                    # entry point: routes inference to the correct task
@@ -185,6 +189,8 @@ python mammoth/hf_integration/to_hf/push_to_hub.py \
 
 This script uploads the entire directory, so it works for single-task, multi-task, single-artifact, and modular models alike.
 
+Every converted directory contains a `README.md` model card, generated from its `config.json`. It is the page users see on the Hub: a self-contained guide listing the trained tasks with ready-to-run commands. The converter cannot know the repo id, so the card uses a `<repo_id>` placeholder; `push_to_hub.py` fills in `--repo-id` before uploading. Edit the README before pushing if you want to add details such as training data, evaluation scores or a license.
+
 ## Inference
 
 No Mammoth installation is required. Set up a fresh environment with the minimum dependencies:
@@ -198,7 +204,7 @@ pip install transformers torch huggingface_hub safetensors
 Every artifact ships `inference.py`. Download it from the repo (if you have the Mammoth repo, it is at `mammoth/hf_integration/to_hf/inference.py`). `--model-dir` takes a Hub repo id or a local directory:
 
 ```bash
-huggingface-cli download <repo_id_on_HF> inference.py --local-dir .
+hf download <repo_id_on_HF> inference.py --local-dir .
 ```
 
 ### Standalone Model
@@ -253,7 +259,7 @@ print(translate(src_tok, tgt_tok, model, ["Helsinki is the capital of Finland."]
 By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `model_downloader.py`, which is also shipped in every artifact:
 
 ```bash
-huggingface-cli download <repo_id_on_HF> model_downloader.py --local-dir .
+hf download <repo_id_on_HF> model_downloader.py --local-dir .
 
 # Single-task model — download everything
 python model_downloader.py --repo-id org/my-model --local-dir ./my_model

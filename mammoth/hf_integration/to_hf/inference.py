@@ -4,7 +4,7 @@ Inference script for a Mammoth model converted to HuggingFace format.
 This file is shipped inside every converted artifact, so it can be fetched
 without the mammoth repo:
 
-    huggingface-cli download <repo_id> inference.py --local-dir .
+    hf download <repo_id> inference.py --local-dir .
 
 Install:
 

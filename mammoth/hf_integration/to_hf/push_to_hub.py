@@ -10,7 +10,7 @@ Usage:
         [--token YOUR_HF_TOKEN]
 
 The model directory must have been produced by convert_mammoth_to_hf.py.
-If --token is omitted, the script uses the token stored by `huggingface-cli login`.
+If --token is omitted, the script uses the token stored by `hf auth login`.
 """
 
 import argparse
@@ -18,6 +18,22 @@ import os
 import sys
 
 from huggingface_hub import HfApi, login
+
+
+REPO_ID_PLACEHOLDER = "<repo_id>"  # written by model_card.py, which cannot know the repo id
+
+
+def fill_repo_id(model_dir: str, repo_id: str):
+    """Put the real repo id into the generated README.md, so its commands run as-is."""
+    path = os.path.join(model_dir, "README.md")
+    if not os.path.isfile(path):
+        return
+    with open(path) as f:
+        card = f.read()
+    if REPO_ID_PLACEHOLDER in card:
+        with open(path, "w") as f:
+            f.write(card.replace(REPO_ID_PLACEHOLDER, repo_id))
+        print(f"README.md: filled in repo id {repo_id}")
 
 
 def push(model_dir: str, repo_id: str, private: bool, token: str | None):
@@ -35,6 +51,7 @@ def push(model_dir: str, repo_id: str, private: bool, token: str | None):
     )
     print(f"Repo ready: https://huggingface.co/{repo_id}")
 
+    fill_repo_id(model_dir, repo_id)
     print(f"Uploading files from {model_dir} ...")
     api.upload_folder(
         folder_path=model_dir,

@@ -53,6 +53,7 @@ from transformers import PreTrainedTokenizerFast
 from mammoth.constants import DefaultTokens
 from mammoth.hf_integration.to_hf.configuration_mammoth import MammothConfig
 from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalGeneration
+from mammoth.hf_integration.to_hf.model_card import write_model_card
 from mammoth.hf_integration.to_hf.mammoth_hub import (
     MODULAR_MODEL_TYPE, component_name, component_to_hf, filter_component_state,
 )
@@ -401,6 +402,7 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     save_tokenizer(tgt_vocab_obj, os.path.join(output_dir, config.tgt_tokenizer_dir), ids, 'tgt')
 
     copy_code_files(output_dir)
+    write_model_card(output_dir, src=src, tgt=tgt)
 
     print(f"Saved to {output_dir}")
 
@@ -481,6 +483,7 @@ def convert_multi_task_artifact(
     }
     with open(os.path.join(output_dir, "config.json"), "w") as f:
         json.dump(manifest, f, indent=2)
+    write_model_card(output_dir)
 
     print(f"\nBundled {len(task_manifest)} tasks into {output_dir}")
     for t in task_manifest:
@@ -587,6 +590,7 @@ def convert_modular(
         json.dump(manifest, f, indent=2)
 
     copy_code_files(output_dir, with_hub=True)
+    write_model_card(output_dir)
 
     print(f"\nExported {len(components)} components for {len(tasks)} tasks into {output_dir}")
     for name, t in tasks.items():

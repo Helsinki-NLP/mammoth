@@ -279,3 +279,56 @@ def test_partial_download_patterns(modular_dir, tmp_path):
         "tgt_emb__fra", "dec__0__fra", "dec__1__all", "dec_wrapper__fra__all")}
     assert not any(c.startswith(("tokenizers/src/deu", "tokenizers/tgt/spa")) for c in copied)
     MammothHub.from_pretrained(str(tmp_path), task="eng-fra")
+
+
+def _card_commands(readme: str) -> list:
+    """The `python inference.py ...` lines of a model card, split into argument lists."""
+    import shlex
+    return [shlex.split(line)[2:] for line in readme.splitlines()
+            if line.startswith("python inference.py ")]
+
+
+def _load_from_card_args(inference, model_dir, args):
+    """Run load_model with the direction options a card command uses."""
+    kw, it = {}, iter(args)
+    for a in it:
+        if a in ("--task", "--src", "--tgt"):
+            kw[a[2:]] = next(it)
+    return inference.load_model(model_dir, **kw)
+
+
+@pytest.mark.parametrize("fmt", ["standalone", "single_artifact", "modular"])
+def test_model_card_commands_load(checkpoint, modular_dir, tmp_path, fmt):
+    """Each format gets a README whose example commands load with the shipped inference.py."""
+    import importlib.util
+    from mammoth.hf_integration.to_hf.convert_mammoth_to_hf import convert_multi_task_artifact
+    from mammoth.hf_integration.to_hf.push_to_hub import fill_repo_id
+
+    ckpt, _, _ = checkpoint
+    if fmt == "modular":
+        out = modular_dir
+    elif fmt == "standalone":
+        out = tmp_path
+        convert(str(ckpt), PREFIX, "eng", "spa", str(out))
+    else:
+        out = tmp_path
+        convert_multi_task_artifact(str(ckpt), str(out))
+
+    readme = (out / "README.md").read_text()
+    assert readme.startswith("---\n") and "pipeline_tag: translation" in readme
+    commands = _card_commands(readme)
+    assert commands and all(c[:2] == ["--model-dir", "<repo_id>"] for c in commands)
+
+    spec = importlib.util.spec_from_file_location("card_inference", out / "inference.py")
+    inference = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(inference)
+    for args in commands:
+        _load_from_card_args(inference, str(out), args)
+
+    if fmt == "modular":
+        assert "--src deu --tgt fra" in readme   # the untrained pair is offered as zero-shot
+        assert "| `eng` | all 2 target languages | eng all | — |" in readme
+
+    if fmt == "standalone":  # fill_repo_id edits in place; keep the shared modular fixture intact
+        fill_repo_id(str(out), "org/my-model")
+        assert "<repo_id>" not in (out / "README.md").read_text()

@@ -16,6 +16,11 @@ Usage (--model-dir takes a HF Hub repo id or a local directory):
     python inference.py --model-dir ./my_model
     python inference.py --model-dir ./my_model --device cuda --num-beams 4
 
+    # Download a Hub repo into a plain local directory (instead of the hidden HF
+    # cache), then reuse that directory on later runs:
+    python inference.py --model-dir org/my-model --local-dir ./my_model
+    python inference.py --model-dir ./my_model
+
     # Multi-task bundle (--single-artifact):
     python inference.py --model-dir ./bundled_model --task eng-spa
 
@@ -50,6 +55,7 @@ sibling .py files in the model directory rather than upstream in
 import argparse
 import json
 import os
+import sys
 
 import torch
 from transformers import AutoConfig, AutoModelForSeq2SeqLM, PreTrainedTokenizerFast
@@ -85,8 +91,11 @@ def _is_bundle(model_dir: str) -> bool:
     return False
 
 
-def load_single(model_dir: str, device: str):
+def load_single(model_dir: str, device: str, local_dir: str | None = None):
     """Load a single-task converted model."""
+    if local_dir and not os.path.isdir(model_dir):
+        from huggingface_hub import snapshot_download
+        model_dir = snapshot_download(repo_id=model_dir, local_dir=local_dir)
     config = AutoConfig.from_pretrained(model_dir, trust_remote_code=True)
     if os.path.isdir(model_dir):
         src_tokenizer = PreTrainedTokenizerFast.from_pretrained(
@@ -126,29 +135,36 @@ def _load_mammoth_hub(model_id: str):
     return _mod.MammothHub
 
 
-def load_bundle(model_dir: str, task: str | None, device: str, **components):
+def load_bundle(model_dir: str, task: str | None, device: str,
+                local_dir: str | None = None, **components):
     """Load a model from a multi-task repo: a trained task, or (modular repos)
     a src/tgt/encoder/decoder combination."""
     MammothHub = _load_mammoth_hub(model_dir)
+    if local_dir:
+        components["local_dir"] = local_dir
     model = MammothHub.from_pretrained(model_dir, task=task, device=device, **components)
     return model.src_tokenizer, model.tgt_tokenizer, model
 
 
 def load_model(model_dir: str, task: str | None = None, src: str | None = None,
                tgt: str | None = None, encoder: list[str] | None = None,
-               decoder: list[str] | None = None, device: str = "cpu"):
+               decoder: list[str] | None = None, device: str = "cpu",
+               local_dir: str | None = None):
     """Load any Mammoth HF repo (standalone, single-artifact or modular).
 
     Returns (src_tokenizer, tgt_tokenizer, model). Multi-task repos need `task`,
     or `src` and `tgt` (plus optional `encoder`/`decoder`) for modular repos.
+    `local_dir`: download Hub files into this directory instead of the HF cache
+    (multi-task repos: only the files the selected model needs). Pass it as
+    `model_dir` on later runs to load offline.
     """
     if not _is_bundle(model_dir):
-        return load_single(model_dir, device)
+        return load_single(model_dir, device, local_dir=local_dir)
     if not task and not (src and tgt):
         raise ValueError(
             "This is a multi-task repo: specify a task (e.g. eng-spa), "
             "or a source and target language for a modular repo.")
-    return load_bundle(model_dir, task, device, src=src, tgt=tgt,
+    return load_bundle(model_dir, task, device, local_dir=local_dir, src=src, tgt=tgt,
                        encoder=encoder, decoder=decoder)
 
 
@@ -182,6 +198,11 @@ def main():
                         help="Modular repos: encoder xcoder_id per layer stack, e.g. eng all")
     parser.add_argument("--decoder", nargs="+", default=None,
                         help="Modular repos: decoder xcoder_id per layer stack, e.g. spa all")
+    parser.add_argument("--local-dir", default=None,
+                        help="When --model-dir is a HF Hub repo id: download the files "
+                             "into this directory instead of the HF cache, so they are easy "
+                             "to find and can be reused with --model-dir <local-dir>. "
+                             "Multi-task repos: only the selected task's files are downloaded.")
     parser.add_argument("--device", default="cpu", help="cpu / cuda / mps")
     parser.add_argument("--num-beams", type=int, default=4)
     parser.add_argument("--max-new-tokens", type=int, default=128)
@@ -204,9 +225,13 @@ def main():
     try:
         src_tokenizer, tgt_tokenizer, model = load_model(
             args.model_dir, task=args.task, src=args.src, tgt=args.tgt,
-            encoder=args.encoder, decoder=args.decoder, device=args.device)
+            encoder=args.encoder, decoder=args.decoder, device=args.device,
+            local_dir=args.local_dir)
     except ValueError as e:
         parser.error(str(e))
+    if args.local_dir and not os.path.isdir(args.model_dir):
+        print(f"Model files saved to {args.local_dir}; "
+              f"next time run with --model-dir {args.local_dir}", file=sys.stderr)
 
     out = open(args.output_file, "w") if args.output_file else None
     try:

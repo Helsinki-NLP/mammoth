@@ -99,12 +99,16 @@ def _read_manifest(model_id: str) -> dict:
         return json.load(f)
 
 
-def _fetch(model_id: str, patterns: list) -> str:
-    """Return a local directory containing at least the files matching `patterns`."""
+def _fetch(model_id: str, patterns: list, local_dir: Optional[str] = None) -> str:
+    """Return a local directory containing at least the files matching `patterns`.
+
+    Hub files go to `local_dir` when given (a plain, browsable directory that can be
+    passed back as `model_id` later), otherwise to the HF cache.
+    """
     if os.path.isdir(model_id):
         return model_id
     from huggingface_hub import snapshot_download
-    return snapshot_download(repo_id=model_id, allow_patterns=patterns)
+    return snapshot_download(repo_id=model_id, allow_patterns=patterns, local_dir=local_dir)
 
 
 def _load_tensors(path: str) -> dict:
@@ -250,6 +254,7 @@ class MammothHub:
         tgt: Optional[str] = None,
         encoder: Optional[Sequence[str]] = None,
         decoder: Optional[Sequence[str]] = None,
+        local_dir: Optional[str] = None,
     ):
         """Load one translation model.
 
@@ -260,6 +265,8 @@ class MammothHub:
             src, tgt: Source/target language — alternative to `task` (modular repos only).
             encoder, decoder: xcoder_id per layer stack, e.g. ["eng", "all"]. Override the
                 task's paths, or define new combinations (modular repos only).
+            local_dir: Download the needed Hub files into this directory instead of the
+                HF cache. Ignored when `model_id` is already a local directory.
 
         Returns:
             A MammothForConditionalGeneration in eval mode, with .src_tokenizer and
@@ -268,12 +275,13 @@ class MammothHub:
         manifest = _read_manifest(model_id)
         model_type = manifest.get("model_type")
         if model_type == MODULAR_MODEL_TYPE:
-            model = cls._load_modular(model_id, manifest, task, src, tgt, encoder, decoder)
+            model = cls._load_modular(model_id, manifest, task, src, tgt, encoder, decoder,
+                                      local_dir)
         elif model_type == LEGACY_MODEL_TYPE:
             if task is None or any(v is not None for v in (src, tgt, encoder, decoder)):
                 raise ValueError("Per-task bundles only support task='src-tgt'; convert with "
                                  "--modular to combine components freely.")
-            model = cls._load_legacy(model_id, manifest, task)
+            model = cls._load_legacy(model_id, manifest, task, local_dir)
         else:
             raise ValueError(f"{model_id} is not a Mammoth multi-task repo "
                              f"(config.json model_type={model_type!r})")
@@ -298,7 +306,7 @@ class MammothHub:
     # -- modular ------------------------------------------------------------
 
     @staticmethod
-    def _load_modular(model_id, manifest, task, src, tgt, encoder, decoder):
+    def _load_modular(model_id, manifest, task, src, tgt, encoder, decoder, local_dir=None):
         spec = resolve_components(manifest, task=task, src=src, tgt=tgt,
                                   encoder=encoder, decoder=decoder)
         components = manifest["components"]
@@ -307,7 +315,7 @@ class MammothHub:
 
         repo_path = _fetch(model_id, modular_file_patterns(
             manifest, src=spec["src"], tgt=spec["tgt"],
-            encoder=spec["encoder"], decoder=spec["decoder"]))
+            encoder=spec["encoder"], decoder=spec["decoder"]), local_dir=local_dir)
 
         config_dict = dict(manifest["architecture"])
         config_dict.update(
@@ -345,7 +353,7 @@ class MammothHub:
     # -- legacy per-task bundle ---------------------------------------------
 
     @staticmethod
-    def _load_legacy(model_id, manifest, task):
+    def _load_legacy(model_id, manifest, task, local_dir=None):
         tasks = manifest.get("tasks", {})
         if task not in tasks:
             raise ValueError(f"Task {task!r} not found. Available tasks: {list(tasks.keys())}")
@@ -355,7 +363,7 @@ class MammothHub:
             "config.json", "*.py",
             f"{task}.safetensors", f"{task}.bin",
             f"{task}_src_tokenizer/**", f"{task}_tgt_tokenizer/**",
-        ])
+        ], local_dir=local_dir)
 
         weight_file = os.path.join(repo_path, f"{task}.safetensors")
         if not os.path.exists(weight_file):

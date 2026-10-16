@@ -160,8 +160,9 @@ def test_components_stored_once(modular_dir):
     assert set(manifest["tokenizers"]["src"]) == {"eng", "deu"}
     assert set(manifest["tokenizers"]["tgt"]) == {"spa", "fra"}
     for f in ("mammoth_hub.py", "modeling_mammoth.py", "configuration_mammoth.py",
-              "native_transformer.py", "inference.py", "model_downloader.py"):
+              "native_transformer.py", "inference.py"):
         assert (modular_dir / f).exists()
+    assert not (modular_dir / "model_downloader.py").exists()
 
 
 @pytest.mark.parametrize("task", sorted(TASKS))
@@ -280,6 +281,11 @@ def test_partial_download_patterns(modular_dir, tmp_path):
     assert not any(c.startswith(("tokenizers/src/deu", "tokenizers/tgt/spa")) for c in copied)
     MammothHub.from_pretrained(str(tmp_path), task="eng-fra")
 
+    # A direction whose components were not downloaded fails with a download hint.
+    with pytest.raises(FileNotFoundError, match="--local-dir .* --src deu --tgt spa") as err:
+        MammothHub.from_pretrained(str(tmp_path), src="deu", tgt="spa")
+    assert "components/src_emb__deu.safetensors" in str(err.value)
+
 
 def _card_commands(readme: str) -> list:
     """The `python inference.py ...` lines of a model card, split into argument lists."""
@@ -323,7 +329,9 @@ def test_model_card_commands_load(checkpoint, modular_dir, tmp_path, fmt):
     inference = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(inference)
     for args in commands:
-        _load_from_card_args(inference, str(out), args)
+        if "--download-only" not in args:  # download-only commands may not select a model
+            _load_from_card_args(inference, str(out), args)
+    assert any("--download-only" in args for args in commands)
 
     if fmt == "modular":
         assert "--src deu --tgt fra" in readme   # the untrained pair is offered as zero-shot
@@ -332,3 +340,21 @@ def test_model_card_commands_load(checkpoint, modular_dir, tmp_path, fmt):
     if fmt == "standalone":  # fill_repo_id edits in place; keep the shared modular fixture intact
         fill_repo_id(str(out), "org/my-model")
         assert "<repo_id>" not in (out / "README.md").read_text()
+
+
+def test_download_selects_files(modular_dir, monkeypatch):
+    """MammothHub.download fetches the same files the loader needs, or the whole repo."""
+    import mammoth.hf_integration.to_hf.mammoth_hub as hub
+
+    manifest = json.loads((modular_dir / "config.json").read_text())
+    monkeypatch.setattr(hub, "_read_manifest", lambda _: manifest)
+    calls = []
+    monkeypatch.setattr("huggingface_hub.snapshot_download",
+                        lambda **kw: calls.append(kw) or kw["local_dir"])
+    hub.MammothHub.download("org/repo", "out", task="eng-fra")
+    hub.MammothHub.download("org/repo", "out", src="deu", tgt="fra")
+    hub.MammothHub.download("org/repo", "out")
+    assert calls[0]["allow_patterns"] == hub.modular_file_patterns(manifest, task="eng-fra")
+    assert calls[1]["allow_patterns"] == hub.modular_file_patterns(manifest, src="deu", tgt="fra")
+    assert calls[2]["allow_patterns"] is None
+    assert all(c["local_dir"] == "out" and c["repo_id"] == "org/repo" for c in calls)

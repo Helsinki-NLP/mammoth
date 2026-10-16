@@ -12,9 +12,14 @@ Two repo formats are supported (detected from config.json "model_type"):
   fused weight file per task.
 
 Internal loader: users should go through inference.py (shipped in every
-artifact), whose load_model() routes multi-task repos here. Entry points:
+artifact), whose load_model() and --download-only route multi-task repos here.
+Entry points:
 MammothHub.from_pretrained(model_id, task=... | src=, tgt=, encoder=, decoder=),
+MammothHub.download(model_id, local_dir, task=... | src=, tgt=, ...),
 MammothHub.list_tasks(model_id), MammothHub.list_components(model_id).
+
+This module is the single place that decides which repo files a model needs
+(modular_file_patterns, legacy_file_patterns), for both loading and downloading.
 
 A local directory path works anywhere a Hub repo id does.
 """
@@ -99,8 +104,9 @@ def _read_manifest(model_id: str) -> dict:
         return json.load(f)
 
 
-def _fetch(model_id: str, patterns: list, local_dir: Optional[str] = None) -> str:
-    """Return a local directory containing at least the files matching `patterns`.
+def _fetch(model_id: str, patterns: Optional[list], local_dir: Optional[str] = None) -> str:
+    """Return a local directory containing at least the files matching `patterns`
+    (None: the whole repo).
 
     Hub files go to `local_dir` when given (a plain, browsable directory that can be
     passed back as `model_id` later), otherwise to the HF cache.
@@ -111,6 +117,23 @@ def _fetch(model_id: str, patterns: list, local_dir: Optional[str] = None) -> st
     from huggingface_hub import snapshot_download
     return os.path.abspath(
         snapshot_download(repo_id=model_id, allow_patterns=patterns, local_dir=local_dir))
+
+
+def _check_local_files(model_id: str, paths: list, cli_args: str) -> None:
+    """Fail readably when a local directory holds only part of a repo (e.g. downloaded
+    with --local-dir for another task) and lacks files the selected model needs.
+
+    `cli_args`: the inference.py arguments selecting the model, for the hint.
+    """
+    if not os.path.isdir(model_id):
+        return
+    missing = [p for p in paths if not os.path.exists(os.path.join(model_id, p))]
+    if missing:
+        raise FileNotFoundError(
+            f"The local folder {model_id} does not contain the files needed for "
+            f"{cli_args}: {missing}\nIt was probably downloaded for a different task. "
+            f"Download the missing files from the Hub into the same folder:\n"
+            f"  python inference.py --model-dir <repo_id> --local-dir {model_id} {cli_args}")
 
 
 def _load_tensors(path: str) -> dict:
@@ -242,6 +265,29 @@ def modular_file_patterns(manifest: dict, **selection) -> list:
     return patterns
 
 
+def legacy_file_patterns(task: str) -> list:
+    """Repo files (allow_patterns) needed for one task of a per-task bundle."""
+    return ["config.json", "*.py", f"{task}.safetensors", f"{task}.bin",
+            f"{task}_src_tokenizer/**", f"{task}_tgt_tokenizer/**"]
+
+
+def _file_patterns(manifest: dict, task, src, tgt, encoder, decoder) -> list:
+    """Repo files needed for one model of a multi-task repo (either format)."""
+    model_type = manifest.get("model_type")
+    if model_type == MODULAR_MODEL_TYPE:
+        return modular_file_patterns(manifest, task=task, src=src, tgt=tgt,
+                                     encoder=encoder, decoder=decoder)
+    if model_type == LEGACY_MODEL_TYPE:
+        if task is None or any(v is not None for v in (src, tgt, encoder, decoder)):
+            raise ValueError("Per-task bundles only support task='src-tgt'; convert with "
+                             "--modular to combine components freely.")
+        if task not in manifest.get("tasks", {}):
+            raise ValueError(f"Task {task!r} not found. "
+                             f"Available tasks: {sorted(manifest.get('tasks', {}))}")
+        return legacy_file_patterns(task)
+    raise ValueError(f"Not a Mammoth multi-task repo (config.json model_type={model_type!r})")
+
+
 class MammothHub:
     """Loads a translation model from a Mammoth HF repo (modular or legacy bundle)."""
 
@@ -280,9 +326,7 @@ class MammothHub:
             model = cls._load_modular(model_id, manifest, task, src, tgt, encoder, decoder,
                                       local_dir)
         elif model_type == LEGACY_MODEL_TYPE:
-            if task is None or any(v is not None for v in (src, tgt, encoder, decoder)):
-                raise ValueError("Per-task bundles only support task='src-tgt'; convert with "
-                                 "--modular to combine components freely.")
+            _file_patterns(manifest, task, src, tgt, encoder, decoder)  # validates the selection
             model = cls._load_legacy(model_id, manifest, task, local_dir)
         else:
             raise ValueError(f"{model_id} is not a Mammoth multi-task repo "
@@ -291,6 +335,22 @@ class MammothHub:
             model = model.to(device)
         model.eval()
         return model
+
+    @staticmethod
+    def download(model_id: str, local_dir: str, task: Optional[str] = None, *,
+                 src: Optional[str] = None, tgt: Optional[str] = None,
+                 encoder: Optional[Sequence[str]] = None,
+                 decoder: Optional[Sequence[str]] = None) -> str:
+        """Download a Hub repo into `local_dir` without loading a model.
+
+        With a selection (same arguments as from_pretrained), only the files that model
+        needs are downloaded; without one, the whole repo. Returns the local directory.
+        """
+        if any(v is not None for v in (task, src, tgt, encoder, decoder)):
+            patterns = _file_patterns(_read_manifest(model_id), task, src, tgt, encoder, decoder)
+        else:
+            patterns = None
+        return _fetch(model_id, patterns, local_dir=local_dir)
 
     @staticmethod
     def list_tasks(model_id: str) -> dict:
@@ -318,6 +378,14 @@ class MammothHub:
         repo_path = _fetch(model_id, modular_file_patterns(
             manifest, src=spec["src"], tgt=spec["tgt"],
             encoder=spec["encoder"], decoder=spec["decoder"]), local_dir=local_dir)
+        cli_args = (f"--task {task}" if task else f"--src {spec['src']} --tgt {spec['tgt']}")
+        if encoder or decoder:
+            cli_args += f" --encoder {' '.join(spec['encoder'])} --decoder {' '.join(spec['decoder'])}"
+        _check_local_files(
+            model_id,
+            [components[name]["file"] for name in spec["components"]]
+            + [src_tok["dir"], tgt_tok["dir"]],
+            cli_args)
 
         config_dict = dict(manifest["architecture"])
         config_dict.update(
@@ -361,17 +429,16 @@ class MammothHub:
             raise ValueError(f"Task {task!r} not found. Available tasks: {list(tasks.keys())}")
 
         # Download only the files needed for this task, not every task's weights.
-        repo_path = _fetch(model_id, [
-            "config.json", "*.py",
-            f"{task}.safetensors", f"{task}.bin",
-            f"{task}_src_tokenizer/**", f"{task}_tgt_tokenizer/**",
-        ], local_dir=local_dir)
+        repo_path = _fetch(model_id, legacy_file_patterns(task), local_dir=local_dir)
 
         weight_file = os.path.join(repo_path, f"{task}.safetensors")
         if not os.path.exists(weight_file):
             weight_file = os.path.join(repo_path, f"{task}.bin")
         if not os.path.exists(weight_file):
+            _check_local_files(model_id, [f"{task}.safetensors"], f"--task {task}")
             raise FileNotFoundError(f"No weight file for task {task!r} in {repo_path}")
+        _check_local_files(model_id, [f"{task}_src_tokenizer", f"{task}_tgt_tokenizer"],
+                           f"--task {task}")
 
         # Create a temp dir with symlinks so from_pretrained can load it
         # as a standard single-task HF model.

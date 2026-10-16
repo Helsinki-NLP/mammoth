@@ -256,23 +256,23 @@ print(translate(src_tok, tgt_tok, model, ["Helsinki is the capital of Finland."]
 
 ## Download Models for Local Use
 
-By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `model_downloader.py`, which is also shipped in every artifact:
+By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, pass `--local-dir` to `inference.py`. It downloads into that folder and translates; add `--download-only` to only download:
 
 ```bash
-hf download <repo_id_on_HF> model_downloader.py --local-dir .
+# Download and translate in one step
+python inference.py --model-dir org/my-modular --task eng-spa --local-dir ./eng_spa --input-file in.txt
 
 # Single-task model — download everything
-python model_downloader.py --repo-id org/my-model --local-dir ./my_model
+python inference.py --model-dir org/my-model --local-dir ./my_model --download-only
 
-# Multi-task single artifact — download everything
-python model_downloader.py --repo-id org/my-bundle --local-dir ./my_bundle
+# Multi-task repo — download every task
+python inference.py --model-dir org/my-bundle --local-dir ./my_bundle --download-only
 
-# Multi-task single artifact — download ONE task only (saves disk space / bandwidth)
-python model_downloader.py --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
-
-# Modular artifact — download only the components ONE task is assembled from
-python model_downloader.py --repo-id org/my-modular --local-dir ./eng_spa --task eng-spa
+# Multi-task repo — download ONE task only (modular: only the components it is assembled from)
+python inference.py --model-dir org/my-bundle --local-dir ./eng_spa --task eng-spa --download-only
 ```
+
+From Python, `download(model_dir, local_dir, task=...)` does the same as `--download-only`, and `load_model(..., local_dir=...)` downloads and loads.
 
 The downloaded directory contains `inference.py`, so you can run it directly:
 

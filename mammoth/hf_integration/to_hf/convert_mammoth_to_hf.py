@@ -305,10 +305,10 @@ def save_tokenizer(vocab_obj, save_path: str, ids: dict, label: str, add_bos_eos
 
 
 def copy_code_files(output_dir: str, with_hub: bool = False):
-    """Ship the model code plus the inference/download scripts inside the artifact,
-    so users without the mammoth repo can fetch them from the Hub."""
+    """Ship the model code plus the inference script (which also downloads) inside
+    the artifact, so users without the mammoth repo can fetch them from the Hub."""
     fnames = ["configuration_mammoth.py", "modeling_mammoth.py", "native_transformer.py",
-              "inference.py", "model_downloader.py"]
+              "inference.py"]
     if with_hub:
         fnames.append("mammoth_hub.py")
     here = os.path.dirname(os.path.abspath(__file__))

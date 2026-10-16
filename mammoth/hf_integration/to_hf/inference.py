@@ -21,6 +21,11 @@ Usage (--model-dir takes a HF Hub repo id or a local directory):
     python inference.py --model-dir org/my-model --local-dir ./my_model
     python inference.py --model-dir ./my_model
 
+    # Download only, without translating (multi-task repos: omit --task to get
+    # every task, or give a selection to get only the files it needs):
+    python inference.py --model-dir org/my-bundle --local-dir ./my_bundle --download-only
+    python inference.py --model-dir org/my-modular --local-dir ./eng_spa --task eng-spa --download-only
+
     # Multi-task bundle (--single-artifact):
     python inference.py --model-dir ./bundled_model --task eng-spa
 
@@ -39,6 +44,8 @@ Use from Python (inference.py must be in the current directory or on sys.path):
     src_tok, tgt_tok, model = load_model("org/my-modular", src="deu", tgt="fra",
                                          encoder=["deu", "all"], decoder=["fra", "all"])
     print(translate(src_tok, tgt_tok, model, ["Hello!"], num_beams=4, max_new_tokens=128))
+
+    download("org/my-modular", "./eng_spa", task="eng-spa")                 # files only
 
 load_model returns a standard MammothForConditionalGeneration, so model.generate()
 works as usual if you need more control.
@@ -176,6 +183,35 @@ def load_model(model_dir: str, task: str | None = None, src: str | None = None,
                        encoder=encoder, decoder=decoder)
 
 
+def download(model_dir: str, local_dir: str, task: str | None = None,
+             src: str | None = None, tgt: str | None = None,
+             encoder: list[str] | None = None, decoder: list[str] | None = None) -> str:
+    """Download a Hub repo into `local_dir` without loading the model.
+
+    Multi-task repos: with a selection (`task`, or `src`/`tgt`/`encoder`/`decoder`),
+    only the files that model needs; without one, the whole repo.
+    Returns the local directory; pass it as `model_dir` to load_model later.
+    """
+    if os.path.isdir(model_dir):
+        raise ValueError(f"{model_dir} is already a local directory; nothing to download.")
+    if not _is_bundle(model_dir):
+        from huggingface_hub import snapshot_download
+        return snapshot_download(repo_id=model_dir, local_dir=local_dir)
+    MammothHub = _load_mammoth_hub(model_dir)
+    return MammothHub.download(model_dir, local_dir, task=task, src=src, tgt=tgt,
+                               encoder=encoder, decoder=decoder)
+
+
+def _selection_args(args) -> str:
+    """The command-line options that select a model from a multi-task repo."""
+    parts = []
+    for name in ("task", "src", "tgt", "encoder", "decoder"):
+        value = getattr(args, name)
+        if value:
+            parts.append(f"--{name} {' '.join(value) if isinstance(value, list) else value}")
+    return " ".join(parts)
+
+
 @torch.inference_mode()
 def translate(src_tokenizer, tgt_tokenizer, model, sentences: list[str],
               num_beams: int = 4, max_new_tokens: int = 128) -> list[str]:
@@ -211,6 +247,10 @@ def main():
                              "into this directory instead of the HF cache, so they are easy "
                              "to find and can be reused with --model-dir <local-dir>. "
                              "Multi-task repos: only the selected task's files are downloaded.")
+    parser.add_argument("--download-only", action="store_true",
+                        help="With --local-dir: download and exit without translating. "
+                             "Multi-task repos download every task unless --task / --src "
+                             "--tgt select one.")
     parser.add_argument("--device", default="cpu", help="cpu / cuda / mps")
     parser.add_argument("--num-beams", type=int, default=4)
     parser.add_argument("--max-new-tokens", type=int, default=128)
@@ -223,6 +263,22 @@ def main():
     parser.add_argument("--output-file", default=None,
                         help="Path to write translations (one per line); defaults to stdout")
     args = parser.parse_args()
+
+    if args.download_only:
+        if not args.local_dir:
+            parser.error("--download-only needs --local-dir")
+        if args.model_dir == DEFAULT_MODEL_DIR:
+            parser.error("--download-only needs --model-dir <hub repo id>")
+        try:
+            download(args.model_dir, args.local_dir, task=args.task, src=args.src,
+                     tgt=args.tgt, encoder=args.encoder, decoder=args.decoder)
+        except ValueError as e:
+            parser.error(str(e))
+        selection = _selection_args(args) or ("--task <task>" if _is_bundle(args.local_dir) else "")
+        print(f"Model files saved to {args.local_dir}. Translate with:\n"
+              f"  python {os.path.join(args.local_dir, 'inference.py')} "
+              f"--model-dir {args.local_dir} {selection}".rstrip())
+        return
 
     if args.input_file:
         with open(args.input_file) as f:
@@ -237,9 +293,11 @@ def main():
             local_dir=args.local_dir)
     except ValueError as e:
         parser.error(str(e))
+    except FileNotFoundError as e:
+        sys.exit(f"error: {e}")
     if args.local_dir and not os.path.isdir(args.model_dir):
-        print(f"Model files saved to {args.local_dir}; "
-              f"next time run with --model-dir {args.local_dir}", file=sys.stderr)
+        print(f"Model files saved to {args.local_dir}; next time run with "
+              f"--model-dir {args.local_dir} {_selection_args(args)}".rstrip(), file=sys.stderr)
 
     out = open(args.output_file, "w") if args.output_file else None
     try:

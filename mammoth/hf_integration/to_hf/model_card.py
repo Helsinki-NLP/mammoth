@@ -103,11 +103,11 @@ def _offline_section(task_example: str | None) -> str:
         folder = f"./{task_example}"
         task = f" --task {task_example}"
         scope = "only the files needed for that task are downloaded"
+        download_all = (f"\n\n# Every task\n"
+                        f"python inference.py --model-dir {REPO_ID_PLACEHOLDER} "
+                        f"--local-dir ./model --download-only")
     else:
-        folder, task, scope = "./model", "", "the whole model is downloaded"
-    downloader_task = (f"\n\n# Only the files needed for one task\n"
-                       f"python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER} "
-                       f"--local-dir {folder}{task}") if task_example else ""
+        folder, task, scope, download_all = "./model", "", "the whole model is downloaded", ""
     return f"""## Offline Use
 
 By default the model files go into the Hugging Face cache, which is hard to browse. Add `--local-dir` to download them into a folder of your choice instead ({scope}):
@@ -116,22 +116,19 @@ By default the model files go into the Hugging Face cache, which is hard to brow
 python inference.py --model-dir {REPO_ID_PLACEHOLDER}{task} --local-dir {folder} --input-file in.txt
 ```
 
-The folder contains everything needed, including `inference.py`. On later runs, pass the folder as `--model-dir` (no internet connection needed):
+The folder contains everything needed, including its own copy of `inference.py`. On later runs, pass the folder as `--model-dir` (no internet connection needed):
 
 ```bash
 python {folder}/inference.py --model-dir {folder}{task} --input-file in.txt
 ```
 
-From Python: `load_model("{REPO_ID_PLACEHOLDER}", ..., local_dir="{folder}")`, then `load_model("{folder}", ...)` later.
-
-To download without translating, use the shipped `model_downloader.py`:
+To download without translating, add `--download-only`:
 
 ```bash
-hf download {REPO_ID_PLACEHOLDER} model_downloader.py --local-dir .
-
-# Everything
-python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER} --local-dir ./model{downloader_task}
+python inference.py --model-dir {REPO_ID_PLACEHOLDER}{task} --local-dir {folder} --download-only{download_all}
 ```
+
+From Python: `load_model("{REPO_ID_PLACEHOLDER}", ..., local_dir="{folder}")` downloads and loads, `download("{REPO_ID_PLACEHOLDER}", "{folder}", ...)` only downloads; later, `load_model("{folder}", ...)`.
 """
 
 

@@ -126,19 +126,18 @@ Yes. Once you convert a model to HuggingFace format, anyone can run inference us
 
 ### How do I download Mammoth (or any) models from HuggingFace Hub?
 
-Use the provided downloader:
+Use `inference.py` (shipped in every artifact) with `--local-dir`, plus `--download-only` to skip translating:
 
 ```bash
-python mammoth/hf_integration/to_hf/model_downloader.py \
-    --repo-id org/my-model \
-    --local-dir ./my_model
+python mammoth/hf_integration/to_hf/inference.py \
+    --model-dir org/my-model --local-dir ./my_model --download-only
 ```
 
-For multi-task single artifact, you can download just one task to save space (Mammoth model only):
+For multi-task repos, add a selection to download just the files one task needs:
 
 ```bash
-python mammoth/hf_integration/to_hf/model_downloader.py \
-    --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
+python mammoth/hf_integration/to_hf/inference.py \
+    --model-dir org/my-bundle --local-dir ./eng_spa --task eng-spa --download-only
 ```
 
 

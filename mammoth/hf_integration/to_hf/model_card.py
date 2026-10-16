@@ -61,7 +61,7 @@ pip install transformers torch huggingface_hub safetensors
 hf download {REPO_ID_PLACEHOLDER} inference.py --local-dir .
 ```
 
-`inference.py` downloads the model files it needs on first use (into the Hugging Face cache).
+`inference.py` downloads the model files it needs on first use: into the Hugging Face cache by default, or into a folder of your choice with `--local-dir` (see [Offline Use](#offline-use)).
 """
 
 
@@ -77,6 +77,7 @@ def _options_section() -> str:
 | `--num-beams N` | Beam size (default: 4) |
 | `--max-new-tokens N` | Maximum output length in tokens (default: 128) |
 | `--batch-size N` | Sentences per batch (default: 32) |
+| `--local-dir <path>` | Download the model files into this folder instead of the Hugging Face cache |
 """
 
 
@@ -98,29 +99,38 @@ print(translate(src_tok, tgt_tok, model, ["{sentence}"]))
 
 
 def _offline_section(task_example: str | None) -> str:
-    one_task = ""
     if task_example:
-        one_task = (f"\n# Only the files needed for one task\n"
-                    f"python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER} "
-                    f"--local-dir ./{task_example} --task {task_example}\n")
-        run = f"python ./{task_example}/inference.py --model-dir ./{task_example} --task {task_example} --input-file in.txt"
+        folder = f"./{task_example}"
+        task = f" --task {task_example}"
+        scope = "only the files needed for that task are downloaded"
     else:
-        run = "python ./model/inference.py --model-dir ./model --input-file in.txt"
+        folder, task, scope = "./model", "", "the whole model is downloaded"
+    downloader_task = (f"\n\n# Only the files needed for one task\n"
+                       f"python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER} "
+                       f"--local-dir {folder}{task}") if task_example else ""
     return f"""## Offline Use
 
-To keep a copy in a folder of your choice instead of the Hugging Face cache, use the shipped `model_downloader.py`:
+By default the model files go into the Hugging Face cache, which is hard to browse. Add `--local-dir` to download them into a folder of your choice instead ({scope}):
+
+```bash
+python inference.py --model-dir {REPO_ID_PLACEHOLDER}{task} --local-dir {folder} --input-file in.txt
+```
+
+The folder contains everything needed, including `inference.py`. On later runs, pass the folder as `--model-dir` (no internet connection needed):
+
+```bash
+python {folder}/inference.py --model-dir {folder}{task} --input-file in.txt
+```
+
+From Python: `load_model("{REPO_ID_PLACEHOLDER}", ..., local_dir="{folder}")`, then `load_model("{folder}", ...)` later.
+
+To download without translating, use the shipped `model_downloader.py`:
 
 ```bash
 hf download {REPO_ID_PLACEHOLDER} model_downloader.py --local-dir .
 
 # Everything
-python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER} --local-dir ./model
-{one_task}```
-
-The downloaded folder contains `inference.py`; pass the folder as `--model-dir`:
-
-```bash
-{run}
+python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER} --local-dir ./model{downloader_task}
 ```
 """
 

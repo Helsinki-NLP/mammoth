@@ -114,21 +114,29 @@ def load_single(model_dir: str, device: str, local_dir: str | None = None):
 
 
 def _load_mammoth_hub(model_id: str):
-    """Import MammothHub, bootstrapping from the Hub if neither local copy is available."""
-    try:
-        from mammoth_hub import MammothHub  # vendored in the artifact or on sys.path
-        return MammothHub
-    except ImportError:
-        pass
-    try:
-        from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub  # dev install
-        return MammothHub
-    except ImportError:
-        pass
-    # Clean environment: fetch mammoth_hub.py directly from the Hub repo
-    from huggingface_hub import hf_hub_download
+    """Import MammothHub, bootstrapping from the Hub if no local copy is available."""
+    # A local model directory ships its own mammoth_hub.py, matching its format.
+    # Checked first: this script may be run from outside that directory.
+    _path = os.path.join(model_id, "mammoth_hub.py")
+    if not os.path.isfile(_path):
+        _path = None
+        try:
+            from mammoth_hub import MammothHub  # next to this script or on sys.path
+            return MammothHub
+        except ImportError:
+            pass
+        try:
+            from mammoth.hf_integration.to_hf.mammoth_hub import MammothHub  # dev install
+            return MammothHub
+        except ImportError:
+            pass
+    if _path is None:
+        if os.path.isdir(model_id):
+            raise FileNotFoundError(f"mammoth_hub.py not found in {model_id}")
+        # Clean environment: fetch mammoth_hub.py directly from the Hub repo
+        from huggingface_hub import hf_hub_download
+        _path = hf_hub_download(model_id, "mammoth_hub.py")
     import importlib.util
-    _path = hf_hub_download(model_id, "mammoth_hub.py")
     _spec = importlib.util.spec_from_file_location("mammoth_hub", _path)
     _mod = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(_mod)

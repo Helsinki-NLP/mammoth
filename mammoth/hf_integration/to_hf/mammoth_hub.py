@@ -106,9 +106,11 @@ def _fetch(model_id: str, patterns: list, local_dir: Optional[str] = None) -> st
     passed back as `model_id` later), otherwise to the HF cache.
     """
     if os.path.isdir(model_id):
-        return model_id
+        # Absolute: files from here are symlinked into temp dirs (_instantiate, _load_legacy).
+        return os.path.abspath(model_id)
     from huggingface_hub import snapshot_download
-    return snapshot_download(repo_id=model_id, allow_patterns=patterns, local_dir=local_dir)
+    return os.path.abspath(
+        snapshot_download(repo_id=model_id, allow_patterns=patterns, local_dir=local_dir))
 
 
 def _load_tensors(path: str) -> dict:

@@ -243,6 +243,17 @@ def _paths(tasks: dict, side: str) -> dict:
     return out
 
 
+def _modular_run_commands(prefix: str, model_dir: str | None, examples: list,
+                          target: str | None = None) -> list:
+    """`# comment` + command line for each (comment, args) example. The command targets
+    `--model-dir model_dir`, or `target` verbatim (e.g. `--local-dir ./model`)."""
+    target = target or f"--model-dir {model_dir}"
+    lines = []
+    for i, (comment, args) in enumerate(examples):
+        lines += ([""] if i else []) + [f"# {comment}", f"{prefix} {target} {args}"]
+    return lines
+
+
 def _modular_card(manifest: dict) -> str:
     tasks = manifest["tasks"]
     arch = manifest["architecture"]
@@ -262,9 +273,48 @@ def _modular_card(manifest: dict) -> str:
     show_paths = any(p != (lang,) for paths in (enc_paths, dec_paths)
                      for lang, ps in paths.items() for p in ps)
 
-    multi_stack = len(arch["enc_layers"]) > 1 or len(arch["dec_layers"]) > 1
     layers = (f"{sum(arch['enc_layers'])} encoder + {sum(arch['dec_layers'])} decoder layers, "
               f"dimension {arch['model_dim']}")
+
+    # The ways to pick a model: a trained task, a language pair (when some pair was never
+    # trained), explicit layer stacks. Explained once in "Choosing a Direction"; the command
+    # blocks refer back to them by number and short label.
+    ex_src = pairs[example][0]
+    choices = [("trained direction", f"--task {example}", ex_src)]
+    if untrained:
+        s, t = untrained[0]
+        choices.append(("language pair", f"--src {s} --tgt {t}", s))
+    else:
+        s, t = pairs[example]
+    enc, dec = sorted(enc_paths[s])[0], sorted(dec_paths[t])[0]
+    choices.append(("explicit layer stacks",
+                    f"--src {s} --tgt {t} --encoder {' '.join(enc)} --decoder {' '.join(dec)}", s))
+    labels = [f"{i}. {label}" for i, (label, _, _) in enumerate(choices, 1)]
+    examples = [(n, f"{sel} {_example_input(lang)}") for n, (_, sel, lang) in zip(labels, choices)]
+    downloads = [(n, sel) for n, (_, sel, _) in zip(labels, choices)]
+
+    ids = ("one id per layer stack, as in the *Encoder* / *Decoder* columns of "
+           "[Languages](#languages)" if show_paths else
+           "for this model each id is simply the language code")
+    bullets = [
+        f"- **1. Trained direction** — `--task <source>-<target>`. One of the {len(tasks)} "
+        "directions listed in [Languages](#languages).",
+    ]
+    if untrained:
+        bullets.append(
+            "- **2. Language pair** — `--src <source> --tgt <target>`. Any source language with "
+            "any target language, including pairs that were never trained together "
+            f"({len(untrained)} more direction{'s' if len(untrained) > 1 else ''}, called "
+            "zero-shot). The source language brings its encoder and the target language its "
+            "decoder. Quality of untrained pairs varies; check the output before relying on it.")
+    bullets.append(
+        f"- **{len(choices)}. Explicit layer stacks** — add `--encoder ... --decoder ...` to "
+        f"`--src` / `--tgt` ({ids}). Only stack combinations that some trained direction used "
+        "can be loaded.")
+    ambiguous = sorted(set(srcs - auto_srcs) | set(tgts - auto_tgts))
+    if ambiguous:
+        bullets += ["", f"Languages with several encoder or decoder options ({_codes(ambiguous)}) "
+                    "need `--encoder` / `--decoder` when used with `--src` / `--tgt`."]
 
     lines = [
         _front_matter(srcs | tgts),
@@ -278,51 +328,71 @@ def _modular_card(manifest: dict) -> str:
         "share it. When you choose a direction, only the components it uses are downloaded and "
         "assembled into a model.",
         "",
-        _setup_section(),
-        "## Translate",
+        "## Setup",
+        "",
+        "No Mammoth installation is needed:",
         "",
         "```bash",
-        "# A trained direction",
-        f"python inference.py --model-dir {REPO_ID_PLACEHOLDER} --task {example} {_example_input(pairs[example][0])}",
+        "python -m venv .venv && source .venv/bin/activate",
+        "pip install transformers torch huggingface_hub safetensors",
+        "```",
+        "",
+        "## Choosing a Direction",
+        "",
+        f"Every command below picks a direction in one of {len(choices)} ways:",
+        "",
+        *bullets,
+        "",
+        "## Translate",
+        "",
+        "There are two ways to run the model:",
+        "",
+        "- **Quick inference** — fetch only `inference.py`; it downloads the components it "
+        "needs on first use into the Hugging Face cache.",
+        "- **Offline use** — download the model into a folder of your choice with "
+        "`model_downloader.py`, then run it from there.",
+        "",
+        "### Quick inference",
+        "",
+        "```bash",
+        f"hf download {REPO_ID_PLACEHOLDER} inference.py --local-dir .",
+        "",
+        *_modular_run_commands("python inference.py", REPO_ID_PLACEHOLDER, examples),
+        "```",
+        "",
+        "### Offline use",
+        "",
+        "Download everything, or only the components of the directions you need. Downloads "
+        "into the same folder add up, so you can collect directions one at a time:",
+        "",
+        "```bash",
+        f"hf download {REPO_ID_PLACEHOLDER} model_downloader.py --local-dir .",
+        "",
+        "# Everything",
+        f"python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER} --local-dir ./model",
+        "",
+        *_modular_run_commands(f"python model_downloader.py --repo-id {REPO_ID_PLACEHOLDER}",
+                               None, downloads, "--local-dir ./model"),
+        "```",
+        "",
+        "The folder contains `inference.py`. Run any command from "
+        "[Quick inference](#quick-inference) with `python ./model/inference.py --model-dir ./model` "
+        f"in place of `python inference.py --model-dir {REPO_ID_PLACEHOLDER}`; a direction runs "
+        "once its components are in the folder:",
+        "",
+        "```bash",
+        f"python ./model/inference.py --model-dir ./model {examples[0][1]}",
+        "```",
+        "",
+        _options_section(),
     ]
-    if untrained:
-        s, t = untrained[0]
-        lines += [
-            "",
-            "# A direction that was never trained (zero-shot): combine a source and a target language",
-            f"python inference.py --model-dir {REPO_ID_PLACEHOLDER} --src {s} --tgt {t} {_example_input(s)}",
-        ]
-    lines += ["```", "", _options_section(), "## Choosing a Direction", ""]
 
     lines += [
-        f"**Trained directions** — `--task <source>-<target>`. These {len(tasks)} directions "
-        "were trained directly and are listed in the table below.",
-        "",
+        _python_section(ex_src, f', task="{example}"',
+                        "`load_model` also takes `src=` / `tgt=` (and `encoder=` / `decoder=`), "
+                        "like the command line. "),
+        _notes_section(),
     ]
-    if untrained:
-        lines += [
-            f"**Zero-shot directions** — `--src <source> --tgt <target>`. Any source language "
-            "can be combined with any target language, including pairs that were never trained "
-            f"together ({len(untrained)} more direction{'s' if len(untrained) > 1 else ''}). "
-            "The source language brings its "
-            "encoder and the target language its decoder. Quality of untrained pairs varies; "
-            "check the output before relying on it.",
-            "",
-        ]
-    ambiguous = sorted(set(srcs - auto_srcs) | set(tgts - auto_tgts))
-    if ambiguous or multi_stack or show_paths:
-        lines += [
-            "**Choosing layer stacks yourself** — `--encoder ... --decoder ...` takes one id per "
-            "layer stack (see the *Encoder* / *Decoder* columns below). Only stack combinations "
-            "that some trained direction used can be loaded.",
-            "",
-        ]
-    if ambiguous:
-        lines += [
-            f"Languages with several encoder or decoder options ({_codes(ambiguous)}) need "
-            "`--encoder` / `--decoder` when used with `--src` / `--tgt`.",
-            "",
-        ]
 
     def fmt(paths):
         return "<br>".join(" ".join(p) for p in sorted(paths)) if paths else "—"
@@ -347,11 +417,4 @@ def _modular_card(manifest: dict) -> str:
             "stack); `—` means the language is not available on that side.",
             "",
         ]
-    lines += [
-        _python_section(pairs[example][0], f', task="{example}"',
-                        "`load_model` also takes `src=` / `tgt=` (and `encoder=` / `decoder=`), "
-                        "like the command line. "),
-        _offline_section(example),
-        _notes_section(),
-    ]
     return "\n".join(lines)

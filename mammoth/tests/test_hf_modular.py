@@ -281,6 +281,34 @@ def test_partial_download_patterns(modular_dir, tmp_path):
     MammothHub.from_pretrained(str(tmp_path), task="eng-fra")
 
 
+def test_downloader_collects_combinations(modular_dir, tmp_path, monkeypatch):
+    """model_downloader.py fetches a src/tgt(/encoder/decoder) combination; downloads into one
+    folder add up, and each collected direction loads offline from it (simulated Hub)."""
+    import fnmatch
+    import shutil
+    from mammoth.hf_integration.to_hf import model_downloader
+
+    def fake_snapshot(repo_id, local_dir, allow_patterns):
+        for path in modular_dir.rglob("*"):
+            rel = path.relative_to(modular_dir).as_posix()
+            if path.is_file() and any(fnmatch.fnmatch(rel, p) for p in allow_patterns):
+                os.makedirs(os.path.dirname(os.path.join(local_dir, rel)), exist_ok=True)
+                shutil.copy(path, os.path.join(local_dir, rel))
+
+    monkeypatch.setattr(model_downloader, "hf_hub_download", lambda repo, f: str(modular_dir / f))
+    monkeypatch.setattr(model_downloader, "snapshot_download", fake_snapshot)
+    out = str(tmp_path / "model")
+    model_downloader.download("org/x", out, src="deu", tgt="fra")
+    model_downloader.download("org/x", out, src="eng", tgt="spa",
+                              encoder=["eng", "all"], decoder=["spa", "all"])
+
+    MammothHub.from_pretrained(out, src="deu", tgt="fra")
+    MammothHub.from_pretrained(out, src="eng", tgt="spa", encoder=["eng", "all"],
+                               decoder=["spa", "all"])
+    with pytest.raises(ValueError, match="both --src and --tgt"):
+        model_downloader.download("org/x", out, src="deu")
+
+
 def _card_commands(readme: str) -> list:
     """The `python inference.py ...` lines of a model card, split into argument lists."""
     import shlex
@@ -290,10 +318,13 @@ def _card_commands(readme: str) -> list:
 
 def _load_from_card_args(inference, model_dir, args):
     """Run load_model with the direction options a card command uses."""
-    kw, it = {}, iter(args)
-    for a in it:
+    kw = {}
+    for i, a in enumerate(args):
         if a in ("--task", "--src", "--tgt"):
-            kw[a[2:]] = next(it)
+            kw[a[2:]] = args[i + 1]
+        elif a in ("--encoder", "--decoder"):
+            ids = args[i + 1:]
+            kw[a[2:]] = ids[:next((j for j, x in enumerate(ids) if x.startswith("--")), len(ids))]
     return inference.load_model(model_dir, **kw)
 
 

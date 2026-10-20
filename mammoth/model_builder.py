@@ -86,6 +86,14 @@ def build_xcoder(
     ff_drop = side_opt('ff_dropout', 0.0)
     use_rotary = getattr(model_opts, 'rotary_pos_emb', False)
     use_post_emb_norm = getattr(model_opts, 'post_emb_norm', False)
+    # 'component': one norm per xcoder path (shared by every language on it).
+    # 'language': one norm per language, saved with that language's embedding.
+    # Unset means a new model (checkpoint opts are resolved to 'component' when
+    # they predate the option, see ArgumentParser.checkpoint_model_opts).
+    post_emb_norm_scope = getattr(model_opts, 'post_emb_norm_scope', None) or 'language'
+    if post_emb_norm_scope not in ('component', 'language'):
+        raise ValueError(f'Unknown post_emb_norm_scope {post_emb_norm_scope!r}')
+    per_language_norm = use_post_emb_norm and post_emb_norm_scope == 'language'
     depths = model_opts.enc_layers if side == Side.encoder else model_opts.dec_layers
     block_cls = EncoderBlock if side == Side.encoder else DecoderBlock
 
@@ -200,6 +208,13 @@ def build_xcoder(
             nn.init.normal_(emb.weight, mean=0.0, std=dim ** -0.5)
             token_embs[lang] = emb
 
+    # Per-language post-embedding norms (post_emb_norm_scope='language'). Built
+    # per side even when embeddings are tied, so each side's norm is its own.
+    lang_post_emb_norms: Dict[str, nn.Module] = {}
+    if per_language_norm:
+        for lang in all_langs:
+            lang_post_emb_norms[lang] = nn.RMSNorm(dim, eps=norm_eps)
+
     # 3. Build per-component shared modules (keyed by xcoder_id tuple)
     tasks = task_queue_manager.get_my_tasks()
     if single_task:
@@ -219,7 +234,7 @@ def build_xcoder(
 
     for component_key, vocab_size in component_vocab_sizes.items():
         per_component_post_emb_norms[component_key] = (
-            nn.RMSNorm(dim, eps=norm_eps) if use_post_emb_norm else nn.Identity()
+            nn.RMSNorm(dim, eps=norm_eps) if use_post_emb_norm and not per_language_norm else nn.Identity()
         )
         per_component_rotary_embs[component_key] = (
             RotaryEmbedding(dim_head) if (use_rotary and not blocks_own_their_rotary) else None
@@ -239,7 +254,10 @@ def build_xcoder(
         ]
         transformer_wrappers[task.corpus_id] = NativeTransformerWrapper(
             token_emb=token_embs[lang],
-            post_emb_norm=per_component_post_emb_norms[component_key],
+            post_emb_norm=(
+                lang_post_emb_norms[lang] if per_language_norm
+                else per_component_post_emb_norms[component_key]
+            ),
             stacks=stacks,
             rotary_emb=per_component_rotary_embs[component_key],
             to_logits=per_component_to_logits.get(component_key),
@@ -267,6 +285,7 @@ def build_xcoder(
         shared_post_emb_norms=nn.ModuleDict({'__'.join(k): v for k, v in per_component_post_emb_norms.items()}),
         shared_rotary_embs=nn.ModuleDict(shared_rotary_embs_dict),
         shared_to_logits=nn.ModuleDict({'__'.join(k): v for k, v in per_component_to_logits.items()}),
+        shared_lang_post_emb_norms=nn.ModuleDict(lang_post_emb_norms),
     )
 
 
@@ -670,9 +689,10 @@ def _freeze_cross_attention_only(model):
 def _freeze_embeddings(xcoder):
     """
     Freeze all token embeddings in an encoder or decoder, along with the
-    shared post-embedding norm (StackXcoder.shared_post_emb_norms) - it is
+    post-embedding norms (StackXcoder.shared_post_emb_norms, or the
+    per-language StackXcoder.shared_lang_post_emb_norms) - they are
     applied directly to the token embedding output before any transformer
-    block runs, so it is grouped with "embeddings" rather than with the
+    block runs, so they are grouped with "embeddings" rather than with the
     attention/feedforward freeze functions.
 
     Args:
@@ -689,7 +709,7 @@ def _freeze_embeddings(xcoder):
             param.requires_grad = False
             frozen_count += param.numel()
 
-    for norm in xcoder.shared_post_emb_norms.values():
+    for norm in [*xcoder.shared_post_emb_norms.values(), *xcoder.shared_lang_post_emb_norms.values()]:
         for param in norm.parameters():
             param.requires_grad = False
             frozen_count += param.numel()

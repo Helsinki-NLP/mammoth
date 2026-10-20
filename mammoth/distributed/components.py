@@ -174,10 +174,40 @@ class DistributedEmbedding(DistributedComponent):
         return f'{side_str}_embeddings_{self.lang}'
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        if self.side == Side.encoder:
-            return model.encoder.get_embedding_by_lang(self.lang)
-        else:
-            return model.decoder.get_embedding_by_lang(self.lang)
+        parent = model.encoder if self.side == Side.encoder else model.decoder
+        embedding = parent.get_embedding_by_lang(self.lang)
+        post_emb_norm = parent.get_post_emb_norm_by_lang(self.lang)
+        if post_emb_norm is None:
+            # post_emb_norm_scope='component': the file holds just the embedding ("weight")
+            return embedding
+        # post_emb_norm_scope='language': the language's norm is saved with its embedding
+        return _EmbeddingWithNorm(embedding, post_emb_norm)
+
+    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
+        module = self.get_module(model)
+        if isinstance(module, _EmbeddingWithNorm):
+            # A component-scope checkpoint has no "post_emb_norm.*" here; the
+            # loader reports it missing and fills it from the wrapper file.
+            return module.load_state_dict(state_dict, strict=False)
+        if any(key.startswith('post_emb_norm.') for key in state_dict):
+            raise ValueError(
+                f'{self.get_name()} contains a per-language post_emb_norm: this checkpoint was '
+                'trained with post_emb_norm_scope=language. Set post_emb_norm_scope: language '
+                '(a language-scope checkpoint cannot be loaded as component scope).'
+            )
+        return module.load_state_dict(state_dict)
+
+
+class _EmbeddingWithNorm(nn.Module):
+    """Virtual view of a language's embedding plus its own post-embedding norm.
+
+    The embedding's parameter is registered directly as "weight", so the saved
+    keys are a superset of a plain embedding file: {"weight", "post_emb_norm.weight"}.
+    """
+    def __init__(self, embedding: nn.Embedding, post_emb_norm: nn.Module):
+        super().__init__()
+        self.register_parameter('weight', embedding.weight)
+        self.post_emb_norm = post_emb_norm
 
 
 @dataclass
@@ -202,6 +232,8 @@ class DistributedWrapperModules(DistributedComponent):
         """Returns a virtual ModuleDict of the per-component wrapper modules."""
         parent = model.encoder if self.side == Side.encoder else model.decoder
         modules = nn.ModuleDict()
+        # With post_emb_norm_scope='language' this is an Identity (the norms live
+        # with the language embeddings), so it is skipped here.
         post_emb_norm = parent.get_post_emb_norm_by_component(self.component_key)
         if post_emb_norm is not None and not isinstance(post_emb_norm, nn.Identity):
             modules['post_emb_norm'] = post_emb_norm
@@ -215,6 +247,22 @@ class DistributedWrapperModules(DistributedComponent):
         if to_logits is not None:
             modules['to_logits'] = to_logits
         return modules
+
+    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
+        module = self.get_module(model)
+        parent = model.encoder if self.side == Side.encoder else model.decoder
+        if 'post_emb_norm' not in module and len(parent.shared_lang_post_emb_norms) > 0:
+            # Component-scope checkpoint loaded with post_emb_norm_scope='language':
+            # this norm was copied into each language's norm by the loader.
+            state_dict = {k: v for k, v in state_dict.items() if not k.startswith('post_emb_norm.')}
+        elif 'post_emb_norm' in module and not any(k.startswith('post_emb_norm.') for k in state_dict):
+            raise ValueError(
+                f'{self.get_name()} has no post_emb_norm. If this checkpoint was trained with '
+                'post_emb_norm_scope=language, set post_emb_norm_scope: language '
+                '(a language-scope checkpoint cannot be loaded as component scope); '
+                'if it was trained without post_emb_norm, unset post_emb_norm.'
+            )
+        return module.load_state_dict(state_dict)
 
 
 @dataclass

@@ -39,12 +39,13 @@ LEGACY_MODEL_TYPE = "mammoth_hub"
 # ---------------------------------------------------------------------------
 
 # Component kinds, and which keys of a Mammoth shard each one contributes.
-#   src_emb / tgt_emb          nn.Embedding                → "weight"
+#   src_emb / tgt_emb          nn.Embedding                → "weight", and post_emb_norm.*
+#                                                            when post_emb_norm_scope=language
 #   enc_stack / dec_stack      TransformerStack            → every key
-#   enc_wrapper / dec_wrapper  per-path wrapper modules    → post_emb_norm.*, to_logits.*
+#   enc_wrapper / dec_wrapper  per-path wrapper modules    → post_emb_norm.* (component scope), to_logits.*
 _KEPT_PREFIXES = {
-    "src_emb": ("weight",),
-    "tgt_emb": ("weight",),
+    "src_emb": ("weight", "post_emb_norm."),
+    "tgt_emb": ("weight", "post_emb_norm."),
     "enc_stack": ("",),
     "dec_stack": ("",),
     "enc_wrapper": ("post_emb_norm.",),
@@ -52,8 +53,8 @@ _KEPT_PREFIXES = {
 }
 
 _HF_PREFIX = {
-    "src_emb": "encoder.token_emb.",
-    "tgt_emb": "decoder.token_emb.",
+    "src_emb": "encoder.",
+    "tgt_emb": "decoder.",
     "enc_stack": "encoder.stacks.{stack}.",
     "dec_stack": "decoder.stacks.{stack}.",
     "enc_wrapper": "encoder.",
@@ -82,7 +83,11 @@ def filter_component_state(kind: str, state_dict: dict) -> dict:
 def component_to_hf(kind: str, state_dict: dict, stack: int = None) -> dict:
     """Map a component's (Mammoth shard) state dict to MammothForConditionalGeneration keys."""
     prefix = _HF_PREFIX[kind].format(stack=stack)
-    return {prefix + k: v for k, v in filter_component_state(kind, state_dict).items()}
+    state = filter_component_state(kind, state_dict)
+    if kind in ("src_emb", "tgt_emb"):
+        # "weight" is the embedding table; "post_emb_norm.*" keeps its name.
+        state = {("token_emb.weight" if k == "weight" else k): v for k, v in state.items()}
+    return {prefix + k: v for k, v in state.items()}
 
 
 # ---------------------------------------------------------------------------

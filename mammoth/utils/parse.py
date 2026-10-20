@@ -306,6 +306,10 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
         # the defaults are used.
         the_opts = cls.defaults(opts.model_opts)
         the_opts.__dict__.update(checkpoint_opt.__dict__)
+        # Checkpoints that predate post_emb_norm_scope were all trained with
+        # one norm per component, whatever today's default for new models is.
+        if getattr(the_opts, 'post_emb_norm_scope', None) is None:
+            the_opts.post_emb_norm_scope = 'component'
         return the_opts
 
     @classmethod

@@ -243,11 +243,13 @@ def assemble_state_dict(
 
     Shard → HF key mapping:
         src_embeddings_{src}.pt              weight          → encoder.token_emb.weight
-        encoder_wrapper_{enc_key}.pt         post_emb_norm.* → encoder.post_emb_norm.*
+                                             post_emb_norm.* → encoder.post_emb_norm.*  (scope=language)
+        encoder_wrapper_{enc_key}.pt         post_emb_norm.* → encoder.post_emb_norm.*  (scope=component)
         encoder_{i}_{xcoder_id}.pt           blocks.*        → encoder.stacks.{i}.blocks.*
                                              final_norm.*    → encoder.stacks.{i}.final_norm.*
         tgt_embeddings_{tgt}.pt              weight          → decoder.token_emb.weight
-        decoder_wrapper_{dec_key}.pt         post_emb_norm.* → decoder.post_emb_norm.*
+                                             post_emb_norm.* → decoder.post_emb_norm.*  (scope=language)
+        decoder_wrapper_{dec_key}.pt         post_emb_norm.* → decoder.post_emb_norm.*  (scope=component)
                                              to_logits.*     → decoder.to_logits.*
         decoder_{i}_{xcoder_id}.pt           blocks.*        → decoder.stacks.{i}.blocks.*
                                              final_norm.*    → decoder.stacks.{i}.final_norm.*
@@ -544,7 +546,14 @@ def convert_modular(
             if not os.path.exists(shard_path):
                 raise FileNotFoundError(f"Task {src}-{tgt} needs missing shard {shard_path}")
             state = filter_component_state(kind, _load(shard_path))
-            if not state:
+            # The encoder wrapper holds only post_emb_norm, so it is legitimately
+            # empty without one, or when the norms live with the language embeddings.
+            enc_wrapper_may_be_empty = kind == 'enc_wrapper' and (
+                not getattr(opts, 'post_emb_norm', False)
+                # frames that predate post_emb_norm_scope are component scope
+                or (getattr(opts, 'post_emb_norm_scope', None) or 'component') == 'language'
+            )
+            if not state and not enc_wrapper_may_be_empty:
                 raise ValueError(f"Shard {shard_path} has no weights usable for {kind}")
             # safetensors refuses shared/non-contiguous storage; components are small enough to copy.
             state = {k: v.detach().contiguous().clone() for k, v in state.items()}

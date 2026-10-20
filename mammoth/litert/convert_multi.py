@@ -162,6 +162,9 @@ def load_encoder_model(
     shard = _load_shard(ckpt_dir, prefix, f"{prefix}_src_embeddings_{src}.pt")
     if "weight" in shard:
         sd["encoder.token_emb.weight"] = shard["weight"].to(dtype)
+    # post_emb_norm_scope=language: the norm is stored with the language embedding
+    if "post_emb_norm.weight" in shard:
+        sd["encoder.post_emb_norm.weight"] = shard["post_emb_norm.weight"].to(dtype)
 
     enc_key = "_".join(encoder_id)
     shard = _load_shard(ckpt_dir, prefix, f"{prefix}_encoder_wrapper_{enc_key}.pt")
@@ -210,6 +213,9 @@ def load_decoder_model(
     shard = _load_shard(ckpt_dir, prefix, f"{prefix}_tgt_embeddings_{tgt}.pt")
     if "weight" in shard:
         sd["decoder.token_emb.weight"] = shard["weight"].to(dtype)
+    # post_emb_norm_scope=language: the norm is stored with the language embedding
+    if "post_emb_norm.weight" in shard:
+        sd["decoder.post_emb_norm.weight"] = shard["post_emb_norm.weight"].to(dtype)
 
     dec_key = "_".join(decoder_id)
     shard = _load_shard(ckpt_dir, prefix, f"{prefix}_decoder_wrapper_{dec_key}.pt")

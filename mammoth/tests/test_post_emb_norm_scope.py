@@ -1,13 +1,12 @@
 """
-Tests for post_emb_norm_scope: 'component' (default, one post-embedding norm
-per xcoder path, stored in {encoder,decoder}_wrapper_*.pt) versus 'language'
-(one norm per language, stored with that language's embedding in
-{src,tgt}_embeddings_*.pt).
+Tests for the post-embedding norm scope. It is not a user option: it is
+recorded in the checkpoint frame (opts.post_emb_norm_scope).
 
-The main backward-compatibility guarantee: a component-scope checkpoint loads
-into a language-scope model with exactly the same outputs, and a language new
-to the checkpoint (e.g. adding Danish next to Swedish and Norwegian) starts
-from its path's trained norm.
+- 'language' (every new model): one norm per language and side, stored with
+  that language's embedding in {src,tgt}_embeddings_*.pt.
+- 'component' (checkpoints that predate per-language norms, frame has no key):
+  one norm per xcoder path in {encoder,decoder}_wrapper_*.pt. Such checkpoints
+  are loaded as they are (for inference); scopes are never converted.
 """
 import os
 from argparse import Namespace
@@ -111,22 +110,33 @@ def _component(tqm, cls, name):
     return next(c for c in tqm.get_my_distributed_components() if isinstance(c, cls) and c.get_name() == name)
 
 
-class TestDefault:
-    def test_new_model_defaults_to_language_scope(self):
+class TestScopeFromFrame:
+    def test_new_model_is_language_scope(self):
         model, _ = _build(_opts(), ['swe', 'nob'])
         assert set(model.encoder.shared_lang_post_emb_norms) == {'swe', 'nob'}
 
     def test_fresh_training_records_language_scope_in_the_frame(self):
         from mammoth.train_single import _get_model_opts
-        assert _get_model_opts(Namespace(post_emb_norm_scope=None)).post_emb_norm_scope == 'language'
+        assert _get_model_opts(Namespace()).post_emb_norm_scope == 'language'
 
-    def test_checkpoint_without_the_option_is_component_scope(self):
+    def test_frame_without_the_key_is_component_scope(self):
         from mammoth.utils.parse import ArgumentParser
         old_frame_opts = Namespace(model_dim=16, heads=2, post_emb_norm=True)
         assert ArgumentParser.checkpoint_model_opts(old_frame_opts).post_emb_norm_scope == 'component'
 
+    def test_train_from_keeps_the_frame_scope(self):
+        from mammoth.train_single import _get_model_opts
+        for frame_scope, expected in ((None, 'component'), ('language', 'language')):
+            frame_opts = Namespace(model_dim=16, heads=2, post_emb_norm=True)
+            if frame_scope is not None:
+                frame_opts.post_emb_norm_scope = frame_scope
+            model_opts = _get_model_opts(Namespace(), frame_checkpoint={'opts': frame_opts})
+            assert model_opts.post_emb_norm_scope == expected
+
 
 class TestComponentScope:
+    """Checkpoints that predate per-language norms load and run unchanged."""
+
     def test_one_norm_shared_by_the_path(self):
         model, tqm = _build(_opts('component'), ['swe', 'nob'])
         assert len(model.encoder.shared_lang_post_emb_norms) == 0
@@ -140,6 +150,16 @@ class TestComponentScope:
         assert set(emb.state_dict(model)) == {'weight'}
         wrapper = _component(tqm, DistributedWrapperModules, 'encoder_wrapper_nordic')
         assert set(wrapper.state_dict(model)) == {'post_emb_norm.weight'}
+
+    def test_component_scope_round_trip_is_exact(self, tmp_path):
+        model, tqm = _build(_opts('component'), ['swe', 'nob'])
+        prefix = os.path.join(tmp_path, 'model_best')
+        _save(model, tqm, prefix)
+        torch.manual_seed(123)
+        reloaded, reloaded_tqm = _build(_opts('component'), ['swe', 'nob'])
+        load_parameters_from_checkpoint(f'{prefix}_frame.pt', reloaded, None, reloaded_tqm, reset_optim=True)
+        for src in ('swe', 'nob'):
+            assert torch.equal(_encode(model, src), _encode(reloaded, src))
 
 
 class TestLanguageScope:
@@ -179,49 +199,21 @@ class TestLanguageScope:
         for lang in ('swe', 'nob'):
             assert not model.encoder.get_post_emb_norm_by_lang(lang).weight.requires_grad
 
-
-class TestBackwardCompatibility:
-    def _component_checkpoint(self, tmp_path):
-        model, tqm = _build(_opts('component'), ['swe', 'nob'])
-        prefix = os.path.join(tmp_path, 'model_best')
-        _save(model, tqm, prefix)
-        return model, prefix
-
-    def test_component_checkpoint_loads_exactly_into_language_scope(self, tmp_path):
-        old, prefix = self._component_checkpoint(tmp_path)
-        new, tqm = _build(_opts('language'), ['swe', 'nob'])
-        load_parameters_from_checkpoint(f'{prefix}_frame.pt', new, None, tqm, reset_optim=True)
-        for src in ('swe', 'nob'):
-            assert torch.equal(_encode(old, src), _encode(new, src))
-        old_norm = old.encoder.get_post_emb_norm_by_component(('nordic',)).weight
-        for lang in ('swe', 'nob'):
-            assert torch.equal(new.encoder.get_post_emb_norm_by_lang(lang).weight, old_norm)
-
-    def test_new_language_starts_from_its_path_norm(self, tmp_path):
-        # Jörg's case: add Danish next to an already trained Swedish/Norwegian path.
-        old, prefix = self._component_checkpoint(tmp_path)
-        new, tqm = _build(_opts('language'), ['swe', 'nob', 'dan'])
-        load_parameters_from_checkpoint(
-            f'{prefix}_frame.pt', new, None, tqm, reset_optim=True, yes_i_messed_with_the_checkpoint=True,
-        )
-        old_norm = old.encoder.get_post_emb_norm_by_component(('nordic',)).weight
-        assert torch.equal(new.encoder.get_post_emb_norm_by_lang('dan').weight, old_norm)
-        for src in ('swe', 'nob'):
-            assert torch.equal(_encode(old, src), _encode(new, src))
-
-    def test_scope_switch_requires_optimizer_reset(self, tmp_path):
-        _, prefix = self._component_checkpoint(tmp_path)
-        new, tqm = _build(_opts('language'), ['swe', 'nob'])
-        with pytest.raises(Exception, match='--reset_optim'):
-            load_parameters_from_checkpoint(f'{prefix}_frame.pt', new, None, tqm, reset_optim=False)
-
-    def test_language_checkpoint_into_component_scope_is_a_clear_error(self, tmp_path):
+    def test_adding_a_language_leaves_the_others_untouched(self, tmp_path):
+        # Danish next to an already trained Swedish/Norwegian path: only Danish's
+        # embedding file (with its own norm) is missing; nothing shared changes.
         model, tqm = _build(_opts('language'), ['swe', 'nob'])
         prefix = os.path.join(tmp_path, 'model_best')
         _save(model, tqm, prefix)
-        old, old_tqm = _build(_opts('component'), ['swe', 'nob'])
-        with pytest.raises(ValueError, match='post_emb_norm_scope'):
-            load_parameters_from_checkpoint(f'{prefix}_frame.pt', old, None, old_tqm, reset_optim=True)
+        extended, extended_tqm = _build(_opts('language'), ['swe', 'nob', 'dan'])
+        load_parameters_from_checkpoint(
+            f'{prefix}_frame.pt', extended, None, extended_tqm,
+            reset_optim=True, yes_i_messed_with_the_checkpoint=True,
+        )
+        for src in ('swe', 'nob'):
+            assert torch.equal(_encode(model, src), _encode(extended, src))
+        dan = _component(extended_tqm, DistributedEmbedding, 'src_embeddings_dan')
+        assert set(dan.state_dict(extended)) == {'weight', 'post_emb_norm.weight'}
 
 
 class TestHFMapping:
@@ -234,32 +226,6 @@ class TestHFMapping:
     def test_embedding_component_without_norm_is_unchanged(self):
         mapped = component_to_hf('tgt_emb', {'weight': torch.randn(10, 16)})
         assert set(mapped) == {'decoder.token_emb.weight'}
-
-
-class TestTrainFromScopeOverride:
-    """With --train_from, architecture opts come from the checkpoint frame."""
-
-    def _model_opts(self, checkpoint_scope, config_scope):
-        from mammoth.train_single import _get_model_opts
-        checkpoint_opts = Namespace(model_dim=16, heads=2, post_emb_norm=True)
-        if checkpoint_scope is not None:
-            checkpoint_opts.post_emb_norm_scope = checkpoint_scope
-        return _get_model_opts(
-            Namespace(post_emb_norm_scope=config_scope), frame_checkpoint={'opts': checkpoint_opts},
-        )
-
-    def test_unset_config_keeps_the_checkpoint_scope(self):
-        # Resuming an old run must not switch scope (that would need --reset_optim).
-        assert self._model_opts(None, None).post_emb_norm_scope == 'component'
-        assert self._model_opts('component', None).post_emb_norm_scope == 'component'
-        assert self._model_opts('language', None).post_emb_norm_scope == 'language'
-
-    def test_config_can_switch_component_checkpoint_to_language(self):
-        assert self._model_opts(None, 'language').post_emb_norm_scope == 'language'
-        assert self._model_opts('component', 'language').post_emb_norm_scope == 'language'
-
-    def test_language_checkpoint_stays_language(self):
-        assert self._model_opts('language', 'component').post_emb_norm_scope == 'language'
 
 
 @pytest.fixture(scope='module')

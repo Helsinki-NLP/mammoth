@@ -6,7 +6,7 @@ from collections import OrderedDict, deque
 from glob import glob
 from typing import Dict, Any, Tuple
 
-from mammoth.distributed.components import DistributedEmbedding, DistributedWrapperModules, Side
+from mammoth.distributed.components import DistributedWrapperModules
 from mammoth.distributed.tasks import LocalTaskQueueManager
 from mammoth.model_builder import build_model
 from mammoth.models import NMTModel
@@ -146,56 +146,6 @@ def _migrate_wrapper_modules_from_old_checkpoint(
     return False
 
 
-def _migrate_lang_post_emb_norm_from_wrapper(
-    checkpoint_prefix, component, model, task_queue_manager
-):
-    """Backward compatibility: post_emb_norm_scope='component' -> 'language'.
-
-    A component-scope checkpoint stores one post_emb_norm per xcoder path in
-    {encoder,decoder}_wrapper_{key}.pt, shared by every language on that path.
-    Copying it into the language's own norm reproduces the old model exactly.
-    """
-    is_encoder = component.side == Side.encoder
-    side_str = 'encoder' if is_encoder else 'decoder'
-    lang_norm = (model.encoder if is_encoder else model.decoder).get_post_emb_norm_by_lang(component.lang)
-    if lang_norm is None:
-        return False  # post_emb_norm_scope='component': nothing to migrate
-    component_keys = sorted({
-        tuple(task.encoder_id if is_encoder else task.decoder_id)
-        for task in task_queue_manager.get_my_tasks()
-        if (task.src_lang if is_encoder else task.tgt_lang) == component.lang
-    })
-    norms = {}
-    for component_key in component_keys:
-        wrapper_path = f"{checkpoint_prefix}_{side_str}_wrapper_{'_'.join(component_key)}.pt"
-        if not os.path.isfile(wrapper_path):
-            continue
-        wrapper_state = torch.load(wrapper_path, map_location=lambda storage, loc: storage, weights_only=False)
-        norm_state = {
-            key.removeprefix('post_emb_norm.'): value
-            for key, value in wrapper_state.items() if key.startswith('post_emb_norm.')
-        }
-        if norm_state:
-            norms[component_key] = norm_state
-    if not norms:
-        return False
-    source_key, norm_state = next(iter(norms.items()))
-    if any(
-        any(not torch.equal(other[k], norm_state[k]) for k in norm_state)
-        for other in norms.values()
-    ):
-        logger.warning(
-            f"Language {component.lang!r} uses several {side_str} paths whose post_emb_norms differ: "
-            f"{list(norms)}. Its per-language norm is initialized from {source_key}."
-        )
-    lang_norm.load_state_dict(norm_state)
-    logger.info(
-        f"Initialized the per-language post_emb_norm of {component.get_name()} "
-        f"from {side_str}_wrapper_{'_'.join(source_key)}"
-    )
-    return True
-
-
 def load_parameters_from_checkpoint(
     frame_checkpoint_path,
     model,
@@ -216,7 +166,6 @@ def load_parameters_from_checkpoint(
     all_ok = True
     missing_keys_summary = []
     unexpected_keys_summary = []
-    norm_scope_migrated = False
 
     for component in my_components:
         name = component.get_name()
@@ -230,17 +179,6 @@ def load_parameters_from_checkpoint(
             incompatible_keys = component.load_state_dict(
                 model=model, state_dict=state_dict
             )
-            if (
-                isinstance(component, DistributedEmbedding)
-                and any(key.startswith('post_emb_norm.') for key in incompatible_keys.missing_keys)
-                and _migrate_lang_post_emb_norm_from_wrapper(
-                    checkpoint_prefix, component, model, task_queue_manager
-                )
-            ):
-                norm_scope_migrated = True
-                incompatible_keys = incompatible_keys._replace(missing_keys=[
-                    key for key in incompatible_keys.missing_keys if not key.startswith('post_emb_norm.')
-                ])
             if incompatible_keys.missing_keys or incompatible_keys.unexpected_keys:
                 logger.info(f"Module {name} incompatible keys: {incompatible_keys}")
                 if incompatible_keys.missing_keys:
@@ -267,25 +205,7 @@ def load_parameters_from_checkpoint(
             )
             missing_keys_summary.append(f"{checkpoint_path} (entire file missing)")
             all_ok = False
-            # A language new to this checkpoint (post_emb_norm_scope='language'):
-            # start its norm from its path's trained norm rather than from ones.
-            if (
-                isinstance(component, DistributedEmbedding)
-                and _migrate_lang_post_emb_norm_from_wrapper(
-                    checkpoint_prefix, component, model, task_queue_manager
-                )
-            ):
-                norm_scope_migrated = True
 
-    if norm_scope_migrated and not reset_optim:
-        raise Exception(
-            "This checkpoint was trained with post_emb_norm_scope=component and is being loaded "
-            "with post_emb_norm_scope=language. The weights convert exactly, but the optimizer "
-            "state does not (the norms moved to other components). Use --reset_optim all (or states)."
-        )
-
-    for component in my_components:
-        name = component.get_name()
         if not reset_optim:
             optimizer_path = f"{checkpoint_prefix}_{name}_optim.pt"
             if os.path.isfile(optimizer_path):

@@ -183,20 +183,6 @@ class DistributedEmbedding(DistributedComponent):
         # post_emb_norm_scope='language': the language's norm is saved with its embedding
         return _EmbeddingWithNorm(embedding, post_emb_norm)
 
-    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
-        module = self.get_module(model)
-        if isinstance(module, _EmbeddingWithNorm):
-            # A component-scope checkpoint has no "post_emb_norm.*" here; the
-            # loader reports it missing and fills it from the wrapper file.
-            return module.load_state_dict(state_dict, strict=False)
-        if any(key.startswith('post_emb_norm.') for key in state_dict):
-            raise ValueError(
-                f'{self.get_name()} contains a per-language post_emb_norm: this checkpoint was '
-                'trained with post_emb_norm_scope=language. Set post_emb_norm_scope: language '
-                '(a language-scope checkpoint cannot be loaded as component scope).'
-            )
-        return module.load_state_dict(state_dict)
-
 
 class _EmbeddingWithNorm(nn.Module):
     """Virtual view of a language's embedding plus its own post-embedding norm.
@@ -247,22 +233,6 @@ class DistributedWrapperModules(DistributedComponent):
         if to_logits is not None:
             modules['to_logits'] = to_logits
         return modules
-
-    def load_state_dict(self, model: NMTModel, state_dict: Dict[str, Any]):
-        module = self.get_module(model)
-        parent = model.encoder if self.side == Side.encoder else model.decoder
-        if 'post_emb_norm' not in module and len(parent.shared_lang_post_emb_norms) > 0:
-            # Component-scope checkpoint loaded with post_emb_norm_scope='language':
-            # this norm was copied into each language's norm by the loader.
-            state_dict = {k: v for k, v in state_dict.items() if not k.startswith('post_emb_norm.')}
-        elif 'post_emb_norm' in module and not any(k.startswith('post_emb_norm.') for k in state_dict):
-            raise ValueError(
-                f'{self.get_name()} has no post_emb_norm. If this checkpoint was trained with '
-                'post_emb_norm_scope=language, set post_emb_norm_scope: language '
-                '(a language-scope checkpoint cannot be loaded as component scope); '
-                'if it was trained without post_emb_norm, unset post_emb_norm.'
-            )
-        return module.load_state_dict(state_dict)
 
 
 @dataclass

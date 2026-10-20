@@ -72,16 +72,6 @@ def _get_model_opts(opts, frame_checkpoint=None):
         model_opts = ArgumentParser.checkpoint_model_opts(frame_checkpoint["opts"])
         ArgumentParser.update_model_opts(model_opts)
         ArgumentParser.validate_model_opts(model_opts)
-        # Architecture opts come from the checkpoint, with one exception: a
-        # component-scope post_emb_norm may be switched to per-language scope,
-        # which load_parameters_from_checkpoint converts exactly. The reverse
-        # (language -> component) cannot be converted, so the checkpoint's scope is kept.
-        if (
-            getattr(opts, 'post_emb_norm_scope', None) == 'language'
-            and model_opts.post_emb_norm_scope == 'component'
-        ):
-            logger.info('Switching post_emb_norm_scope from component (checkpoint) to language (config)')
-            model_opts.post_emb_norm_scope = 'language'
         # if opts.tensorboard_log_dir == model_opts.tensorboard_log_dir and \
                 # hasattr(model_opts, 'tensorboard_log_dir_dated'):
             # ensure tensorboard output is written in the directory
@@ -91,9 +81,9 @@ def _get_model_opts(opts, frame_checkpoint=None):
         # model_opts.update_vocab = opts.update_vocab
     else:
         model_opts = opts
-        # Record the resolved default, so the checkpoint frame states its scope.
-        if getattr(model_opts, 'post_emb_norm_scope', None) is None:
-            model_opts.post_emb_norm_scope = 'language'
+        # New models get per-language post-embedding norms; recording it in
+        # the frame is what tells later loads how this model is built.
+        model_opts.post_emb_norm_scope = 'language'
     return model_opts
 
 

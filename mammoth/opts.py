@@ -403,18 +403,6 @@ def model_opts(parser):
         help='Apply RMSNorm after the token embedding.',
     )
     group.add(
-        '--post_emb_norm_scope', '-post_emb_norm_scope', choices=['component', 'language'], default=None,
-        help='Who owns the post-embedding RMSNorm (only used with --post_emb_norm). '
-             '"language" (default for new models): one norm per language, stored with that '
-             'language\'s embedding ({src,tgt}_embeddings_*.pt), so a new language can be added '
-             'without touching anything shared. '
-             '"component": one norm per encoder/decoder path, shared by all languages on it '
-             '(stored in {encoder,decoder}_wrapper_*.pt); checkpoints that predate this option '
-             'are component scope. With --train_from, the checkpoint\'s scope is kept unless '
-             'this is set to "language", which converts a component-scope checkpoint exactly '
-             '(each language starts from its component\'s norm; requires --reset_optim).',
-    )
-    group.add(
         '--attn_dropout', '-attn_dropout', type=float, default=0.0,
         help='Dropout probability inside attention (applied to the attention weights).',
     )

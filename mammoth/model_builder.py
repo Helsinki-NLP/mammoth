@@ -86,10 +86,10 @@ def build_xcoder(
     ff_drop = side_opt('ff_dropout', 0.0)
     use_rotary = getattr(model_opts, 'rotary_pos_emb', False)
     use_post_emb_norm = getattr(model_opts, 'post_emb_norm', False)
-    # 'component': one norm per xcoder path (shared by every language on it).
-    # 'language': one norm per language, saved with that language's embedding.
-    # Unset means a new model (checkpoint opts are resolved to 'component' when
-    # they predate the option, see ArgumentParser.checkpoint_model_opts).
+    # Not a user option: new models use 'language' (one norm per language, saved
+    # with that language's embedding); checkpoints that predate per-language norms
+    # are 'component' (one norm per xcoder path), recorded in / resolved from the
+    # frame by ArgumentParser.checkpoint_model_opts. Scopes are never converted.
     post_emb_norm_scope = getattr(model_opts, 'post_emb_norm_scope', None) or 'language'
     if post_emb_norm_scope not in ('component', 'language'):
         raise ValueError(f'Unknown post_emb_norm_scope {post_emb_norm_scope!r}')

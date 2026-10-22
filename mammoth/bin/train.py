@@ -26,7 +26,7 @@ from mammoth.opts import train_opts
 from mammoth.inputters import get_vocab, DEFAULT_SPECIALS
 from mammoth.inputters.language_tokens import (
     extract_language_tokens_from_config,
-    add_language_tokens_to_tokenizer,
+    save_tokenizers_with_language_tokens,
 )
 from mammoth.transforms import get_transforms_cls
 from collections import OrderedDict
@@ -91,6 +91,41 @@ def train(opts):
     vocabs_dict = OrderedDict()
     # For creating fields, we use a task_queue_manager that doesn't filter by node and gpu
     global_task_queue_manager = TaskQueueManager.from_opts(opts, world_context)
+
+    # Add language tokens to HF tokenizers if enabled. The extended tokenizers are written next to
+    # the saved model and opts.src_vocab / opts.tgt_vocab are pointed at them; the original files are
+    # left untouched so other trainings using them are unaffected. This also runs when resuming, where
+    # an existing copy is extended rather than rebuilt, so token ids stay consistent with the checkpoint.
+    use_hf_tokenizer = getattr(opts, 'use_hf_tokenizer', False) or any(
+        opts.__getattribute__(f'{side}_vocab')[lang].endswith('.json')
+        for side in ('src', 'tgt')
+        for lang in global_task_queue_manager.get_langs(side)
+    )
+    if use_hf_tokenizer and getattr(opts, 'add_language_tokens', True):
+        # Reuse the language tokens already collected by transforms (if any)
+        # These are the same tokens from src_prefix/tgt_prefix in task configs
+        if transforms_cls and 'prefix' in transforms_cls:
+            from mammoth.transforms.misc import PrefixTransform
+            src_prefix_tokens, tgt_prefix_tokens = PrefixTransform.get_specials(opts)
+            language_tokens = src_prefix_tokens | tgt_prefix_tokens
+            logger.info(f"Extracted {len(language_tokens)} language tokens from PrefixTransform")
+        else:
+            # Fallback: extract directly from config if prefix transform not used
+            language_tokens = extract_language_tokens_from_config(opts)
+            logger.info(f"Extracted {len(language_tokens)} language tokens directly from config")
+
+        if language_tokens:
+            tokenizer_dir = os.path.join(os.path.dirname(os.path.abspath(opts.save_model)), 'tokenizers')
+            new_paths = save_tokenizers_with_language_tokens(
+                opts,
+                {side: global_task_queue_manager.get_langs(side) for side in ('src', 'tgt')},
+                language_tokens,
+                tokenizer_dir,
+                extend_existing=bool(opts.train_from),
+            )
+            for original_path, new_path in new_paths.items():
+                if new_path != original_path:
+                    logger.info(f"Training uses {new_path} instead of {original_path}")
 
     frame_checkpoint = None
     checkpoint_path = None
@@ -205,37 +240,6 @@ def train(opts):
             for side in ('src', 'tgt')
             for lang in global_task_queue_manager.get_langs(side)
         )
-
-        # Extract and add language tokens to HF tokenizers if enabled
-        if use_hf_tokenizer and getattr(opts, 'add_language_tokens', True):
-            # Reuse the language tokens already collected by transforms (if any)
-            # These are the same tokens from src_prefix/tgt_prefix in task configs
-            language_tokens = set()
-            if transforms_cls and 'prefix' in transforms_cls:
-                from mammoth.transforms.misc import PrefixTransform
-                src_prefix_tokens, tgt_prefix_tokens = PrefixTransform.get_specials(opts)
-                language_tokens = src_prefix_tokens | tgt_prefix_tokens
-                logger.info(f"Extracted {len(language_tokens)} language tokens from PrefixTransform")
-            else:
-                # Fallback: extract directly from config if prefix transform not used
-                language_tokens = extract_language_tokens_from_config(opts)
-                logger.info(f"Extracted {len(language_tokens)} language tokens directly from config")
-
-            if language_tokens:
-                # Track which tokenizer files we've already modified to avoid duplicate work
-                processed_tokenizer_paths = set()
-
-                for side in ('src', 'tgt'):
-                    for lang in global_task_queue_manager.get_langs(side):
-                        vocab_path = opts.__getattribute__(f'{side}_vocab')[lang]
-
-                        # Only process each unique tokenizer file once
-                        if vocab_path not in processed_tokenizer_paths and vocab_path.endswith('.json'):
-                            try:
-                                add_language_tokens_to_tokenizer(vocab_path, language_tokens, inplace=True)
-                                processed_tokenizer_paths.add(vocab_path)
-                            except Exception as e:
-                                logger.warning(f"Failed to add language tokens to {vocab_path}: {e}")
 
         for side in ('src', 'tgt'):
             for lang in global_task_queue_manager.get_langs(side):

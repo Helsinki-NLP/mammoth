@@ -5,7 +5,7 @@ HuggingFace tokenizers for multilingual translation training.
 """
 
 import json
-from pathlib import Path
+import os
 from mammoth.utils.logging import logger
 
 
@@ -38,21 +38,29 @@ def extract_language_tokens_from_config(opts):
     return language_tokens
 
 
-def add_language_tokens_to_tokenizer(tokenizer_path: str, language_tokens, inplace=True):
+def add_language_tokens_to_tokenizer(tokenizer_path: str, language_tokens, output_path: str, overwrite_input=False):
     """
-    Add language prefix tokens to an existing HuggingFace tokenizer.
+    Add language prefix tokens to a HuggingFace tokenizer and save the result to output_path.
+
+    The input tokenizer file is not modified unless overwrite_input is set, so other trainings
+    that use the original tokenizer are unaffected.
 
     Args:
-        tokenizer_path: Path to the tokenizer.json file
+        tokenizer_path: Path to the tokenizer.json file to read
         language_tokens: Iterable of language tokens to add (e.g., {'<to_hi>', '<hi>', ...})
-        inplace: If True, modify the tokenizer file in place. If False, return modified data
+        output_path: Path where the extended tokenizer.json is written
+        overwrite_input: Allow output_path == tokenizer_path. Only for copies previously written by
+            save_tokenizers_with_language_tokens, never for a user-provided original.
 
     Returns:
-        Number of tokens added (if inplace=True) or tuple (num_added, modified_data) if inplace=False
+        Number of tokens added. If 0, nothing is written.
     """
+    if not overwrite_input and os.path.abspath(tokenizer_path) == os.path.abspath(output_path):
+        raise ValueError(f"Refusing to overwrite the original tokenizer: {tokenizer_path}")
+
     if not language_tokens:
         logger.info("No language tokens to add")
-        return 0 if inplace else (0, None)
+        return 0
 
     logger.info(f"Adding {len(language_tokens)} language tokens to tokenizer: {tokenizer_path}")
 
@@ -82,7 +90,7 @@ def add_language_tokens_to_tokenizer(tokenizer_path: str, language_tokens, inpla
 
     if not added_tokens:
         logger.info("All language tokens already exist in tokenizer")
-        return 0 if inplace else (0, tokenizer_data)
+        return 0
 
     # Update the vocabulary in the tokenizer data
     tokenizer_data['model']['vocab'] = vocab
@@ -102,31 +110,87 @@ def add_language_tokens_to_tokenizer(tokenizer_path: str, language_tokens, inpla
             "special": True  # Mark as special token
         })
 
-    if inplace:
-        # Create backup of original file
-        backup_path = str(Path(tokenizer_path).with_suffix('.json.backup'))
-        if not Path(backup_path).exists():
-            logger.info(f"Creating backup: {backup_path}")
-            import shutil
-            shutil.copy2(tokenizer_path, backup_path)
+    # Write atomically: several nodes may write the same file on a shared filesystem
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+    tmp_path = f"{output_path}.tmp.{os.getpid()}"
+    with open(tmp_path, 'w', encoding='utf-8') as f:
+        json.dump(tokenizer_data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, output_path)
 
-        # Save the modified tokenizer
-        logger.info(f"Saving modified tokenizer to: {tokenizer_path}")
-        with open(tokenizer_path, 'w', encoding='utf-8') as f:
-            json.dump(tokenizer_data, f, ensure_ascii=False, indent=2)
+    logger.info(
+        f"Saved tokenizer with {len(added_tokens)} added language tokens to: {output_path} "
+        f"(vocabulary size {len(vocab)}, was {original_vocab_size})"
+    )
+    if logger.isEnabledFor(10):  # DEBUG level
+        logger.debug("Added tokens:")
+        for token, token_id in added_tokens:
+            logger.debug(f"  {token:12s} → ID {token_id}")
 
-        logger.info(
-            f"Successfully added {len(added_tokens)} language tokens! "
-            f"New vocabulary size: {len(vocab)} (was {original_vocab_size})"
-        )
-        if added_tokens and logger.isEnabledFor(10):  # DEBUG level
-            logger.debug("Added tokens:")
-            for token, token_id in added_tokens:
-                logger.debug(f"  {token:12s} → ID {token_id}")
+    return len(added_tokens)
 
-        return len(added_tokens)
-    else:
-        return len(added_tokens), tokenizer_data
+
+def save_tokenizers_with_language_tokens(opts, langs_by_side, language_tokens, output_dir: str,
+                                         extend_existing=False):
+    """
+    Write an extended copy of every HuggingFace tokenizer used by the tasks into output_dir,
+    and point opts.src_vocab / opts.tgt_vocab at the copies.
+
+    Each unique source tokenizer is written once, to output_dir/<source parent dir>/tokenizer.json,
+    so languages that share a tokenizer keep sharing it. Tokenizers that already contain all
+    language tokens keep their original path.
+
+    A source tokenizer that is itself a copy inside output_dir (the config points at the saved copy)
+    is extended in place. With extend_existing (resuming), an existing copy is extended instead of
+    being rebuilt from the original. In both cases tokens already in the copy keep their ids and
+    new tokens are appended, so the ids stay consistent with the checkpoint vocab.
+
+    Args:
+        opts: Configuration object with src_vocab / tgt_vocab dicts (updated in place)
+        langs_by_side: Dict mapping 'src' / 'tgt' to the languages used on that side
+        language_tokens: Iterable of language tokens to add
+        output_dir: Directory for the extended tokenizers (normally next to the saved model)
+        extend_existing: Build on an existing copy in output_dir instead of the original
+
+    Returns:
+        Dict mapping original tokenizer path to the path now used for training.
+    """
+    output_dir = os.path.abspath(output_dir)
+    new_paths = {}
+    used_names = set()
+    for side in ('src', 'tgt'):
+        vocab_paths = getattr(opts, f'{side}_vocab')
+        for lang in langs_by_side[side]:
+            original_path = vocab_paths[lang]
+            if not original_path.endswith('.json'):
+                continue
+            if original_path not in new_paths:
+                source_dir = os.path.dirname(os.path.abspath(original_path))
+                if os.path.dirname(source_dir) == output_dir:
+                    # Config already points at a copy we wrote: extend it in place
+                    used_names.add(os.path.basename(source_dir))
+                    add_language_tokens_to_tokenizer(
+                        original_path, language_tokens, original_path, overwrite_input=True
+                    )
+                    new_paths[original_path] = original_path
+                else:
+                    name = os.path.basename(source_dir) or 'tokenizer'
+                    unique_name, i = name, 1
+                    while unique_name in used_names:
+                        i += 1
+                        unique_name = f'{name}_{i}'
+                    used_names.add(unique_name)
+                    output_path = os.path.join(output_dir, unique_name, 'tokenizer.json')
+                    if extend_existing and os.path.exists(output_path):
+                        logger.info(f"Extending existing tokenizer copy {output_path} (source: {original_path})")
+                        add_language_tokens_to_tokenizer(
+                            output_path, language_tokens, output_path, overwrite_input=True
+                        )
+                        new_paths[original_path] = output_path
+                    else:
+                        n_added = add_language_tokens_to_tokenizer(original_path, language_tokens, output_path)
+                        new_paths[original_path] = output_path if n_added else original_path
+            vocab_paths[lang] = new_paths[original_path]
+    return new_paths
 
 
 def verify_language_tokens(tokenizer_path: str, language_tokens):

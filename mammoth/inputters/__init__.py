@@ -12,6 +12,7 @@ from mammoth.inputters.vocab import get_vocab, DEFAULT_SPECIALS
 from mammoth.inputters.language_tokens import (
     extract_language_tokens_from_config,
     add_language_tokens_to_tokenizer,
+    save_tokenizers_with_language_tokens,
     verify_language_tokens,
 )
 
@@ -25,5 +26,6 @@ __all__ = [
     'ParallelCorpus',
     'extract_language_tokens_from_config',
     'add_language_tokens_to_tokenizer',
+    'save_tokenizers_with_language_tokens',
     'verify_language_tokens',
 ]

@@ -141,11 +141,11 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
-html_context = {
-    'css_files': [
-        '_static/theme_overrides.css',  # override wide tables in RTD theme
-    ],
-}
+# Appended after the theme's own CSS. Do not set html_context['css_files']: on Sphinx >= 7 that
+# replaces the theme's stylesheet list, so css/theme.css is dropped and pages render unstyled.
+html_css_files = [
+    'theme_overrides.css',  # override wide tables in RTD theme
+]
 
 # Custom sidebar templates, must be a dictionary that maps document names
 # to template names.

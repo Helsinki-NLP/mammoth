@@ -1,5 +1,6 @@
 """Main entry point of the Mammoth library"""
 
+from importlib.metadata import PackageNotFoundError, version
 
 from .trainer import Trainer
 from .utils import optimizers
@@ -11,4 +12,8 @@ from .utils import optimizers
 
 __all__ = ["optimizers", "Trainer"]
 
-__version__ = "2.2.0"
+# Single source of truth is `version=` in setup.py.
+try:
+    __version__ = version("mammoth-nlp")
+except PackageNotFoundError:  # running from a source tree that was never pip-installed
+    __version__ = "unknown"

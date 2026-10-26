@@ -68,6 +68,7 @@
 <li class="toctree-l1"><a class="reference internal" href="#model-conversion">Model Conversion</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#single-task-model">Single-Task Model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#multi-task-model">Multi-Task Model</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#modular">Modular</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#per-task-standalone">Per-Task Standalone</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#single-artifact">Single Artifact</a></li>
 </ul>
@@ -78,7 +79,9 @@
 <li class="toctree-l1"><a class="reference internal" href="#inference">Inference</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#standalone-model">Standalone Model</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#single-task-from-a-multi-task-artifact">Single Task from a Multi-Task Artifact</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#model-from-a-modular-artifact">Model from a Modular Artifact</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#additional-parameters">Additional Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#using-the-model-from-python">Using the Model from Python</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="#download-models-for-local-use">Download Models for Local Use</a></li>
@@ -126,7 +129,9 @@
 <p><strong>This guide covers:</strong> model conversion → pushing to Hub → running inference → downloading locally.</p>
 <section id="how-we-convert-the-model">
 <h1>How We Convert the Model<a class="headerlink" href="#how-we-convert-the-model" title="Link to this heading">¶</a></h1>
-<p>Since Mammoth uses <a class="reference external" href="https://github.com/lucidrains/x-transformers/tree/main/x_transformers">x-transformers</a> as its transformer backend, converting a Mammoth pre-trained model perfectly into Hugging Face format would require rewriting all transformer-related implementations in Hugging Face format. As a practical alternative, we bundle the Mammoth model together with its backend (x-transformers related files) and upload the bundle to Model Hub, so users can use the model without worrying about the dependencies.</p>
+<p>Mammoth’s transformer is built from plain <code class="docutils literal notranslate"><span class="pre">torch.nn</span></code> modules (the native PyTorch backend in <code class="docutils literal notranslate"><span class="pre">mammoth/modules/transformer/</span></code>). The converter loads the sharded checkpoint, assembles the weights for one task (source embeddings, encoder and decoder stacks, target embeddings, output projection), and writes them as a <code class="docutils literal notranslate"><span class="pre">MammothForConditionalGeneration</span></code> Hugging Face model (<code class="docutils literal notranslate"><span class="pre">PreTrainedModel</span></code> + <code class="docutils literal notranslate"><span class="pre">GenerationMixin</span></code>).</p>
+<p>The model code is shipped inside the artifact, so users can run it with <code class="docutils literal notranslate"><span class="pre">trust_remote_code=True</span></code> and do not need Mammoth installed. <code class="docutils literal notranslate"><span class="pre">native_transformer.py</span></code> is a self-contained copy of <code class="docutils literal notranslate"><span class="pre">mammoth/modules/transformer/*.py</span></code> that depends only on <code class="docutils literal notranslate"><span class="pre">torch</span></code>; <code class="docutils literal notranslate"><span class="pre">modeling_mammoth.py</span></code> and <code class="docutils literal notranslate"><span class="pre">configuration_mammoth.py</span></code> wrap it in the Hugging Face interface.</p>
+<p>Mammoth uses <strong>separate source and target vocabularies</strong>, so each artifact contains two tokenizers. Always encode inputs with <code class="docutils literal notranslate"><span class="pre">src_tokenizer</span></code> and decode outputs with <code class="docutils literal notranslate"><span class="pre">tgt_tokenizer</span></code>; decoding with the wrong one produces wrong translation.</p>
 </section>
 <section id="model-conversion">
 <h1>Model Conversion<a class="headerlink" href="#model-conversion" title="Link to this heading">¶</a></h1>
@@ -141,14 +146,13 @@
 <p>By default, the script loads the best checkpoint (<code class="docutils literal notranslate"><span class="pre">_best_frame.pt</span></code>) if one exists; otherwise it falls back to the checkpoint with the highest step number. You can also use <code class="docutils literal notranslate"><span class="pre">--step</span></code> to load a specific checkpoint step.</p>
 <p>The output directory will have the following structure:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>hf_single_task_model/
-├── attend.py                     # vendored: attention mechanism from x-transformers
-├── autoregressive_wrapper.py     # vendored: wraps model for autoregressive decoding
+├── README.md                     # model card: usage guide shown on the Hub repo page
 ├── config.json                   # model architecture hyperparameters (HF format)
 ├── configuration_mammoth.py      # custom HF Config class definition for Mammoth
-├── generation_config.json        # generation settings (beam size, max length, etc.)
+├── generation_config.json        # special token ids (bos/eos/pad/decoder start) for generate()
 ├── model.safetensors             # model weights
 ├── modeling_mammoth.py           # custom HF Model class (forward pass and generate)
-├── x_transformers.py             # vendored: core transformer implementation
+├── native_transformer.py         # vendored: self-contained copy of Mammoth's native transformer modules
 ├── src_tokenizer/                # source language tokenizer
 │   ├── special_tokens_map.json   # maps special token names to their string values
 │   ├── tokenizer_config.json     # tokenizer class and settings
@@ -162,11 +166,52 @@
 </section>
 <section id="multi-task-model">
 <h2>Multi-Task Model<a class="headerlink" href="#multi-task-model" title="Link to this heading">¶</a></h2>
-<p>If the pre-trained Mammoth model has more than one task, there are two approaches:</p>
+<p>If the pre-trained Mammoth model has more than one task, there are three approaches:</p>
 <ul class="simple">
+<li><p><strong>Modular</strong> — Every Mammoth component (language embedding, encoder/decoder layer stack, wrapper) is stored once; a model is assembled at load time from the components a task needs, exactly like Mammoth inference does. Shared components are not duplicated, and users can combine components into untrained (zero-shot) directions.</p></li>
 <li><p><strong>Per-task standalone</strong> — Each task is converted as a separate, standalone model.</p></li>
-<li><p><strong>Single artifact</strong> — All tasks are bundled into one artifact; users specify <code class="docutils literal notranslate"><span class="pre">--task</span></code> to select the model for inference.</p></li>
+<li><p><strong>Single artifact</strong> — All tasks are bundled into one artifact; users specify <code class="docutils literal notranslate"><span class="pre">--task</span></code> to select the model for inference. Shared components are copied into every task’s weight file.</p></li>
 </ul>
+<section id="modular">
+<h3>Modular<a class="headerlink" href="#modular" title="Link to this heading">¶</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--checkpoint-dir<span class="w"> </span>&lt;path&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--output-dir<span class="w"> </span>&lt;path&gt;<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--modular
+</pre></div>
+</div>
+<p>The output directory will have the following structure:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>hf_modular/
+├── README.md                          # model card: trained tasks and usage
+├── config.json                        # manifest: architecture, components, tokenizers, trained tasks
+├── configuration_mammoth.py
+├── mammoth_hub.py                     # entry point: assembles a model from components
+├── modeling_mammoth.py
+├── native_transformer.py
+├── components/                        # each component stored once, whichever tasks share it
+│   ├── src_emb__eng.safetensors       # source embedding per language
+│   ├── tgt_emb__spa.safetensors       # target embedding per language
+│   ├── enc__0__eng.safetensors        # encoder layer stack &lt;index&gt;__&lt;xcoder_id&gt;
+│   ├── enc__1__all.safetensors
+│   ├── dec__0__spa.safetensors        # decoder layer stack &lt;index&gt;__&lt;xcoder_id&gt;
+│   ├── enc_wrapper__eng__all.safetensors   # post_emb_norm for an encoder path
+│   ├── dec_wrapper__spa__all.safetensors   # post_emb_norm + to_logits for a decoder path
+│   └── ...
+└── tokenizers/
+    ├── src/eng/                       # one tokenizer per side and language
+    └── tgt/spa/
+</pre></div>
+</div>
+<p>A model is defined by its source and target language plus one <code class="docutils literal notranslate"><span class="pre">xcoder_id</span></code> per layer stack on each side (the task’s <code class="docutils literal notranslate"><span class="pre">enc_sharing_group</span></code> / <code class="docutils literal notranslate"><span class="pre">dec_sharing_group</span></code>):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model</span> <span class="o">=</span> <span class="n">MammothHub</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">"org/repo"</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">"eng-spa"</span><span class="p">)</span>           <span class="c1"># a trained task</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MammothHub</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">"org/repo"</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="s2">"deu"</span><span class="p">,</span> <span class="n">tgt</span><span class="o">=</span><span class="s2">"fra"</span><span class="p">)</span>     <span class="c1"># paths inferred from trained tasks</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">MammothHub</span><span class="o">.</span><span class="n">from_pretrained</span><span class="p">(</span><span class="s2">"org/repo"</span><span class="p">,</span> <span class="n">src</span><span class="o">=</span><span class="s2">"deu"</span><span class="p">,</span> <span class="n">tgt</span><span class="o">=</span><span class="s2">"fra"</span><span class="p">,</span>
+                                   <span class="n">encoder</span><span class="o">=</span><span class="p">[</span><span class="s2">"deu"</span><span class="p">,</span> <span class="s2">"all"</span><span class="p">],</span> <span class="n">decoder</span><span class="o">=</span><span class="p">[</span><span class="s2">"fra"</span><span class="p">,</span> <span class="s2">"all"</span><span class="p">])</span>
+<span class="n">MammothHub</span><span class="o">.</span><span class="n">list_tasks</span><span class="p">(</span><span class="s2">"org/repo"</span><span class="p">);</span> <span class="n">MammothHub</span><span class="o">.</span><span class="n">list_components</span><span class="p">(</span><span class="s2">"org/repo"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Only the components the model needs are downloaded. <strong>Limitation:</strong> the wrapper modules (<code class="docutils literal notranslate"><span class="pre">post_emb_norm</span></code>, <code class="docutils literal notranslate"><span class="pre">to_logits</span></code>) are trained per complete encoder/decoder path, so an encoder path and a decoder path can only be used if some trained task used them. Any trained encoder path can be combined with any trained decoder path; a path no task trained (e.g. a new mix of layer stacks) is rejected with an error listing the trained paths. Adapters are not exported.</p>
+</section>
 <section id="per-task-standalone">
 <h3>Per-Task Standalone<a class="headerlink" href="#per-task-standalone" title="Link to this heading">¶</a></h3>
 <p>Each task is converted as a standalone model (same structure as single-task above). By default, the script converts all tasks:</p>
@@ -178,14 +223,13 @@
 <p>Each task gets its own subdirectory:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>hf_multi_task/
 ├── task1/                        # one subdirectory per task (named by task ID)
-│   ├── attend.py
-│   ├── autoregressive_wrapper.py
+│   ├── README.md
 │   ├── config.json
 │   ├── configuration_mammoth.py
 │   ├── generation_config.json
 │   ├── model.safetensors
 │   ├── modeling_mammoth.py
-│   ├── x_transformers.py
+│   ├── native_transformer.py
 │   ├── src_tokenizer/
 │   │   ├── special_tokens_map.json
 │   │   ├── tokenizer_config.json
@@ -217,13 +261,12 @@
 </div>
 <p>The output directory will have the following structure:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span>hf_single_artifact/
-├── attend.py
-├── autoregressive_wrapper.py
-├── config.json                       # shared model architecture config for all tasks
+├── README.md                         # model card: available tasks and usage
+├── config.json                       # manifest: per-task architecture config for all tasks
 ├── configuration_mammoth.py
 ├── mammoth_hub.py                    # entry point: routes inference to the correct task
 ├── modeling_mammoth.py
-├── x_transformers.py
+├── native_transformer.py
 ├── bul-eng.safetensors               # weights for bul-eng (one .safetensors per task)
 ├── bul-eng_src_tokenizer/            # source tokenizer for bul-eng
 │   ├── special_tokens_map.json
@@ -251,35 +294,42 @@
 <span class="w">  </span><span class="o">[</span>--token<span class="w"> </span>YOUR_HF_TOKEN<span class="o">]</span>
 </pre></div>
 </div>
-<p>This script uploads the entire directory, so it works for single-task, multi-task, and single-artifact models alike.</p>
+<p>This script uploads the entire directory, so it works for single-task, multi-task, single-artifact, and modular models alike.</p>
+<p>Every converted directory contains a <code class="docutils literal notranslate"><span class="pre">README.md</span></code> model card, generated from its <code class="docutils literal notranslate"><span class="pre">config.json</span></code>. It is the page users see on the Hub: a self-contained guide listing the trained tasks with ready-to-run commands. The converter cannot know the repo id, so the card uses a <code class="docutils literal notranslate"><span class="pre">&lt;repo_id&gt;</span></code> placeholder; <code class="docutils literal notranslate"><span class="pre">push_to_hub.py</span></code> fills in <code class="docutils literal notranslate"><span class="pre">--repo-id</span></code> before uploading. Edit the README before pushing if you want to add details such as training data, evaluation scores or a license.</p>
 </section>
 <section id="inference">
 <h1>Inference<a class="headerlink" href="#inference" title="Link to this heading">¶</a></h1>
-<p>Use <code class="docutils literal notranslate"><span class="pre">mammoth/hf_integration/to_hf/inference.py</span></code> to run inference with a converted Mammoth model from Hugging Face Model Hub.</p>
 <p>No Mammoth installation is required. Set up a fresh environment with the minimum dependencies:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>.venv
 <span class="nb">source</span><span class="w"> </span>.venv/bin/activate
-pip<span class="w"> </span>install<span class="w"> </span>transformers<span class="w"> </span>torch<span class="w"> </span>einops<span class="w"> </span>einx<span class="w"> </span>loguru<span class="w"> </span>packaging
-<span class="c1"># optional: faster attention on supported GPUs</span>
-pip<span class="w"> </span>install<span class="w"> </span>flash-attn
+pip<span class="w"> </span>install<span class="w"> </span>transformers<span class="w"> </span>torch<span class="w"> </span>huggingface_hub<span class="w"> </span>safetensors
+</pre></div>
+</div>
+<p>Every artifact ships <code class="docutils literal notranslate"><span class="pre">inference.py</span></code>. Download it from the repo (if you have the Mammoth repo, it is at <code class="docutils literal notranslate"><span class="pre">mammoth/hf_integration/to_hf/inference.py</span></code>). <code class="docutils literal notranslate"><span class="pre">--model-dir</span></code> takes a Hub repo id or a local directory:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>hf<span class="w"> </span>download<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span>inference.py<span class="w"> </span>--local-dir<span class="w"> </span>.
 </pre></div>
 </div>
 <section id="standalone-model">
 <h2>Standalone Model<a class="headerlink" href="#standalone-model" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>inference.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--model-dir<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input-file<span class="w"> </span>&lt;path&gt;
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>inference.py<span class="w"> </span>--model-dir<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span>--input-file<span class="w"> </span>&lt;path&gt;
 </pre></div>
 </div>
 </section>
 <section id="single-task-from-a-multi-task-artifact">
 <h2>Single Task from a Multi-Task Artifact<a class="headerlink" href="#single-task-from-a-multi-task-artifact" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>inference.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--model-dir<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--input-file<span class="w"> </span>&lt;path&gt;
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>inference.py<span class="w"> </span>--model-dir<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span>--input-file<span class="w"> </span>&lt;path&gt;
 </pre></div>
 </div>
+</section>
+<section id="model-from-a-modular-artifact">
+<h2>Model from a Modular Artifact<a class="headerlink" href="#model-from-a-modular-artifact" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>inference.py<span class="w"> </span>--model-dir<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span>--task<span class="w"> </span>&lt;task-id&gt;<span class="w"> </span>--input-file<span class="w"> </span>&lt;path&gt;
+python<span class="w"> </span>inference.py<span class="w"> </span>--model-dir<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span>--src<span class="w"> </span>deu<span class="w"> </span>--tgt<span class="w"> </span>fra<span class="w"> </span>--input-file<span class="w"> </span>&lt;path&gt;
+python<span class="w"> </span>inference.py<span class="w"> </span>--model-dir<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span>--src<span class="w"> </span>deu<span class="w"> </span>--tgt<span class="w"> </span>fra<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--encoder<span class="w"> </span>deu<span class="w"> </span>all<span class="w"> </span>--decoder<span class="w"> </span>fra<span class="w"> </span>all<span class="w"> </span>--input-file<span class="w"> </span>&lt;path&gt;
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">--encoder</span></code> / <code class="docutils literal notranslate"><span class="pre">--decoder</span></code> take one <code class="docutils literal notranslate"><span class="pre">xcoder_id</span></code> per layer stack. If omitted, they are taken from the trained tasks with the same source / target language.</p>
 </section>
 <section id="additional-parameters">
 <h2>Additional Parameters<a class="headerlink" href="#additional-parameters" title="Link to this heading">¶</a></h2>
@@ -292,11 +342,24 @@ pip<span class="w"> </span>install<span class="w"> </span>flash-attn
 </pre></div>
 </div>
 </section>
+<section id="using-the-model-from-python">
+<h2>Using the Model from Python<a class="headerlink" href="#using-the-model-from-python" title="Link to this heading">¶</a></h2>
+<p>The same downloaded <code class="docutils literal notranslate"><span class="pre">inference.py</span></code> works as a module (it must be in the current directory or on <code class="docutils literal notranslate"><span class="pre">sys.path</span></code>), for every artifact type:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">inference</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_model</span><span class="p">,</span> <span class="n">translate</span>
+
+<span class="n">src_tok</span><span class="p">,</span> <span class="n">tgt_tok</span><span class="p">,</span> <span class="n">model</span> <span class="o">=</span> <span class="n">load_model</span><span class="p">(</span><span class="s2">"&lt;repo_id_on_HF&gt;"</span><span class="p">,</span> <span class="n">task</span><span class="o">=</span><span class="s2">"&lt;task-id&gt;"</span><span class="p">)</span>  <span class="c1"># omit task for a standalone model</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">translate</span><span class="p">(</span><span class="n">src_tok</span><span class="p">,</span> <span class="n">tgt_tok</span><span class="p">,</span> <span class="n">model</span><span class="p">,</span> <span class="p">[</span><span class="s2">"Helsinki is the capital of Finland."</span><span class="p">]))</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">load_model</span></code> takes the same selections as the command line (<code class="docutils literal notranslate"><span class="pre">task</span></code>, or <code class="docutils literal notranslate"><span class="pre">src</span></code> / <code class="docutils literal notranslate"><span class="pre">tgt</span></code> / <code class="docutils literal notranslate"><span class="pre">encoder</span></code> / <code class="docutils literal notranslate"><span class="pre">decoder</span></code>) and returns a standard <code class="docutils literal notranslate"><span class="pre">MammothForConditionalGeneration</span></code>, so <code class="docutils literal notranslate"><span class="pre">model.generate()</span></code> works as usual.</p>
+</section>
 </section>
 <section id="download-models-for-local-use">
 <h1>Download Models for Local Use<a class="headerlink" href="#download-models-for-local-use" title="Link to this heading">¶</a></h1>
-<p>By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use <code class="docutils literal notranslate"><span class="pre">mammoth/hf_integration/to_hf/model_downloader.py</span></code>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Single-task model — download everything</span>
+<p>By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use <code class="docutils literal notranslate"><span class="pre">model_downloader.py</span></code>, which is also shipped in every artifact:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>hf<span class="w"> </span>download<span class="w"> </span>&lt;repo_id_on_HF&gt;<span class="w"> </span>model_downloader.py<span class="w"> </span>--local-dir<span class="w"> </span>.
+
+<span class="c1"># Single-task model — download everything</span>
 python<span class="w"> </span>model_downloader.py<span class="w"> </span>--repo-id<span class="w"> </span>org/my-model<span class="w"> </span>--local-dir<span class="w"> </span>./my_model
 
 <span class="c1"># Multi-task single artifact — download everything</span>
@@ -304,6 +367,13 @@ python<span class="w"> </span>model_downloader.py<span class="w"> </span>--repo-
 
 <span class="c1"># Multi-task single artifact — download ONE task only (saves disk space / bandwidth)</span>
 python<span class="w"> </span>model_downloader.py<span class="w"> </span>--repo-id<span class="w"> </span>org/my-bundle<span class="w"> </span>--local-dir<span class="w"> </span>./eng_spa<span class="w"> </span>--task<span class="w"> </span>eng-spa
+
+<span class="c1"># Modular artifact — download only the components ONE task is assembled from</span>
+python<span class="w"> </span>model_downloader.py<span class="w"> </span>--repo-id<span class="w"> </span>org/my-modular<span class="w"> </span>--local-dir<span class="w"> </span>./eng_spa<span class="w"> </span>--task<span class="w"> </span>eng-spa
+</pre></div>
+</div>
+<p>The downloaded directory contains <code class="docutils literal notranslate"><span class="pre">inference.py</span></code>, so you can run it directly:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>./eng_spa/inference.py<span class="w"> </span>--model-dir<span class="w"> </span>./eng_spa<span class="w"> </span>--task<span class="w"> </span>eng-spa
 </pre></div>
 </div>
 </section>

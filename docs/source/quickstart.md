@@ -37,12 +37,12 @@ This gives you `train`, `val` (validation) and `test_2016_flickr` files for each
 
 ## Step 2: Train the tokenizers
 
-MAMMOTH uses [Hugging Face tokenizers](HF_TOKENIZERS.md). Each language gets its own tokenizer, trained with `mammoth/bin/build_vocab.py`. The script reads plain text, so decompress the training data first (`gzip -dc` works on both Linux and macOS):
+MAMMOTH uses [Hugging Face tokenizers](HF_TOKENIZERS.md). Each language gets its own tokenizer, trained with the `mammoth_build_vocab` command. The script reads plain text, so decompress the training data first (`gzip -dc` works on both Linux and macOS):
 
 ```bash
 for language in en de; do
     gzip -dc data/multi30k/train.${language}.gz > data/multi30k/train.${language}.txt
-    python mammoth/bin/build_vocab.py \
+    mammoth_build_vocab \
         --input_file data/multi30k/train.${language}.txt \
         --output_dir models/tokenizers/${language} \
         --vocab_size 8000

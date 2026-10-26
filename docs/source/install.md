@@ -58,6 +58,7 @@ The command-line tools installed by `pip install -e .` are:
 |---|---|
 | `mammoth_train` | train a model (equivalent to `python train.py`) |
 | `mammoth_translate` | translate with a trained model |
+| `mammoth_build_vocab` | train a BPE tokenizer, see [HF tokenizers](HF_TOKENIZERS.md) |
 | `mammoth_config_config` | generate multi-task configs, see [config_config](config_config.md) |
 | `mammoth_iterate_tasks` | list the tasks in a config, optionally as `--task_id` arguments with `--src`/`--output` path templates (handy for translation scripts) |
 | `mammoth_generate_synth_data` | generate synthetic toy data for the [quickstart](quickstart.md) |

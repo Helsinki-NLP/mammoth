@@ -55,10 +55,10 @@ You end up with `europarl_data/split/bg-en/{train,val}.{bg,en}` and the same for
 
 ## Step 2: Train the tokenizer
 
-All languages share one BPE tokenizer here, trained on the training files of every language. `build_vocab.py` accepts any number of input files:
+All languages share one BPE tokenizer here, trained on the training files of every language. `mammoth_build_vocab` accepts any number of input files:
 
 ```bash
-python mammoth/bin/build_vocab.py \
+mammoth_build_vocab \
     --input_file europarl_data/split/bg-en/train.bg europarl_data/split/bg-en/train.en \
                  europarl_data/split/cs-en/train.cs europarl_data/split/cs-en/train.en \
     --output_dir tokenizer \

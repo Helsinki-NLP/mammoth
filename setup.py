@@ -52,7 +52,7 @@ setup(
             "mammoth_generate_synth_data=mammoth.bin.generate_synth_data:main",
             # "onmt_release_model=mammoth.bin.release_model:main",
             # "onmt_average_models=mammoth.bin.average_models:main",
-            # "onmt_build_vocab=mammoth.bin.build_vocab:main",
+            "mammoth_build_vocab=mammoth.bin.build_vocab:main",
         ],
     },
 )

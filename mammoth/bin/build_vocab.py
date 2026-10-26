@@ -5,6 +5,7 @@ from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
 from tokenizers.pre_tokenizers import Metaspace
 from tokenizers.decoders import Metaspace as MetaspaceDecoder
+from transformers import PreTrainedTokenizerFast
 
 
 def parse_args():
@@ -34,17 +35,6 @@ def parse_args():
     return parser.parse_args()
 
 
-# Parse command line arguments
-args = parse_args()
-INPUT_FILE = args.input_file
-OUTPUT_DIR = args.output_dir
-VOCAB_SIZE = args.vocab_size
-
-# Validate input files exist
-for file_path in INPUT_FILE:
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Training file not found: {file_path}")
-
 # Validate UTF-8 encoding
 def validate_and_clean_if_needed(file_path, sample_size=10_000_000):
     """Validate UTF-8 and clean if necessary."""
@@ -72,104 +62,119 @@ def validate_and_clean_if_needed(file_path, sample_size=10_000_000):
         print(f"✓ Cleaned file saved to: {cleaned_path}")
         return cleaned_path
 
-# Validate and potentially clean all input files
-INPUT_FILES = []
-for file_path in INPUT_FILE:
-    validated_file = validate_and_clean_if_needed(file_path)
-    INPUT_FILES.append(validated_file)
 
-# Initialize tokenizer with BPE model
-tokenizer = Tokenizer(BPE(unk_token="<unk>",byte_fallback=True))
+def main():
+    # Parse command line arguments
+    args = parse_args()
+    INPUT_FILE = args.input_file
+    OUTPUT_DIR = args.output_dir
+    VOCAB_SIZE = args.vocab_size
 
-# Configure trainer with correct special tokens (no duplicates)
-trainer = BpeTrainer(
-    vocab_size=VOCAB_SIZE,
-    special_tokens=["</s>", "<pad>", "<s>", "<unk>", "<mask>"],
-    show_progress=True
-)
+    # Validate input files exist
+    for file_path in INPUT_FILE:
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"Training file not found: {file_path}")
 
-# Set pre-tokenizer
-tokenizer.pre_tokenizer = Metaspace(replacement="▁")
+    # Validate and potentially clean all input files
+    INPUT_FILES = []
+    for file_path in INPUT_FILE:
+        validated_file = validate_and_clean_if_needed(file_path)
+        INPUT_FILES.append(validated_file)
 
-# Train the tokenizer
-print(f"Training MARIAN-style tokenizer on {len(INPUT_FILES)} file(s)...")
-for i, file_path in enumerate(INPUT_FILES):
-    print(f"  [{i+1}/{len(INPUT_FILES)}] {file_path}")
-tokenizer.train(INPUT_FILES, trainer)
+    # Initialize tokenizer with BPE model
+    tokenizer = Tokenizer(BPE(unk_token="<unk>",byte_fallback=True))
 
-# Set decoder (MARIAN-style: properly handles ▁ markers during decoding)
-tokenizer.decoder = MetaspaceDecoder(replacement="▁")
+    # Configure trainer with correct special tokens (no duplicates)
+    trainer = BpeTrainer(
+        vocab_size=VOCAB_SIZE,
+        special_tokens=["</s>", "<pad>", "<s>", "<unk>", "<mask>"],
+        show_progress=True
+    )
 
-# NOTE: We DO NOT add a post-processor for BOS/EOS tokens here
-# MAMMOTH handles special token insertion during data loading (dataset.py:143-145)
-# The tokenizer's job is ONLY subword tokenization, not sequence formatting
-# This gives MAMMOTH flexibility to experiment with different special token strategies
+    # Set pre-tokenizer
+    tokenizer.pre_tokenizer = Metaspace(replacement="▁")
 
-# Enable padding (needed for batching)
-tokenizer.enable_padding(pad_id=tokenizer.token_to_id("<pad>"), pad_token="<pad>")
+    # Train the tokenizer
+    print(f"Training MARIAN-style tokenizer on {len(INPUT_FILES)} file(s)...")
+    for i, file_path in enumerate(INPUT_FILES):
+        print(f"  [{i+1}/{len(INPUT_FILES)}] {file_path}")
+    tokenizer.train(INPUT_FILES, trainer)
 
-# Save the trained tokenizer
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-tokenizer_path = os.path.join(OUTPUT_DIR, "tokenizer.json")
-tokenizer.save(tokenizer_path)
-print(f"Tokenizer saved to {tokenizer_path}")
+    # Set decoder (MARIAN-style: properly handles ▁ markers during decoding)
+    tokenizer.decoder = MetaspaceDecoder(replacement="▁")
 
-# Also save in HuggingFace format for easy loading later
-from transformers import PreTrainedTokenizerFast
+    # NOTE: We DO NOT add a post-processor for BOS/EOS tokens here
+    # MAMMOTH handles special token insertion during data loading (dataset.py:143-145)
+    # The tokenizer's job is ONLY subword tokenization, not sequence formatting
+    # This gives MAMMOTH flexibility to experiment with different special token strategies
 
-hf_tokenizer = PreTrainedTokenizerFast(
-    tokenizer_object=tokenizer,
-    bos_token="<s>",
-    eos_token="</s>",
-    unk_token="<unk>",
-    pad_token="<pad>",
-    mask_token="<mask>",
-)
+    # Enable padding (needed for batching)
+    tokenizer.enable_padding(pad_id=tokenizer.token_to_id("<pad>"), pad_token="<pad>")
 
-# Save HuggingFace tokenizer (creates tokenizer_config.json, special_tokens_map.json, etc.)
-hf_tokenizer.save_pretrained(OUTPUT_DIR)
-print(f"HuggingFace tokenizer saved to {OUTPUT_DIR}")
+    # Save the trained tokenizer
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    tokenizer_path = os.path.join(OUTPUT_DIR, "tokenizer.json")
+    tokenizer.save(tokenizer_path)
+    print(f"Tokenizer saved to {tokenizer_path}")
 
-# Test the tokenizer
-print("\n" + "="*70)
-print("TESTING MARIAN-STYLE TOKENIZER")
-print("="*70)
+    # Also save in HuggingFace format for easy loading later
+    hf_tokenizer = PreTrainedTokenizerFast(
+        tokenizer_object=tokenizer,
+        bos_token="<s>",
+        eos_token="</s>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+        mask_token="<mask>",
+    )
 
-test_text = "Hello, world! This is a test."
-encoded = tokenizer.encode(test_text)
+    # Save HuggingFace tokenizer (creates tokenizer_config.json, special_tokens_map.json, etc.)
+    hf_tokenizer.save_pretrained(OUTPUT_DIR)
+    print(f"HuggingFace tokenizer saved to {OUTPUT_DIR}")
 
-print(f"\nOriginal text: '{test_text}'")
-print(f"Tokens: {encoded.tokens}")
-print(f"Token IDs: {encoded.ids}")
+    # Test the tokenizer
+    print("\n" + "="*70)
+    print("TESTING MARIAN-STYLE TOKENIZER")
+    print("="*70)
 
-# Test decoding to verify punctuation handling
-decoded_text = tokenizer.decode(encoded.ids)
-print(f"Decoded text: '{decoded_text}'")
-print(f"Decoding matches original: {decoded_text == test_text}")
+    test_text = "Hello, world! This is a test."
+    encoded = tokenizer.encode(test_text)
 
-# Demonstrate how ▁ markers work
-print("\n" + "-"*70)
-print("UNDERSTANDING ▁ MARKERS:")
-print("-"*70)
-for i, token in enumerate(encoded.tokens):
-    has_marker = token.startswith("▁")
-    marker_info = "← Word boundary" if has_marker else "← Continuation"
-    print(f"  [{i}] '{token}' {marker_info}")
+    print(f"\nOriginal text: '{test_text}'")
+    print(f"Tokens: {encoded.tokens}")
+    print(f"Token IDs: {encoded.ids}")
 
-print("\n" + "-"*70)
-print("PUNCTUATION SPACING TEST:")
-print("-"*70)
-# Test that comma and period don't get spaces before them
-test_cases = [
-    "Hello, world!",
-    "I like apples, oranges, and bananas.",
-    "Dr. Smith said: \"Hello!\""
-]
+    # Test decoding to verify punctuation handling
+    decoded_text = tokenizer.decode(encoded.ids)
+    print(f"Decoded text: '{decoded_text}'")
+    print(f"Decoding matches original: {decoded_text == test_text}")
 
-for test in test_cases:
-    encoded = tokenizer.encode(test)
-    decoded = tokenizer.decode(encoded.ids)
-    match = "✓" if decoded == test else "✗"
-    print(f"{match} Original: '{test}'")
-    print(f"   Decoded:  '{decoded}'")
-    print()
+    # Demonstrate how ▁ markers work
+    print("\n" + "-"*70)
+    print("UNDERSTANDING ▁ MARKERS:")
+    print("-"*70)
+    for i, token in enumerate(encoded.tokens):
+        has_marker = token.startswith("▁")
+        marker_info = "← Word boundary" if has_marker else "← Continuation"
+        print(f"  [{i}] '{token}' {marker_info}")
+
+    print("\n" + "-"*70)
+    print("PUNCTUATION SPACING TEST:")
+    print("-"*70)
+    # Test that comma and period don't get spaces before them
+    test_cases = [
+        "Hello, world!",
+        "I like apples, oranges, and bananas.",
+        "Dr. Smith said: \"Hello!\""
+    ]
+
+    for test in test_cases:
+        encoded = tokenizer.encode(test)
+        decoded = tokenizer.decode(encoded.ids)
+        match = "✓" if decoded == test else "✗"
+        print(f"{match} Original: '{test}'")
+        print(f"   Decoded:  '{decoded}'")
+        print()
+
+
+if __name__ == "__main__":
+    main()

@@ -123,9 +123,9 @@ def train(opts):
                 tokenizer_dir,
                 extend_existing=bool(opts.train_from),
             )
-            for original_path, new_path in new_paths.items():
+            for (side, lang), (original_path, new_path) in new_paths.items():
                 if new_path != original_path:
-                    logger.info(f"Training uses {new_path} instead of {original_path}")
+                    logger.info(f"Training uses {new_path} instead of {original_path} ({side} {lang})")
 
     frame_checkpoint = None
     checkpoint_path = None

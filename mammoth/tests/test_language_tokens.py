@@ -56,34 +56,44 @@ def test_add_language_tokens_refuses_to_overwrite_original(tmp_path):
         add_language_tokens_to_tokenizer(original, {'<en>'}, original)
 
 
-def test_save_tokenizers_updates_opts_and_dedups(tmp_path):
-    shared = str(tmp_path / 'shared' / 'tokenizer.json')
-    _write_tokenizer(shared, {'<unk>': 0, 'a': 1})
-    # Different source file whose parent dir has the same name -> must not collide
-    other = str(tmp_path / 'x' / 'shared' / 'tokenizer.json')
-    _write_tokenizer(other, {'<unk>': 0, 'b': 1})
+def test_save_tokenizers_writes_one_copy_per_side_and_lang(tmp_path):
+    # deu and eng tokenizers live in directories with the same name (".../32000/")
+    deu = str(tmp_path / 'deu' / '32000' / 'tokenizer.json')
+    _write_tokenizer(deu, {'<unk>': 0, 'a': 1})
+    eng = str(tmp_path / 'eng' / '32000' / 'tokenizer.json')
+    _write_tokenizer(eng, {'<unk>': 0, 'b': 1})
     # Already contains the tokens -> keeps original path
     complete = str(tmp_path / 'complete' / 'tokenizer.json')
     _write_tokenizer(complete, {'<unk>': 0, '<en>': 1, '<fi>': 2})
 
     opts = SimpleNamespace(
-        src_vocab={'en': shared, 'fi': shared},
-        tgt_vocab={'en': shared, 'fi': other, 'de': complete},
+        src_vocab={'deu': deu, 'eng': eng},
+        tgt_vocab={'eng': eng, 'fin': deu, 'dan': complete},
     )
     out_dir = str(tmp_path / 'model' / 'tokenizers')
 
     new_paths = save_tokenizers_with_language_tokens(
-        opts, {'src': ['en', 'fi'], 'tgt': ['en', 'fi', 'de']}, {'<en>', '<fi>'}, out_dir
+        opts, {'src': ['deu', 'eng'], 'tgt': ['eng', 'fin', 'dan']}, {'<en>', '<fi>'}, out_dir
     )
 
-    shared_new = os.path.join(out_dir, 'shared', 'tokenizer.json')
-    other_new = os.path.join(out_dir, 'shared_2', 'tokenizer.json')
-    assert new_paths == {shared: shared_new, other: other_new, complete: complete}
-    assert opts.src_vocab == {'en': shared_new, 'fi': shared_new}
-    assert opts.tgt_vocab == {'en': shared_new, 'fi': other_new, 'de': complete}
-    assert '<en>' not in _read(shared)['model']['vocab']
-    assert _read(shared_new)['model']['vocab']['<fi>'] == 3
-    assert _read(other_new)['model']['vocab']['b'] == 1
+    def copy(side, lang):
+        return os.path.join(out_dir, side, f'{lang}_tokenizer.json')
+
+    assert new_paths == {
+        ('src', 'deu'): (deu, copy('src', 'deu')),
+        ('src', 'eng'): (eng, copy('src', 'eng')),
+        ('tgt', 'eng'): (eng, copy('tgt', 'eng')),
+        ('tgt', 'fin'): (deu, copy('tgt', 'fin')),
+        ('tgt', 'dan'): (complete, complete),
+    }
+    assert opts.src_vocab == {'deu': copy('src', 'deu'), 'eng': copy('src', 'eng')}
+    assert opts.tgt_vocab == {'eng': copy('tgt', 'eng'), 'fin': copy('tgt', 'fin'), 'dan': complete}
+    assert '<en>' not in _read(deu)['model']['vocab']
+    assert _read(copy('src', 'deu'))['model']['vocab']['<fi>'] == 3
+    assert _read(copy('tgt', 'eng'))['model']['vocab']['b'] == 1
+    # Languages sharing a source tokenizer get identical copies
+    assert _read(copy('tgt', 'fin')) == _read(copy('src', 'deu'))
+    assert sorted(os.listdir(out_dir)) == ['src', 'tgt']
 
 
 def test_config_pointing_at_saved_copy_is_extended_in_place(tmp_path):
@@ -96,14 +106,14 @@ def test_config_pointing_at_saved_copy_is_extended_in_place(tmp_path):
     langs = {'src': ['en'], 'tgt': ['fi']}
     save_tokenizers_with_language_tokens(opts, langs, {'<en>', '<fi>'}, out_dir)
     copy = opts.src_vocab['en']
-    assert copy == os.path.join(out_dir, 'shared', 'tokenizer.json')
+    assert copy == os.path.join(out_dir, 'src', 'en_tokenizer.json')
 
     # Resume with the config pointing at the copy, same languages: no error, nothing changes
     opts = SimpleNamespace(src_vocab={'en': copy}, tgt_vocab={'fi': copy})
     new_paths = save_tokenizers_with_language_tokens(
         opts, langs, {'<en>', '<fi>'}, out_dir, extend_existing=True
     )
-    assert new_paths == {copy: copy}
+    assert new_paths == {('src', 'en'): (copy, copy), ('tgt', 'fi'): (copy, copy)}
     assert opts.src_vocab == {'en': copy}
 
     # Resume with the copy and a new language '<da>' that sorts before the others:
@@ -122,7 +132,8 @@ def test_resume_with_original_path_extends_existing_copy(tmp_path):
     original = str(tmp_path / 'shared' / 'tokenizer.json')
     original_bytes = _write_tokenizer(original, {'<unk>': 0, 'a': 1})
     out_dir = str(tmp_path / 'model' / 'tokenizers')
-    copy = os.path.join(out_dir, 'shared', 'tokenizer.json')
+    copy = os.path.join(out_dir, 'src', 'en_tokenizer.json')
+    da_copy = os.path.join(out_dir, 'src', 'da_tokenizer.json')
 
     opts = SimpleNamespace(src_vocab={'en': original}, tgt_vocab={'fi': original})
     save_tokenizers_with_language_tokens(opts, {'src': ['en'], 'tgt': ['fi']}, {'<en>', '<fi>'}, out_dir)
@@ -132,8 +143,10 @@ def test_resume_with_original_path_extends_existing_copy(tmp_path):
     save_tokenizers_with_language_tokens(
         opts, {'src': ['en', 'da'], 'tgt': ['fi']}, {'<en>', '<fi>', '<da>'}, out_dir, extend_existing=True
     )
-    assert opts.src_vocab == {'en': copy, 'da': copy}
+    assert opts.src_vocab == {'en': copy, 'da': da_copy}
+    # Existing copy keeps its ids; the new language's copy is built fresh from the original
     assert _read(copy)['model']['vocab'] == {'<unk>': 0, 'a': 1, '<en>': 2, '<fi>': 3, '<da>': 4}
+    assert _read(da_copy)['model']['vocab'] == {'<unk>': 0, 'a': 1, '<da>': 2, '<en>': 3, '<fi>': 4}
     with open(original, 'rb') as f:
         assert f.read() == original_bytes
 
@@ -142,7 +155,7 @@ def test_fresh_training_rebuilds_copy_from_original(tmp_path):
     original = str(tmp_path / 'shared' / 'tokenizer.json')
     _write_tokenizer(original, {'<unk>': 0, 'a': 1})
     out_dir = str(tmp_path / 'model' / 'tokenizers')
-    copy = os.path.join(out_dir, 'shared', 'tokenizer.json')
+    copy = os.path.join(out_dir, 'src', 'en_tokenizer.json')
     # Stale copy left over from an earlier run in the same directory
     _write_tokenizer(copy, {'<unk>': 0, 'stale': 1, '<xx>': 2})
 

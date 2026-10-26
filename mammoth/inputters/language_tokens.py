@@ -135,9 +135,10 @@ def save_tokenizers_with_language_tokens(opts, langs_by_side, language_tokens, o
     Write an extended copy of every HuggingFace tokenizer used by the tasks into output_dir,
     and point opts.src_vocab / opts.tgt_vocab at the copies.
 
-    Each unique source tokenizer is written once, to output_dir/<source parent dir>/tokenizer.json,
-    so languages that share a tokenizer keep sharing it. Tokenizers that already contain all
-    language tokens keep their original path.
+    Each (side, language) gets its own copy at output_dir/<side>/<lang>_tokenizer.json, where lang
+    is the half of the task's src_tgt for that side (e.g. "deu-eng" -> src/deu_tokenizer.json and
+    tgt/eng_tokenizer.json). Languages that share a source tokenizer get identical copies, so their
+    ids stay the same. Tokenizers that already contain all language tokens keep their original path.
 
     A source tokenizer that is itself a copy inside output_dir (the config points at the saved copy)
     is extended in place. With extend_existing (resuming), an existing copy is extended instead of
@@ -152,44 +153,38 @@ def save_tokenizers_with_language_tokens(opts, langs_by_side, language_tokens, o
         extend_existing: Build on an existing copy in output_dir instead of the original
 
     Returns:
-        Dict mapping original tokenizer path to the path now used for training.
+        Dict mapping (side, lang) to (original tokenizer path, path now used for training).
     """
     output_dir = os.path.abspath(output_dir)
     new_paths = {}
-    used_names = set()
     for side in ('src', 'tgt'):
         vocab_paths = getattr(opts, f'{side}_vocab')
         for lang in langs_by_side[side]:
+            if (side, lang) in new_paths:
+                continue
             original_path = vocab_paths[lang]
             if not original_path.endswith('.json'):
                 continue
-            if original_path not in new_paths:
-                source_dir = os.path.dirname(os.path.abspath(original_path))
-                if os.path.dirname(source_dir) == output_dir:
-                    # Config already points at a copy we wrote: extend it in place
-                    used_names.add(os.path.basename(source_dir))
+            source_dir = os.path.dirname(os.path.abspath(original_path))
+            if os.path.dirname(source_dir) == output_dir:
+                # Config already points at a copy we wrote: extend it in place
+                add_language_tokens_to_tokenizer(
+                    original_path, language_tokens, original_path, overwrite_input=True
+                )
+                new_path = original_path
+            else:
+                output_path = os.path.join(output_dir, side, f'{lang}_tokenizer.json')
+                if extend_existing and os.path.exists(output_path):
+                    logger.info(f"Extending existing tokenizer copy {output_path} (source: {original_path})")
                     add_language_tokens_to_tokenizer(
-                        original_path, language_tokens, original_path, overwrite_input=True
+                        output_path, language_tokens, output_path, overwrite_input=True
                     )
-                    new_paths[original_path] = original_path
+                    new_path = output_path
                 else:
-                    name = os.path.basename(source_dir) or 'tokenizer'
-                    unique_name, i = name, 1
-                    while unique_name in used_names:
-                        i += 1
-                        unique_name = f'{name}_{i}'
-                    used_names.add(unique_name)
-                    output_path = os.path.join(output_dir, unique_name, 'tokenizer.json')
-                    if extend_existing and os.path.exists(output_path):
-                        logger.info(f"Extending existing tokenizer copy {output_path} (source: {original_path})")
-                        add_language_tokens_to_tokenizer(
-                            output_path, language_tokens, output_path, overwrite_input=True
-                        )
-                        new_paths[original_path] = output_path
-                    else:
-                        n_added = add_language_tokens_to_tokenizer(original_path, language_tokens, output_path)
-                        new_paths[original_path] = output_path if n_added else original_path
-            vocab_paths[lang] = new_paths[original_path]
+                    n_added = add_language_tokens_to_tokenizer(original_path, language_tokens, output_path)
+                    new_path = output_path if n_added else original_path
+            new_paths[(side, lang)] = (original_path, new_path)
+            vocab_paths[lang] = new_path
     return new_paths
 
 

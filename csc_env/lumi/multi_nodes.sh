@@ -7,10 +7,10 @@
 #SBATCH --partition=dev-g
 #SBATCH --nodes=2
 #SBATCH --ntasks=2
-#SBATCH --cpus-per-task=56
+#SBATCH --cpus-per-task=28
 #SBATCH --mem=0
 #SBATCH --time=00:30:00
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:4
 
 
 echo "Starting at `date`"
@@ -38,10 +38,10 @@ echo "Master node: ${MASTER_NODE}"
 echo "Master port: ${MASTER_PORT}"
 
 python mammoth/train.py \
-    -config ./two_nodes.yaml \
+    -config ${SLURM_SUBMIT_DIR}/multi_nodes.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip ${MASTER_NODE} \
-    --master_port ${MASTER_PORT} \
+    --master_port ${MASTER_PORT}
 EOF
 
 chmod +x ./two_nodes_wrapper_script.sh

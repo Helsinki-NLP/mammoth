@@ -29,7 +29,7 @@ This creates a venv inside the container with all dependencies. Edit the script 
 
 ### Single-Node Training
 
-Use `csc_env/lumi/single_node/single_node_train.sh` as a template. Key SLURM options:
+Use `csc_env/lumi/single_node.sh` as a template. Key SLURM options:
 
 ```
 #SBATCH --partition=dev-g
@@ -51,7 +51,7 @@ singularity exec \
 
 ### Multi-Node Training
 
-Use `csc_env/lumi/multi_nodes/two_nodes.sh` as a template. Key SLURM options for 2 nodes × 4 GPUs:
+Use `csc_env/lumi/multi_nodes.sh` as a template. Key SLURM options for 2 nodes × 4 GPUs:
 
 ```
 #SBATCH --partition=dev-g
@@ -74,7 +74,7 @@ Inside the wrapper, each node gets its rank from `$SLURM_PROCID`:
 
 ```bash
 python mammoth/train.py \
-    -config two_nodes.yaml \
+    -config ${SLURM_SUBMIT_DIR}/multi_nodes.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip ${MASTER_NODE} \
     --master_port ${MASTER_PORT}
@@ -90,7 +90,7 @@ gpu_ranks: [0, 1, 2, 3]
 
 ### Inference (LUMI)
 
-Use `csc_env/translate.sh` as a template. Edit the SLURM options as needed (inference only supports one GPU at a time):
+Use `csc_env/lumi/translate.sh` as a template. Edit the SLURM options as needed (inference only supports one GPU at a time):
 
 ```bash
 #SBATCH --partition=dev-g

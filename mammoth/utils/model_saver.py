@@ -146,13 +146,28 @@ def _migrate_wrapper_modules_from_old_checkpoint(
     return False
 
 
+def _format_key_summary(missing_keys_summary, unexpected_keys_summary, limit=None):
+    """Formats missing/unexpected checkpoint keys, showing at most `limit` of each (None = all)."""
+    msg = ""
+    for title, keys in (("Missing", missing_keys_summary), ("Unexpected", unexpected_keys_summary)):
+        if not keys:
+            continue
+        msg += f"\n\n{title} parameters ({len(keys)}):"
+        shown = keys if limit is None else keys[:limit]
+        for key in shown:
+            msg += f"\n  - {key}"
+        if len(keys) > len(shown):
+            msg += f"\n  ... and {len(keys) - len(shown)} more"
+    return msg
+
+
 def load_parameters_from_checkpoint(
     frame_checkpoint_path,
     model,
     optim,
     task_queue_manager,
     reset_optim=False,
-    yes_i_messed_with_the_checkpoint=False,
+    allow_partial_checkpoint=False,
 ):
     """
     Splits the model into distributed components
@@ -243,25 +258,20 @@ def load_parameters_from_checkpoint(
                 f"All modules and optimizer restored from checkpoint {checkpoint_prefix}"
             )
     else:
-        if yes_i_messed_with_the_checkpoint:
+        if allow_partial_checkpoint:
+            # List everything here: this is the place to check that only the intended
+            # (new) components were reinitialized, not something lost to a config typo.
             logger.warning(
-                "Proceeding with a partial checkpoint due to --yes_i_messed_with_the_checkpoint"
+                "Proceeding with a partial checkpoint due to --allow_partial_checkpoint. "
+                "Parameters not covered by the checkpoint keep their random initialization."
+                + _format_key_summary(missing_keys_summary, unexpected_keys_summary, limit=None)
             )
         else:
-            error_msg = "Some parameters are missing from the checkpoint."
-            if missing_keys_summary:
-                error_msg += f"\n\nMissing parameters ({len(missing_keys_summary)}):"
-                for key in missing_keys_summary[:10]:  # Show first 10 to avoid overwhelming
-                    error_msg += f"\n  - {key}"
-                if len(missing_keys_summary) > 10:
-                    error_msg += f"\n  ... and {len(missing_keys_summary) - 10} more"
-            if unexpected_keys_summary:
-                error_msg += f"\n\nUnexpected parameters ({len(unexpected_keys_summary)}):"
-                for key in unexpected_keys_summary[:10]:  # Show first 10 to avoid overwhelming
-                    error_msg += f"\n  - {key}"
-                if len(unexpected_keys_summary) > 10:
-                    error_msg += f"\n  ... and {len(unexpected_keys_summary) - 10} more"
-            raise Exception(error_msg)
+            raise Exception(
+                "Some parameters are missing from the checkpoint."
+                + _format_key_summary(missing_keys_summary, unexpected_keys_summary, limit=10)
+                + "\n\nIf this is intended (e.g. adding new components), set --allow_partial_checkpoint."
+            )
 
 
 def load_model_for_translation(opts, task_queue_manager, task=None, model_path=None):
@@ -296,7 +306,7 @@ def load_model_for_translation(opts, task_queue_manager, task=None, model_path=N
         optim=None,
         task_queue_manager=task_queue_manager,
         reset_optim=True,
-        yes_i_messed_with_the_checkpoint=opts.yes_i_messed_with_the_checkpoint,
+        allow_partial_checkpoint=opts.allow_partial_checkpoint,
     )
 
     device = torch.device("cuda" if use_gpu(opts) else "cpu")

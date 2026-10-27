@@ -671,10 +671,20 @@ def _add_train_general_opts(parser):
              "Checkpoints only save: (1) model architecture, (2) model weights, (3) optimizer state buffers.",
     )
     group.add(
+        '--allow_partial_checkpoint',
+        '-allow_partial_checkpoint',
+        # Deprecated alias, kept so old configs keep working
         '--yes_i_messed_with_the_checkpoint',
         '-yes_i_messed_with_the_checkpoint',
+        dest='allow_partial_checkpoint',
         action='store_true',
-        help="Only set this if you know what you are doing."
+        help="Continue loading when the checkpoint does not cover the whole model "
+             "(missing component files, missing/unexpected keys, or missing optimizer state). "
+             "Uncovered parameters keep their fresh random initialization. "
+             "Needed when extending a trained model with new components (languages, sharing groups, stacks). "
+             "WARNING: a typo in a sharing group or a wrong checkpoint prefix looks exactly the same, "
+             "so check the logged list of reinitialized components. "
+             "--yes_i_messed_with_the_checkpoint is a deprecated alias.",
     )
 
     # Granular parameter freezing

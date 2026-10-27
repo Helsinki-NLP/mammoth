@@ -214,9 +214,4 @@ save_checkpoint_steps: 2500
 keep_checkpoint: 1
 ```
 
-The example configs also enable a BART-style denoising objective (`denoising_objective: bart`, `mask_ratio`, `mask_length`, `poisson_lambda`, `replace_length`); remove those keys if you only want plain translation training.
-
 For multi-GPU / multi-node runs, add one entry to `tasks` per language pair and place each on a GPU with `node_gpu: "<node>:<gpu>"`. Set `n_nodes`, `gpu_ranks` (GPU ids per node) and `world_size` (total GPU count) to match. See `csc_env/roihu/multi_nodes.yaml` for a 2-node × 4-GPU example with eight tasks.
-
-## Notes:
-- To test a different scheme, change only the `enc_sharing_group` / `dec_sharing_group` entries (and `node_gpu` if you add tasks), retrain, and point `task_id` at the task you want to decode.

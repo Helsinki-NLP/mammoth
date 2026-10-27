@@ -101,9 +101,9 @@ label_smoothing: 0.1
 batch_size: 4096
 batch_type: tokens
 normalization: tokens
-valid_batch_size: 2048
-src_seq_length_max: 100
-tgt_seq_length_max: 100
+valid_batch_size: 1024
+src_seq_length_max: 256
+tgt_seq_length_max: 256
 
 # ---- Optimization ----
 optim: adam
@@ -113,16 +113,15 @@ learning_rate: 0.0005
 decay_method: linear_warmup
 warmup_steps: 1000
 max_grad_norm: 1.0
-train_steps: 10000
-valid_steps: 1000
+train_steps: 2500
+valid_steps: 500
 report_every: 100
-save_checkpoint_steps: 2500
+save_checkpoint_steps: 500
 keep_checkpoint: 3
 seed: 3435
 
 # ---- Output ----
 save_model: models/multi30k_en_de
-max_length: 200
 ```
 
 The keys worth knowing about:

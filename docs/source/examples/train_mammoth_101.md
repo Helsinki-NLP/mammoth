@@ -335,29 +335,28 @@ Checkpoints are written under `models/`, named from `save_model` and the step nu
 
 ### Several nodes with Slurm
 
-Start the same command once per node, each with its own `--node_rank`, and point every node at the same master address. With Slurm, `srun` starts one wrapper per node, and the wrapper reads the rank from the environment. Save this as `train_multinode.sh`:
+Multi-node training is currently tested only on HPC clusters that use Slurm, such as LUMI and Roihu. Launch it with the script for your cluster:
+
+| Cluster | Script |
+|---|---|
+| LUMI | [`csc_env/lumi/multi_nodes.sh`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/lumi/multi_nodes.sh) |
+| Roihu | [`csc_env/roihu/multi-nodes.sh`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/roihu/multi-nodes.sh) |
+
+Each script finds the master node, writes a small wrapper script, and uses `srun` to run that wrapper once per node. Each node then starts training with its own `--node_rank`. Copy the script for your cluster and edit:
+
+- `#SBATCH -A`: your project account.
+- `#SBATCH --nodes` and `--ntasks`: set both to the config's `n_nodes` (`5` for `europarl_21langs_5nodes.yaml`). The scripts start one task per node.
+- The virtual environment and MAMMOTH paths in the wrapper.
+- The `-config` path: point it at `europarl_21langs_5nodes.yaml`.
+
+Create the log directory, then submit the job (on Roihu, the script is `multi-nodes.sh`):
 
 ```bash
-#!/bin/bash
-#SBATCH --nodes=5
-#SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:4
-#SBATCH --time=72:00:00
-
-MASTER_NODE=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
-MASTER_PORT=9973
-
-srun bash -c "mammoth_train \
-    --config europarl_21langs_5nodes.yaml \
-    --node_rank \${SLURM_NODEID} \
-    --master_ip ${MASTER_NODE} \
-    --master_port ${MASTER_PORT}"
+mkdir -p log/train
+sbatch multi_nodes.sh
 ```
 
-Then submit it with `sbatch train_multinode.sh`.
-
-- `n_nodes` in the config must equal the number of Slurm nodes, and `--node_rank` must equal the node's index. MAMMOTH checks both against `SLURM_NNODES` / `SLURM_NODEID` and stops with an error if they differ.
-- The partition, account, modules or container, and GPU-type options in the `#SBATCH` header depend on your cluster. For LUMI and Roihu, see the [CSC quickstart](../CSC_quickstart.md).
+MAMMOTH checks `n_nodes` and `--node_rank` against `SLURM_NNODES` / `SLURM_NODEID`, and stops with an error if they differ. For the partitions, GPU options and environment setup on each cluster, see the [CSC quickstart](../CSC_quickstart.md).
 
 ## Step 6: Translate
 

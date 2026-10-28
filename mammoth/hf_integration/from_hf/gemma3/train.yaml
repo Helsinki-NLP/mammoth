@@ -183,7 +183,7 @@ valid_steps: 12000                    # Validation frequency
 valid_metrics: [bleu,chrf]                # Validation metrics
 
 save_strategy: best_and_last
-metric_for_best_model: chrf
+metric_for_best_model: mean_chrf
 keep_checkpoint: 3                   # Keep last 5 checkpoints
 
 # ============================================================================

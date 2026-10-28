@@ -14,6 +14,14 @@ from mammoth.utils.logging import logger
 from mammoth.utils.misc import use_gpu
 from mammoth.utils.parse import ArgumentParser
 
+# --metric_for_best_model choices -> (validation metric name, greater_is_better)
+BEST_MODEL_METRICS = {
+    'mean_bleu': ('bleu', True),
+    'mean_chrf': ('chrf', True),
+    'mean_ppl': ('ppl', False),
+}
+DEFAULT_BEST_MODEL_METRIC = 'mean_ppl'
+
 
 def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_manager):
     # _check_save_model_path
@@ -431,21 +439,20 @@ class ModelSaver(ModelSaverBase):
         # one-shot conversion scripts' build_model_saver() calls).
         strategy_opts = opts if opts is not None else model_opts
         self.save_strategy = getattr(strategy_opts, 'save_strategy', 'steps')
-        self.metric_for_best_model = getattr(strategy_opts, 'metric_for_best_model', 'ppl')
-        self.greater_is_better = getattr(strategy_opts, 'greater_is_better', None)
-
-        # Auto-infer greater_is_better if not specified
-        if self.greater_is_better is None:
-            if self.metric_for_best_model in ['ppl', 'perplexity', 'loss']:
-                self.greater_is_better = False
-            elif self.metric_for_best_model in ['accuracy', 'bleu', 'chrf']:
-                self.greater_is_better = True
-            else:
-                logger.warning(
-                    f"Cannot auto-infer greater_is_better for metric '{self.metric_for_best_model}'. "
-                    f"Defaulting to False. Please set --greater_is_better explicitly."
+        metric = getattr(strategy_opts, 'metric_for_best_model', DEFAULT_BEST_MODEL_METRIC)
+        if metric not in BEST_MODEL_METRICS:
+            if opts is not None:
+                raise ValueError(
+                    f"metric_for_best_model={metric!r} is not supported. Choices: {sorted(BEST_MODEL_METRICS)}"
                 )
-                self.greater_is_better = False
+            # model_opts fallback: frames saved before the option was restricted
+            # may carry e.g. 'bleu'. These callers don't validate, so don't fail.
+            logger.warning(
+                f"Ignoring legacy metric_for_best_model={metric!r}; using {DEFAULT_BEST_MODEL_METRIC!r}"
+            )
+            metric = DEFAULT_BEST_MODEL_METRIC
+        self.metric_for_best_model = metric
+        self.greater_is_better = BEST_MODEL_METRICS[metric][1]
 
         # Best checkpoint tracking
         self.best_metric_value = float('-inf') if self.greater_is_better else float('inf')
@@ -485,105 +492,100 @@ class ModelSaver(ModelSaverBase):
         else:
             return current < best
 
-    def _aggregate_metrics_across_devices(self, metric_value, device_context):
-        """Aggregate validation metrics across all devices in distributed training.
+    def _best_metric_state(self):
+        """Best-so-far tracking, stored in each checkpoint frame so a resumed run continues it."""
+        if self.best_checkpoint_step is None:
+            return None
+        return {
+            "metric": self.metric_for_best_model,
+            "value": float(self.best_metric_value),
+            "step": self.best_checkpoint_step,
+        }
 
-        In multi-task distributed training, each device validates its own tasks.
-        This method collects metrics from all devices and uses a conservative
-        aggregation strategy that focuses on the worst-performing task:
+    def restore_best_metric(self, frame_checkpoint):
+        """Continue best-checkpoint tracking from a `train_from` frame.
 
-        - PPL/loss (lower is better): use max (worst-performing task)
-        - BLEU/accuracy (higher is better): use min (worst-performing task)
-
-        This ensures we don't save a checkpoint that excels at one task
-        while performing poorly on others.
-
-        Args:
-            metric_value: Metric value from this device (None if no validation data)
-            device_context: Distributed training device context
+        Without this, a resumed run starts from +/-inf and its first validation
+        always counts as a new best (and resets early-stopping patience).
 
         Returns:
-            float: Aggregated metric value
+            bool: True if the best value was restored.
         """
-        if not device_context.is_distributed():
-            # Single device - no aggregation needed
-            return metric_value
-
-        # Gather metrics from all devices
-        all_metrics = [None for _ in range(device_context.world_size)]
-        torch.distributed.all_gather_object(all_metrics, metric_value)
-
-        # Filter out None values (devices without validation data)
-        valid_metrics = [m for m in all_metrics if m is not None]
-
-        if not valid_metrics:
-            # No device had a usable value for the configured metric this round
-            # (e.g. metric_for_best_model='bleu' but no device produced any
-            # non-empty predictions yet). Propagate None rather than a bogus
-            # sentinel: `_is_better_metric` treats None as "not better", so this
-            # round is skipped instead of comparing against a fabricated value
-            # that would incorrectly count as best (previously always float('inf'),
-            # which for greater_is_better metrics like bleu/accuracy compares as
-            # better than everything).
-            logger.warning("No validation metrics collected from any device!")
-            return metric_value
-
-        # Choose aggregation strategy based on metric type (conservative approach)
-        if self.greater_is_better:
-            # For BLEU, accuracy (higher is better): use min (worst-performing task)
-            aggregated = min(valid_metrics)
-            strategy = 'min'
-        else:
-            # For PPL, loss (lower is better): use max (worst-performing task)
-            aggregated = max(valid_metrics)
-            strategy = 'max'
-
-        if device_context.is_master():
+        best = frame_checkpoint.get("best_metric") if frame_checkpoint else None
+        if best is None:
+            logger.info("train_from frame has no best_metric (older checkpoint); best tracking starts fresh")
+            return False
+        if best["metric"] != self.metric_for_best_model:
             logger.info(
-                f"Multi-task metric aggregation ({strategy}): "
-                f"collected {len(valid_metrics)} metrics {[f'{m:.4f}' for m in valid_metrics]}, "
-                f"aggregated = {aggregated:.4f}"
+                f"train_from frame tracked {best['metric']}, this run uses {self.metric_for_best_model}; "
+                "best tracking starts fresh"
             )
+            return False
+        self.best_metric_value = best["value"]
+        self.best_checkpoint_step = best["step"]
+        logger.info(
+            f"Restored best {self.metric_for_best_model}={self.best_metric_value:.4f} "
+            f"at step {self.best_checkpoint_step} from train_from frame"
+        )
+        return True
 
-        return aggregated
+    def _local_scores(self, valid_stats):
+        """Scores this device contributes to the cross-device mean.
 
-    def _extract_metric_value(self, valid_stats):
-        """Extract the configured metric value from validation statistics.
+        BLEU/chrF are taken per task (`bleu/<corpus_id>` keys, not the per-device
+        mean under `bleu`), so a device validating several tasks weighs in once
+        per task. Perplexity only exists per device: validation pools all of a
+        device's tasks into one Statistics object.
+        """
+        if valid_stats is None:
+            return []
+        name, _ = BEST_MODEL_METRICS[self.metric_for_best_model]
+        if name == 'ppl':
+            ppl = valid_stats.ppl()
+            return [] if ppl is None else [ppl]
+        prefix = f'{name}/'
+        return [v for k, v in valid_stats.validation_metrics.items() if k.startswith(prefix)]
 
-        This method knows how to pull different metrics from the validation
-        statistics object. It handles special cases like perplexity and
-        accuracy which have dedicated methods, as well as custom metrics
-        stored in the validation_metrics dictionary.
+    def _mean_metric_across_devices(self, valid_stats, device_context):
+        """Mean of the configured metric over every validated task on every device.
 
-        Args:
-            valid_stats: Statistics object with validation metrics
+        Collective: all ranks must call it, including ranks without validation
+        data (they pass valid_stats=None and contribute nothing). Skipping it on
+        some ranks desyncs the collective call order for the rest of the process
+        group and corrupts unrelated collectives later on (e.g. the data_state
+        all_gather_object in _save()).
 
         Returns:
-            float: The metric value
-
-        Raises:
-            ValueError: If the configured metric is not found
+            float, or None if no device produced a score this round (e.g. 'mean_bleu'
+            before the model produces any non-empty predictions). `_is_better_metric`
+            treats None as "not better".
         """
-        metric_name = self.metric_for_best_model
+        scores = self._local_scores(valid_stats)
+        if device_context.is_distributed():
+            gathered = [None for _ in range(device_context.world_size)]
+            torch.distributed.all_gather_object(gathered, scores)
+            scores = [score for device_scores in gathered for score in device_scores]
 
-        if metric_name in ['ppl', 'perplexity']:
-            return valid_stats.ppl()
-        elif metric_name == 'accuracy':
-            return valid_stats.accuracy()
-        elif metric_name == 'bleu' and hasattr(valid_stats, 'validation_metrics') and 'bleu' in valid_stats.validation_metrics:
-            return valid_stats.validation_metrics['bleu']
-        elif metric_name == 'chrf' and hasattr(valid_stats, 'validation_metrics') and 'chrf' in valid_stats.validation_metrics:
-            return valid_stats.validation_metrics['chrf']
-        elif hasattr(valid_stats, 'validation_metrics') and metric_name in valid_stats.validation_metrics:
-            return valid_stats.validation_metrics[metric_name]
-        else:
-            available = ['ppl', 'accuracy']
-            if hasattr(valid_stats, 'validation_metrics'):
-                available.extend(list(valid_stats.validation_metrics.keys()))
-            raise ValueError(
-                f"Metric '{metric_name}' not found in validation statistics. "
-                f"Available: {available}"
-            )
+        if not scores:
+            logger.warning(f"No {self.metric_for_best_model} scores collected from any device!")
+            return None
+
+        mean = sum(scores) / len(scores)
+        if device_context.is_master():
+            logger.info(f"{self.metric_for_best_model} = {mean:.4f} (over {len(scores)} scores)")
+        return mean
+
+    def _record_metrics(self, step, valid_stats, metric_value):
+        """Store this step's metrics for the metadata JSON and rotation (master only).
+
+        The master's own task metrics are kept for reference; the key
+        `metric_for_best_model` holds the cross-device mean that actually ranks
+        checkpoints. Recorded even when the master has no validation data, so
+        rotation still sees every step.
+        """
+        metrics = self._get_all_metrics(valid_stats) if valid_stats is not None else {}
+        metrics[self.metric_for_best_model] = metric_value
+        self.checkpoint_metadata[step] = metrics
 
     def _get_all_metrics(self, valid_stats):
         """Extract all available metrics from validation statistics.
@@ -718,14 +720,13 @@ class ModelSaver(ModelSaverBase):
 
         elif self.save_strategy == 'best_n':
             # Keep top N by metric value
-            sorted_by_metric = sorted(
-                all_steps,
-                key=lambda s: self.checkpoint_metadata[s].get(
-                    self.metric_for_best_model,
-                    float('-inf') if self.greater_is_better else float('inf')
-                ),
-                reverse=self.greater_is_better
-            )
+            worst = float('-inf') if self.greater_is_better else float('inf')
+
+            def rank_key(step):
+                value = self.checkpoint_metadata[step].get(self.metric_for_best_model)
+                return worst if value is None else value
+
+            sorted_by_metric = sorted(all_steps, key=rank_key, reverse=self.greater_is_better)
             steps_to_keep = set(sorted_by_metric[:self.keep_checkpoint])
 
         else:
@@ -762,35 +763,20 @@ class ModelSaver(ModelSaverBase):
         Returns:
             bool: True if this is a new best metric
         """
-        # Extract metric value from valid_stats (None if this device has no validation data)
-        metric_value = None
-        if valid_stats is not None:
-            try:
-                metric_value = self._extract_metric_value(valid_stats)
-            except ValueError as e:
-                logger.warning(f"Could not extract metric: {e}. Treating as no metric for this device.")
-                metric_value = None
+        # Collective: every rank must reach this call.
+        metric_value = self._mean_metric_across_devices(valid_stats, device_context)
 
-        # Aggregate metrics across all devices in distributed training.
-        # Every rank MUST reach this collective call regardless of whether metric
-        # extraction succeeded locally: skipping it on some ranks desyncs the
-        # collective call order for the rest of the process group and corrupts
-        # unrelated collectives later on (e.g. all_gather_object in _save()).
-        aggregated_metric = self._aggregate_metrics_across_devices(metric_value, device_context)
-
-        # Store metadata (only on master device)
-        if device_context.is_master() and valid_stats is not None:
-            self.checkpoint_metadata[step] = self._get_all_metrics(valid_stats)
-            self.checkpoint_metadata[step]['aggregated_' + self.metric_for_best_model] = aggregated_metric
+        if device_context.is_master():
+            self._record_metrics(step, valid_stats, metric_value)
 
         # Update best checkpoint tracking (no file ops, just bookkeeping)
-        is_new_best = self._is_better_metric(aggregated_metric, self.best_metric_value)
+        is_new_best = self._is_better_metric(metric_value, self.best_metric_value)
         if is_new_best:
-            self.best_metric_value = aggregated_metric
+            self.best_metric_value = metric_value
             self.best_checkpoint_step = step
             logger.info(
                 f"New best metric at step {step} with "
-                f"aggregated {self.metric_for_best_model}={aggregated_metric:.4f}"
+                f"{self.metric_for_best_model}={metric_value:.4f}"
             )
 
         # Write metadata file so users can inspect metric history
@@ -825,33 +811,19 @@ class ModelSaver(ModelSaverBase):
         if self.keep_checkpoint == 0 or step == self.last_saved_step:
             return False
 
-        # Extract metric value from valid_stats (None if this device has no validation data)
-        metric_value = None
-        if valid_stats is not None:
-            try:
-                metric_value = self._extract_metric_value(valid_stats)
-            except ValueError as e:
-                logger.warning(f"Could not extract metric: {e}. Treating as no metric for this device.")
-                metric_value = None
+        # Collective: every rank must reach this call regardless of local state.
+        metric_value = self._mean_metric_across_devices(valid_stats, device_context)
 
-        # Aggregate metrics across all devices in distributed training.
-        # Every rank MUST reach this collective call regardless of whether metric
-        # extraction succeeded locally: skipping it on some ranks (e.g. by taking
-        # a "fallback save" shortcut here) desyncs the collective call order for
-        # the rest of the process group. A later, unrelated all_gather_object
-        # (e.g. the data_state gather in _save()) then gets matched against this
-        # one on other ranks, corrupting both -- this is what caused
-        # "TypeError: '<' not supported between instances of 'dict' and 'float'".
-        aggregated_metric = self._aggregate_metrics_across_devices(metric_value, device_context)
+        if device_context.is_master():
+            self._record_metrics(step, valid_stats, metric_value)
 
-        # Store metadata for this checkpoint (only on master device)
-        if device_context.is_master() and valid_stats is not None:
-            self.checkpoint_metadata[step] = self._get_all_metrics(valid_stats)
-            # Add aggregated metric to metadata
-            self.checkpoint_metadata[step]['aggregated_' + self.metric_for_best_model] = aggregated_metric
-
-        # Determine if this is a new best checkpoint (using aggregated metric)
-        is_new_best = self._is_better_metric(aggregated_metric, self.best_metric_value)
+        # Determine if this is a new best checkpoint. Update the tracking before
+        # _save() so this step's frame already records itself as the best.
+        is_new_best = self._is_better_metric(metric_value, self.best_metric_value)
+        old_best_step = self.best_checkpoint_step
+        if is_new_best:
+            self.best_metric_value = metric_value
+            self.best_checkpoint_step = step
 
         # Handle moving average temporarily if provided
         save_model = self.model
@@ -878,14 +850,11 @@ class ModelSaver(ModelSaverBase):
 
         # Update best checkpoint tracking
         if is_new_best:
-            old_best_step = self.best_checkpoint_step
-            self.best_metric_value = aggregated_metric
-            self.best_checkpoint_step = step
             self.best_checkpoint_files = checkpoint_files
 
             logger.info(
                 f"New best checkpoint at step {step} with "
-                f"aggregated {self.metric_for_best_model}={aggregated_metric:.4f}"
+                f"{self.metric_for_best_model}={metric_value:.4f}"
             )
             if old_best_step is not None:
                 logger.info(f"Previous best was step {old_best_step}")
@@ -1044,6 +1013,9 @@ class ModelSaver(ModelSaverBase):
                 "opts": self.model_opts,
                 "global_training_step": self.optim.global_training_step,
             }
+            best_metric = self._best_metric_state()
+            if best_metric is not None:
+                module_state_dicts["frame"]["best_metric"] = best_metric
 
         # In a distributed context, aggregate all data states for corpus restoration
         if device_context.is_distributed():

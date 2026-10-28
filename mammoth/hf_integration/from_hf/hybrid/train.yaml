@@ -136,7 +136,7 @@ tensorboard_log_dir: /scratch/project_462000964/members/wangchao/training/181125
 
 # Validation
 early_stopping: 5
-early_stopping_criteria: ppl         # Perplexity
+metric_for_best_model: mean_ppl     # also picks the best checkpoint
 
 # Save options
 save_model: /scratch/project_462000964/members/wangchao/training/181125/model/

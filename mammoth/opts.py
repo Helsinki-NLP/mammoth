@@ -538,17 +538,13 @@ def _add_train_general_opts(parser):
         '--metric_for_best_model',
         '-metric_for_best_model',
         type=str,
-        default='bleu',
-        help="Metric to use for determining best checkpoint. "
-        "Options: 'ppl' (perplexity), 'accuracy', 'bleu', 'chrf', or custom metric name",
-    )
-    group.add(
-        '--greater_is_better',
-        '-greater_is_better',
-        type=lambda x: x.lower() == 'true',
-        default=None,
-        help="Whether higher metric values are better. "
-        "If None, auto-inferred: False for ppl, True for accuracy/bleu",
+        default='mean_ppl',
+        choices=['mean_bleu', 'mean_chrf', 'mean_ppl'],
+        help="Validation metric that picks the best checkpoint and drives early stopping, "
+        "averaged over all validated tasks on all devices:\n"
+        "  'mean_ppl': mean of per-device perplexity (lower is better)\n"
+        "  'mean_bleu' / 'mean_chrf': mean of per-task BLEU / chrF (higher is better; "
+        "requires it in --valid_metrics)",
     )
     group.add('--train_steps', '-train_steps', type=int, default=100000, help='Number of training steps')
     group.add('--epochs', '-epochs', type=int, default=0, help='Deprecated epochs see train_steps')
@@ -561,14 +557,11 @@ def _add_train_general_opts(parser):
     group.add('--valid_max_batches', '-valid_max_batches', type=int, default=None, help='Maximum number of batches used for validation.')
     group.add('--valid_metrics', '-valid_metrics', nargs='*', default=[], help='List of names of additional validation metrics')
     group.add(
-        '--early_stopping', '-early_stopping', type=int, default=0, help='Number of validation steps without improving.'
-    )
-    group.add(
-        '--early_stopping_criteria',
-        '-early_stopping_criteria',
-        nargs="*",
-        default=None,
-        help='Criteria to use for early stopping.',
+        '--early_stopping',
+        '-early_stopping',
+        type=int,
+        default=0,
+        help='Number of validations without improvement in --metric_for_best_model before stopping.',
     )
 
     # GPU

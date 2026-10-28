@@ -8,97 +8,28 @@ class PatienceEnum(Enum):
     STOPPED = 2
 
 
-class Scorer(object):
-    def __init__(self, best_score, name):
-        self.best_score = best_score
-        self.name = name
-
-    def is_improving(self, stats):
-        raise NotImplementedError()
-
-    def is_decreasing(self, stats):
-        raise NotImplementedError()
-
-    def update(self, stats):
-        self.best_score = self._caller(stats)
-
-    def __call__(self, stats, **kwargs):
-        return self._caller(stats)
-
-    def _caller(self, stats):
-        raise NotImplementedError()
-
-
-class PPLScorer(Scorer):
-    def __init__(self):
-        super(PPLScorer, self).__init__(float("inf"), "ppl")
-
-    def is_improving(self, stats):
-        return stats.ppl() < self.best_score
-
-    def is_decreasing(self, stats):
-        return stats.ppl() > self.best_score
-
-    def _caller(self, stats):
-        return stats.ppl()
-
-
-class AccuracyScorer(Scorer):
-    def __init__(self):
-        super(AccuracyScorer, self).__init__(float("-inf"), "acc")
-
-    def is_improving(self, stats):
-        return stats.accuracy() > self.best_score
-
-    def is_decreasing(self, stats):
-        return stats.accuracy() < self.best_score
-
-    def _caller(self, stats):
-        return stats.accuracy()
-
-
-DEFAULT_SCORERS = [PPLScorer(), AccuracyScorer()]
-
-
-SCORER_BUILDER = {"ppl": PPLScorer, "accuracy": AccuracyScorer}
-
-
-def scorers_from_opts(opts):
-    if opts.early_stopping_criteria is None:
-        return DEFAULT_SCORERS
-    else:
-        scorers = []
-        for criterion in set(opts.early_stopping_criteria):
-            assert criterion in SCORER_BUILDER.keys(), "Criterion {} not found".format(criterion)
-            scorers.append(SCORER_BUILDER[criterion]())
-        return scorers
-
-
 class EarlyStopping(object):
-    def __init__(self, tolerance, scorers=DEFAULT_SCORERS):
+    def __init__(self, tolerance):
         """
-        Callable class to keep track of early stopping.
+        Patience counter for early stopping.
+
+        The improvement signal comes from ModelSaver (--metric_for_best_model,
+        averaged over all tasks on all devices), so early stopping and
+        best-checkpoint selection always agree.
 
         Args:
-            tolerance(int): number of validation steps without improving
-            scorer(fn): list of scorers to validate performance on dev
+            tolerance(int): number of validations without improvement before stopping
         """
 
         self.tolerance = tolerance
-        self.stalled_tolerance = self.tolerance
         self.current_tolerance = self.tolerance
-        self.early_stopping_scorers = scorers
         self.status = PatienceEnum.IMPROVING
         self.current_step_best = 0
 
     def update(self, is_new_best, step):
         """Update early stopping state using a pre-computed is_new_best boolean.
 
-        Use this instead of __call__ when the improvement signal comes from an
-        aggregated metric (e.g. from model_saver across all distributed tasks).
-        Patience decreases whenever the aggregated metric did not improve.
-
-        :param is_new_best: True if the aggregated validation metric improved
+        :param is_new_best: True if the validation metric improved
         :param step: Current training step
         """
         if self.status == PatienceEnum.STOPPED:
@@ -107,66 +38,9 @@ class EarlyStopping(object):
         if is_new_best:
             self.current_step_best = step
             self.current_tolerance = self.tolerance
-            self.stalled_tolerance = self.tolerance
             self.status = PatienceEnum.IMPROVING
         else:
             self._update_decreasing()
-
-    def __call__(self, valid_stats, step):
-        """
-            Update the internal state of early stopping mechanism, whether to
-        continue training or stop the train procedure.
-
-            Checks whether the scores from all pre-chosen scorers improved. If
-        every metric improve, then the status is switched to improving and the
-        tolerance is reset. If every metric deteriorate, then the status is
-        switched to decreasing and the tolerance is also decreased; if the
-        tolerance reaches 0, then the status is changed to stopped.
-        Finally, if some improved and others not, then it's considered stalled;
-        after tolerance number of stalled, the status is switched to stopped.
-
-        :param valid_stats: Statistics of dev set
-        """
-
-        if self.status == PatienceEnum.STOPPED:
-            # Don't do anything
-            return
-
-        if all([scorer.is_improving(valid_stats) for scorer in self.early_stopping_scorers]):
-            self._update_increasing(valid_stats, step)
-
-        elif all([scorer.is_decreasing(valid_stats) for scorer in self.early_stopping_scorers]):
-            self._update_decreasing()
-
-        else:
-            self._update_stalled()
-
-    def _update_stalled(self):
-        self.stalled_tolerance -= 1
-
-        logger.info("Stalled patience: {}/{}".format(self.stalled_tolerance, self.tolerance))
-
-        if self.stalled_tolerance == 0:
-            logger.info("Training finished after stalled validations. Early Stop!")
-            self._log_best_step()
-
-        self._decreasing_or_stopped_status_update(self.stalled_tolerance)
-
-    def _update_increasing(self, valid_stats, step):
-        self.current_step_best = step
-        for scorer in self.early_stopping_scorers:
-            logger.info(
-                "Model is improving {}: {:g} --> {:g}.".format(scorer.name, scorer.best_score, scorer(valid_stats))
-            )
-            # Update best score of each criteria
-            scorer.update(valid_stats)
-
-        # Reset tolerance
-        self.current_tolerance = self.tolerance
-        self.stalled_tolerance = self.tolerance
-
-        # Update current status
-        self.status = PatienceEnum.IMPROVING
 
     def _update_decreasing(self):
         # Decrease tolerance

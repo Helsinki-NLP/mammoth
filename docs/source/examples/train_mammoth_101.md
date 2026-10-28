@@ -202,7 +202,7 @@ train_steps: 100000
 valid_steps: 5000
 report_every: 100
 early_stopping: 5
-early_stopping_criteria: accuracy
+metric_for_best_model: mean_ppl
 seed: 3435
 
 # ---- Output ----

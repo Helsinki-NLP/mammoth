@@ -116,8 +116,14 @@ def build_trainer(
     dropout_steps = opts.dropout_steps
     gpu_verbose_level = opts.gpu_verbose_level
 
+    best_metric = getattr(opts, 'metric_for_best_model', 'mean_ppl')
+    if best_metric in ('mean_bleu', 'mean_chrf'):
+        needed = best_metric.split('_', 1)[1]
+        if needed not in (opts.valid_metrics or []):
+            raise ValueError(f"--metric_for_best_model {best_metric} requires '{needed}' in --valid_metrics")
+
     earlystopper = (
-        mammoth.utils.EarlyStopping(opts.early_stopping, scorers=mammoth.utils.scorers_from_opts(opts))
+        mammoth.utils.EarlyStopping(opts.early_stopping)
         if opts.early_stopping > 0
         else None
     )
@@ -504,9 +510,9 @@ class Trainer(object):
                             step, self._data_state, valid_stats, device_context, moving_average=self.moving_average
                         )
 
-                # Early stopping: driven by aggregated is_new_best from model_saver so that
-                # all tasks across all GPUs inform the patience counter, not just the master's
-                # local tasks. Master keeps count, then broadcasts stop decision.
+                # Early stopping: driven by is_new_best from model_saver (--metric_for_best_model,
+                # averaged over all tasks on all GPUs), so stopping and best-checkpoint selection
+                # always agree. Master keeps count, then broadcasts stop decision.
                 should_stop = False
                 if device_context.is_master():
                     if self.earlystopper is not None and self.model_saver is not None:

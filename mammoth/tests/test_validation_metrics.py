@@ -107,26 +107,16 @@ def test_unknown_metric_name_is_ignored(preds_by_direction, refs_by_direction):
 
 
 # ---------------------------------------------------------------------------
-# ModelSaver: metric_for_best_model='chrf' auto-inference
+# ModelSaver: metric_for_best_model direction
 # ---------------------------------------------------------------------------
 
-def test_greater_is_better_autoinfer_for_chrf():
-    """metric_for_best_model='chrf' with greater_is_better=None should infer True.
-
-    This test pokes the auto-infer block in model_saver.py directly to avoid
-    constructing a full ModelSaver (which needs a real model, vocabs, etc.).
-    It mirrors the logic; once implemented, the real assertion is that 'chrf'
-    is added to the `greater_is_better = True` branch at model_saver.py:431.
-    """
-    from mammoth.utils import model_saver as ms
-    import inspect
-    src = inspect.getsource(ms)
-    # After implementation, the `['accuracy', 'bleu']` list in the
-    # greater_is_better auto-infer branch should include 'chrf'.
-    assert "'chrf'" in src or '"chrf"' in src, (
-        "Expected 'chrf' to be added to the greater_is_better auto-infer branch "
-        "in model_saver.py (around line 431)."
-    )
+def test_best_model_metric_directions():
+    from mammoth.utils.model_saver import BEST_MODEL_METRICS
+    assert BEST_MODEL_METRICS == {
+        'mean_bleu': ('bleu', True),
+        'mean_chrf': ('chrf', True),
+        'mean_ppl': ('ppl', False),
+    }
 
 
 # ---------------------------------------------------------------------------

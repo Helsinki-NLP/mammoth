@@ -340,6 +340,13 @@ def main(
     )
     logger.info("{} - Trainer built".format(device_context.id))
 
+    # Resuming (training step kept): continue best-checkpoint tracking instead of
+    # restarting from +/-inf. Every rank restores the same value from the same
+    # frame, so is_new_best stays consistent across ranks.
+    if opts.train_from and opts.reset_optim in {'none', 'states'}:
+        if model_saver.restore_best_metric(frame_checkpoint) and trainer.earlystopper is not None:
+            trainer.earlystopper.current_step_best = model_saver.best_checkpoint_step
+
     # It is no longer possible to train without multiprocessing
     assert batch_queue is not None
     assert semaphore is not None

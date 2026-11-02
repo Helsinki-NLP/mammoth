@@ -81,6 +81,9 @@ def _get_model_opts(opts, frame_checkpoint=None):
         # model_opts.update_vocab = opts.update_vocab
     else:
         model_opts = opts
+        # New models get per-language post-embedding norms; recording it in
+        # the frame is what tells later loads how this model is built.
+        model_opts.post_emb_norm_scope = 'language'
     return model_opts
 
 

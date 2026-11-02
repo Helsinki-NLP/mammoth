@@ -174,10 +174,26 @@ class DistributedEmbedding(DistributedComponent):
         return f'{side_str}_embeddings_{self.lang}'
 
     def get_module(self, model: NMTModel) -> nn.Module:
-        if self.side == Side.encoder:
-            return model.encoder.get_embedding_by_lang(self.lang)
-        else:
-            return model.decoder.get_embedding_by_lang(self.lang)
+        parent = model.encoder if self.side == Side.encoder else model.decoder
+        embedding = parent.get_embedding_by_lang(self.lang)
+        post_emb_norm = parent.get_post_emb_norm_by_lang(self.lang)
+        if post_emb_norm is None:
+            # post_emb_norm_scope='component': the file holds just the embedding ("weight")
+            return embedding
+        # post_emb_norm_scope='language': the language's norm is saved with its embedding
+        return _EmbeddingWithNorm(embedding, post_emb_norm)
+
+
+class _EmbeddingWithNorm(nn.Module):
+    """Virtual view of a language's embedding plus its own post-embedding norm.
+
+    The embedding's parameter is registered directly as "weight", so the saved
+    keys are a superset of a plain embedding file: {"weight", "post_emb_norm.weight"}.
+    """
+    def __init__(self, embedding: nn.Embedding, post_emb_norm: nn.Module):
+        super().__init__()
+        self.register_parameter('weight', embedding.weight)
+        self.post_emb_norm = post_emb_norm
 
 
 @dataclass
@@ -202,6 +218,8 @@ class DistributedWrapperModules(DistributedComponent):
         """Returns a virtual ModuleDict of the per-component wrapper modules."""
         parent = model.encoder if self.side == Side.encoder else model.decoder
         modules = nn.ModuleDict()
+        # With post_emb_norm_scope='language' this is an Identity (the norms live
+        # with the language embeddings), so it is skipped here.
         post_emb_norm = parent.get_post_emb_norm_by_component(self.component_key)
         if post_emb_norm is not None and not isinstance(post_emb_norm, nn.Identity):
             modules['post_emb_norm'] = post_emb_norm

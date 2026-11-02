@@ -24,6 +24,7 @@ class StackXcoder(nn.Module):
         shared_post_emb_norms: nn.ModuleDict,
         shared_rotary_embs: nn.ModuleDict,
         shared_to_logits: nn.ModuleDict,
+        shared_lang_post_emb_norms: Optional[nn.ModuleDict] = None,
     ):
         super().__init__()
         # Single owners of all shared parameters.
@@ -32,6 +33,11 @@ class StackXcoder(nn.Module):
         self.shared_post_emb_norms = shared_post_emb_norms
         self.shared_rotary_embs = shared_rotary_embs
         self.shared_to_logits = shared_to_logits
+        # Per-language post-embedding norms (post_emb_norm_scope='language');
+        # empty in the default per-component scope.
+        self.shared_lang_post_emb_norms = (
+            shared_lang_post_emb_norms if shared_lang_post_emb_norms is not None else nn.ModuleDict()
+        )
         # Lightweight routing views — no parameters of their own (only emb_dropout).
         self.task_wrappers = nn.ModuleDict(task_wrappers)
 
@@ -61,6 +67,10 @@ class StackXcoder(nn.Module):
     def get_post_emb_norm_by_component(self, component_key: tuple):
         key = '__'.join(component_key)
         return self.shared_post_emb_norms[key]
+
+    def get_post_emb_norm_by_lang(self, lang: str) -> Optional[nn.Module]:
+        """The language's own norm, or None when norms are per component."""
+        return self.shared_lang_post_emb_norms[lang] if lang in self.shared_lang_post_emb_norms else None
 
     def get_pos_emb_by_component(self, component_key: tuple):
         key = '__'.join(component_key)

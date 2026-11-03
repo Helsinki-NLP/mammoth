@@ -68,7 +68,7 @@ def load_mammoth_model(mammoth_checkpoint, task_id, decoder_group, lang, weight=
         optim=None,
         task_queue_manager=tqm,
         reset_optim=True,
-        yes_i_messed_with_the_checkpoint=False,
+        allow_partial_checkpoint=False,
     )
     mammoth_model.eval()
     return mammoth_model, tqm

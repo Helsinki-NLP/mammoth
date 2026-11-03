@@ -208,7 +208,7 @@ class TestLanguageScope:
         extended, extended_tqm = _build(_opts('language'), ['swe', 'nob', 'dan'])
         load_parameters_from_checkpoint(
             f'{prefix}_frame.pt', extended, None, extended_tqm,
-            reset_optim=True, yes_i_messed_with_the_checkpoint=True,
+            reset_optim=True, allow_partial_checkpoint=True,
         )
         for src in ('swe', 'nob'):
             assert torch.equal(_encode(model, src), _encode(extended, src))

@@ -50,7 +50,7 @@ This works for a model trained with per-language norms (anything trained on this
 3. Train with:
 
    ```
-   --train_from <ckpt_dir> --reset_optim all --yes_i_messed_with_the_checkpoint
+   --train_from <ckpt_dir> --reset_optim all --allow_partial_checkpoint
    --freeze_encoder --freeze_decoder --freeze_decoder_embeddings
    ```
 

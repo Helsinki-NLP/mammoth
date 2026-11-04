@@ -53,6 +53,9 @@ setup(
             # "onmt_release_model=mammoth.bin.release_model:main",
             # "onmt_average_models=mammoth.bin.average_models:main",
             "mammoth_build_vocab=mammoth.bin.build_vocab:main",
+            "mammoth_convert2hf=mammoth.hf_integration.to_hf.convert_mammoth_to_hf:main",
+            "mammoth_push2hf=mammoth.hf_integration.to_hf.push_to_hub:main",
+            "mammoth_download_hf=mammoth.hf_integration.to_hf.model_downloader:main",
         ],
     },
 )

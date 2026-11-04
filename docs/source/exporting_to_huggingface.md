@@ -17,7 +17,7 @@ Mammoth uses **separate source and target vocabularies**, so each artifact conta
 If the pre-trained Mammoth model has only one task, you can convert it into a standalone NMT model:
 
 ```bash
-python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
+mammoth_convert2hf \
   --checkpoint-dir <path> \
   --output-dir <path>
 ```
@@ -56,7 +56,7 @@ If the pre-trained Mammoth model has more than one task, there are three approac
 #### Modular
 
 ```bash
-python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
+mammoth_convert2hf \
   --checkpoint-dir <path> \
   --output-dir <path> \
   --modular
@@ -103,7 +103,7 @@ Only the components the model needs are downloaded. **Limitation:** the wrapper 
 Each task is converted as a standalone model (same structure as single-task above). By default, the script converts all tasks:
 
 ```bash
-python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
+mammoth_convert2hf \
   --checkpoint-dir <path> \
   --output-dir <path>
 ```
@@ -135,7 +135,7 @@ hf_multi_task/
 Use the `--task` flag to convert only a specific task:
 
 ```bash
-python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
+mammoth_convert2hf \
   --checkpoint-dir <path> \
   --output-dir <path> \
   --task eng-spa
@@ -146,7 +146,7 @@ python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
 All submodels are bundled into one artifact:
 
 ```bash
-python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
+mammoth_convert2hf \
   --checkpoint-dir <path> \
   --output-dir <path> \
   --single-artifact
@@ -180,7 +180,7 @@ hf_single_artifact/
 ## Push the Converted Model to Model Hub
 
 ```bash
-python mammoth/hf_integration/to_hf/push_to_hub.py \
+mammoth_push2hf \
   --model-dir <path> \
   --repo-id <org/model-name> \
   [--private] \
@@ -189,9 +189,11 @@ python mammoth/hf_integration/to_hf/push_to_hub.py \
 
 This script uploads the entire directory, so it works for single-task, multi-task, single-artifact, and modular models alike.
 
-Every converted directory contains a `README.md` model card, generated from its `config.json`. It is the page users see on the Hub: a self-contained guide listing the trained tasks with ready-to-run commands. The converter cannot know the repo id, so the card uses a `<repo_id>` placeholder; `push_to_hub.py` fills in `--repo-id` before uploading. Edit the README before pushing if you want to add details such as training data, evaluation scores or a license.
+Every converted directory contains a `README.md` model card, generated from its `config.json`. It is the page users see on the Hub: a self-contained guide listing the trained tasks with ready-to-run commands. The converter cannot know the repo id, so the card uses a `<repo_id>` placeholder; `mammoth_push2hf` fills in `--repo-id` before uploading. Edit the README before pushing if you want to add details such as training data, evaluation scores or a license.
 
 ## Inference
+
+This section is for running a converted model. If you have MAMMOTH installed and the original checkpoint, you can translate with `mammoth_translate` directly instead (see the [quickstart](quickstart.md)).
 
 No Mammoth installation is required. Set up a fresh environment with the minimum dependencies:
 
@@ -256,7 +258,9 @@ print(translate(src_tok, tgt_tok, model, ["Helsinki is the capital of Finland."]
 
 ## Download Models for Local Use
 
-By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `model_downloader.py`, which is also shipped in every artifact:
+By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `model_downloader.py`, which is also shipped in every artifact. If you have MAMMOTH installed, `mammoth_download_hf` takes the same options and needs no separate download.
+
+Without MAMMOTH, fetch the script first:
 
 ```bash
 hf download <repo_id_on_HF> model_downloader.py --local-dir .

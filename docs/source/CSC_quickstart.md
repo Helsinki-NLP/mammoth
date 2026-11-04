@@ -7,6 +7,8 @@ This guide covers how to set up and run MAMMOTH training jobs on two CSC superco
 
 Both use SLURM for job scheduling. The main difference is that LUMI requires a Singularity container while Roihu runs with native modules.
 
+The job templates in [`csc_env/`](https://github.com/Helsinki-NLP/mammoth/tree/main/csc_env) run MAMMOTH from a shared source checkout (`<Path to Python> mammoth/train.py`). If you install the package into your own venv instead (`pip install mammoth-nlp`; it keeps the PyTorch already provided by the container or module), replace `<Path to Python> mammoth/train.py` with `mammoth_train` and `<Path to Python> mammoth/translate.py` with `mammoth_translate`. The options stay the same.
+
 ---
 
 ## LUMI (AMD MI250X)
@@ -196,7 +198,7 @@ srun ./multinode_train_script.sh
 Inside the wrapper, each node gets its rank from `$SLURM_PROCID`:
 
 ```bash
-python train.py \
+python mammoth/train.py \
     -config multi_node_train.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip ${MASTER_NODE} \
@@ -220,4 +222,3 @@ export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 /scratch/<your_project>/mammoth-shared/.venv/bin/python /scratch/<your_project>/mammoth-shared/mammoth_pytorch/mammoth/translate.py -config <your_inference_config_yaml>
 ```
----

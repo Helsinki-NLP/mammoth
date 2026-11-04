@@ -10,7 +10,7 @@ It is the multi-GPU follow-up to the [Quickstart](../quickstart.md), which train
 4. Scale the config to more languages and to several nodes.
 5. Launch training.
 
-Tokenization uses [Hugging Face tokenizers](../HF_TOKENIZERS.md), and the model is MAMMOTH's native PyTorch Transformer. Run every command from the root of the MAMMOTH repository, with the environment from the [installation guide](../install.md) active.
+Tokenization uses [Hugging Face tokenizers](../HF_TOKENIZERS.md), and the model is MAMMOTH's native PyTorch Transformer. Run every command from the same working directory, with MAMMOTH installed (`pip install mammoth-nlp`, see the [installation guide](../install.md)) and its environment active.
 
 ## The model you will train
 
@@ -38,7 +38,7 @@ mkdir europarl_data
 tar -xvzf europarl-3langs.tar.gz -C europarl_data
 ```
 
-The next step is to check that source and target are line-aligned, clean the pairs, shuffle, and hold out a validation set. This is done by the `prepare_parallel.py` script from [Preparing your data](../prepare_data.md#step-2-check-clean-and-split-trainvalid). Save that script, then run:
+The next step is to check that source and target are line-aligned, clean the pairs, shuffle, and hold out a validation set. This is done by the `prepare_parallel.py` script from [Preparing your data](../prepare_data.md) (Step 2). Save that script, then run:
 
 ```bash
 for lang in bg cs; do
@@ -372,6 +372,6 @@ mammoth_translate \
     --beam_size 5
 ```
 
-`--task_id` selects the task's encoder, decoder and tokenizers; it is the key under `tasks`. See the [Quickstart](../quickstart.md#step-5-translate) for scoring the output.
+`--task_id` selects the task's encoder, decoder and tokenizers; it is the key under `tasks`. See the [Quickstart](../quickstart.md) (Step 5) for scoring the output.
 
 Hooray! Take a moment to celebrate the progress you've made. Wait for hours (or days, for the full set) and the model training should be completed soon.

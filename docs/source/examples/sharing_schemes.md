@@ -9,7 +9,7 @@ MAMMOTH is designed as a flexible modular system, allowing users to configure, t
 
 The scheme is controlled entirely by the YAML config, so switching between schemes never requires a code change.
 
-The commands below follow the ready-to-use setups in `csc_env/` for the CSC supercomputers ([LUMI](https://docs.lumi-supercomputer.eu/) with AMD MI250X, and Roihu with NVIDIA GH200). The same configs work on any SLURM cluster, or on a single workstation GPU, once you adapt the paths.
+The commands below follow the ready-to-use setups in [`csc_env/`](https://github.com/Helsinki-NLP/mammoth/tree/main/csc_env) for the CSC supercomputers ([LUMI](https://docs.lumi-supercomputer.eu/) with AMD MI250X, and Roihu with NVIDIA GH200). The same configs work on any SLURM cluster, or on a single workstation GPU, once you adapt the paths.
 
 
 ## Data and Tokenizers
@@ -110,7 +110,7 @@ Note that embeddings and vocabularies stay per-language even in the fully shared
    - `enc_layers` / `dec_layers` take a list, one entry per stack, and each stack gets its own sharing id.
    - This lets one part of the encoder be language-specific while another part is shared.
 
-The multi-node Roihu example (`csc_env/roihu/multi_nodes.yaml`) uses a two-stack encoder and a single shared-by-target decoder stack:
+The multi-node Roihu example ([`csc_env/roihu/multi_nodes.yaml`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/roihu/multi_nodes.yaml)) uses a two-stack encoder and a single shared-by-target decoder stack:
 ```yaml
 enc_layers: [6,6]    # two encoder stacks of 6 layers each
 dec_layers: [12]     # one decoder stack of 12 layers
@@ -126,7 +126,7 @@ The `enc_sharing_group` list must have as many entries as `enc_layers` (likewise
 
 ## Example Configuration
 
-A complete single-task config (`csc_env/lumi/single_node.yaml`; `csc_env/roihu/single_node.yaml` is identical apart from the paths). Adapt the paths to your machine:
+A complete single-task config ([`csc_env/lumi/single_node.yaml`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/lumi/single_node.yaml); [`csc_env/roihu/single_node.yaml`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/roihu/single_node.yaml) is identical apart from the paths). Adapt the paths to your machine:
 
 ```yaml
 tasks:
@@ -214,4 +214,4 @@ save_checkpoint_steps: 2500
 keep_checkpoint: 1
 ```
 
-For multi-GPU / multi-node runs, add one entry to `tasks` per language pair and place each on a GPU with `node_gpu: "<node>:<gpu>"`. Set `n_nodes`, `gpu_ranks` (GPU ids per node) and `world_size` (total GPU count) to match. See `csc_env/roihu/multi_nodes.yaml` for a 2-node × 4-GPU example with eight tasks.
+For multi-GPU / multi-node runs, add one entry to `tasks` per language pair and place each on a GPU with `node_gpu: "<node>:<gpu>"`. Set `n_nodes`, `gpu_ranks` (GPU ids per node) and `world_size` (total GPU count) to match. See [`csc_env/roihu/multi_nodes.yaml`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/roihu/multi_nodes.yaml) for a 2-node × 4-GPU example with eight tasks.

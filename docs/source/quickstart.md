@@ -14,9 +14,9 @@ For running on the CSC supercomputers (LUMI, Roihu), see the [LUMI & Roihu quick
 
 ## Before you start
 
-- Install MAMMOTH from source by following the [installation guide](install.md). Activate the environment you created there.
+- Install MAMMOTH with `pip install mammoth-nlp` (see the [installation guide](install.md)) and activate that environment.
 - A GPU (NVIDIA or AMD) is recommended. MAMMOTH also trains and translates on CPU, which is enough to check your setup but too slow for a useful model. To use the CPU, change the hardware settings as shown in Step 3.
-- Run every command below from the root of the MAMMOTH repository.
+- Run every command below from the same working directory, for example a new empty folder. All paths are relative to it.
 
 ## Step 1: Download the data
 

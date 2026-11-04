@@ -8,9 +8,30 @@ This guide covers installing MAMMOTH on a local machine or a generic GPU server.
 - PyTorch 2.8 or newer (the test suite is verified on 2.8.0). A GPU build is needed for real training. CPU-only is fine for tests and small experiments.
 - A Unix-like OS (Linux or macOS)
 
-## Install from source (recommended)
+## Install from PyPI (recommended)
 
-Installing from source gives you the latest code and lets you edit it.
+```bash
+python -m venv .venv
+source .venv/bin/activate
+
+pip install mammoth-nlp
+```
+
+This installs MAMMOTH, its dependencies and its command-line tools.
+
+### Choosing the right PyTorch build
+
+`mammoth-nlp` asks for `torch>=2.8`, which pip resolves to the default PyPI build. For a specific CUDA or ROCm version, install PyTorch first by following the selector at [pytorch.org](https://pytorch.org/get-started/locally/), then install MAMMOTH:
+
+```bash
+# example: CUDA 12.6 wheels
+pip install torch --index-url https://download.pytorch.org/whl/cu126
+pip install mammoth-nlp   # keeps the torch you just installed if it satisfies torch>=2.8
+```
+
+## Install from source
+
+Install from source if you want the latest unreleased code or want to edit MAMMOTH itself.
 
 ```bash
 git clone https://github.com/Helsinki-NLP/mammoth.git
@@ -23,27 +44,7 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
-
-### Choosing the right PyTorch build
-
-`requirements.txt` asks for `torch>=2.8`, which pip resolves to the default PyPI build. For a specific CUDA or ROCm version, install PyTorch first by following the selector at [pytorch.org](https://pytorch.org/get-started/locally/), then install the rest:
-
-```bash
-# example: CUDA 12.6 wheels
-pip install torch --index-url https://download.pytorch.org/whl/cu126
-pip install -r requirements.txt   # keeps the torch you just installed if it satisfies torch>=2.8
-pip install -e .
-```
-
-If you need a torch older than 2.8, skip that line with `grep -v '^torch' requirements.txt | pip install -r /dev/stdin`.
-
-## Install from PyPI
-
-```bash
-pip install mammoth-nlp
-```
-
-This installs the package and its console scripts, but not the dependencies (see the note above). Install PyTorch and the packages from `requirements.txt` separately.
+To pick a PyTorch build, install it first as shown above. If you need a torch older than 2.8, skip the torch line with `grep -v '^torch' requirements.txt | pip install -r /dev/stdin`.
 
 ## Verify the installation
 
@@ -52,18 +53,24 @@ python -c "import mammoth, torch; print('torch', torch.__version__, '| cuda', to
 mammoth_train --help
 ```
 
-The command-line tools installed by `pip install -e .` are:
+The command-line tools installed with the package are:
 
 | Command | Purpose |
 |---|---|
-| `mammoth_train` | train a model (equivalent to `python train.py`) |
+| `mammoth_train` | train a model |
 | `mammoth_translate` | translate with a trained model |
-| `mammoth_build_vocab` | train a BPE tokenizer, see [HF tokenizers](HF_TOKENIZERS.md) |
-| `mammoth_config_config` | generate multi-task configs, see [config_config](config_config.md) |
+| `mammoth_build_vocab` | train a BPE tokenizer |
 | `mammoth_iterate_tasks` | list the tasks in a config, optionally as `--task_id` arguments with `--src`/`--output` path templates (handy for translation scripts) |
-| `mammoth_generate_synth_data` | generate synthetic toy data for the [quickstart](quickstart.md) |
+| `mammoth_generate_synth_data` | generate synthetic toy data for the quickstart |
+| `mammoth_convert2hf` | convert a trained model to Hugging Face format |
+| `mammoth_push2hf` | upload a converted model to the Hugging Face Hub |
+| `mammoth_download_hf` | download a model (or one task of a bundle) from the Hugging Face Hub |
 
-The repository root also has `train.py` and `translate.py`, which do the same thing without installing the package.
+See [HF tokenizers](HF_TOKENIZERS.md) for `mammoth_build_vocab`, the [quickstart](quickstart.md) for training and translating, and [export to Hugging Face](exporting_to_huggingface.md) for the three Hugging Face commands.
+
+Other tools run as Python modules, for example `python -m mammoth.bin.config_config` ([config_config](config_config.md)).
+
+In a source checkout, the repository root also has `train.py` and `translate.py`, which do the same as `mammoth_train` and `mammoth_translate`.
 
 ## Optional dependencies
 

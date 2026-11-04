@@ -117,10 +117,10 @@ The script only does basic cleaning. For further filtering, for example by lengt
 
 ### Step 3: Train a tokenizer
 
-Train a BPE tokenizer on the **training** files with `mammoth/bin/build_vocab.py` (run from the root of the MAMMOTH repository). It needs the `tokenizers` and `transformers` packages, both listed in `requirements.txt`.
+Train a BPE tokenizer on the **training** files with the `mammoth_build_vocab` command, which is installed with the package. It needs the `tokenizers` and `transformers` packages, both listed in `requirements.txt`.
 
 ```bash
-python mammoth/bin/build_vocab.py \
+mammoth_build_vocab \
     --input_file europarl_data/split/bg-en/train.bg europarl_data/split/bg-en/train.en \
                  europarl_data/split/cs-en/train.cs europarl_data/split/cs-en/train.en \
     --output_dir tokenizer \

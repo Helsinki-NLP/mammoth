@@ -10,7 +10,7 @@ It is the multi-GPU follow-up to the [Quickstart](../quickstart.md), which train
 4. Scale the config to more languages and to several nodes.
 5. Launch training.
 
-Tokenization uses [Hugging Face tokenizers](../HF_TOKENIZERS.md), and the model is MAMMOTH's native PyTorch Transformer. Run every command from the root of the MAMMOTH repository, with the environment from the [installation guide](../install.md) active.
+Tokenization uses [Hugging Face tokenizers](../HF_TOKENIZERS.md), and the model is MAMMOTH's native PyTorch Transformer. Run every command from the same working directory, with MAMMOTH installed (`pip install mammoth-nlp`, see the [installation guide](../install.md)) and its environment active.
 
 ## The model you will train
 
@@ -38,7 +38,7 @@ mkdir europarl_data
 tar -xvzf europarl-3langs.tar.gz -C europarl_data
 ```
 
-The next step is to check that source and target are line-aligned, clean the pairs, shuffle, and hold out a validation set. This is done by the `prepare_parallel.py` script from [Preparing your data](../prepare_data.md#step-2-check-clean-and-split-trainvalid). Save that script, then run:
+The next step is to check that source and target are line-aligned, clean the pairs, shuffle, and hold out a validation set. This is done by the `prepare_parallel.py` script from [Preparing your data](../prepare_data.md) (Step 2). Save that script, then run:
 
 ```bash
 for lang in bg cs; do
@@ -55,10 +55,10 @@ You end up with `europarl_data/split/bg-en/{train,val}.{bg,en}` and the same for
 
 ## Step 2: Train the tokenizer
 
-All languages share one BPE tokenizer here, trained on the training files of every language. `build_vocab.py` accepts any number of input files:
+All languages share one BPE tokenizer here, trained on the training files of every language. `mammoth_build_vocab` accepts any number of input files:
 
 ```bash
-python mammoth/bin/build_vocab.py \
+mammoth_build_vocab \
     --input_file europarl_data/split/bg-en/train.bg europarl_data/split/bg-en/train.en \
                  europarl_data/split/cs-en/train.cs europarl_data/split/cs-en/train.en \
     --output_dir tokenizer \
@@ -335,29 +335,28 @@ Checkpoints are written under `models/`, named from `save_model` and the step nu
 
 ### Several nodes with Slurm
 
-Start the same command once per node, each with its own `--node_rank`, and point every node at the same master address. With Slurm, `srun` starts one wrapper per node, and the wrapper reads the rank from the environment. Save this as `train_multinode.sh`:
+Multi-node training is currently tested only on HPC clusters that use Slurm, such as LUMI and Roihu. Launch it with the script for your cluster:
+
+| Cluster | Script |
+|---|---|
+| LUMI | [`csc_env/lumi/multi_nodes.sh`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/lumi/multi_nodes.sh) |
+| Roihu | [`csc_env/roihu/multi-nodes.sh`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/roihu/multi-nodes.sh) |
+
+Each script finds the master node, writes a small wrapper script, and uses `srun` to run that wrapper once per node. Each node then starts training with its own `--node_rank`. Copy the script for your cluster and edit:
+
+- `#SBATCH -A`: your project account.
+- `#SBATCH --nodes` and `--ntasks`: set both to the config's `n_nodes` (`5` for `europarl_21langs_5nodes.yaml`). The scripts start one task per node.
+- The virtual environment and MAMMOTH paths in the wrapper.
+- The `-config` path: point it at `europarl_21langs_5nodes.yaml`.
+
+Create the log directory, then submit the job (on Roihu, the script is `multi-nodes.sh`):
 
 ```bash
-#!/bin/bash
-#SBATCH --nodes=5
-#SBATCH --ntasks-per-node=1
-#SBATCH --gres=gpu:4
-#SBATCH --time=72:00:00
-
-MASTER_NODE=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
-MASTER_PORT=9973
-
-srun bash -c "mammoth_train \
-    --config europarl_21langs_5nodes.yaml \
-    --node_rank \${SLURM_NODEID} \
-    --master_ip ${MASTER_NODE} \
-    --master_port ${MASTER_PORT}"
+mkdir -p log/train
+sbatch multi_nodes.sh
 ```
 
-Then submit it with `sbatch train_multinode.sh`.
-
-- `n_nodes` in the config must equal the number of Slurm nodes, and `--node_rank` must equal the node's index. MAMMOTH checks both against `SLURM_NNODES` / `SLURM_NODEID` and stops with an error if they differ.
-- The partition, account, modules or container, and GPU-type options in the `#SBATCH` header depend on your cluster. For LUMI and Roihu, see the [CSC quickstart](../CSC_quickstart.md).
+MAMMOTH checks `n_nodes` and `--node_rank` against `SLURM_NNODES` / `SLURM_NODEID`, and stops with an error if they differ. For the partitions, GPU options and environment setup on each cluster, see the [CSC quickstart](../CSC_quickstart.md).
 
 ## Step 6: Translate
 
@@ -373,6 +372,6 @@ mammoth_translate \
     --beam_size 5
 ```
 
-`--task_id` selects the task's encoder, decoder and tokenizers; it is the key under `tasks`. See the [Quickstart](../quickstart.md#step-5-translate) for scoring the output.
+`--task_id` selects the task's encoder, decoder and tokenizers; it is the key under `tasks`. See the [Quickstart](../quickstart.md) (Step 5) for scoring the output.
 
 Hooray! Take a moment to celebrate the progress you've made. Wait for hours (or days, for the full set) and the model training should be completed soon.

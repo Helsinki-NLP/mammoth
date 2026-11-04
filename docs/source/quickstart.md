@@ -14,9 +14,9 @@ For running on the CSC supercomputers (LUMI, Roihu), see the [LUMI & Roihu quick
 
 ## Before you start
 
-- Install MAMMOTH from source by following the [installation guide](install.md). Activate the environment you created there.
+- Install MAMMOTH with `pip install mammoth-nlp` (see the [installation guide](install.md)) and activate that environment.
 - A GPU (NVIDIA or AMD) is recommended. MAMMOTH also trains and translates on CPU, which is enough to check your setup but too slow for a useful model. To use the CPU, change the hardware settings as shown in Step 3.
-- Run every command below from the root of the MAMMOTH repository.
+- Run every command below from the same working directory, for example a new empty folder. All paths are relative to it.
 
 ## Step 1: Download the data
 
@@ -37,12 +37,12 @@ This gives you `train`, `val` (validation) and `test_2016_flickr` files for each
 
 ## Step 2: Train the tokenizers
 
-MAMMOTH uses [Hugging Face tokenizers](HF_TOKENIZERS.md). Each language gets its own tokenizer, trained with `mammoth/bin/build_vocab.py`. The script reads plain text, so decompress the training data first (`gzip -dc` works on both Linux and macOS):
+MAMMOTH uses [Hugging Face tokenizers](HF_TOKENIZERS.md). Each language gets its own tokenizer, trained with the `mammoth_build_vocab` command. The script reads plain text, so decompress the training data first (`gzip -dc` works on both Linux and macOS):
 
 ```bash
 for language in en de; do
     gzip -dc data/multi30k/train.${language}.gz > data/multi30k/train.${language}.txt
-    python mammoth/bin/build_vocab.py \
+    mammoth_build_vocab \
         --input_file data/multi30k/train.${language}.txt \
         --output_dir models/tokenizers/${language} \
         --vocab_size 8000
@@ -101,9 +101,9 @@ label_smoothing: 0.1
 batch_size: 4096
 batch_type: tokens
 normalization: tokens
-valid_batch_size: 2048
-src_seq_length_max: 100
-tgt_seq_length_max: 100
+valid_batch_size: 1024
+src_seq_length_max: 256
+tgt_seq_length_max: 256
 
 # ---- Optimization ----
 optim: adam
@@ -113,16 +113,15 @@ learning_rate: 0.0005
 decay_method: linear_warmup
 warmup_steps: 1000
 max_grad_norm: 1.0
-train_steps: 10000
-valid_steps: 1000
+train_steps: 2500
+valid_steps: 500
 report_every: 100
-save_checkpoint_steps: 2500
+save_checkpoint_steps: 500
 keep_checkpoint: 3
 seed: 3435
 
 # ---- Output ----
 save_model: models/multi30k_en_de
-max_length: 200
 ```
 
 The keys worth knowing about:

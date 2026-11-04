@@ -11,7 +11,7 @@ This portal provides a detailed documentation of the **MAMMOTH**: Modular Adapta
 pip install mammoth-nlp
 ```
 
-Check out the [installation guide](install) to install in specific clusters.
+See the [installation guide](install) for PyTorch builds and installing from source, and the [LUMI & Roihu quickstart](CSC_quickstart) for the CSC clusters.
 
 Take a look at the [quickstart](quickstart) to familiarize yourself with the main training workflow.
 

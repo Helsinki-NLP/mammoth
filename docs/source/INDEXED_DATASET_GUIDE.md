@@ -1,13 +1,15 @@
+# Indexed datasets (pretokenization)
+
 Mammoth now supports pretokenization (automatic/manual) before training starts:
 
 - Add `data_type: indexed` to enable pretokenization. For each text file, pretokenization will produce a `idx` file and a `bin` file.
 - Pretokenization is incompatible with on-the-fly transforms.
 - Currently, length filtering is not included in the pretokenization process. Please keep the length of the training data less than or equal to `max_length: 512` otherwise training will crash. A template script for using HF tokenizer for length filtering is provided below.
 - To use automatic pretokenization, assign the paths with the filtered text data. Mammoth will first check if the provided text data has been pretokenized (looking for `idx` and `bin` files in the same directory). If not, pretokenization will run automatically and process this data for training, saving the results to the same directory.
-- To use manual pretokenization, run the script `mammoth/scripts/preprocess_indexed.py`. This is a template script:
+- To use manual pretokenization, run `python -m mammoth.scripts.preprocess_indexed`. This is a template script:
 
 ```bash
-python mammoth/scripts/preprocess_indexed.py \
+python -m mammoth.scripts.preprocess_indexed \
   --input /scratch/project_462000964/members/wangchao/training/test_pretokenization/train_ar_filtered.txt \
   --output_prefix train_ar_tok \
   --vocab_path hf_tokenizer.json \
@@ -65,7 +67,7 @@ max_length: 512 # Input sentence length must be less than or equal to this value
 The template script for using HF tokenizer for length filtering:
 
 ```bash
-python mammoth/scripts/filter_by_length.py \
+python -m mammoth.scripts.filter_by_length \
   --src_input ${SRC_INPUT} \
   --tgt_input ${TGT_INPUT} \
   --src_output ${SRC_OUTPUT} \

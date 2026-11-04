@@ -35,6 +35,7 @@ Contents
       INDEXED_DATASET_GUIDE.md
       examples/train_mammoth_101.md
       examples/sharing_schemes.md
+      training_tips.md
       exporting_to_huggingface.md
 
 .. toctree::

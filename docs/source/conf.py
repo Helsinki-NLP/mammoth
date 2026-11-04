@@ -48,13 +48,6 @@ extensions = ['recommonmark',
               'sphinxarg.ext',
               'sphinx_markdown_tables']
 
-mathjax_config = {
-    'tex2jax': {
-        'inlineMath': [["\\(", "\\)"]],
-        'displayMath': [["\\[", "\\]"]],
-    }
-}
-
 mathjax3_config = {
     "tex": {
         "inlineMath": [['\\(', '\\)']],
@@ -127,7 +120,6 @@ todo_include_todos = False
 # html_theme = 'sphinx_materialdesign_theme'
 # html_theme_path = [sphinx_materialdesign_theme.get_path()]
 html_theme = "sphinx_rtd_theme"
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -220,7 +212,6 @@ github_doc_root = 'https://github.com/Helsinki-NLP/TODO/tree/master/doc/'
 
 
 def setup(app):
-    print("hello")
     app.add_config_value('recommonmark_config', {
         'enable_eval_rst': True
     }, True)

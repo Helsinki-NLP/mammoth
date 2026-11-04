@@ -11,8 +11,7 @@
 #SBATCH --mem=0G
 #SBATCH --time=01:00:00
 #SBATCH --gres=gpu:gh200:1
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=chao.wang@helsinki.fi
+
 
 echo "Starting at `date`"
 

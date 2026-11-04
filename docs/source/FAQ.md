@@ -31,11 +31,13 @@ We welcome contributions from the community. Please see [`CONTRIBUTING.md`](CONT
 
 For installing on HPC clusters (LUMI, Roihu, etc.), see the [LUMI/Roihu quickstart guide](CSC_quickstart.md).
 
-The basic workflow is:
+Install with `pip install mammoth-nlp` (see the [installation guide](install.md)). The basic workflow is:
 
-1. Prepare your data and tokenizer.
-2. Write a config template (YAML).
-3. Run the training/inferencing job
+1. Prepare your data and train a tokenizer with `mammoth_build_vocab`.
+2. Write a config (YAML).
+3. Train with `mammoth_train` and translate with `mammoth_translate`.
+
+The [quickstart](quickstart.md) walks through all three steps.
 
 
 <!-- ## Configuration
@@ -108,12 +110,27 @@ See [prepare_data.md](prepare_data.md) for full details.
 
 ## Exporting and Inference
 
+### How do I translate with a trained model?
+
+Use `mammoth_translate` on the checkpoint directory. It loads the best checkpoint if there is one, and otherwise the latest:
+
+```bash
+mammoth_translate \
+    --config /path/to/train_config.yaml \
+    --model /path/to/checkpoints/ \
+    --task_id <task-id> \
+    --src input.txt \
+    --output output.txt
+```
+
+`--task_id` picks the language pair. See the [quickstart](quickstart.md) for details. To share a model with people who do not have MAMMOTH installed, export it to Hugging Face (below).
+
 ### How do I export a trained model to HuggingFace?
 
 Use the conversion script:
 
 ```bash
-python mammoth/hf_integration/to_hf/convert_mammoth_to_hf.py \
+mammoth_convert2hf \
     --checkpoint-dir /path/to/checkpoints \
     --output-dir /path/to/hf_model
 ```
@@ -129,7 +146,7 @@ Yes. Once you convert a model to HuggingFace format, anyone can run inference us
 Use the provided downloader:
 
 ```bash
-python mammoth/hf_integration/to_hf/model_downloader.py \
+mammoth_download_hf \
     --repo-id org/my-model \
     --local-dir ./my_model
 ```
@@ -137,7 +154,7 @@ python mammoth/hf_integration/to_hf/model_downloader.py \
 For multi-task single artifact, you can download just one task to save space (Mammoth model only):
 
 ```bash
-python mammoth/hf_integration/to_hf/model_downloader.py \
+mammoth_download_hf \
     --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
 ```
 

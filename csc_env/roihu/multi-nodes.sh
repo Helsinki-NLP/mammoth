@@ -11,8 +11,7 @@
 #SBATCH --mem=0
 #SBATCH --time=4:00:00
 #SBATCH --gres=gpu:gh200:4
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=chao.wang@helsinki.fi
+
 
 echo "Starting at `date`"
 
@@ -45,10 +44,10 @@ export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 
 python /scratch/project_2017852/mammoth-shared/mammoth_pytorch/mammoth/train.py \
-    -config .multi_nodes.yaml \
+    -config ./multi_nodes.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip $MASTER_NODE \
-    --master_port $MASTER_PORT \
+    --master_port $MASTER_PORT
 EOF
 
 chmod +x ./multinode_train_script.sh

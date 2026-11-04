@@ -25,7 +25,7 @@ your additions look right.
 cd docs
 # install some dependencies if necessary:
 # recommonmark, sphinx_rtd_theme, sphinxcontrib-bibtex
-pip install requirements.txt
+pip install -r requirements.txt
 make html
 firefox build/html/main.html  # or your browser of choice
 ```

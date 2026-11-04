@@ -292,8 +292,10 @@ Because of this, you need to run `config_config` so that it can access the corpo
 
 ## Usage
 ```
-python mammoth/tools/config_config.py config_all --in_config path/to/input.yaml --out_config path/to/output.yaml
+python -m mammoth.bin.config_config config_all --in_config path/to/input.yaml --out_config path/to/output.yaml
 ```
+
+The tool clusters languages with scikit-learn, which is not installed with `mammoth-nlp`. Install it first with `pip install scikit-learn`.
 
 ### Stages
 

@@ -47,9 +47,9 @@ class TranslationBuilder(object):
 
             # Use tokenizer's decode method to properly handle BPE merging
             decoded_text = vocab.decode_tokens(token_ids, skip_special_tokens=True)
-            # Replace embedded newlines with spaces (model may generate newlines from training data)
-            # and normalize multiple spaces to single space
-            decoded_text = ' '.join(decoded_text.split())
+            # Keep embedded newlines: paragraph-level models generate them on purpose.
+            # Plain-text output files flatten them when writing (see format_output_line).
+            decoded_text = decoded_text.strip()
             # Return as single-element list containing the fully decoded text
             # This prevents re-splitting subword tokens
             tokens = [decoded_text] if decoded_text else []

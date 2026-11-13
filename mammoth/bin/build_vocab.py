@@ -1,11 +1,17 @@
-import os
 import argparse
-from tokenizers import Tokenizer
+import itertools
+import json
+import os
+from tokenizers import Regex, Tokenizer, decoders, normalizers, pre_tokenizers
 from tokenizers.models import BPE
 from tokenizers.trainers import BpeTrainer
-from tokenizers.pre_tokenizers import Metaspace
-from tokenizers.decoders import Metaspace as MetaspaceDecoder
 from transformers import PreTrainedTokenizerFast
+
+from mammoth.inputters.corpus_io import open_corpus_lines
+
+SPECIAL_TOKENS = ["</s>", "<pad>", "<s>", "<unk>", "<mask>"]
+# One token per byte value, used by BPE byte fallback for characters not in the vocab.
+BYTE_TOKENS = [f"<0x{i:02X}>" for i in range(256)]
 
 
 def parse_args():
@@ -18,7 +24,7 @@ def parse_args():
         type=str,
         nargs="+",
         required=True,
-        help="Path(s) to the training text file(s). Can provide multiple files."
+        help="Path(s) to the training file(s): plain text (one example per line) or .jsonl / .jsonl.gz (only the \"text\" key is used). A .gz suffix means gzipped. Can provide multiple files."
     )
     parser.add_argument(
         "--output_dir",
@@ -35,73 +41,96 @@ def parse_args():
     return parser.parse_args()
 
 
-# Validate UTF-8 encoding
-def validate_and_clean_if_needed(file_path, sample_size=10_000_000):
-    """Validate UTF-8 and clean if necessary."""
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            # Sample the file (first 10MB) to check encoding
-            f.read(sample_size)
-        print(f"✓ File is valid UTF-8: {file_path}")
-        return file_path
-    except UnicodeDecodeError as e:
-        print(f"⚠️  Invalid UTF-8 detected at position {e.start}: {e.reason}")
-        print(f"   Creating cleaned version...")
+def _new_tokenizer():
+    """MARIAN-style BPE (▁ word markers) that also handles paragraphs and rare characters.
 
-        # Create cleaned file
-        cleaned_path = file_path + ".utf8_cleaned"
-        with open(file_path, 'rb') as f_in:
-            raw_data = f_in.read()
+    - Newline runs are split off before Metaspace, so they become their own tokens
+      ("\n", "\n\n", ...) and are never glued to words; sentence-level data simply
+      never uses them. \r\n and \r are normalized to \n first.
+    - prepend_scheme="first" adds ▁ only at the start of the text, not after each
+      newline, so decoding reproduces the text exactly.
+    - The decoder turns ▁ back into spaces and byte tokens back into characters.
+    """
+    tokenizer = Tokenizer(BPE(unk_token="<unk>", byte_fallback=True))
+    tokenizer.normalizer = normalizers.Replace(Regex(r"\r\n?"), "\n")
+    tokenizer.pre_tokenizer = pre_tokenizers.Sequence([
+        pre_tokenizers.Split(Regex(r"\n+"), behavior="isolated"),
+        pre_tokenizers.Metaspace(replacement="▁", prepend_scheme="first"),
+    ])
+    tokenizer.decoder = decoders.Sequence([
+        decoders.Replace("▁", " "),
+        decoders.ByteFallback(),
+        decoders.Fuse(),
+        decoders.Strip(" ", 1, 0),
+    ])
+    return tokenizer
 
-        # Replace invalid sequences with � (U+FFFD replacement character)
-        cleaned_text = raw_data.decode('utf-8', errors='replace')
 
-        with open(cleaned_path, 'w', encoding='utf-8') as f_out:
-            f_out.write(cleaned_text)
+def _add_byte_tokens(tokenizer):
+    """Append BYTE_TOKENS to the BPE vocab as regular (non-special) tokens.
 
-        print(f"✓ Cleaned file saved to: {cleaned_path}")
-        return cleaned_path
+    Passing them to the trainer as special tokens would make
+    decode(skip_special_tokens=True), which MAMMOTH uses, silently drop them.
+    """
+    data = json.loads(tokenizer.to_str())
+    vocab = data["model"]["vocab"]
+    next_id = max(vocab.values()) + 1
+    for tok in BYTE_TOKENS:
+        if tok not in vocab:
+            vocab[tok] = next_id
+            next_id += 1
+    return Tokenizer.from_str(json.dumps(data))
+
+
+def train_tokenizer_from_texts(texts, vocab_size, show_progress=False):
+    """Train the tokenizer on an iterable of example strings.
+
+    `vocab_size` is the final size, including special and byte tokens.
+    """
+    reserved = len(SPECIAL_TOKENS) + len(BYTE_TOKENS)
+    if vocab_size <= reserved:
+        raise ValueError(f"vocab_size must be larger than {reserved} (special + byte tokens), got {vocab_size}")
+
+    tokenizer = _new_tokenizer()
+    trainer = BpeTrainer(
+        vocab_size=vocab_size - len(BYTE_TOKENS),
+        special_tokens=SPECIAL_TOKENS,
+        initial_alphabet=["\n"],  # newline token exists even if the data has no paragraphs
+        show_progress=show_progress
+    )
+    tokenizer.train_from_iterator(texts, trainer)
+    return _add_byte_tokens(tokenizer)
+
+
+def train_tokenizer(input_files, vocab_size, show_progress=False):
+    """Train on corpus files, read the same way MAMMOTH reads training data.
+
+    Plain text (.txt, .gz, ...) is read one example per line; .jsonl / .jsonl.gz
+    contribute only their "text" values. Invalid UTF-8 is replaced with U+FFFD.
+    """
+    texts = itertools.chain.from_iterable(
+        open_corpus_lines(path, errors='replace') for path in input_files
+    )
+    return train_tokenizer_from_texts(texts, vocab_size, show_progress=show_progress)
 
 
 def main():
     # Parse command line arguments
     args = parse_args()
-    INPUT_FILE = args.input_file
+    INPUT_FILES = args.input_file
     OUTPUT_DIR = args.output_dir
     VOCAB_SIZE = args.vocab_size
 
     # Validate input files exist
-    for file_path in INPUT_FILE:
+    for file_path in INPUT_FILES:
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Training file not found: {file_path}")
-
-    # Validate and potentially clean all input files
-    INPUT_FILES = []
-    for file_path in INPUT_FILE:
-        validated_file = validate_and_clean_if_needed(file_path)
-        INPUT_FILES.append(validated_file)
-
-    # Initialize tokenizer with BPE model
-    tokenizer = Tokenizer(BPE(unk_token="<unk>",byte_fallback=True))
-
-    # Configure trainer with correct special tokens (no duplicates)
-    trainer = BpeTrainer(
-        vocab_size=VOCAB_SIZE,
-        special_tokens=["</s>", "<pad>", "<s>", "<unk>", "<mask>"],
-        show_progress=True
-    )
-
-    # Set pre-tokenizer
-    tokenizer.pre_tokenizer = Metaspace(replacement="▁")
 
     # Train the tokenizer
     print(f"Training MARIAN-style tokenizer on {len(INPUT_FILES)} file(s)...")
     for i, file_path in enumerate(INPUT_FILES):
         print(f"  [{i+1}/{len(INPUT_FILES)}] {file_path}")
-    tokenizer.train(INPUT_FILES, trainer)
-
-    # Set decoder (MARIAN-style: properly handles ▁ markers during decoding)
-    tokenizer.decoder = MetaspaceDecoder(replacement="▁")
+    tokenizer = train_tokenizer(INPUT_FILES, VOCAB_SIZE, show_progress=True)
 
     # NOTE: We DO NOT add a post-processor for BOS/EOS tokens here
     # MAMMOTH handles special token insertion during data loading (dataset.py:143-145)

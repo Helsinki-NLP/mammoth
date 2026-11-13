@@ -1,9 +1,8 @@
 import collections
-import gzip
 import itertools
+import os
 from dataclasses import dataclass
 from functools import partial
-from io import IOBase
 
 import torch
 from torch import Tensor
@@ -15,6 +14,7 @@ from mammoth.transforms import TransformPipe, get_transforms_cls, make_transform
 from mammoth.utils.logging import logger
 from mammoth.inputters.vocab import Vocab
 from mammoth.inputters.indexed_corpus import IndexedCorpus
+from mammoth.inputters.corpus_io import open_corpus_lines
 
 
 TensorWithMask = collections.namedtuple('TensorWithMask', ['tensor', 'mask'])
@@ -111,20 +111,16 @@ def read_examples_from_files(
             'line_idx': line_idx,
         }
 
-    if isinstance(src_path, IOBase):
-        src_fh = src_path
-    elif src_path.endswith('.gz'):
-        src_fh = gzip.open(src_path, 'rt')
-    else:
-        src_fh = open(src_path, 'rt')
+    # Paths are opened here (plain text or JSONL, see corpus_io); anything else is an
+    # already-open iterable of example strings (e.g. an inference shard) and is used as-is.
+    def _is_path(path):
+        return isinstance(path, (str, os.PathLike))
+
+    src_fh = open_corpus_lines(src_path) if _is_path(src_path) else src_path
     if tgt_path is None:
         tgt_fh = itertools.repeat(None)
-    elif isinstance(tgt_path, IOBase):
-        tgt_fh = src_path
-    elif tgt_path.endswith('.gz'):
-        tgt_fh = gzip.open(tgt_path, 'rt')
     else:
-        tgt_fh = open(tgt_path, 'rt')
+        tgt_fh = open_corpus_lines(tgt_path) if _is_path(tgt_path) else tgt_path
 
     examples = zip(src_fh, tgt_fh)
     if stride is not None and offset is not None:
@@ -138,8 +134,9 @@ def read_examples_from_files(
     examples = filter(None, examples)  # filtertoolong replaces invalid examples with None
     yield from examples
 
-    src_fh.close()
-    if tgt_path is not None:
+    if _is_path(src_path):
+        src_fh.close()
+    if tgt_path is not None and _is_path(tgt_path):
         tgt_fh.close()
 
 
@@ -381,6 +378,7 @@ def _get_indexed_path(text_path):
     Examples:
         /data/train.txt -> /data/train
         /data/train.txt.gz -> /data/train
+        /data/train.jsonl.gz -> /data/train
         /data/train -> /data/train
 
     Args:
@@ -391,7 +389,7 @@ def _get_indexed_path(text_path):
     """
     path = str(text_path)
     # Remove common extensions
-    for ext in ['.txt.gz', '.txt', '.gz']:
+    for ext in ['.jsonl.gz', '.jsonl', '.txt.gz', '.txt', '.gz']:
         if path.endswith(ext):
             path = path[:-len(ext)]
             break

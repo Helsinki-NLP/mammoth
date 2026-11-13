@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 
-import gzip
 import inspect
 import numpy as np
 import os
 import random
 import torch
-from io import StringIO
 from itertools import islice, repeat
 
 
@@ -32,21 +30,26 @@ def split_corpus(path, shard_size, default=None):
 
 
 def _split_corpus(path, shard_size):
-    """Yield io's with `shard_size` lines each."""
-    # FIXME: this is a horrible, ugly kludge
-    if path.endswith('.gz'):
-        open_func = gzip.open
-    else:
-        open_func = open
-    with open_func(path, "rt") as f:
+    """Yield iterables of example strings with `shard_size` examples each.
+
+    Shards are lists rather than re-joined text, so a JSONL "text" containing
+    newlines stays a single example.
+    """
+    # local import: mammoth.inputters imports mammoth.utils at package import time
+    from mammoth.inputters.corpus_io import open_corpus_lines
+
+    lines = open_corpus_lines(path)
+    try:
         if shard_size <= 0:
-            yield f
+            yield lines
         else:
             while True:
-                shard = "".join(islice(f, shard_size))
+                shard = list(islice(lines, shard_size))
                 if not shard:
                     break
-                yield StringIO(shard)
+                yield shard
+    finally:
+        lines.close()
 
 
 def aeq(*args):

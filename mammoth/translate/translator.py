@@ -21,6 +21,7 @@ from mammoth.translate.translation import TranslationBuilder
 from mammoth.utils.alignment import build_align_pharaoh
 from mammoth.utils.misc import set_random_seed, report_matrix, use_gpu
 from mammoth.inputters.vocab import HFTokenizerVocab
+from mammoth.inputters.corpus_io import format_output_line, is_jsonl_path, open_corpus_output
 from mammoth.utils.model_saver import load_frame_checkpoint, load_parameters_from_checkpoint
 from mammoth.utils.parse import ArgumentParser
 
@@ -54,7 +55,7 @@ def build_translator(opts, task_queue_manager, task, report_score=True, logger=N
         if outdir and not os.path.isdir(outdir):
             warnings.warn(f'output file directory "{outdir}" does not exist... creating it.')
             os.makedirs(os.path.dirname(opts.output), exist_ok=True)
-        out_file = codecs.open(opts.output, "w+", "utf-8")
+        out_file = open_corpus_output(opts.output)
 
     # TODO: reimplement ensemble decoding
     load_model_for_translation_func = load_model_for_translation
@@ -181,6 +182,8 @@ class Inference(object):
         global_scorer (mammoth.translate.GNMTGlobalScorer): Translation
             scoring/reranking object.
         out_file (TextIO or codecs.StreamReaderWriter): Output file.
+        out_jsonl (bool): Write translations to `out_file` as JSONL
+            ``{"text": ...}`` records (keeps newlines) instead of one per line.
         report_score (bool) : Whether to report scores
         logger (logging.Logger or NoneType): Logger.
     """
@@ -213,6 +216,7 @@ class Inference(object):
         report_time=False,
         global_scorer=None,
         out_file=None,
+        out_jsonl=False,
         report_align=False,
         report_score=True,
         logger=None,
@@ -281,6 +285,7 @@ class Inference(object):
         if self.global_scorer.has_cov_pen and not self.model.decoder.attentional:
             raise ValueError("Coverage penalty requires an attentional decoder.")
         self.out_file = out_file
+        self.out_jsonl = out_jsonl
         self.report_align = report_align
         self.report_score = report_score
         self.logger = logger
@@ -367,6 +372,7 @@ class Inference(object):
             report_time=opts.report_time,
             global_scorer=global_scorer,
             out_file=out_file,
+            out_jsonl=is_jsonl_path(getattr(opts, 'output', None) or ''),
             report_align=report_align,
             report_score=report_score,
             logger=logger,
@@ -625,7 +631,7 @@ class Inference(object):
                 if dynamic:
                     n_best_preds = [transforms.apply_reverse(x) for x in n_best_preds]
                 all_predictions += [n_best_preds]
-                self.out_file.write("\n".join(n_best_preds) + "\n")
+                self.out_file.write("".join(format_output_line(pred, self.out_jsonl) for pred in n_best_preds))
                 self.out_file.flush()
 
                 if self.verbose:

@@ -127,7 +127,7 @@ mammoth_build_vocab \
     --vocab_size 32000
 ```
 
-`--input_file` accepts any number of files, so one command trains a single tokenizer shared by all your languages. The tokenizer is saved to `tokenizer/tokenizer.json`. The special tokens (`</s>`, `<pad>`, `<s>`, `<unk>`, `<mask>`) are fixed for MAMMOTH, and BOS/EOS are added by MAMMOTH during data loading, not by the tokenizer. See the [HF tokenizers guide](HF_TOKENIZERS.md) for details and for using a pretrained tokenizer instead.
+`--input_file` accepts any number of files, so one command trains a single tokenizer shared by all your languages. The files are read the same way as training data: plain text one line per example, `.gz` decompressed, and for `.jsonl` / `.jsonl.gz` only the `"text"` values (see [JSONL input](#jsonl-input)). Invalid UTF-8 bytes are replaced with `�`. The same tokenizer works for sentence-level and paragraph-level data: line breaks inside a text become their own tokens (`\n`, `\n\n`, ...), never glued to words, and characters missing from the vocabulary fall back to byte tokens (`<0xF0>`, ...) instead of `<unk>`. Decoding gives back exactly the original text. The tokenizer is saved to `tokenizer/tokenizer.json`. The special tokens (`</s>`, `<pad>`, `<s>`, `<unk>`, `<mask>`) are fixed for MAMMOTH, and BOS/EOS are added by MAMMOTH during data loading, not by the tokenizer. See the [HF tokenizers guide](HF_TOKENIZERS.md) for details and for using a pretrained tokenizer instead.
 
 ### Step 4: Point the config at your files
 
@@ -150,6 +150,21 @@ tasks:
 ```
 
 Transforms such as `filtertoolong` still work with this setup, since they run on the fly too. If you would rather tokenize once up front, see the [indexed dataset guide](INDEXED_DATASET_GUIDE.md).
+
+#### JSONL input
+
+Any corpus path (`path_src`, `path_tgt`, `path_valid_*`, and `-src` / `-tgt` for `translate.py`) may also be a JSONL file, optionally gzipped. The format is chosen by extension: files ending in `.jsonl` or `.jsonl.gz` are read as one JSON object per line, and only the `"text"` value is used. All other keys are ignored. Every other extension is still read as plain text, one example per line.
+
+```
+{"text": "Здравейте, свят.", "id": 17, "source": "europarl"}
+{"text": "Втори ред.", "id": 18}
+```
+
+Source and target files are paired record by record, just like lines in plain-text files, so line N of the source file must match line N of the target file. You can mix formats, for example a JSONL source with a plain-text target. A record that is not valid JSON, has no `"text"` key, or whose `"text"` is not a string stops loading with an error that names the file and line. The `"text"` value is used as-is, including any newlines inside it. The line ending of a plain-text line is not part of the example, so a sentence in a `.txt` file and the same sentence as a JSONL `"text"` are read identically. Indexed datasets (`data_type: indexed`) accept JSONL too: the pretokenized files for `train.jsonl.gz` are written to `train.bin` / `train.idx`.
+
+**Paragraph-level translation.** Put whole paragraphs or documents in `"text"`, with line breaks (`\n`) at matching places on the source and target side. The model learns to read and produce them. To keep them in the output, give `translate.py` an output path ending in `.jsonl` or `.jsonl.gz` (`-output pred.jsonl.gz`): each translation is then written as one `{"text": ...}` record. With any other output extension, each translation is written on one line with its line breaks replaced by spaces, so the output stays line-aligned with the input. Paragraphs are much longer than sentences, so check `max_length` / `filtertoolong`, and for on-device models the `--enc-max-len` / `--dec-max-len` used at LiteRT conversion.
+
+**Checkpoints trained before JSONL support** saw a line ending at the end of every plain-text example. Plain-text input no longer includes it, which matches how those models were always used through HF and on-device inference.
 
 
 ## Option 2: SentencePiece (legacy)

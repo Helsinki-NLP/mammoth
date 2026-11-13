@@ -117,6 +117,8 @@ def translate(opts):
             attn_debug=opts.attn_debug,
             align_debug=opts.align_debug,
         )
+    # gzip output is only complete once closed
+    translator.out_file.close()
 
 
 def _get_parser():

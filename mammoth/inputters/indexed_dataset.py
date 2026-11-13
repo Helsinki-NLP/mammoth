@@ -360,6 +360,7 @@ def preprocess_text_to_indexed(
     import time
     import multiprocessing
     from mammoth.inputters.vocab import get_vocab
+    from mammoth.inputters.corpus_io import open_corpus_lines
     from mammoth.utils.logging import logger
 
     try:
@@ -374,7 +375,7 @@ def preprocess_text_to_indexed(
 
         # Open input file
         logger.info(f"Opening input file: {input_path}")
-        fin = open(input_path, 'r', encoding='utf-8')
+        fin = open_corpus_lines(input_path)  # plain text or JSONL "text", optionally gzipped
 
         # Create encoder and multiprocessing pool
         encoder = _PreprocessEncoder(vocab_path, lang, decoder_start_with_eos)

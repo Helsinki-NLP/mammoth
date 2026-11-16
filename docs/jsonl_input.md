@@ -23,7 +23,7 @@ MAMMOTH can now read JSONL corpora, optionally gzipped, for tokenizer training, 
 | Tokenizer: rare characters | `byte_fallback=True` but no byte tokens in the vocab, so emoji and rare characters became `<unk>` | 256 byte tokens (`<0x00>`…`<0xFF>`) are regular vocabulary; no `<unk>`; decoding reproduces the input exactly |
 | `--vocab_size` | Learned tokens + specials | Total size, including the 256 byte tokens |
 | Translations | All whitespace (including newlines) collapsed to single spaces | Newlines kept |
-| `translate.py -output` | One line per translation | `.jsonl` / `.jsonl.gz` → one `{"text": ...}` record per translation, newlines kept. Other extensions: one line per translation, newlines turned into spaces (stays line-aligned with the input) |
+| `translate.py` output | One line per translation | Default unchanged: one line per translation, newlines turned into spaces (stays line-aligned with the input). New `-jsonl` flag → one `{"text": ...}` record per translation, newlines kept. `.gz` output paths are gzip-compressed |
 
 ## Design decisions
 
@@ -75,7 +75,8 @@ sacrebleu treats newlines as whitespace, so BLEU and chrF on paragraph output ne
 
 - **Existing tokenizers and checkpoints** load and run unchanged. The only difference: `translate.py` on `.txt` input no longer passes the trailing `\n`, so these models see `▁today.` instead of `▁today.\n`. That is a small mismatch for models trained before this branch, and the same one the HF and Android paths already had.
 - **New tokenizers** built with `mammoth_build_vocab` differ from old ones: they have newline tokens, 256 byte tokens and a new decoder. Do not mix an old tokenizer with a model trained on a new one.
-- **The `Translator` API** has a new `out_jsonl` argument (default `False`). `Translator.from_opts` sets it from the `-output` extension.
+- **`translate.py` output** stays plain text, one translation per line, unless `-jsonl` is given. The format is not inferred from the `-output` extension; a `.jsonl` output path without `-jsonl` gets plain text and a warning.
+- **The `Translator` API** has a new `out_jsonl` argument (default `False`). `Translator.from_opts` sets it from the `-jsonl` flag.
 
 ## Files
 
@@ -87,13 +88,14 @@ sacrebleu treats newlines as whitespace, so BLEU and chrF on paragraph output ne
 | `mammoth/utils/misc.py` | `split_corpus` yields lists of examples |
 | `mammoth/bin/build_vocab.py` | Reads through the reader; new tokenizer pipeline; byte tokens; `train_tokenizer` / `train_tokenizer_from_texts` split out for testing; `.utf8_cleaned` copies removed |
 | `mammoth/translate/translation.py` | Keeps newlines in decoded translations |
-| `mammoth/translate/translator.py` | Writes output through `format_output_line`; `out_jsonl` option; output opened via `open_corpus_output` (gzip support) |
+| `mammoth/translate/translator.py` | Writes output through `format_output_line`; `out_jsonl` option set from `-jsonl`; output opened via `open_corpus_output` (gzip support) |
+| `mammoth/opts.py` | New `-jsonl` translate flag (default off) |
 | `mammoth/bin/translate.py` | Closes the output file |
 | `docs/source/prepare_data.md` | JSONL input and paragraph-level sections |
-| `mammoth/tests/test_jsonl_input.py` | **New.** 46 tests: reading, errors, stride/offset, inference shards, indexed preprocessing, output format |
+| `mammoth/tests/test_jsonl_input.py` | **New.** 47 tests: reading, errors, stride/offset, inference shards, indexed preprocessing, output format |
 | `mammoth/tests/test_build_vocab.py` | **New.** 27 tests: formats, round trips, newline and byte tokens, vocab size, `HFTokenizerVocab` integration, translation output |
 
-The full suite gives 345 passed, 9 skipped on macOS (`pytorch_backend`: 272 passed, 9 skipped).
+The full suite gives 346 passed, 9 skipped on macOS (`pytorch_backend`: 272 passed, 9 skipped).
 
 ## Not covered yet
 

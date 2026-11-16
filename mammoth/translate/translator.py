@@ -55,6 +55,11 @@ def build_translator(opts, task_queue_manager, task, report_score=True, logger=N
         if outdir and not os.path.isdir(outdir):
             warnings.warn(f'output file directory "{outdir}" does not exist... creating it.')
             os.makedirs(os.path.dirname(opts.output), exist_ok=True)
+        if is_jsonl_path(opts.output) and not getattr(opts, 'jsonl', False):
+            warnings.warn(
+                f'output file "{opts.output}" has a JSONL extension but -jsonl is not set: '
+                'writing plain text, one prediction per line'
+            )
         out_file = open_corpus_output(opts.output)
 
     # TODO: reimplement ensemble decoding
@@ -372,7 +377,7 @@ class Inference(object):
             report_time=opts.report_time,
             global_scorer=global_scorer,
             out_file=out_file,
-            out_jsonl=is_jsonl_path(getattr(opts, 'output', None) or ''),
+            out_jsonl=getattr(opts, 'jsonl', False),
             report_align=report_align,
             report_score=report_score,
             logger=logger,

@@ -272,8 +272,19 @@ def test_output_round_trips_through_reader(tmp_path, name):
     """What translate.py writes can be read back as a corpus (e.g. for back-translation)."""
     path = str(tmp_path / name)
     texts = ['one paragraph.\nsecond line.', 'überall grüße']
+    jsonl = is_jsonl_path(path)  # i.e. translate.py run with -jsonl and a matching output name
     with open_corpus_output(path) as f:
         for t in texts:
-            f.write(format_output_line(t, jsonl=is_jsonl_path(path)))
-    expected = texts if is_jsonl_path(path) else ['one paragraph. second line.', 'überall grüße']
+            f.write(format_output_line(t, jsonl=jsonl))
+    expected = texts if jsonl else ['one paragraph. second line.', 'überall grüße']
     assert list(open_corpus_lines(path)) == expected
+
+
+def test_translate_output_format_defaults_to_plain_text():
+    """Backward compatible: JSONL output only with -jsonl, whatever the -output extension."""
+    from mammoth.bin.translate import _get_parser
+
+    required = ['-tasks', 't.yaml', '-src_vocab', 'v', '-task_id', 'eng-spa', '-seed', '1', '-max_length', '10']
+    base = required + ['-model', 'm', '-src', 's.jsonl', '-output', 'pred.jsonl']
+    assert _get_parser().parse_args(base).jsonl is False
+    assert _get_parser().parse_args(base + ['-jsonl']).jsonl is True

@@ -1212,6 +1212,14 @@ def translate_opts(parser, dynamic=False):
         default='pred.txt',
         help="Path to output the predictions (each line will be the decoded sequence",
     )
+    group.add(
+        '--jsonl',
+        '-jsonl',
+        action='store_true',
+        help="Write each prediction as a JSONL record {\"text\": ...}, keeping line breaks inside it "
+        "(paragraph-level translation). By default each prediction is written on one line, "
+        "with line breaks replaced by spaces. A '.gz' output path is gzip-compressed either way.",
+    )
     group.add('--report_align', '-report_align', action='store_true', help="Report alignment for each translation.")
     group.add('--report_time', '-report_time', action='store_true', help="Report some translation time metrics")
 

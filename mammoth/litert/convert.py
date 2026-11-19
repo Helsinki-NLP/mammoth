@@ -133,7 +133,8 @@ def load_hf_model(
     print(
         f"Config: dim={config.model_dim}  heads={config.heads}  "
         f"enc={config.enc_layers}  dec={config.dec_layers}  "
-        f"ff_mult={config.ff_mult}  swiglu={config.ff_swiglu}"
+        f"ff enc={config.enc_ff_activation}x{config.enc_ff_mult}  "
+        f"dec={config.dec_ff_activation}x{config.dec_ff_mult}"
     )
 
     print("Assembling state dict from shards …")
@@ -146,11 +147,11 @@ def load_hf_model(
     model = MammothForConditionalGeneration(config)
     missing = [k for k in model.state_dict() if k not in sd]
     unexpected = [k for k in sd if k not in model.state_dict()]
-    if missing:
-        print(f"  [WARN] missing keys: {missing}")
-    if unexpected:
-        print(f"  [WARN] unexpected keys: {unexpected}")
-    model.load_state_dict(sd, strict=not (missing or unexpected))
+    if missing or unexpected:
+        raise RuntimeError(
+            f"Checkpoint does not fill the model exactly.\n"
+            f"  missing: {missing[:10]}\n  unexpected: {unexpected[:10]}")
+    model.load_state_dict(sd)
     print("  Weights loaded.")
     return model, config, src, tgt
 

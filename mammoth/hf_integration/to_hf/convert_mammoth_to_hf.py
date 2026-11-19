@@ -51,6 +51,8 @@ import torch
 from transformers import PreTrainedTokenizerFast
 
 from mammoth.constants import DefaultTokens
+from mammoth.distributed.components import Side
+from mammoth.model_builder import resolve_ff_mult
 from mammoth.hf_integration.to_hf.configuration_mammoth import MammothConfig
 from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalGeneration
 from mammoth.hf_integration.to_hf.model_card import write_model_card
@@ -81,11 +83,17 @@ def config_from_opts(
     decoder_sharing_groups: list | None = None,
 ) -> MammothConfig:
     """Build MammothConfig from a native-mode Mammoth opts Namespace."""
+    # FFN shape comes from the same resolver the model builder used in training,
+    # so an unset ff_mult and side overrides (dec_ff_activation, ...) match.
+    enc_ff_mult, enc_ff_activation, _ = resolve_ff_mult(opts, Side.encoder)
+    dec_ff_mult, dec_ff_activation, _ = resolve_ff_mult(opts, Side.decoder)
     return MammothConfig(
         model_dim=opts.model_dim,
         heads=opts.heads,
-        ff_mult=getattr(opts, 'ff_mult', None) or 2.67,
-        ff_swiglu=getattr(opts, 'ff_swiglu', True),
+        enc_ff_mult=enc_ff_mult,
+        dec_ff_mult=dec_ff_mult,
+        enc_ff_activation=enc_ff_activation,
+        dec_ff_activation=dec_ff_activation,
         enc_layers=list(opts.enc_layers),
         dec_layers=list(opts.dec_layers),
         attn_dropout=getattr(opts, 'attn_dropout', 0.0),
@@ -368,7 +376,8 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     print(
         f"Config: {config.model_dim}d, {config.heads}h, "
         f"enc_layers={enc_stack_sizes}, dec_layers={dec_stack_sizes}, "
-        f"ff_mult={config.ff_mult}, ff_swiglu={config.ff_swiglu}, "
+        f"ff enc={config.enc_ff_activation}x{config.enc_ff_mult} "
+        f"dec={config.dec_ff_activation}x{config.dec_ff_mult}, "
         f"rotary={config.rotary_pos_emb}, post_emb_norm={config.post_emb_norm}"
     )
 
@@ -382,12 +391,15 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     model_sd = model.state_dict()
     missing = [k for k in model_sd if k not in hf_sd]
     unexpected = [k for k in hf_sd if k not in model_sd]
-    if missing:
-        print(f"  [WARN] Missing keys ({len(missing)}): {missing[:10]}{'...' if len(missing) > 10 else ''}")
-    if unexpected:
-        print(f"  [WARN] Unexpected keys ({len(unexpected)}): {unexpected[:10]}{'...' if len(unexpected) > 10 else ''}")
+    if missing or unexpected:
+        # A non-strict load would leave the missing weights at their random init
+        # (e.g. a gelu checkpoint loaded into a swiglu model keeps a random w3).
+        raise RuntimeError(
+            f"Checkpoint does not fill the HF model exactly; the config does not match the "
+            f"trained architecture.\n  missing ({len(missing)}): {missing[:10]}"
+            f"\n  unexpected ({len(unexpected)}): {unexpected[:10]}")
 
-    model.load_state_dict(hf_sd, strict=not (missing or unexpected))
+    model.load_state_dict(hf_sd)
     print("Weights loaded.")
 
     os.makedirs(output_dir, exist_ok=True)
@@ -584,7 +596,8 @@ def convert_modular(
 
     # Architecture only: vocab sizes, token ids and sharing groups are filled in per model at load time.
     arch = config_from_opts(opts, src_vocab_size=0, tgt_vocab_size=0).to_dict()
-    arch_keys = ('model_dim', 'heads', 'ff_mult', 'ff_swiglu', 'enc_layers', 'dec_layers',
+    arch_keys = ('model_dim', 'heads', 'enc_ff_mult', 'dec_ff_mult', 'enc_ff_activation',
+                 'dec_ff_activation', 'enc_layers', 'dec_layers',
                  'attn_dropout', 'ff_dropout', 'emb_dropout', 'rotary_pos_emb', 'post_emb_norm',
                  'use_cache')
     manifest = {

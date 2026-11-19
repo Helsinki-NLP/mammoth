@@ -11,6 +11,10 @@ class MammothConfig(PretrainedConfig):
         self,
         model_dim: int = 512,
         heads: int = 8,
+        enc_ff_mult: Optional[float] = None,
+        dec_ff_mult: Optional[float] = None,
+        enc_ff_activation: Optional[str] = None,
+        dec_ff_activation: Optional[str] = None,
         ff_mult: float = 2.67,
         ff_swiglu: bool = True,
         enc_layers: List[int] = (6,),
@@ -45,8 +49,13 @@ class MammothConfig(PretrainedConfig):
         )
         self.model_dim = model_dim
         self.heads = heads
-        self.ff_mult = ff_mult
-        self.ff_swiglu = ff_swiglu
+        # ff_mult / ff_swiglu are the legacy shared fields (config.json files written
+        # before per-side FFN settings); they only fill in sides left unset.
+        legacy_activation = "swiglu" if ff_swiglu else "gelu"
+        self.enc_ff_mult = enc_ff_mult if enc_ff_mult is not None else ff_mult
+        self.dec_ff_mult = dec_ff_mult if dec_ff_mult is not None else ff_mult
+        self.enc_ff_activation = enc_ff_activation or legacy_activation
+        self.dec_ff_activation = dec_ff_activation or legacy_activation
         self.enc_layers = list(enc_layers)
         self.dec_layers = list(dec_layers)
         self.attn_dropout = attn_dropout

@@ -55,7 +55,7 @@ class _Vocab:
 
 def _opts():
     return argparse.Namespace(
-        model_dim=32, heads=4, ff_mult=2.0, ff_swiglu=True, enc_layers=[1, 1], dec_layers=[2, 1],
+        model_dim=32, heads=4, ff_mult=2.0, enc_layers=[1, 1], dec_layers=[2, 1],
         attn_dropout=0.0, ff_dropout=0.0, dropout=[0.0], rotary_pos_emb=True, post_emb_norm=True,
         tasks={
             f"train_{name}": {"src_tgt": name, "enc_sharing_group": enc, "dec_sharing_group": dec}

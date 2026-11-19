@@ -120,6 +120,20 @@ def _load_shard(ckpt_dir: str, prefix: str, filename: str) -> dict:
 
 # ── Per-language model loading ────────────────────────────────────────────────
 
+def _load_side(model: MammothForConditionalGeneration, sd: dict, side_prefix: str) -> None:
+    """Load one side's weights; the other side is intentionally left at random init.
+
+    Every parameter on the loaded side must come from the checkpoint, otherwise a
+    config/checkpoint mismatch (e.g. wrong FFN activation) would leave weights random.
+    """
+    result = model.load_state_dict(sd, strict=False)
+    missing = [k for k in result.missing_keys if k.startswith(side_prefix)]
+    if missing or result.unexpected_keys:
+        raise RuntimeError(
+            f"Checkpoint does not fill the {side_prefix.rstrip('.')} exactly.\n"
+            f"  missing: {missing[:10]}\n  unexpected: {result.unexpected_keys[:10]}")
+
+
 def _base_config(opts, src_vocab_size: int, tgt_vocab_size: int, vocab, src: str) -> MammothConfig:
     from mammoth.constants import DefaultTokens
     sp = vocab[("src", src)].specials
@@ -176,7 +190,7 @@ def load_encoder_model(
         for k, v in shard.items():
             sd[f"encoder.stacks.{stack_idx}.{k}"] = v.to(dtype)
 
-    model.load_state_dict(sd, strict=False)
+    _load_side(model, sd, "encoder.")
 
     # Share stack modules whose parameters should be deduplicated across languages.
     for stack_idx, xcoder_id in enumerate(encoder_id):
@@ -229,7 +243,7 @@ def load_decoder_model(
         for k, v in shard.items():
             sd[f"decoder.stacks.{stack_idx}.{k}"] = v.to(dtype)
 
-    model.load_state_dict(sd, strict=False)
+    _load_side(model, sd, "decoder.")
 
     for stack_idx, xcoder_id in enumerate(decoder_id):
         key = (stack_idx, xcoder_id)

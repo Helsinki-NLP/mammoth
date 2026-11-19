@@ -96,24 +96,28 @@ class FeedForward(nn.Module):
         dim: int,
         ff_mult: float = 2.67,
         ff_dropout: float = 0.0,
-        activation: Literal["swiglu", "gelu"] = "swiglu",
+        activation: Literal["swiglu", "gelu", "geglu"] = "swiglu",
     ):
         super().__init__()
         inner = int(dim * ff_mult)
         self.activation = activation
-        if activation == "swiglu":
+        if activation in ("swiglu", "geglu"):
             self.w1 = nn.Linear(dim, inner, bias=False)
             self.w2 = nn.Linear(inner, dim, bias=False)
             self.w3 = nn.Linear(dim, inner, bias=False)
-        else:
+        elif activation == "gelu":
             self.w1 = nn.Linear(dim, inner, bias=False)
             self.w2 = nn.Linear(inner, dim, bias=False)
             self.w3 = None
+        else:
+            raise ValueError(f"Unknown FFN activation {activation!r}")
         self.dropout = nn.Dropout(ff_dropout)
 
     def forward(self, x: Tensor) -> Tensor:
         if self.activation == "swiglu":
             return self.dropout(self.w2(F.silu(self.w1(x)) * self.w3(x)))
+        if self.activation == "geglu":
+            return self.dropout(self.w2(F.gelu(self.w1(x), approximate="tanh") * self.w3(x)))
         return self.dropout(self.w2(F.gelu(self.w1(x))))
 
 

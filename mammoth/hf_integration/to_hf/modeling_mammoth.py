@@ -28,7 +28,6 @@ class MammothEncoder(nn.Module):
     def __init__(self, config: MammothConfig):
         super().__init__()
         dim = config.model_dim
-        activation = "swiglu" if config.ff_swiglu else "gelu"
 
         self.token_emb = nn.Embedding(config.src_vocab_size, dim)
         self.post_emb_norm = nn.RMSNorm(dim) if config.post_emb_norm else nn.Identity()
@@ -42,10 +41,10 @@ class MammothEncoder(nn.Module):
                 EncoderBlock(
                     dim=dim,
                     heads=config.heads,
-                    ff_mult=config.ff_mult,
+                    ff_mult=config.enc_ff_mult,
                     attn_dropout=config.attn_dropout,
                     ff_dropout=config.ff_dropout,
-                    activation=activation,
+                    activation=config.enc_ff_activation,
                 )
                 for _ in range(depth)
             ])
@@ -69,7 +68,6 @@ class MammothDecoder(nn.Module):
     def __init__(self, config: MammothConfig):
         super().__init__()
         dim = config.model_dim
-        activation = "swiglu" if config.ff_swiglu else "gelu"
 
         self.token_emb = nn.Embedding(config.tgt_vocab_size, dim)
         self.post_emb_norm = nn.RMSNorm(dim) if config.post_emb_norm else nn.Identity()
@@ -83,10 +81,10 @@ class MammothDecoder(nn.Module):
                 DecoderBlock(
                     dim=dim,
                     heads=config.heads,
-                    ff_mult=config.ff_mult,
+                    ff_mult=config.dec_ff_mult,
                     attn_dropout=config.attn_dropout,
                     ff_dropout=config.ff_dropout,
-                    activation=activation,
+                    activation=config.dec_ff_activation,
                 )
                 for _ in range(depth)
             ])

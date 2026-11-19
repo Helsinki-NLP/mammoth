@@ -29,6 +29,28 @@ from mammoth.utils.misc import use_gpu
 
 
 
+def resolve_ff_mult(model_opts, side: Side) -> Tuple[float, str, bool]:
+    """Resolve the FFN multiplier and activation actually used for one side.
+
+    Returns (ff_mult, ff_activation, ff_mult_from_config). Side-prefixed opts
+    (enc_ff_mult, dec_ff_activation, ...) override the shared ones. ff_mult has
+    no static argparse default (see opts.py) so that an unset value genuinely
+    means "not provided" and falls through to the activation-based default,
+    rather than always resolving to swiglu's 2.67 regardless of ff_activation.
+    Shared by build_xcoder and the trainer's FLOP counter so they cannot drift apart.
+    """
+    prefix = 'enc' if side == Side.encoder else 'dec'
+
+    def side_opt(name, default):
+        value = getattr(model_opts, f'{prefix}_{name}', None)
+        return value if value is not None else getattr(model_opts, name, default)
+
+    activation = side_opt('ff_activation', 'swiglu')
+    ff_mult = side_opt('ff_mult', None)
+    if ff_mult is not None:
+        return ff_mult, activation, True
+    return (4.0 if activation == 'gelu' else 2.67), activation, False
+
 
 def build_xcoder(
     side: Side,
@@ -74,14 +96,12 @@ def build_xcoder(
 
     heads = side_opt('heads', 8)
     dim_head = side_opt('attn_dim_head', dim // heads)
-    activation = side_opt('ff_activation', 'swiglu')
-    # ff_mult has no static argparse default (see opts.py) so that an unset
-    # value here genuinely means "not provided" and falls through to the
-    # activation-based default below, rather than always resolving to
-    # swiglu's 2.67 regardless of ff_activation.
-    ff_mult = side_opt('ff_mult', None)
-    if ff_mult is None:
-        ff_mult = 4.0 if activation == 'gelu' else 2.67
+    ff_mult, activation, ff_mult_from_config = resolve_ff_mult(model_opts, side)
+    ff_mult_source = 'from config' if ff_mult_from_config else f'auto: default for {activation}'
+    logger.info(
+        f'{side.name} ff_mult = {ff_mult} ({ff_mult_source}), ff_activation = {activation}, '
+        f'ff_inner_dim = {int(dim * ff_mult)}'
+    )
     attn_drop = side_opt('attn_dropout', 0.0)
     ff_drop = side_opt('ff_dropout', 0.0)
     use_rotary = getattr(model_opts, 'rotary_pos_emb', False)

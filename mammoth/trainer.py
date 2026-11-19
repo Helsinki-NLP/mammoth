@@ -21,6 +21,8 @@ from mammoth.utils.logging import logger
 from mammoth.utils.loss import build_loss_function
 from mammoth.utils.statistics import Statistics
 from mammoth.utils.flops import compute_transformer_flops
+from mammoth.distributed.components import Side
+from mammoth.model_builder import resolve_ff_mult
 from mammoth.inputters.vocab import HFTokenizerVocab
 
 try:
@@ -134,7 +136,8 @@ def build_trainer(
         'enc_layers': sum(opts.enc_layers) if opts.enc_layers else 6,
         'dec_layers': sum(opts.dec_layers) if opts.dec_layers else 6,
         'vocab_size': opts.tgt_vocab_size or 0,
-        'ff_mult': getattr(opts, 'ff_mult', None) or (4.0 if getattr(opts, 'ff_activation', 'swiglu') == 'gelu' else 2.67),
+        'enc_ff_mult': resolve_ff_mult(opts, Side.encoder)[0],
+        'dec_ff_mult': resolve_ff_mult(opts, Side.decoder)[0],
         'use_glu': False,
     }
 

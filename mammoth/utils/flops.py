@@ -15,7 +15,8 @@ def compute_transformer_flops(
     enc_layers: int,
     dec_layers: int,
     vocab_size: int,
-    ff_mult: float = 4.0,
+    enc_ff_mult: float = 4.0,
+    dec_ff_mult: float = 4.0,
     use_glu: bool = False,
 ) -> int:
     """Compute total FLOPs (forward + backward) for one training step.
@@ -29,8 +30,9 @@ def compute_transformer_flops(
         enc_layers: Number of encoder layers.
         dec_layers: Number of decoder layers.
         vocab_size: Size of the target vocabulary (for logit projection).
-        ff_mult: FFN inner dimension multiplier (ff_inner = model_dim * ff_mult).
-            Corresponds to the `ff_mult` training config option; defaults to 4.0.
+        enc_ff_mult: Encoder FFN inner dimension multiplier (ff_inner = model_dim * ff_mult).
+            Pass the resolved value (model_builder.resolve_ff_mult), not the raw config option.
+        dec_ff_mult: Decoder FFN inner dimension multiplier, as enc_ff_mult.
         use_glu: If True, GLU-style FFN multiplies inner dim by 1.5.
 
     Returns:
@@ -39,13 +41,16 @@ def compute_transformer_flops(
     if n_src_tokens == 0 and n_tgt_tokens == 0:
         return 0
 
-    ff_inner_dim = model_dim * ff_mult
-    if use_glu:
-        ff_inner_dim *= 1.5
+    def mlp_flops(ff_mult):
+        ff_inner_dim = model_dim * ff_mult
+        if use_glu:
+            ff_inner_dim *= 1.5
+        return 4 * model_dim * ff_inner_dim
 
     # Per-token FLOPs per layer (before the 2x FMA and 3x fwd+bwd factors)
     # MLP: two linear projections  →  4 * dim * ff_inner_dim
-    mlp_flops = 4 * model_dim * ff_inner_dim
+    enc_mlp_flops = mlp_flops(enc_ff_mult)
+    dec_mlp_flops = mlp_flops(dec_ff_mult)
 
     # Self-attention: QKV proj + output proj = 4 * dim * dim
     #                 attention scores      = 2 * dim * seq_len
@@ -56,8 +61,8 @@ def compute_transformer_flops(
     cross_attn_flops = 4 * model_dim * model_dim + 2 * model_dim * src_seq_len
 
     # Per-token FLOPs aggregated over all layers
-    encoder_flops_per_token = enc_layers * (mlp_flops + enc_self_attn_flops)
-    decoder_flops_per_token = dec_layers * (mlp_flops + dec_self_attn_flops + cross_attn_flops)
+    encoder_flops_per_token = enc_layers * (enc_mlp_flops + enc_self_attn_flops)
+    decoder_flops_per_token = dec_layers * (dec_mlp_flops + dec_self_attn_flops + cross_attn_flops)
 
     # Logit projection: 2 * dim * vocab_size per target token
     logit_flops_per_token = 2 * model_dim * vocab_size

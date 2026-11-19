@@ -13,7 +13,7 @@ from mammoth.distributed import (
     batch_producer,
     consumer,
 )
-from mammoth.utils.misc import set_random_seed
+from mammoth.utils.misc import get_code_version, set_random_seed
 # from mammoth.modules.embeddings import prepare_pretrained_embeddings
 from mammoth.utils.logging import init_logger, logger
 
@@ -58,6 +58,7 @@ def train(opts):
         log_file_level=opts.log_file_level,
         structured_log_file=opts.structured_log_file
     )
+    logger.info(f'Code version: {get_code_version()}')
     ArgumentParser.validate_train_opts(opts)
     ArgumentParser.update_model_opts(opts)
     ArgumentParser.validate_model_opts(opts)

@@ -10,6 +10,32 @@ from io import StringIO
 from itertools import islice, repeat
 
 
+def get_code_version():
+    """Return a string with the mammoth version and the git commit of the source tree.
+
+    The commit is 'unknown' when mammoth does not run from a git checkout
+    (e.g. a non-editable pip install) or git is not available.
+    """
+    import subprocess
+    import mammoth
+
+    repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(mammoth.__file__)))
+
+    def git(*args):
+        return subprocess.run(
+            ['git', '-C', repo_dir, *args], capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+
+    try:
+        commit = git('rev-parse', 'HEAD')
+        branch = git('rev-parse', '--abbrev-ref', 'HEAD')
+        dirty = ', uncommitted changes' if git('status', '--porcelain', '--untracked-files=no') else ''
+        git_info = f'commit {commit} (branch {branch}{dirty})'
+    except (OSError, subprocess.SubprocessError):
+        git_info = 'commit unknown'
+    return f'mammoth {mammoth.__version__}, {git_info}'
+
+
 def check_path(path, exist_ok=False, log=print):
     """Check if `path` exists, makedirs if not else warning/IOError."""
     if os.path.exists(path):

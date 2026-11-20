@@ -1,15 +1,20 @@
-"""Count parameters in a trained Mammoth checkpoint: total, and per task.
+"""Count parameters in a trained Mammoth checkpoint: total, per task, or per component.
 
-  full       every parameter the task's forward pass touches (what you would
-             have to ship to run this one task; shared parts are counted in full)
-  exclusive  parameters used by this task and no other task
+  --by task       (default) one row per task:
+                    full       every parameter the task's forward pass touches (what you would
+                               have to ship to run this one task; shared parts are counted in full)
+                    exclusive  parameters used by this task and no other task
+                    shared     full - exclusive
+  --by component  one row per component (= checkpoint shard: embeddings, layer stacks,
+                  wrappers, adapters), grouped by kind, with the number of tasks using it
 
-  total      every parameter in the checkpoint, each shard counted once
+  total           every parameter in the checkpoint, each component counted once
 
-Optimizer shards (*_optim.pt) are ignored.
+Optimizer shards (*_optim.pt) are ignored. --json always writes both views.
 
 Usage:
-    python count_params.py --checkpoint-dir path/to/ckpt [--task TASK_ID] [-v] [--json out.json]
+    python count_params.py --checkpoint-dir path/to/ckpt [--by {task,component}] [--task TASK_ID]
+                           [-v] [--json out.json] [--debug]
 """
 import argparse
 import collections
@@ -76,7 +81,7 @@ _stub_pickle.__dict__.update({k: v for k, v in vars(pickle).items() if not k.sta
 _stub_pickle.Unpickler = _StubUnpickler
 
 
-_VERBOSE = False  # set from -v/--verbose in main(); gates the per-file timing lines on stderr
+_DEBUG = False  # set from --debug in main(); gates the per-file timing lines on stderr
 
 
 def _load(path):
@@ -90,7 +95,7 @@ def _load(path):
         # The frame pickles mammoth objects (e.g. tokenizer vocabs) that this script never reads.
         out = torch.load(path, map_location='cpu', weights_only=False, pickle_module=_stub_pickle)
         mode = f'FALLBACK full read ({type(e).__name__}: {str(e).splitlines()[0][:100]})'
-    if _VERBOSE:
+    if _DEBUG:
         print(f'[load] {name}: {time.perf_counter() - t0:7.2f}s  {size_mb:10.1f} MB  {mode}', file=sys.stderr)
     return out
 
@@ -135,7 +140,7 @@ def shard_numel(path):
     t0 = time.perf_counter()
     try:
         counts = _shard_header(path)
-        if _VERBOSE:
+        if _DEBUG:
             print(f'[hdr]  {os.path.basename(path)}: {time.perf_counter() - t0:7.2f}s', file=sys.stderr)
     except Exception as e:
         print(f'[hdr]  {os.path.basename(path)}: header parse failed ({type(e).__name__}: {e}); using torch.load',
@@ -178,116 +183,54 @@ def fmt(n):
     return f'{n:>15,}  ({n / 1e6:8.2f}M)'
 
 
-def print_breakdown(shards, users, total):
-    """Every shard counted in the total, grouped by kind, with per-group subtotals."""
-    groups = defaultdict(list)
-    for name, (p, _) in shards.items():
-        groups[component_kind(name)].append((name, p))
+def collect(ckpt_dir):
+    """Read a checkpoint directory into one table that both views are printed from.
 
-    w = max(len(n) for n in shards)
-    print('Components contributing to the total (each counted once):')
-    for kind, items in sorted(groups.items(), key=lambda kv: -sum(p for _, p in kv[1])):
-        sub = sum(p for _, p in items)
-        print(f'\n  {kind}: {len(items)} shard(s), {fmt(sub)}  {100 * sub / total:5.1f}%')
-        for name, p in sorted(items):
-            n_users = len(users.get(name, ()))
-            used = f'used by {n_users} task(s)' if n_users else 'not used by any task'
-            print(f'    {name:<{w}}  {fmt(p)}  {100 * p / total:5.1f}%  {used}')
-    check = sum(sum(p for _, p in items) for items in groups.values())
-    print(f'\n  sum of all components: {fmt(check)}\n')
+    Returns {'prefix', 'total', 'total_buffers', 'tasks', 'components'} where
+      components: {name: {'params', 'buffers', 'kind', 'tasks': [task ids using it]}}
+      tasks:      [{'task', 'src_tgt', 'components', 'full', 'exclusive', 'shared', 'missing_shards'}]
+    """
+    prefix = resolve_prefix(ckpt_dir)
+    frame = _load(os.path.join(ckpt_dir, f'{prefix}_frame.pt'))
+    task_specs = getattr(frame['opts'], 'tasks', None) or {}
 
-
-def print_task_detail(tid, spec, names, shards, users):
-    """One task's shards grouped by kind; each marked exclusive or shared (and with whom)."""
-    full = sum(shards[n][0] for n in names if n in shards)
-    groups = defaultdict(list)
-    for n in names:
-        groups[component_kind(n)].append(n)
-
-    w = max(len(n) for n in names)
-    print(f"Task {tid!r} ({spec['src_tgt']}): every shard its forward pass uses")
-    for kind, items in sorted(groups.items(), key=lambda kv: -sum(shards[n][0] for n in kv[1] if n in shards)):
-        sub = sum(shards[n][0] for n in items if n in shards)
-        print(f'\n  {kind}: {len(items)} shard(s), {fmt(sub)}  {100 * sub / full:5.1f}%')
-        for n in sorted(items):
-            if n not in shards:
-                print(f'    {n:<{w}}  [WARN] not found on disk')
-                continue
-            others = sorted(users[n] - {tid})
-            note = f"shared with {', '.join(others)}" if others else 'exclusive'
-            print(f'    {n:<{w}}  {fmt(shards[n][0])}  {100 * shards[n][0] / full:5.1f}%  {note}')
-    excl = sum(shards[n][0] for n in names if n in shards and len(users[n]) == 1)
-    print(f'\n  full:      {fmt(full)}')
-    print(f'  exclusive: {fmt(excl)}')
-    print(f'  shared:    {fmt(full - excl)}\n')
-
-
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--checkpoint-dir', required=True)
-    ap.add_argument('-v', '--verbose', action='store_true',
-                    help='list every component shard that adds up to the total, before the task table '
-                         '(with --task: that one task\'s per-component detail instead)')
-    ap.add_argument('--task', default=None, metavar='TASK_ID',
-                    help='report only this task (add -v for its per-component detail)')
-    ap.add_argument('--json', default=None, help='also write results to this file')
-    args = ap.parse_args()
-    global _VERBOSE
-    _VERBOSE = args.verbose
-
-    prefix = resolve_prefix(args.checkpoint_dir)
-    print(f'Checkpoint prefix: {prefix!r} in {args.checkpoint_dir}')
-
-    frame = _load(os.path.join(args.checkpoint_dir, f'{prefix}_frame.pt'))
-    tasks = getattr(frame['opts'], 'tasks', None) or {}
-    if args.task is not None and args.task not in tasks:
-        raise SystemExit(f'Unknown task {args.task!r}. Available tasks: {", ".join(tasks) or "(none found in frame opts)"}')
-
-    # Every non-optimizer component shard on disk: name -> (params, buffers)
+    # Every non-optimizer component shard on disk
     shard_re = re.compile(rf'^{re.escape(prefix)}_(.+)\.pt$')
-    shards = {}
-    for f in sorted(os.listdir(args.checkpoint_dir)):
+    components = {}
+    for f in sorted(os.listdir(ckpt_dir)):
         m = shard_re.match(f)
         if not m or m.group(1) == 'frame' or m.group(1).endswith('_optim'):
             continue
-        shards[m.group(1)] = shard_numel(os.path.join(args.checkpoint_dir, f))
+        params, buffers = shard_numel(os.path.join(ckpt_dir, f))
+        components[m.group(1)] = {'params': params, 'buffers': buffers, 'kind': component_kind(m.group(1)),
+                                  'tasks': []}
 
-    total = sum(p for p, _ in shards.values())
-    total_buf = sum(b for _, b in shards.values())
-
-    # Which tasks use each shard (to find what is exclusive vs shared).
-    users = defaultdict(set)
-    per_task_shards = {}
-    for tid, spec in tasks.items():
-        names = task_shards(tid, spec)
-        per_task_shards[tid] = names
+    per_task = {tid: task_shards(tid, spec) for tid, spec in task_specs.items()}
+    for tid, names in per_task.items():
         for n in names:
-            users[n].add(tid)
+            if n in components:
+                components[n]['tasks'].append(tid)
 
-    rows = []
-    for tid, names in per_task_shards.items():
-        missing = [n for n in names if n not in shards]
-        full = sum(shards[n][0] for n in names if n in shards)
-        excl = sum(shards[n][0] for n in names if n in shards and len(users[n]) == 1)
-        rows.append({'task': tid, 'src_tgt': tasks[tid]['src_tgt'], 'full': full,
-                     'exclusive': excl, 'shared': full - excl, 'missing_shards': missing})
+    tasks = []
+    for tid, names in per_task.items():
+        found = [n for n in names if n in components]
+        full = sum(components[n]['params'] for n in found)
+        excl = sum(components[n]['params'] for n in found if len(components[n]['tasks']) == 1)
+        tasks.append({'task': tid, 'src_tgt': task_specs[tid]['src_tgt'], 'components': found,
+                      'full': full, 'exclusive': excl, 'shared': full - excl,
+                      'missing_shards': [n for n in names if n not in components]})
 
-    claimed = set(users)
-    unclaimed = {n: shards[n][0] for n in shards if n not in claimed}
+    return {'prefix': prefix,
+            'total': sum(c['params'] for c in components.values()),
+            'total_buffers': sum(c['buffers'] for c in components.values()),
+            'tasks': tasks,
+            'components': components}
 
-    print(f'\nTOTAL parameters (each shard once): {fmt(total)}')
-    if total_buf:
-        print(f'  (+ {total_buf:,} buffer elements, e.g. rotary inv_freq, not counted)')
-    print(f'Component shards: {len(shards)}   Tasks: {len(rows)}\n')
 
-    if args.verbose and args.task is None:
-        print_breakdown(shards, users, total)
-
-    if args.task is not None and args.verbose:
-        print_task_detail(args.task, tasks[args.task], per_task_shards[args.task], shards, users)
-    elif rows:
-        if args.task is not None:
-            rows = [r for r in rows if r['task'] == args.task]
+def print_by_task(data, task=None):
+    """One row per task: full / exclusive / shared parameter counts."""
+    rows = [r for r in data['tasks'] if task is None or r['task'] == task]
+    if rows:
         w = max(len(r['task']) for r in rows)
         print(f"{'task':<{w}}  {'full':>24}  {'exclusive':>24}  {'shared':>24}")
         for r in rows:
@@ -295,17 +238,89 @@ def main():
             if r['missing_shards']:
                 print(f"  [WARN] shards not found on disk: {r['missing_shards']}")
 
-    if unclaimed and args.task is None:
+    unused = {n: c['params'] for n, c in data['components'].items() if not c['tasks']}
+    if unused and task is None:
         print(f'\nShards not attributed to any task (adapters, attention bridge, or unexpected): '
-              f'{fmt(sum(unclaimed.values()))}')
-        for n, c in unclaimed.items():
-            print(f'  {n}: {c:,}')
+              f'{fmt(sum(unused.values()))}')
+        for n, p in unused.items():
+            print(f'  {n}: {p:,}')
+
+
+def print_by_component(data, task=None, verbose=False):
+    """One row per component, grouped by kind with subtotals.
+
+    With task: only the components that task's forward pass uses, percentages relative to the task.
+    With verbose: also list the tasks using each component.
+    """
+    components = data['components']
+    if task is None:
+        names, base = list(components), data['total']
+        print('Components (each counted once):')
+    else:
+        row = next(r for r in data['tasks'] if r['task'] == task)
+        names, base = row['components'], row['full']
+        print(f"Components used by task {task!r} ({row['src_tgt']}):")
+        if row['missing_shards']:
+            print(f"  [WARN] shards not found on disk: {row['missing_shards']}")
+    if not names:
+        return
+
+    groups = defaultdict(list)
+    for n in names:
+        groups[components[n]['kind']].append(n)
+
+    def pct(n):
+        return f'{100 * n / base:5.1f}%' if base else '    -'
+
+    w = max(len(n) for n in names)
+    for kind, items in sorted(groups.items(), key=lambda kv: -sum(components[n]['params'] for n in kv[1])):
+        sub = sum(components[n]['params'] for n in items)
+        print(f'\n  {kind}: {len(items)} component(s), {fmt(sub)}  {pct(sub)}')
+        for n in sorted(items):
+            c = components[n]
+            users = c['tasks']
+            used = f'used by {len(users)} task(s)' if users else 'not used by any task'
+            if verbose and users:
+                used += f": {', '.join(users)}"
+            print(f"    {n:<{w}}  {fmt(c['params'])}  {pct(c['params'])}  {used}")
+    print(f"\n  sum: {fmt(sum(components[n]['params'] for n in names))}")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--checkpoint-dir', required=True)
+    ap.add_argument('--by', choices=('task', 'component'), default='task',
+                    help='one row per task (default) or one row per component')
+    ap.add_argument('--task', default=None, metavar='TASK_ID',
+                    help='report only this task (with --by component: the components it uses)')
+    ap.add_argument('-v', '--verbose', action='store_true',
+                    help='with --by component: list the tasks using each component')
+    ap.add_argument('--debug', action='store_true', help='print per-file load timing on stderr')
+    ap.add_argument('--json', default=None, help='also write both views to this file')
+    args = ap.parse_args()
+    global _DEBUG
+    _DEBUG = args.debug
+
+    data = collect(args.checkpoint_dir)
+    print(f"Checkpoint prefix: {data['prefix']!r} in {args.checkpoint_dir}")
+    task_ids = [r['task'] for r in data['tasks']]
+    if args.task is not None and args.task not in task_ids:
+        raise SystemExit(f'Unknown task {args.task!r}. '
+                         f'Available tasks: {", ".join(task_ids) or "(none found in frame opts)"}')
+
+    print(f"\nTOTAL parameters (each component once): {fmt(data['total'])}")
+    if data['total_buffers']:
+        print(f"  (+ {data['total_buffers']:,} buffer elements, e.g. rotary inv_freq, not counted)")
+    print(f"Components: {len(data['components'])}   Tasks: {len(data['tasks'])}\n")
+
+    if args.by == 'task':
+        print_by_task(data, args.task)
+    else:
+        print_by_component(data, args.task, args.verbose)
 
     if args.json:
         with open(args.json, 'w') as fh:
-            json.dump({'prefix': prefix, 'total_params': total, 'tasks': rows,
-                       'shards': {n: p for n, (p, _) in shards.items()},
-                       'unattributed_shards': unclaimed}, fh, indent=2)
+            json.dump(data, fh, indent=2)
         print(f'\nWrote {args.json}')
 
 

@@ -231,7 +231,10 @@ def load_parameters_from_checkpoint(
 
         if not reset_optim:
             optimizer_path = f"{checkpoint_prefix}_{name}_optim.pt"
-            if os.path.isfile(optimizer_path):
+            if name not in optim.suboptimizers:
+                # Frozen component: it has no suboptimizer, so its saved optimizer state is not needed
+                logger.info(f"Skipping optimizer state of frozen component {name}")
+            elif os.path.isfile(optimizer_path):
                 # The optimizer parameters are distributed the same way as the components
                 optim_state_dict = torch.load(
                     optimizer_path,

@@ -45,7 +45,6 @@ Contents
 
       options/train.rst
       options/translate.rst
-      options/server.rst
 
 
 .. toctree::
@@ -55,5 +54,4 @@ Contents
       mammoth.rst
       mammoth.modules.rst
       mammoth.translation.rst
-      mammoth.translate.translation_server.rst
       mammoth.inputters.rst

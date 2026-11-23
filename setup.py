@@ -46,7 +46,6 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            # "onmt_server=mammoth.bin.server:main",
             "mammoth_train=mammoth.bin.train:main",
             "mammoth_translate=mammoth.bin.translate:main",
             # "mammoth_config_config=mammoth.bin.config_config:main",

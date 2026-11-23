@@ -38,6 +38,7 @@ Contents
       examples/extending_with_a_new_language.md
       training_tips.md
       exporting_to_huggingface.md
+      serving.md
 
 .. toctree::
       :caption: Scripts
@@ -45,6 +46,7 @@ Contents
 
       options/train.rst
       options/translate.rst
+      options/serve.rst
 
 
 .. toctree::

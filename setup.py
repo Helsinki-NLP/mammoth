@@ -58,6 +58,7 @@ setup(
             "mammoth_convert2hf=mammoth.hf_integration.to_hf.convert_mammoth_to_hf:main",
             "mammoth_push2hf=mammoth.hf_integration.to_hf.push_to_hub:main",
             "mammoth_download_hf=mammoth.hf_integration.to_hf.model_downloader:main",
+            "mammoth_serve=mammoth.bin.serve:main",
         ],
     },
 )

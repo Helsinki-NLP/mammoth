@@ -3,7 +3,8 @@
 Each input string is one segment: nothing is split into sentences. Inputs are tokenized
 with the task's own source tokenizer, sorted by length and cut into batches (so a batch
 holds segments of similar length and little padding), generated with beam search, decoded
-with the task's target tokenizer and returned in the input order.
+with the task's target tokenizer (surrounding whitespace stripped) and returned in the
+input order.
 
 Generation runs one call at a time: on a laptop CPU, parallel calls only compete for the
 same cores. Unloading a task while it translates is safe, since a running call holds its
@@ -117,4 +118,5 @@ class TranslationEngine:
         with self._generate_lock, torch.inference_mode():
             output_ids = model.generate(input_ids=input_ids.to(model.device),
                                         attention_mask=attention_mask.to(model.device), **gen_kwargs)
-        return loaded.tgt_tokenizer.batch_decode(output_ids, skip_special_tokens=True)
+        # Models trained on raw lines may generate the line break before EOS.
+        return [h.strip() for h in loaded.tgt_tokenizer.batch_decode(output_ids, skip_special_tokens=True)]

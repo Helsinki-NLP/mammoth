@@ -34,7 +34,7 @@ def _reference(loaded, segment, num_beams, max_new_tokens):
     out = loaded.model.generate(input_ids=inputs["input_ids"], attention_mask=inputs["attention_mask"],
                                 num_beams=num_beams, max_new_tokens=max_new_tokens,
                                 early_stopping=num_beams > 1)
-    return loaded.tgt_tokenizer.decode(out[0], skip_special_tokens=True)
+    return loaded.tgt_tokenizer.decode(out[0], skip_special_tokens=True).strip()
 
 
 @pytest.mark.parametrize("num_beams", [1, 3])

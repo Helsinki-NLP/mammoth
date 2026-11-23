@@ -329,6 +329,13 @@ class ArgumentParser(cfargparse.ArgumentParser, DataOptsCheckerMixin):
                 "-gpu_ranks should have master(=0) rank unless -world_size is greater than len(gpu_ranks)."
             )
 
+        freeze_components = getattr(opts, 'freeze_components', None)
+        train_components = getattr(opts, 'train_components', None)
+        if freeze_components and train_components:
+            raise ValueError('freeze_components and train_components are mutually exclusive: set only one of them')
+        if '@pretrained' in (freeze_components or train_components or []) and not opts.train_from:
+            raise ValueError("'@pretrained' in freeze_components/train_components requires train_from")
+
         assert len(opts.dropout) == len(opts.dropout_steps), "Number of dropout values must match accum_steps values"
 
         assert len(opts.attention_dropout) == len(

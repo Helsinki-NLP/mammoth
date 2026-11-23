@@ -743,6 +743,33 @@ def _add_train_general_opts(parser):
              "decoder's internal processing frozen. Adapters remain trainable if configured. "
              "Mutually exclusive with --freeze_decoder and --freeze_cross_attention.",
     )
+    group.add(
+        '--freeze_components',
+        '-freeze_components',
+        nargs='*',
+        default=[],
+        help="Freeze the model components matching any of these patterns; all others stay trainable. "
+             "A component is a checkpoint shard, named e.g. encoder_0_all, src_embeddings_sme, "
+             "decoder_wrapper_eng, encoder_adapter_0_g_x, attention_bridge "
+             "(list them with scripts/count_params.py --by component). "
+             "Patterns are fnmatch wildcards (quote them on the command line). "
+             "'@pretrained' selects every component that has a shard in the --train_from checkpoint, "
+             "so only newly added components (e.g. a new language) are trained. "
+             "Adapters are only frozen by patterns containing 'adapter'. "
+             "Every pattern must match at least one component. "
+             "Combined with the other freeze_* options (union). "
+             "Mutually exclusive with --train_components.",
+    )
+    group.add(
+        '--train_components',
+        '-train_components',
+        nargs='*',
+        default=[],
+        help="Train only the model components matching any of these patterns (same syntax as "
+             "--freeze_components, including '@pretrained'); freeze all others. "
+             "Adapters always stay trainable. "
+             "Mutually exclusive with --freeze_components.",
+    )
 
     # Optimization options
     group = parser.add_argument_group('Batching')

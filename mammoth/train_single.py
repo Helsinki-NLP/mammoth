@@ -257,7 +257,7 @@ def main(
     # Must run on every rank: WorldGroupGradientSync packs only requires_grad params,
     # so ranks that disagree on what is frozen misalign the allreduce buffer.
     from mammoth.model_builder import freeze_model_components
-    freeze_model_components(model, opts, task_queue_manager)
+    freeze_model_components(model, opts, task_queue_manager, frame_checkpoint_path=frame_checkpoint_path)
 
     logger.info("{} - Init model".format(device_context.id))
     world_group_sync = None

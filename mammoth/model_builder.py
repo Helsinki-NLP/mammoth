@@ -2,15 +2,20 @@
 This file is for models creation, which consults options
 and creates each encoder and decoder accordingly.
 """
+import os
 import torch
 import torch.nn as nn
 from collections import defaultdict
+from fnmatch import fnmatchcase
+from glob import glob
 from torch.nn.init import xavier_uniform_
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Set, Tuple
 
 from mammoth.distributed.components import (
+    DistributedAdapter,
     DistributedDecoderAttentionLayersBlock,
     DistributedEncoderAttentionLayersBlock,
+    DistributedWrapperModules,
     Side,
 )
 from mammoth.inputters.vocab import Vocab
@@ -521,29 +526,38 @@ def build_model(
     return model
 
 
-def freeze_model_components(model, opts, task_queue_manager):
+def freeze_model_components(model, opts, task_queue_manager, frame_checkpoint_path=None):
     """
     Freeze model components based on configuration options.
-    Must be called after model initialization but before optimizer creation.
+    Must be called after model initialization but before optimizer creation,
+    on every rank (all ranks must agree on what is frozen, see WorldGroupGradientSync).
 
     This function implements granular freezing for parameter-efficient fine-tuning,
     allowing independent control over encoder, decoder, cross-attention, embeddings,
-    and attention bridge freezing.
+    and attention bridge freezing. On top of that, freeze_components / train_components
+    select whole DistributedComponents by name (see resolve_frozen_components).
+    The result is the union of both mechanisms.
 
     Args:
         model: The NMTModel instance
         opts: Configuration options containing freeze flags
         task_queue_manager: TaskQueueManager for distributed component access
+        frame_checkpoint_path: the train_from frame file, needed for '@pretrained'
 
     Notes:
-        - Adapters are never frozen, even when base model is frozen
+        - Adapters are never frozen, unless a freeze_components pattern names them
         - Frozen parameters are excluded from optimizer automatically
         - Freezing happens before distributed initialization to ensure consistency
     """
     from mammoth.utils.logging import logger
 
+    checkpoint_prefix = frame_checkpoint_path.removesuffix('_frame.pt') if frame_checkpoint_path else None
+    frozen_components = resolve_frozen_components(opts, task_queue_manager, checkpoint_prefix)
+    if frozen_components:
+        logger.info(f"Freezing components selected by freeze_components/train_components: {sorted(frozen_components)}")
+        _freeze_named_components(model, frozen_components, task_queue_manager)
+
     frozen_params_count = 0
-    total_params_count = sum(p.numel() for p in model.parameters())
 
     # Freeze encoder
     if getattr(opts, 'freeze_encoder', False):
@@ -604,8 +618,11 @@ def freeze_model_components(model, opts, task_queue_manager):
                 "encoder/decoder dimensions match."
             )
 
-    # Report freezing summary
+    # Report freezing summary. Counted from the model, since several options may freeze the same parameters.
+    total_params_count = sum(p.numel() for p in model.parameters())
+    frozen_params_count = sum(p.numel() for p in model.parameters() if not p.requires_grad)
     if frozen_params_count > 0:
+        log_component_freezing_summary(model, task_queue_manager)
         frozen_percentage = (frozen_params_count / total_params_count) * 100
         trainable_params = total_params_count - frozen_params_count
         logger.info(
@@ -616,6 +633,100 @@ def freeze_model_components(model, opts, task_queue_manager):
         logger.info("No parameters frozen - all parameters are trainable")
 
     return frozen_params_count
+
+
+PRETRAINED_SELECTOR = '@pretrained'
+
+
+def resolve_frozen_components(opts, task_queue_manager, checkpoint_prefix=None) -> Set[str]:
+    """Names of the DistributedComponents to freeze, from opts.freeze_components / opts.train_components.
+
+    Patterns are fnmatch wildcards over component names (= checkpoint shard names, e.g.
+    'encoder_0_all', 'src_embeddings_sme', 'decoder_wrapper_eng'). '@pretrained' selects every
+    component that has a shard in the train_from checkpoint (checkpoint_prefix).
+
+    - freeze_components: freeze the matched components, train the rest.
+    - train_components: train only the matched components, freeze the rest.
+
+    Adapters stay trainable in both modes, unless a freeze_components pattern contains 'adapter'.
+    Matching uses the global component list, so every rank gets the same answer.
+    Every pattern must match something, to catch typos.
+    """
+    freeze_patterns = getattr(opts, 'freeze_components', None) or []
+    train_patterns = getattr(opts, 'train_components', None) or []
+    if freeze_patterns and train_patterns:
+        raise ValueError('freeze_components and train_components are mutually exclusive: set only one of them')
+    if not freeze_patterns and not train_patterns:
+        return set()
+
+    components = task_queue_manager.distributed_components
+    all_names = {c.get_name() for c in components}
+    adapter_names = {c.get_name() for c in components if isinstance(c, DistributedAdapter)}
+
+    selected = set()
+    for pattern in freeze_patterns or train_patterns:
+        if pattern == PRETRAINED_SELECTOR:
+            if not checkpoint_prefix:
+                raise ValueError(f"'{PRETRAINED_SELECTOR}' requires train_from")
+            matched = _pretrained_component_names(components, checkpoint_prefix)
+        else:
+            matched = {name for name in all_names if fnmatchcase(name, pattern)}
+        if not matched:
+            raise ValueError(
+                f"Component pattern {pattern!r} matches no component. "
+                f"Available components: {sorted(all_names)}"
+            )
+        if freeze_patterns and 'adapter' not in pattern:
+            matched -= adapter_names
+            if not matched:
+                raise ValueError(
+                    f"Component pattern {pattern!r} matches only adapters, which are not frozen "
+                    f"unless the pattern contains 'adapter'"
+                )
+        selected |= matched
+
+    if freeze_patterns:
+        return selected
+    return all_names - selected - adapter_names
+
+
+def _pretrained_component_names(components, checkpoint_prefix) -> Set[str]:
+    """Components whose weights load_parameters_from_checkpoint restores from this checkpoint."""
+    # Old checkpoints keep the wrapper modules inside per-task files; they are migrated on load
+    legacy_wrapper_sides = {
+        side for side in Side if glob(f'{checkpoint_prefix}_{side.name}_task_*.pt')
+    }
+    names = set()
+    for component in components:
+        name = component.get_name()
+        if os.path.isfile(f'{checkpoint_prefix}_{name}.pt'):
+            names.add(name)
+        elif isinstance(component, DistributedWrapperModules) and component.side in legacy_wrapper_sides:
+            names.add(name)
+    return names
+
+
+def _freeze_named_components(model, names, task_queue_manager):
+    """Freeze the parameters of the named components that live on this rank."""
+    for component in task_queue_manager.get_my_distributed_components():
+        if component.get_name() not in names or component.get_module(model) is None:
+            continue
+        for _, param in component.named_parameters(model):
+            param.requires_grad = False
+
+
+def log_component_freezing_summary(model, task_queue_manager):
+    """Log, for each component on this rank, whether it is frozen, trainable or partially frozen."""
+    lines = []
+    for component in task_queue_manager.get_my_distributed_components():
+        if component.get_module(model) is None:
+            continue
+        params = [p for _, p in component.named_parameters(model)]
+        trainable = sum(p.numel() for p in params if p.requires_grad)
+        frozen = sum(p.numel() for p in params if not p.requires_grad)
+        status = 'trainable' if frozen == 0 else 'frozen' if trainable == 0 else 'partial'
+        lines.append(f"  {status:<9} {component.get_name():<40} trainable {trainable:>13,}  frozen {frozen:>13,}")
+    logger.info("Component freezing status on this rank:\n" + "\n".join(lines))
 
 
 def _freeze_encoder_layers(model):

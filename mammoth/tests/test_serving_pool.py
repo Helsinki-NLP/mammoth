@@ -1,19 +1,43 @@
 """Mammoth server, step 1: model sources + ComponentPool.
 
 Uses the three-task checkpoint of test_hf_modular (eng-spa, eng-fra, deu-spa sharing
-stacks) served two ways — straight from the training checkpoint and from its modular HF
-export — and checks that pooled models reproduce the reference model exactly in fp32,
+stacks) served three ways — straight from the training checkpoint, from its modular HF
+export, and from its --single-artifact bundle — plus a standalone single-task export, and
+checks that pooled models reproduce the reference model exactly in fp32,
 that shared components are loaded once and shared in memory, and that zero-shot
 directions are served like trained ones.
 """
 
+import json
+import shutil
+
 import pytest
 import torch
 
-from mammoth.serving import CheckpointSource, ComponentPool, HFSource, default_path, open_source
-from mammoth.tests.test_hf_modular import (  # noqa: F401  (fixtures)
-    TASKS, VOCAB_SIZES, _logits, _reference, checkpoint, modular_dir,
+from mammoth.hf_integration.to_hf.convert_mammoth_to_hf import convert, convert_multi_task_artifact
+from mammoth.serving import (
+    ArtifactSource, CheckpointSource, ComponentPool, HFSource, default_path, open_source,
 )
+from mammoth.serving.sources import post_emb_norm_owner
+from mammoth.tests.test_hf_modular import (  # noqa: F401  (fixtures)
+    PREFIX, TASKS, VOCAB_SIZES, _logits, _reference, checkpoint, modular_dir,
+)
+
+
+@pytest.fixture(scope="module")
+def bundle_dir(checkpoint, tmp_path_factory):
+    ckpt, _, _ = checkpoint
+    out = tmp_path_factory.mktemp("bundle")
+    convert_multi_task_artifact(str(ckpt), str(out))
+    return out
+
+
+@pytest.fixture(scope="module")
+def standalone_dir(checkpoint, tmp_path_factory):
+    ckpt, _, _ = checkpoint
+    out = tmp_path_factory.mktemp("standalone")
+    convert(str(ckpt), PREFIX, "eng", "spa", str(out))
+    return out
 
 
 class _CountingSource:
@@ -30,16 +54,18 @@ class _CountingSource:
         return self.source.load_tokenizer(side, lang)
 
 
-@pytest.fixture(params=["checkpoint", "hf"])
-def source(request, checkpoint, modular_dir):
+@pytest.fixture(params=["checkpoint", "modular", "bundle"])
+def source(request, checkpoint, modular_dir, bundle_dir):
     ckpt, _, _ = checkpoint
-    return open_source(str(ckpt) if request.param == "checkpoint" else str(modular_dir))
+    return open_source(str({"checkpoint": ckpt, "modular": modular_dir, "bundle": bundle_dir}[request.param]))
 
 
-def test_open_source_detects_format(checkpoint, modular_dir):
+def test_open_source_detects_format(checkpoint, modular_dir, bundle_dir, standalone_dir):
     ckpt, _, _ = checkpoint
     assert isinstance(open_source(str(ckpt)), CheckpointSource)
     assert isinstance(open_source(str(modular_dir)), HFSource)
+    assert isinstance(open_source(str(bundle_dir)), ArtifactSource)
+    assert isinstance(open_source(str(standalone_dir)), ArtifactSource)
 
 
 def test_sources_agree(checkpoint, modular_dir):
@@ -145,3 +171,60 @@ def test_generate(source):
     inputs.pop("token_type_ids", None)
     out = loaded.model.generate(**inputs, max_new_tokens=5, num_beams=2)
     assert out.shape[0] == 1 and out.max().item() < VOCAB_SIZES[("tgt", "fra")]
+
+
+def test_standalone_model(checkpoint, standalone_dir, tmp_path):
+    """A standalone single-task export serves its one direction, exactly."""
+    _, opts, modules = checkpoint
+    pool = ComponentPool(open_source(str(standalone_dir)))
+    assert pool.available_tasks() == {"eng-spa": dict(src="eng", tgt="spa", encoder=["eng", "all"],
+                                                      decoder=["spa", "all"], trained=True)}
+    loaded = pool.add_task("eng-spa")
+    ref = _reference(opts, modules, "eng", "spa", ["eng", "all"], ["spa", "all"])
+    assert torch.equal(_logits(loaded.model, "eng", "spa"), _logits(ref, "eng", "spa"))
+
+    # The fixture frame predates post_emb_norm_scope, so its norms are per component (path).
+    assert json.loads((standalone_dir / "config.json").read_text())["post_emb_norm_scope"] == "component"
+    assert open_source(str(standalone_dir))._norm_owner == {"src": "wrapper", "tgt": "wrapper"}
+
+    # Exports made before src_lang/tgt_lang/post_emb_norm_scope were recorded: the direction
+    # must be named, and the norm owner is judged from the weights.
+    old = tmp_path / "old"
+    shutil.copytree(standalone_dir, old)
+    config = json.loads((old / "config.json").read_text())
+    del config["src_lang"], config["tgt_lang"], config["post_emb_norm_scope"]
+    (old / "config.json").write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="task='eng-spa'"):
+        open_source(str(old))
+    loaded = ComponentPool(open_source(str(old), task="eng-spa")).add_task("eng-spa")
+    assert torch.equal(_logits(loaded.model, "eng", "spa"), _logits(ref, "eng", "spa"))
+
+
+def test_recorded_norm_scope_is_used(bundle_dir, tmp_path):
+    """post_emb_norm_scope in config.json decides where the norm goes, not the weights."""
+    assert open_source(str(bundle_dir))._norm_owner == {"src": "wrapper", "tgt": "wrapper"}
+    bundle = tmp_path / "bundle"
+    shutil.copytree(bundle_dir, bundle)
+    config = json.loads((bundle / "config.json").read_text())
+    for t in config["tasks"].values():
+        t["post_emb_norm_scope"] = "language"
+    (bundle / "config.json").write_text(json.dumps(config))
+    source = open_source(str(bundle))
+    assert source._norm_owner == {"src": "emb", "tgt": "emb"}
+    assert "post_emb_norm.weight" in source.load_component("src_emb__eng")
+    assert source.load_component("enc_wrapper__eng__all") == {}
+
+    config["tasks"]["eng-fra"]["post_emb_norm_scope"] = "component"
+    (bundle / "config.json").write_text(json.dumps(config))
+    with pytest.raises(ValueError, match="disagree"):
+        open_source(str(bundle))
+
+
+def test_post_emb_norm_owner():
+    a, b = {"weight": torch.ones(2)}, {"weight": torch.zeros(2)}
+    # One norm per language: two languages share the path ["all"] but keep their own norm.
+    assert post_emb_norm_owner([("eng", ("all",), a), ("deu", ("all",), b), ("eng", ("all",), a)]) == "emb"
+    # One norm per path: one language on two paths, each with its own norm.
+    assert post_emb_norm_owner([("eng", ("x",), a), ("eng", ("y",), b), ("deu", ("x",), a)]) == "wrapper"
+    with pytest.raises(ValueError, match="cannot be split"):
+        post_emb_norm_owner([("eng", ("x",), a), ("eng", ("x",), b)])

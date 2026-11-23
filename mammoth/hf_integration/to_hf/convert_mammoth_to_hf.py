@@ -57,7 +57,7 @@ from mammoth.hf_integration.to_hf.configuration_mammoth import MammothConfig
 from mammoth.hf_integration.to_hf.modeling_mammoth import MammothForConditionalGeneration
 from mammoth.hf_integration.to_hf.model_card import write_model_card
 from mammoth.hf_integration.to_hf.mammoth_hub import (
-    MODULAR_MODEL_TYPE, component_name, component_to_hf, filter_component_state,
+    ARCH_KEYS, MODULAR_MODEL_TYPE, component_name, component_to_hf, filter_component_state,
 )
 
 
@@ -409,6 +409,11 @@ def convert(ckpt_dir: str, prefix: str, src: str, tgt: str, output_dir: str):
     print("Weights loaded.")
 
     os.makedirs(output_dir, exist_ok=True)
+    # Not used by the model; lets loaders (e.g. the Mammoth server) name the direction and
+    # split the fused weights back into components (which one owns post_emb_norm).
+    config.src_lang, config.tgt_lang = src, tgt
+    # frames that predate post_emb_norm_scope are component scope
+    config.post_emb_norm_scope = getattr(opts, 'post_emb_norm_scope', None) or 'component'
     config.auto_map = {
         "AutoConfig": "configuration_mammoth.MammothConfig",
         "AutoModelForSeq2SeqLM": "modeling_mammoth.MammothForConditionalGeneration",
@@ -561,14 +566,10 @@ def modular_manifest(ckpt_dir: str, prefix: str, opts, vocab) -> tuple[dict, dic
 
     # Architecture only: vocab sizes, token ids and sharing groups are filled in per model at load time.
     arch = config_from_opts(opts, src_vocab_size=0, tgt_vocab_size=0).to_dict()
-    arch_keys = ('model_dim', 'heads', 'enc_ff_mult', 'dec_ff_mult', 'enc_ff_activation',
-                 'dec_ff_activation', 'enc_layers', 'dec_layers',
-                 'attn_dropout', 'ff_dropout', 'emb_dropout', 'rotary_pos_emb', 'post_emb_norm',
-                 'use_cache')
     manifest = {
         'model_type': MODULAR_MODEL_TYPE,
         'format_version': 1,
-        'architecture': {k: arch[k] for k in arch_keys},
+        'architecture': {k: arch[k] for k in ARCH_KEYS},
         'components': components,
         'tokenizers': tokenizers,
         'tasks': tasks,

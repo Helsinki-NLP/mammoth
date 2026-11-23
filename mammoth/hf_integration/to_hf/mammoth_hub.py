@@ -32,6 +32,11 @@ CODE_FILES = ("configuration_mammoth.py", "modeling_mammoth.py", "native_transfo
 MODULAR_MODEL_TYPE = "mammoth_modular"
 LEGACY_MODEL_TYPE = "mammoth_hub"
 
+# MammothConfig fields shared by every model of a modular repo (its "architecture").
+ARCH_KEYS = ("model_dim", "heads", "enc_ff_mult", "dec_ff_mult", "enc_ff_activation",
+             "dec_ff_activation", "enc_layers", "dec_layers", "attn_dropout", "ff_dropout",
+             "emb_dropout", "rotary_pos_emb", "post_emb_norm", "use_cache")
+
 
 # ---------------------------------------------------------------------------
 # Component naming and component → HF key mapping.

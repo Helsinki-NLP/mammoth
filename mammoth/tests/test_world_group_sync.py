@@ -87,6 +87,19 @@ class TestCommunicatingComponentsFilter(unittest.TestCase):
         self.assertEqual(WorldGroupGradientSync._communicating_components(comps), [])
 
 
+class TestPackIntoBuckets(unittest.TestCase):
+    def test_greedy_packing(self):
+        layout = OrderedDict([('a', 4), ('b', 4), ('c', 10), ('d', 1)])
+        buckets, max_size = WorldGroupGradientSync._pack_into_buckets(layout, bucket_elements=8)
+        # 'c' is larger than a bucket and gets its own
+        self.assertEqual(buckets, [[('a', 4), ('b', 4)], [('c', 10)], [('d', 1)]])
+        self.assertEqual(max_size, 10)
+
+    def test_no_components_gives_no_buckets(self):
+        """Every shared component frozen -> empty layout. Used to crash with max() of an empty iterable."""
+        self.assertEqual(WorldGroupGradientSync._pack_into_buckets(OrderedDict(), bucket_elements=8), ([], 0))
+
+
 class TestWorldGroupGradientSyncPipeline(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -153,6 +166,16 @@ class TestWorldGroupGradientSyncPipeline(unittest.TestCase):
         for name in sizes:
             torch.testing.assert_close(results[1][name], results[2][name])
             torch.testing.assert_close(results[1][name], results[3][name])
+
+    def test_no_buckets_is_a_noop(self):
+        """With nothing to allreduce, sync() must not touch the gradients."""
+        syncs, _, modules = self._make_components({'a': (4, 3)})
+        expected = modules['a'].weight.grad.clone()
+        sync = WorldGroupGradientSync.__new__(WorldGroupGradientSync)
+        sync.profiler_range = get_profiler_range()
+        sync.buckets, sync.buffers = [], []
+        sync.sync(model=None, all_gradient_syncs=syncs)
+        torch.testing.assert_close(modules['a'].weight.grad, expected)
 
     def test_more_buckets_than_buffers(self):
         """pipeline_depth smaller than bucket count must force buffer reuse and still be correct."""

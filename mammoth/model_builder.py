@@ -632,6 +632,15 @@ def freeze_model_components(model, opts, task_queue_manager, frame_checkpoint_pa
     else:
         logger.info("No parameters frozen - all parameters are trainable")
 
+    # A rank with nothing to train would otherwise fail later in loss.backward() with an obscure
+    # "does not require grad" error. Raising here stops every rank via the error handler.
+    if total_params_count > 0 and frozen_params_count == total_params_count:
+        corpus_ids = [task.corpus_id for task in task_queue_manager.get_my_tasks()]
+        raise ValueError(
+            f"Every parameter on this GPU is frozen, so its tasks {corpus_ids} have nothing to train. "
+            f"Remove these tasks from the config, or leave a component they use trainable."
+        )
+
     return frozen_params_count
 
 
@@ -724,7 +733,10 @@ def log_component_freezing_summary(model, task_queue_manager):
         params = [p for _, p in component.named_parameters(model)]
         trainable = sum(p.numel() for p in params if p.requires_grad)
         frozen = sum(p.numel() for p in params if not p.requires_grad)
-        status = 'trainable' if frozen == 0 else 'frozen' if trainable == 0 else 'partial'
+        if trainable + frozen == 0:
+            status = 'empty'  # e.g. a wrapper whose only module moved into the per-language embeddings
+        else:
+            status = 'trainable' if frozen == 0 else 'frozen' if trainable == 0 else 'partial'
         lines.append(f"  {status:<9} {component.get_name():<40} trainable {trainable:>13,}  frozen {frozen:>13,}")
     logger.info("Component freezing status on this rank:\n" + "\n".join(lines))
 

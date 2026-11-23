@@ -84,8 +84,9 @@ Rules:
 - **Every pattern must match at least one component.** A typo such as `encoder_0_nordc` stops training at startup and prints the available names.
 - **Adapters stay trainable** unless a `freeze_components` pattern contains the word `adapter` (e.g. `'*adapter*'`). With `train_components`, adapters are never frozen.
 - **The older options still work.** `freeze_encoder`, `freeze_cross_attention`, etc. are applied too, and a parameter is frozen if any option freezes it. Use them for finer control than whole components, e.g. freezing only cross-attention.
+- **Every GPU must have something to train.** If all components on a GPU are frozen, training stops at startup and names that GPU's tasks. Example: with a frozen decoder, an old task such as `eng-swe` whose encoder is also frozen has nothing to learn. Remove it from the config.
 
-At startup each GPU logs every component it holds as `trainable`, `frozen` or `partial` (partly frozen by one of the older options), together with parameter counts. Check this list before a long run.
+At startup each GPU logs every component it holds as `trainable`, `frozen`, `partial` (partly frozen by one of the older options) or `empty` (no parameters, e.g. an encoder wrapper whose post-embedding norm is stored with the embeddings), together with parameter counts. Check this list before a long run.
 
 ## What happens to frozen components
 

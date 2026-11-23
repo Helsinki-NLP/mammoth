@@ -364,27 +364,12 @@ class WorldGroupGradientSync:
 
         BUCKET_MB = 200
         bucket_elements = BUCKET_MB * 1024 * 1024 // element_size
-
-        # Greedily pack components into buckets of at most bucket_elements each.
-        # A component larger than the bucket size gets its own bucket.
-        self.buckets = []
-        current_bucket = []
-        current_size = 0
-        for name, size in self.component_layout.items():
-            if current_size + size > bucket_elements and current_bucket:
-                self.buckets.append(current_bucket)
-                current_bucket = []
-                current_size = 0
-            current_bucket.append((name, size))
-            current_size += size
-        if current_bucket:
-            self.buckets.append(current_bucket)
-
-        max_bucket_size = max(sum(s for _, s in b) for b in self.buckets)
+        self.buckets, max_bucket_size = self._pack_into_buckets(self.component_layout, bucket_elements)
 
         # Allocate a pool of identical bucket buffers so several allreduces can be in flight at
-        # once. No point holding more buffers than there are buckets to fill.
-        self.pipeline_depth = max(1, min(pipeline_depth, len(self.buckets)))
+        # once. No point holding more buffers than there are buckets to fill. With no buckets
+        # (e.g. every shared component is frozen) there is nothing to allreduce and sync() is a no-op.
+        self.pipeline_depth = min(max(1, pipeline_depth), len(self.buckets))
         self.buffers = [
             torch.zeros(max_bucket_size, dtype=dtype, device=device)
             for _ in range(self.pipeline_depth)
@@ -399,6 +384,29 @@ class WorldGroupGradientSync:
             f"bucket buffer {max_bucket_size * element_size / 1024 / 1024:.1f} MB "
             f"x {self.pipeline_depth} (pipeline depth)"
         )
+
+    @staticmethod
+    def _pack_into_buckets(component_layout, bucket_elements):
+        """Greedily pack components into buckets of at most bucket_elements each.
+
+        A component larger than the bucket size gets its own bucket.
+        Returns (buckets, max_bucket_size); ([], 0) when there are no components, which happens
+        when every shared component is frozen.
+        """
+        buckets = []
+        current_bucket = []
+        current_size = 0
+        for name, size in component_layout.items():
+            if current_size + size > bucket_elements and current_bucket:
+                buckets.append(current_bucket)
+                current_bucket = []
+                current_size = 0
+            current_bucket.append((name, size))
+            current_size += size
+        if current_bucket:
+            buckets.append(current_bucket)
+        max_bucket_size = max((sum(s for _, s in b) for b in buckets), default=0)
+        return buckets, max_bucket_size
 
     @staticmethod
     def _communicating_components(all_components):

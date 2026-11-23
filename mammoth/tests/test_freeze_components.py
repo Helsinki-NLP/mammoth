@@ -22,6 +22,7 @@ from mammoth.distributed.components import (
 from mammoth.distributed.contexts import WorldContext, DeviceContextEnum
 from mammoth.distributed.tasks import TaskSpecs, TaskQueueManager, RoundRobinTaskDistributionStrategy
 from mammoth.inputters.vocab import Vocab, DEFAULT_SPECIALS
+import mammoth.model_builder as model_builder
 from mammoth.model_builder import (
     build_xcoder,
     freeze_model_components,
@@ -213,3 +214,23 @@ def test_extending_with_sme_trains_only_the_new_components(tmp_path, freeze_opts
     for name in before:
         changed = any(not torch.equal(before[name][k], after[name][k]) for k in before[name])
         assert changed == (name == 'src_embeddings_sme'), name
+
+
+def test_rank_with_nothing_to_train_is_an_error():
+    """Without this check the rank crashes later in loss.backward() with 'does not require grad'."""
+    model, opts, tqm = _build(['swe', 'nob'], freeze_components=['*'])
+    with pytest.raises(ValueError, match=r"Every parameter on this GPU is frozen.*\['swe-eng', 'nob-eng'\]"):
+        freeze_model_components(model, opts, tqm)
+
+
+def test_summary_marks_components_without_parameters_as_empty(monkeypatch):
+    messages = []
+    monkeypatch.setattr(model_builder.logger, 'info', messages.append)
+    model, opts, tqm = _build(['swe'], freeze_components=['tgt_embeddings_eng'])
+    freeze_model_components(model, opts, tqm)
+    status = {line.split()[1]: line.split()[0] for m in messages if 'freezing status' in m for line in m.splitlines()[1:]}
+    assert status['tgt_embeddings_eng'] == 'frozen'
+    assert status['encoder_0_nordic'] == 'trainable'
+    empty = {name for name, s in status.items() if s == 'empty'}
+    assert empty and all(sum(p.numel() for _, p in c.named_parameters(model)) == 0
+                         for c in tqm.get_my_distributed_components() if c.get_name() in empty)

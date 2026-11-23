@@ -227,6 +227,25 @@ def resolve_components(manifest: dict, task: Optional[str] = None, src: Optional
     }
 
 
+def model_config(manifest: dict, spec: dict) -> dict:
+    """MammothConfig kwargs for the model `spec` (from resolve_components) describes."""
+    components = manifest["components"]
+    tgt_tok = manifest["tokenizers"]["tgt"][spec["tgt"]]
+    config = dict(manifest["architecture"])
+    config.update(
+        src_vocab_size=components[component_name("src_emb", lang=spec["src"])]["vocab_size"],
+        tgt_vocab_size=components[component_name("tgt_emb", lang=spec["tgt"])]["vocab_size"],
+        # Decoding produces target-side tokens, so the special ids come from the target vocab.
+        bos_token_id=tgt_tok["bos_token_id"],
+        eos_token_id=tgt_tok["eos_token_id"],
+        pad_token_id=tgt_tok["pad_token_id"],
+        decoder_start_token_id=tgt_tok["bos_token_id"],
+        encoder_sharing_groups=spec["encoder"],
+        decoder_sharing_groups=spec["decoder"],
+    )
+    return config
+
+
 def modular_file_patterns(manifest: dict, **selection) -> list:
     """Repo files (allow_patterns) needed for one model of a modular repo.
 
@@ -314,20 +333,8 @@ class MammothHub:
             manifest, src=spec["src"], tgt=spec["tgt"],
             encoder=spec["encoder"], decoder=spec["decoder"]))
 
-        config_dict = dict(manifest["architecture"])
-        config_dict.update(
-            model_type="mammoth",
-            auto_map=_AUTO_MAP,
-            src_vocab_size=components[component_name("src_emb", lang=spec["src"])]["vocab_size"],
-            tgt_vocab_size=components[component_name("tgt_emb", lang=spec["tgt"])]["vocab_size"],
-            # Decoding produces target-side tokens, so the special ids come from the target vocab.
-            bos_token_id=tgt_tok["bos_token_id"],
-            eos_token_id=tgt_tok["eos_token_id"],
-            pad_token_id=tgt_tok["pad_token_id"],
-            decoder_start_token_id=tgt_tok["bos_token_id"],
-            encoder_sharing_groups=spec["encoder"],
-            decoder_sharing_groups=spec["decoder"],
-        )
+        config_dict = model_config(manifest, spec)
+        config_dict.update(model_type="mammoth", auto_map=_AUTO_MAP)
         model = _instantiate(config_dict, repo_path)
 
         state_dict = {}

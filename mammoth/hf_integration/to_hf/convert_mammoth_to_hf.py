@@ -288,8 +288,8 @@ def vocab_special_ids(vocab_obj) -> dict:
     )
 
 
-def save_tokenizer(vocab_obj, save_path: str, ids: dict, label: str, add_bos_eos: bool = False):
-    """Write a Mammoth vocab's HF tokenizer as a PreTrainedTokenizerFast directory.
+def build_tokenizer(vocab_obj, ids: dict, add_bos_eos: bool = False) -> PreTrainedTokenizerFast:
+    """A Mammoth vocab's HF tokenizer as a PreTrainedTokenizerFast.
 
     ids: {bos, eos, pad, unk} token ids. With add_bos_eos the tokenizer wraps every
     input as BOS ... EOS, which is what the Mammoth encoder was trained on.
@@ -308,6 +308,12 @@ def save_tokenizer(vocab_obj, save_path: str, ids: dict, label: str, add_bos_eos
             single=f"{DefaultTokens.BOS}:0 $A:0 {DefaultTokens.EOS}:0",
             special_tokens=[(DefaultTokens.BOS, ids['bos']), (DefaultTokens.EOS, ids['eos'])],
         )
+    return tok
+
+
+def save_tokenizer(vocab_obj, save_path: str, ids: dict, label: str, add_bos_eos: bool = False):
+    """Write a Mammoth vocab's HF tokenizer (see build_tokenizer) as a directory."""
+    tok = build_tokenizer(vocab_obj, ids, add_bos_eos=add_bos_eos)
     os.makedirs(save_path, exist_ok=True)
     tok.save_pretrained(save_path)
     print(f"{label} tokenizer saved → {save_path} ({len(tok)} tokens)"
@@ -504,6 +510,72 @@ def convert_multi_task_artifact(
         print(f"  {t}")
 
 
+def modular_manifest(ckpt_dir: str, prefix: str, opts, vocab) -> tuple[dict, dict]:
+    """Describe a checkpoint as a modular repo, without loading any weights.
+
+    Returns (manifest, shard_paths). The manifest has the layout of a modular repo's
+    config.json, except that component entries have no "file" yet and decoder wrappers no
+    "vocab_size". shard_paths maps each component name to the checkpoint shard holding it.
+    Both convert_modular and the Mammoth server (which loads checkpoints directly) use this.
+    """
+    pairs = _discover_tasks(opts)
+    if not pairs:
+        raise ValueError(f"No tasks found in checkpoint opts at {ckpt_dir}")
+
+    tasks, components, tokenizers, shard_paths = {}, {}, {'src': {}, 'tgt': {}}, {}
+    for src, tgt in pairs:
+        encoder_id, decoder_id = _task_xcoder_ids(opts, src, tgt)
+        tasks[f'{src}-{tgt}'] = dict(src=src, tgt=tgt, encoder=encoder_id, decoder=decoder_id)
+
+        for kind, shard_name, stack in task_shards(src, tgt, encoder_id, decoder_id):
+            if kind in ('src_emb', 'tgt_emb'):
+                lang = src if kind == 'src_emb' else tgt
+                name = component_name(kind, lang=lang)
+                meta = dict(kind=kind, lang=lang, vocab_size=len(vocab[(kind[:3], lang)]))
+            elif kind in ('enc_stack', 'dec_stack'):
+                xcoder_id = (encoder_id if kind == 'enc_stack' else decoder_id)[stack]
+                name = component_name(kind, stack=stack, xcoder_id=xcoder_id)
+                meta = dict(kind=kind, stack=stack, xcoder_id=xcoder_id)
+            else:
+                path = encoder_id if kind == 'enc_wrapper' else decoder_id
+                name = component_name(kind, path=path)
+                meta = dict(kind=kind, path=list(path))
+            if name in components:
+                continue  # shared with an earlier task
+
+            shard_path = os.path.join(ckpt_dir, f'{prefix}_{shard_name}.pt')
+            if not os.path.exists(shard_path):
+                raise FileNotFoundError(f"Task {src}-{tgt} needs missing shard {shard_path}")
+            components[name] = meta
+            shard_paths[name] = shard_path
+
+        for side, lang in (('src', src), ('tgt', tgt)):
+            if lang in tokenizers[side]:
+                continue
+            ids = vocab_special_ids(vocab[(side, lang)])
+            tokenizers[side][lang] = {
+                'dir': f'tokenizers/{side}/{lang}',
+                'bos_token_id': ids['bos'], 'eos_token_id': ids['eos'],
+                'pad_token_id': ids['pad'], 'unk_token_id': ids['unk'],
+            }
+
+    # Architecture only: vocab sizes, token ids and sharing groups are filled in per model at load time.
+    arch = config_from_opts(opts, src_vocab_size=0, tgt_vocab_size=0).to_dict()
+    arch_keys = ('model_dim', 'heads', 'enc_ff_mult', 'dec_ff_mult', 'enc_ff_activation',
+                 'dec_ff_activation', 'enc_layers', 'dec_layers',
+                 'attn_dropout', 'ff_dropout', 'emb_dropout', 'rotary_pos_emb', 'post_emb_norm',
+                 'use_cache')
+    manifest = {
+        'model_type': MODULAR_MODEL_TYPE,
+        'format_version': 1,
+        'architecture': {k: arch[k] for k in arch_keys},
+        'components': components,
+        'tokenizers': tokenizers,
+        'tasks': tasks,
+    }
+    return manifest, shard_paths
+
+
 def convert_modular(
     ckpt_dir: str,
     output_dir: str,
@@ -527,95 +599,46 @@ def convert_modular(
     prefix = resolve_prefix(ckpt_dir, step)
     frame = _load(os.path.join(ckpt_dir, f'{prefix}_frame.pt'))
     opts, vocab = frame['opts'], frame['vocab']
-    pairs = _discover_tasks(opts)
-    if not pairs:
-        raise ValueError(f"No tasks found in checkpoint opts at {ckpt_dir}")
+    manifest, shard_paths = modular_manifest(ckpt_dir, prefix, opts, vocab)
 
     os.makedirs(os.path.join(output_dir, 'components'), exist_ok=True)
+    # The encoder wrapper holds only post_emb_norm, so it is legitimately
+    # empty without one, or when the norms live with the language embeddings.
+    enc_wrapper_may_be_empty = (
+        not getattr(opts, 'post_emb_norm', False)
+        # frames that predate post_emb_norm_scope are component scope
+        or (getattr(opts, 'post_emb_norm_scope', None) or 'component') == 'language'
+    )
+    for name, meta in manifest['components'].items():
+        kind, shard_path = meta['kind'], shard_paths[name]
+        state = filter_component_state(kind, _load(shard_path))
+        if not state and not (kind == 'enc_wrapper' and enc_wrapper_may_be_empty):
+            raise ValueError(f"Shard {shard_path} has no weights usable for {kind}")
+        # safetensors refuses shared/non-contiguous storage; components are small enough to copy.
+        state = {k: v.detach().contiguous().clone() for k, v in state.items()}
+        if kind == 'dec_wrapper' and 'to_logits.weight' in state:
+            meta['vocab_size'] = state['to_logits.weight'].shape[0]
 
-    tasks, components, tokenizers = {}, {}, {'src': {}, 'tgt': {}}
-    for src, tgt in pairs:
-        encoder_id, decoder_id = _task_xcoder_ids(opts, src, tgt)
-        tasks[f'{src}-{tgt}'] = dict(src=src, tgt=tgt, encoder=encoder_id, decoder=decoder_id)
+        meta['file'] = f'components/{name}.safetensors'
+        save_file(state, os.path.join(output_dir, meta['file']))
+        print(f"  {name:<40} ← {os.path.basename(shard_path)} ({len(state)} tensors)")
 
-        for kind, shard_name, stack in task_shards(src, tgt, encoder_id, decoder_id):
-            if kind in ('src_emb', 'tgt_emb'):
-                lang = src if kind == 'src_emb' else tgt
-                name = component_name(kind, lang=lang)
-                meta = dict(kind=kind, lang=lang)
-            elif kind in ('enc_stack', 'dec_stack'):
-                xcoder_id = (encoder_id if kind == 'enc_stack' else decoder_id)[stack]
-                name = component_name(kind, stack=stack, xcoder_id=xcoder_id)
-                meta = dict(kind=kind, stack=stack, xcoder_id=xcoder_id)
-            else:
-                path = encoder_id if kind == 'enc_wrapper' else decoder_id
-                name = component_name(kind, path=path)
-                meta = dict(kind=kind, path=list(path))
-            if name in components:
-                continue  # shared with an earlier task: already exported
+    for side, side_toks in manifest['tokenizers'].items():
+        for lang, tok in side_toks.items():
+            ids = dict(bos=tok['bos_token_id'], eos=tok['eos_token_id'],
+                       pad=tok['pad_token_id'], unk=tok['unk_token_id'])
+            save_tokenizer(vocab[(side, lang)], os.path.join(output_dir, tok['dir']), ids,
+                           f'{side} {lang}', add_bos_eos=(side == 'src'))
 
-            shard_path = os.path.join(ckpt_dir, f'{prefix}_{shard_name}.pt')
-            if not os.path.exists(shard_path):
-                raise FileNotFoundError(f"Task {src}-{tgt} needs missing shard {shard_path}")
-            state = filter_component_state(kind, _load(shard_path))
-            # The encoder wrapper holds only post_emb_norm, so it is legitimately
-            # empty without one, or when the norms live with the language embeddings.
-            enc_wrapper_may_be_empty = kind == 'enc_wrapper' and (
-                not getattr(opts, 'post_emb_norm', False)
-                # frames that predate post_emb_norm_scope are component scope
-                or (getattr(opts, 'post_emb_norm_scope', None) or 'component') == 'language'
-            )
-            if not state and not enc_wrapper_may_be_empty:
-                raise ValueError(f"Shard {shard_path} has no weights usable for {kind}")
-            # safetensors refuses shared/non-contiguous storage; components are small enough to copy.
-            state = {k: v.detach().contiguous().clone() for k, v in state.items()}
-
-            if kind in ('src_emb', 'tgt_emb'):
-                meta['vocab_size'] = len(vocab[(kind[:3], meta['lang'])])
-            elif kind == 'dec_wrapper' and 'to_logits.weight' in state:
-                meta['vocab_size'] = state['to_logits.weight'].shape[0]
-
-            meta['file'] = f'components/{name}.safetensors'
-            save_file(state, os.path.join(output_dir, meta['file']))
-            components[name] = meta
-            print(f"  {name:<40} ← {os.path.basename(shard_path)} ({len(state)} tensors)")
-
-        for side, lang in (('src', src), ('tgt', tgt)):
-            if lang in tokenizers[side]:
-                continue
-            vocab_obj = vocab[(side, lang)]
-            ids = vocab_special_ids(vocab_obj)
-            tok_dir = f'tokenizers/{side}/{lang}'
-            save_tokenizer(vocab_obj, os.path.join(output_dir, tok_dir), ids, f'{side} {lang}',
-                           add_bos_eos=(side == 'src'))
-            tokenizers[side][lang] = {
-                'dir': tok_dir,
-                'bos_token_id': ids['bos'], 'eos_token_id': ids['eos'],
-                'pad_token_id': ids['pad'], 'unk_token_id': ids['unk'],
-            }
-
-    # Architecture only: vocab sizes, token ids and sharing groups are filled in per model at load time.
-    arch = config_from_opts(opts, src_vocab_size=0, tgt_vocab_size=0).to_dict()
-    arch_keys = ('model_dim', 'heads', 'enc_ff_mult', 'dec_ff_mult', 'enc_ff_activation',
-                 'dec_ff_activation', 'enc_layers', 'dec_layers',
-                 'attn_dropout', 'ff_dropout', 'emb_dropout', 'rotary_pos_emb', 'post_emb_norm',
-                 'use_cache')
-    manifest = {
-        'model_type': MODULAR_MODEL_TYPE,
-        'format_version': 1,
-        'architecture': {k: arch[k] for k in arch_keys},
-        'components': components,
-        'tokenizers': tokenizers,
-        'tasks': tasks,
-    }
     with open(os.path.join(output_dir, 'config.json'), 'w') as f:
         json.dump(manifest, f, indent=2)
 
     copy_code_files(output_dir, with_hub=True)
     write_model_card(output_dir)
 
-    print(f"\nExported {len(components)} components for {len(tasks)} tasks into {output_dir}")
-    for name, t in tasks.items():
+    print(f"\nExported {len(manifest['components'])} components for {len(manifest['tasks'])} tasks "
+          f"into {output_dir}")
+    for name, t in manifest['tasks'].items():
         print(f"  {name}: encoder={t['encoder']} decoder={t['decoder']}")
 
 

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mammoth Translate</title>
+<style>
+  :root {
+    --bg: #f6f6f3; --panel: #ffffff; --text: #1d1d1b; --muted: #6b6b66; --border: #d9d9d3;
+    --accent: #2f5d8a; --accent-text: #ffffff; --warn: #8a5a00; --warn-bg: #fff3d6; --error: #a12a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --panel: #1f1f1d; --text: #e9e9e4; --muted: #9a9a93; --border: #34342f;
+      --accent: #7fa8d1; --accent-text: #111; --warn: #f0c060; --warn-bg: #3a2f14; --error: #ef8a8a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  h1 { font-size: 1.4rem; margin: 0; }
+  .muted { color: var(--muted); font-size: .9rem; }
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  select, button, textarea { font: inherit; color: inherit; }
+  select { background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }
+  button { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; padding: 6px 14px;
+           cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .badge { font-size: .8rem; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+  .badge.zero { color: var(--warn); background: var(--warn-bg); border-color: transparent; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 720px) { .panes { grid-template-columns: 1fr; } }
+  textarea, .output { width: 100%; min-height: 260px; padding: 12px; border: 1px solid var(--border);
+                      border-radius: 8px; background: var(--panel); resize: vertical; }
+  .output { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .output.placeholder { color: var(--muted); }
+  .status { min-height: 1.5em; margin-top: 8px; }
+  .status.error { color: var(--error); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Mammoth Translate</h1>
+    <span class="muted" id="model-info">Loading…</span>
+  </header>
+
+  <div class="bar">
+    <label class="muted" for="src">From</label>
+    <select id="src"></select>
+    <button id="swap" title="Swap languages" aria-label="Swap languages">⇄</button>
+    <label class="muted" for="tgt">To</label>
+    <select id="tgt"></select>
+    <span id="badge" class="badge" hidden></span>
+    <button id="load" hidden>Load direction</button>
+    <span style="flex:1"></span>
+    <button id="translate" class="primary" disabled>Translate</button>
+  </div>
+
+  <div class="panes">
+    <textarea id="source" placeholder="Text to translate. Each line is translated as one segment."></textarea>
+    <div id="output" class="output placeholder" aria-live="polite">Translation</div>
+  </div>
+  <div id="status" class="status muted">Ctrl+Enter / ⌘+Enter to translate</div>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let tasks = {};  // name → {src, tgt, encoder, decoder, trained, loaded}
+
+async function api(path, options = {}) {
+  const r = await fetch(path, {headers: {"content-type": "application/json"}, ...options});
+  if (r.status === 204) return null;
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = body.error || (Array.isArray(body.detail) ? body.detail.map(d => d.msg).join("; ") : body.detail);
+    throw new Error(msg || `HTTP ${r.status}`);
+  }
+  return body;
+}
+
+function setStatus(text, isError = false) {
+  $("status").textContent = text;
+  $("status").className = "status " + (isError ? "error" : "muted");
+}
+
+function fillSelect(select, values, keep) {
+  select.replaceChildren(...values.map(v => new Option(v, v)));
+  if (values.includes(keep)) select.value = keep;
+}
+
+function refreshTargets() {
+  const src = $("src").value;
+  const tgts = [...new Set(Object.values(tasks).filter(t => t.src === src).map(t => t.tgt))].sort();
+  // Prefer a loaded direction when the current target is not available.
+  const keep = tgts.includes($("tgt").value) ? $("tgt").value
+             : (tgts.find(t => tasks[`${src}-${t}`].loaded) || tgts[0]);
+  fillSelect($("tgt"), tgts, keep);
+  refreshDirection();
+}
+
+function current() { return tasks[`${$("src").value}-${$("tgt").value}`]; }
+
+function refreshDirection() {
+  const t = current();
+  $("badge").hidden = !t;
+  $("load").hidden = !t || t.loaded;
+  $("translate").disabled = !t || !t.loaded;
+  $("swap").disabled = !t || !tasks[`${t.tgt}-${t.src}`];
+  if (!t) return;
+  $("badge").textContent = t.trained ? "trained" : "zero-shot";
+  $("badge").className = "badge" + (t.trained ? "" : " zero");
+  $("badge").title = `encoder ${t.encoder.join(" / ")} · decoder ${t.decoder.join(" / ")}`;
+}
+
+async function loadTasks() {
+  tasks = await api("/api/tasks");
+  const loaded = Object.values(tasks).filter(t => t.loaded);
+  const srcs = [...new Set(Object.values(tasks).map(t => t.src))].sort();
+  const keep = $("src").value || (loaded[0] && loaded[0].src);
+  fillSelect($("src"), srcs, keep);
+  refreshTargets();
+  const health = await api("/api/health");
+  $("model-info").textContent =
+    `${loaded.length} of ${Object.keys(tasks).length} directions loaded · ` +
+    `${Object.keys(health.loaded_components).length} components · ${health.device} ${health.dtype}`;
+}
+
+async function loadDirection() {
+  const t = current();
+  $("load").disabled = true;
+  setStatus(`Loading ${t.src}-${t.tgt}…`);
+  try {
+    await api("/api/tasks", {method: "POST", body: JSON.stringify({task: `${t.src}-${t.tgt}`})});
+    await loadTasks();
+    setStatus(`Loaded ${t.src}-${t.tgt}`);
+  } catch (e) {
+    setStatus(e.message, true);
+  } finally {
+    $("load").disabled = false;
+  }
+}
+
+async function translate() {
+  const t = current();
+  const text = $("source").value;
+  if (!t || !t.loaded || !text.trim()) return;
+  $("translate").disabled = true;
+  setStatus("Translating…");
+  const started = performance.now();
+  try {
+    const lines = text.split("\n");
+    const body = await api("/api/translate", {
+      method: "POST", body: JSON.stringify({from: t.src, to: t.tgt, source: lines}),
+    });
+    $("output").textContent = body.translation.join("\n");
+    $("output").classList.remove("placeholder");
+    const n = lines.filter(l => l.trim()).length;
+    setStatus(`${n} segment${n === 1 ? "" : "s"} in ${((performance.now() - started) / 1000).toFixed(2)} s`);
+  } catch (e) {
+    setStatus(e.message, true);
+  } finally {
+    refreshDirection();
+  }
+}
+
+$("src").addEventListener("change", refreshTargets);
+$("tgt").addEventListener("change", refreshDirection);
+$("load").addEventListener("click", loadDirection);
+$("translate").addEventListener("click", translate);
+$("swap").addEventListener("click", () => {
+  const t = current();
+  $("src").value = t.tgt;
+  refreshTargets();
+  $("tgt").value = t.src;
+  refreshDirection();
+  if (!$("output").classList.contains("placeholder")) {  // translate the translation back
+    $("source").value = $("output").textContent;
+    $("output").textContent = "Translation";
+    $("output").classList.add("placeholder");
+  }
+});
+$("source").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); translate(); }
+});
+
+loadTasks().catch(e => setStatus(`Cannot reach the server: ${e.message}`, true));
+</script>
+</body>
+</html>

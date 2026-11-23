@@ -13,21 +13,22 @@ setup(
     long_description_content_type='text/markdown',
     version='0.3.0rc1',
     packages=find_packages(),
+    package_data={"mammoth.serving": ["static/*"]},  # mammoth_serve web page
     project_urls={
         "Documentation": "https://helsinki-nlp.github.io/mammoth/",
         # "Forum": "http://forum.opennmt.net/",
         # "Gitter": "https://gitter.im/OpenNMT/OpenNMT-py",
         "Source": "https://github.com/Helsinki-NLP/mammoth",
     },
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     # Keep in sync with requirements.txt (see the comments there for why each bound exists).
     install_requires=[
         "torch>=2.8",
         "numpy>=2.0",
         "einops>=0.8.1",
-        "transformers>=4.57",
-        "tokenizers>=0.22",
-        "huggingface-hub>=0.34.4",
+        "transformers>=5.24,<6",
+        "tokenizers>=0.23.1",
+        "huggingface-hub>=1.31",
         "safetensors>=0.6.2",
         "PyYAML>=6.0.2",
         "ConfigArgParse>=1.7.1",
@@ -41,10 +42,11 @@ setup(
         "sentencepiece": ["sentencepiece==0.2.1"],
         # CPU affinity binding on LUMI (train_single.py skips it if missing).
         "affinity": ["psutil"],
+        # Local translation server (mammoth/serving): mammoth_serve.
+        "server": ["fastapi>=0.115", "uvicorn>=0.30"],
     },
     entry_points={
         "console_scripts": [
-            # "onmt_server=mammoth.bin.server:main",
             "mammoth_train=mammoth.bin.train:main",
             "mammoth_translate=mammoth.bin.translate:main",
             # "mammoth_config_config=mammoth.bin.config_config:main",
@@ -56,6 +58,7 @@ setup(
             "mammoth_convert2hf=mammoth.hf_integration.to_hf.convert_mammoth_to_hf:main",
             "mammoth_push2hf=mammoth.hf_integration.to_hf.push_to_hub:main",
             "mammoth_download_hf=mammoth.hf_integration.to_hf.model_downloader:main",
+            "mammoth_serve=mammoth.bin.serve:main",
         ],
     },
 )

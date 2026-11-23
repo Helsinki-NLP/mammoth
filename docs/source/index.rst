@@ -38,6 +38,7 @@ Contents
       examples/extending_with_a_new_language.md
       training_tips.md
       exporting_to_huggingface.md
+      serving.md
 
 .. toctree::
       :caption: Scripts
@@ -45,7 +46,7 @@ Contents
 
       options/train.rst
       options/translate.rst
-      options/server.rst
+      options/serve.rst
 
 
 .. toctree::
@@ -55,5 +56,4 @@ Contents
       mammoth.rst
       mammoth.modules.rst
       mammoth.translation.rst
-      mammoth.translate.translation_server.rst
       mammoth.inputters.rst

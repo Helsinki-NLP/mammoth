@@ -7,6 +7,3 @@ sphinxcontrib-bibtex>=2.6
 sphinxcontrib-mermaid>=0.9
 sphinx-argparse>=0.5
 sphinx_markdown_tables>=0.0.17
-# bin/server.py is imported (not run) to document its options.
-flask
-waitress

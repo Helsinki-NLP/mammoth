@@ -19,6 +19,7 @@ pip install mammoth-nlp
 ## Guides
 - [LUMI/Roihu quickstart guide](docs/source/CSC_quickstart.md): working on the LUMI/Roihu supercomputer environments.
 - [Exporting Mammoth to Model Hub guide](docs/source/exporting_to_huggingface.md): export pretrained Mammoth model weights to the Hugging Face Model Hub.
+- [Translation server guide](docs/source/serving.md): serve a Mammoth model locally with a web page and an OPUS-MT compatible API (`mammoth_serve`).
 - [HF Tokenizers guide](docs/source/HF_TOKENIZERS.md): we recommend the Hugging Face Tokenizer for training and inferencing in Mammoth.
 - [Indexed dataset guide](docs/source/INDEXED_DATASET_GUIDE.md): tokenize once up front to remove tokenization cost during training.
 

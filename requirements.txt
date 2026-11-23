@@ -11,11 +11,12 @@ numpy>=2.0
 einops>=0.8.1
 
 # Hugging Face
-# Works on transformers 4.57 and 5.x (the Gemma3 converters read the RoPE thetas through
-# hf_integration/from_hf/gemma3/gemma3_rope.py, which handles both config layouts).
-transformers>=4.57
-tokenizers>=0.22
-huggingface-hub>=0.34.4
+# Tested on transformers 5.24 (needs Python >= 3.11). 4.x is no longer tested; the 4.x
+# compatibility code (e.g. hf_integration/from_hf/gemma3/gemma3_rope.py) is kept but unverified.
+# <6: v5 renamed past_key_values to cache and only deprecates the old name; v6 may drop it.
+transformers>=5.24,<6
+tokenizers>=0.23.1
+huggingface-hub>=1.31
 safetensors>=0.6.2
 
 # Legacy SentencePiece support (deprecated, use HF tokenizers instead).
@@ -31,6 +32,3 @@ tensorboard>=2.20.0
 
 # Evaluation
 sacrebleu>=2.5.1
-
-# Optional: psutil enables CPU affinity binding on LUMI (train_single.py skips it if missing).
-psutil

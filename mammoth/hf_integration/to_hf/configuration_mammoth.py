@@ -44,9 +44,10 @@ class MammothConfig(PretrainedConfig):
             eos_token_id=eos_token_id,
             decoder_start_token_id=decoder_start_token_id,
             is_encoder_decoder=True,
-            use_cache=use_cache,
             **kwargs,
         )
+        # Set here, not via super(): transformers v5 no longer stores use_cache on PretrainedConfig.
+        self.use_cache = use_cache
         self.model_dim = model_dim
         self.heads = heads
         # ff_mult / ff_swiglu are the legacy shared fields (config.json files written

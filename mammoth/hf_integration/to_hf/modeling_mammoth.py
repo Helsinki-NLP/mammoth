@@ -168,6 +168,8 @@ class MammothForConditionalGeneration(MammothPreTrainedModel, GenerationMixin):
         **kwargs,
     ) -> Seq2SeqLMOutput:
         use_cache = use_cache if use_cache is not None else self.config.use_cache
+        if past_key_values is None:
+            past_key_values = kwargs.get("cache")  # transformers v5 name
 
         if encoder_outputs is None:
             encoder_outputs = self.encoder(input_ids, attention_mask=attention_mask)
@@ -212,6 +214,9 @@ class MammothForConditionalGeneration(MammothPreTrainedModel, GenerationMixin):
         use_cache=None,
         **kwargs,
     ):
+        # transformers v5 renamed the generation cache kwarg from past_key_values to cache.
+        if past_key_values is None:
+            past_key_values = kwargs.get("cache")
         if past_key_values is not None:
             # Cache is populated — feed only the last generated token
             decoder_input_ids = decoder_input_ids[:, -1:]

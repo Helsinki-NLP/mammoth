@@ -1,4 +1,6 @@
+import copy
 import os
+import shutil
 import torch
 import torch.distributed
 import torch.nn as nn
@@ -23,7 +25,7 @@ BEST_MODEL_METRICS = {
 DEFAULT_BEST_MODEL_METRIC = 'mean_ppl'
 
 
-def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_manager):
+def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_manager, frame_checkpoint_path=None):
     # _check_save_model_path
     save_model_path = os.path.abspath(opts.save_model)
     os.makedirs(os.path.dirname(save_model_path), exist_ok=True)
@@ -37,8 +39,51 @@ def build_model_saver(model_opts, opts, model, vocabs_dict, optim, task_queue_ma
         opts.keep_checkpoint,
         task_queue_manager,
         opts=opts,
+        frame_checkpoint_path=frame_checkpoint_path,
     )
     return model_saver
+
+
+def merge_frame_with_train_from(model_opts, vocabs_dict, current_tasks, train_from_frame):
+    """Frame opts and vocab describing the whole model: the train_from model plus this run.
+
+    With train_from, model_opts is the old frame's opts, whose `tasks` are the old run's tasks.
+    Tasks and vocabs are merged (this run wins on equal keys), so converters that discover tasks
+    from the frame see both the old tasks and the ones added in this run.
+    """
+    opts = copy.copy(model_opts)
+    vocab = dict(vocabs_dict)
+    if train_from_frame is not None:
+        old_tasks = getattr(train_from_frame['opts'], 'tasks', None) or {}
+        opts.tasks = {**old_tasks, **(current_tasks or {})}
+        vocab = {**train_from_frame['vocab'], **vocab}
+    elif current_tasks is not None:
+        opts.tasks = current_tasks
+    return opts, vocab
+
+
+def carry_over_shards(train_from_prefix, new_prefix, current_names):
+    """Bring the train_from shards of components this run does not have into the new checkpoint.
+
+    A run only saves the components its model holds. Without this, extending a model with a new
+    language would save the new language and the components it shares, but drop the rest of the
+    model (e.g. the old source languages). Shards (and their optimizer states) are hard-linked,
+    falling back to a copy across filesystems. Returns the new paths.
+    """
+    carried = []
+    for old_path in sorted(glob(f'{train_from_prefix}_*.pt')):
+        key = old_path[len(train_from_prefix) + 1:-len('.pt')]
+        if key == 'frame' or key.removesuffix('_optim') in current_names:
+            continue
+        new_path = f'{new_prefix}_{key}.pt'
+        if os.path.exists(new_path):
+            continue
+        try:
+            os.link(old_path, new_path)
+        except OSError:
+            shutil.copy2(old_path, new_path)
+        carried.append(new_path)
+    return carried
 
 
 def load_frame_checkpoint(checkpoint_path):
@@ -427,6 +472,7 @@ class ModelSaver(ModelSaverBase):
         keep_checkpoint=-1,
         task_queue_manager=None,
         opts=None,
+        frame_checkpoint_path=None,
     ):
         super().__init__(
             base_path,
@@ -451,6 +497,15 @@ class ModelSaver(ModelSaverBase):
         # back to `model_opts` for callers that don't pass `opts` (e.g. the
         # one-shot conversion scripts' build_model_saver() calls).
         strategy_opts = opts if opts is not None else model_opts
+
+        # train_from checkpoint: its tasks, vocabs and the shards of components this run does not
+        # have are carried into every saved checkpoint, so each one holds the whole model.
+        self.current_tasks = getattr(opts, 'tasks', None) if opts is not None else None
+        self.train_from_prefix = None
+        self.train_from_frame = None
+        if frame_checkpoint_path:
+            self.train_from_prefix = frame_checkpoint_path.removesuffix('_frame.pt')
+            self.train_from_frame = torch.load(frame_checkpoint_path, map_location='cpu', weights_only=False)
         self.save_strategy = getattr(strategy_opts, 'save_strategy', 'steps')
         metric = getattr(strategy_opts, 'metric_for_best_model', DEFAULT_BEST_MODEL_METRIC)
         if metric not in BEST_MODEL_METRICS:
@@ -1021,9 +1076,12 @@ class ModelSaver(ModelSaverBase):
 
         # The master device stores the frame
         if device_context.is_master():
+            frame_opts, frame_vocab = merge_frame_with_train_from(
+                self.model_opts, self.vocabs_dict, self.current_tasks, self.train_from_frame
+            )
             module_state_dicts["frame"] = {
-                "vocab": self.vocabs_dict,
-                "opts": self.model_opts,
+                "vocab": frame_vocab,
+                "opts": frame_opts,
                 "global_training_step": self.optim.global_training_step,
             }
             best_metric = self._best_metric_state()
@@ -1067,6 +1125,16 @@ class ModelSaver(ModelSaverBase):
                     )
                 torch.save(state_dict, checkpoint_path)
                 tmp_checkpoint_paths.append(checkpoint_path)
+
+        if device_context.is_master() and self.train_from_prefix:
+            current_names = {c.get_name() for c in task_queue_manager.distributed_components}
+            carried = carry_over_shards(self.train_from_prefix, f"{self.base_path}_step_{step}", current_names)
+            if carried:
+                logger.info(
+                    f"Carried {len(carried)} files of components not in this run over from "
+                    f"{self.train_from_prefix}: {[os.path.basename(p) for p in carried]}"
+                )
+            tmp_checkpoint_paths.extend(carried)
 
         return tmp_checkpoint_paths
 

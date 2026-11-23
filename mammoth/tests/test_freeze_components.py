@@ -30,7 +30,7 @@ from mammoth.model_builder import (
     validate_optimizer_coverage,
 )
 from mammoth.models import NMTModel
-from mammoth.utils.model_saver import load_parameters_from_checkpoint
+from mammoth.utils.model_saver import carry_over_shards, load_parameters_from_checkpoint
 
 
 # ---------------------------------------------------------------------------
@@ -234,3 +234,33 @@ def test_summary_marks_components_without_parameters_as_empty(monkeypatch):
     empty = {name for name, s in status.items() if s == 'empty'}
     assert empty and all(sum(p.numel() for _, p in c.named_parameters(model)) == 0
                          for c in tqm.get_my_distributed_components() if c.get_name() in empty)
+
+
+def test_extended_checkpoint_holds_the_whole_model(tmp_path):
+    """Train only sme-eng from a swe/nob checkpoint; the saved checkpoint must still load swe-eng and nob-eng."""
+    old, new = str(tmp_path / 'old'), str(tmp_path / 'new')
+    torch.manual_seed(0)
+    pretrained, _, pretrained_tqm = _build(['swe', 'nob'])
+    for c in pretrained_tqm.get_my_distributed_components():
+        torch.save(c.state_dict(pretrained), f'{old}_{c.get_name()}.pt')
+
+    # The new run only knows sme-eng, so its model has no swe/nob embeddings
+    torch.manual_seed(1)
+    model, _, tqm = _build(['sme'])
+    load_parameters_from_checkpoint(
+        f'{old}_frame.pt', model, optim=None, task_queue_manager=tqm, reset_optim=True, allow_partial_checkpoint=True,
+    )
+    for c in tqm.get_my_distributed_components():
+        torch.save(c.state_dict(model), f'{new}_{c.get_name()}.pt')
+    carry_over_shards(old, new, {c.get_name() for c in tqm.distributed_components})
+
+    torch.manual_seed(2)
+    full, _, full_tqm = _build(['swe', 'nob', 'sme'])
+    load_parameters_from_checkpoint(  # not partial: every component must be found
+        f'{new}_frame.pt', full, optim=None, task_queue_manager=full_tqm, reset_optim=True,
+    )
+    loaded = _state(full, full_tqm)
+    assert set(loaded) == set(_state(pretrained, pretrained_tqm)) | {'src_embeddings_sme'}
+    for name, state in _state(pretrained, pretrained_tqm).items():
+        for k in state:
+            assert torch.equal(loaded[name][k], state[k]), name

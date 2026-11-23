@@ -329,6 +329,7 @@ def main(
         vocabs_dict,
         optim,
         task_queue_manager=task_queue_manager,
+        frame_checkpoint_path=frame_checkpoint_path,
     )
 
     logger.info("{} - Build trainer".format(device_context.id))

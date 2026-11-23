@@ -92,4 +92,14 @@ At startup each GPU logs every component it holds as `trainable`, `frozen`, `par
 
 - They get no optimizer, so weight decay and learning-rate changes cannot touch them.
 - They are not part of the gradient all-reduce.
-- They are still saved in every checkpoint, unchanged, so the new checkpoint is complete on its own.
+- They are still saved in every checkpoint, unchanged.
+
+## The new checkpoint holds the whole model
+
+You do not need to list the old tasks in the new config. Every checkpoint of a `train_from` run contains:
+
+- the components of this run (trained or frozen);
+- every other component of the `train_from` checkpoint, e.g. the encoder of an old source language this run does not use. These are hard-linked (copied across filesystems), so they stay valid if the old checkpoint is deleted;
+- a frame whose `tasks` and `vocab` list the old tasks and this run's tasks.
+
+So the new checkpoint directory is complete: translation and the HF/LiteRT converters see every language pair, old and new.

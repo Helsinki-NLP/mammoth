@@ -41,6 +41,8 @@ setup(
         "sentencepiece": ["sentencepiece==0.2.1"],
         # CPU affinity binding on LUMI (train_single.py skips it if missing).
         "affinity": ["psutil"],
+        # Local translation server (mammoth/serving): mammoth_serve.
+        "server": ["fastapi>=0.115", "uvicorn>=0.30"],
     },
     entry_points={
         "console_scripts": [

@@ -81,9 +81,10 @@ class TranslationEngine:
         whitespace-only segments translate to "".
         """
         settings = self.settings.updated(**overrides)
-        loaded = self.pool.tasks.get(task)
-        if loaded is None:
-            raise KeyError(f"Task {task!r} is not loaded (loaded: {sorted(self.pool.tasks)})")
+        tasks = self.pool.loaded_tasks()
+        if task not in tasks:
+            raise KeyError(f"Task {task!r} is not loaded (loaded: {sorted(tasks)})")
+        loaded = tasks[task]
         if isinstance(text, str):
             return self._translate(loaded, [text], settings)[0]
         return self._translate(loaded, list(text), settings)

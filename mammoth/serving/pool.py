@@ -90,7 +90,11 @@ class ComponentPool:
         self.tasks: dict[str, LoadedTask] = {}
         self._components: dict[str, _Component] = {}
         self._tokenizers: dict[tuple, PreTrainedTokenizerFast] = {}
+        self._available = None  # available_tasks(), computed once
+        # _lock: one add/remove at a time (loading may take long). _state_lock: held only
+        # while tasks/_components change, so readers never wait for a load.
         self._lock = threading.RLock()
+        self._state_lock = threading.Lock()
 
     # -- what can be served --------------------------------------------------
 
@@ -99,6 +103,8 @@ class ComponentPool:
 
         Trained tasks plus every zero-shot src→tgt combination whose components exist.
         """
+        if self._available is not None:
+            return self._available
         srcs = sorted({t["src"] for t in self.manifest["tasks"].values()})
         tgts = sorted({t["tgt"] for t in self.manifest["tasks"].values()})
         out = {}
@@ -112,11 +118,18 @@ class ComponentPool:
                     continue
                 out[f"{src}-{tgt}"] = dict(src=src, tgt=tgt, encoder=spec["encoder"],
                                            decoder=spec["decoder"], trained=trained)
+        self._available = out
         return out
+
+    def loaded_tasks(self) -> dict[str, LoadedTask]:
+        """A snapshot of the loaded tasks; safe to call while another thread loads one."""
+        with self._state_lock:
+            return dict(self.tasks)
 
     def loaded_components(self) -> dict:
         """Loaded component name → sorted names of the tasks using it."""
-        return {name: sorted(c.users) for name, c in self._components.items()}
+        with self._state_lock:
+            return {name: sorted(c.users) for name, c in self._components.items()}
 
     # -- loading and unloading -------------------------------------------------
 
@@ -148,23 +161,25 @@ class ComponentPool:
                 name=task, spec=spec, trained=trained, model=model,
                 src_tokenizer=self._tokenizer("src", src), tgt_tokenizer=self._tokenizer("tgt", tgt))
 
-            self._components.update(new)
-            for name in spec["components"]:
-                self._components[name].users.add(task)
-            self.tasks[task] = loaded
+            with self._state_lock:
+                self._components.update(new)
+                for name in spec["components"]:
+                    self._components[name].users.add(task)
+                self.tasks[task] = loaded
             return loaded
 
     def remove_task(self, task: str) -> None:
         """Unload a task; components and tokenizers no other loaded task uses are freed."""
         with self._lock:
-            loaded = self.tasks.pop(task, None)
-            if loaded is None:
-                raise KeyError(f"Task {task!r} is not loaded")
-            for name in loaded.spec["components"]:
-                comp = self._components[name]
-                comp.users.discard(task)
-                if not comp.users:
-                    del self._components[name]
+            with self._state_lock:
+                loaded = self.tasks.pop(task, None)
+                if loaded is None:
+                    raise KeyError(f"Task {task!r} is not loaded")
+                for name in loaded.spec["components"]:
+                    comp = self._components[name]
+                    comp.users.discard(task)
+                    if not comp.users:
+                        del self._components[name]
             in_use = {key for t in self.tasks.values()
                       for key in (("src", t.spec["src"]), ("tgt", t.spec["tgt"]))}
             for key in list(self._tokenizers):

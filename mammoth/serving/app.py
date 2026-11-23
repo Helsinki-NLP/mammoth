@@ -1,10 +1,11 @@
-"""HTTP API of the Mammoth server (FastAPI; install with `pip install mammoth-nmt[server]`).
+"""HTTP API of the Mammoth server (FastAPI; install with `pip install mammoth-nlp[server]`).
 
 OPUS-MT compatible (github.com/Helsinki-NLP/Opus-MT), so its clients work unchanged:
 
     GET  /api/languages              {"languages": {src: [tgt, ...]}}   loaded directions
     POST /api/translate              {"from", "to", "source"} → {"translation"}
     GET  /api/ready                  204 once a direction is loaded, else 503
+    GET  /                           web page: pick a direction, translate text
 
 Mammoth extensions:
 
@@ -23,17 +24,20 @@ Endpoints are plain functions, which FastAPI runs in a thread pool: a long load 
 block translation of loaded directions, and the engine runs one generation at a time.
 """
 
+import os
 from typing import Optional, Union
 
 try:
     from fastapi import FastAPI, HTTPException, Request, Response
-    from fastapi.responses import JSONResponse
+    from fastapi.responses import FileResponse, JSONResponse
     from pydantic import BaseModel, ConfigDict, Field
 except ImportError as e:  # pragma: no cover
-    raise ImportError("The Mammoth server needs FastAPI: pip install 'mammoth-nmt[server]'") from e
+    raise ImportError("The Mammoth server needs FastAPI: pip install 'mammoth-nlp[server]'") from e
 
 from mammoth.serving.engine import TranslationEngine
 from mammoth.serving.pool import split_task
+
+INDEX_HTML = os.path.join(os.path.dirname(__file__), "static", "index.html")
 
 # Per-request caps, so one request cannot exhaust a laptop's memory.
 MAX_NUM_BEAMS = 16
@@ -60,6 +64,10 @@ def create_app(engine: TranslationEngine) -> FastAPI:
     @app.exception_handler(HTTPException)
     def _error(request: Request, exc: HTTPException):
         return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
+
+    @app.get("/", include_in_schema=False)
+    def index():
+        return FileResponse(INDEX_HTML)
 
     # -- OPUS-MT compatible ------------------------------------------------------
 

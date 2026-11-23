@@ -124,3 +124,11 @@ def test_reads_do_not_wait_for_a_load(engine):
         release.set()
         loader.join()
     assert client.get("/api/languages").json() == {"languages": {"deu": ["fra"], "eng": ["spa"]}}
+
+
+def test_web_page(client):
+    r = client.get("/")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    # The page only uses API endpoints that exist.
+    for path in ("/api/tasks", "/api/health", "/api/translate"):
+        assert f'"{path}"' in r.text

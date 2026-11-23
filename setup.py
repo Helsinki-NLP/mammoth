@@ -13,6 +13,7 @@ setup(
     long_description_content_type='text/markdown',
     version='0.3.0rc1',
     packages=find_packages(),
+    package_data={"mammoth.serving": ["static/*"]},  # mammoth_serve web page
     project_urls={
         "Documentation": "https://helsinki-nlp.github.io/mammoth/",
         # "Forum": "http://forum.opennmt.net/",

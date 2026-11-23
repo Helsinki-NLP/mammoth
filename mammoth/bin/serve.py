@@ -101,7 +101,7 @@ def main(argv=None):
         import uvicorn
         from mammoth.serving.app import create_app
     except ImportError:
-        parser.error("mammoth_serve needs the server extras: pip install 'mammoth-nmt[server]'")
+        parser.error("mammoth_serve needs the server extras: pip install 'mammoth-nlp[server]'")
     try:
         engine = build_engine(args)
     except ValueError as e:

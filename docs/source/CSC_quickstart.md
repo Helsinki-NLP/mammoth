@@ -9,6 +9,8 @@ Both use SLURM for job scheduling. The main difference is that LUMI requires a S
 
 The job templates in [`csc_env/`](https://github.com/Helsinki-NLP/mammoth/tree/main/csc_env) run MAMMOTH from a shared source checkout (`<Path to Python> mammoth/train.py`). If you install the package into your own venv instead (`pip install mammoth-nlp`; it keeps the PyTorch already provided by the container or module), replace `<Path to Python> mammoth/train.py` with `mammoth_train` and `<Path to Python> mammoth/translate.py` with `mammoth_translate`. The options stay the same.
 
+Packages installed with `pip install --user` live in `~/.local` and are loaded before those of the container or venv. An old `transformers` there breaks MAMMOTH with errors such as `cannot import name 'PreTrainedModel' from 'transformers'`. Set `export PYTHONNOUSERSITE=1` in your shell and job scripts (see Troubleshooting in [Installation](install.md)).
+
 ---
 
 ## LUMI (AMD MI250X)

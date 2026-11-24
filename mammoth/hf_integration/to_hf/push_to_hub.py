@@ -2,14 +2,15 @@
 """
 Push a converted Mammoth HF model directory to the Hugging Face Hub.
 
-Usage:
-    python push_to_hub.py \
+Usage (installed as the `mammoth_upload` command; without installing, use
+`python -m mammoth.hf_integration.to_hf.push_to_hub` from the repository root):
+    mammoth_upload \
         --model-dir path/to/converted_hf_model \
         --repo-id username/my-mammoth-model \
         [--private] \
         [--token YOUR_HF_TOKEN]
 
-The model directory must have been produced by convert_mammoth_to_hf.py.
+The model directory must have been produced by mammoth_export_hf.
 If --token is omitted, the script uses the token stored by `hf auth login`.
 """
 

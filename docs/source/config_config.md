@@ -14,8 +14,10 @@ To ease the creation of configs, the config-config tool reads in a human-writabl
 
 ## Command
 ```bash
-mammoth_config_config config_all --in_config input.yaml --out_config output.yaml
+python -m mammoth.bin.config_config config_all --in_config input.yaml --out_config output.yaml
 ```
+
+config-config is not maintained and is planned for deprecation, so it is not installed as a `mammoth_*` command.
 
 ## Inputs
 

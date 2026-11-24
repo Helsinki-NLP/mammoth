@@ -17,7 +17,7 @@ Mammoth uses **separate source and target vocabularies**, so each artifact conta
 If the pre-trained Mammoth model has only one task, you can convert it into a standalone NMT model:
 
 ```bash
-mammoth_convert2hf \
+mammoth_export_hf \
   --checkpoint-dir <path> \
   --output-dir <path>
 ```
@@ -56,7 +56,7 @@ If the pre-trained Mammoth model has more than one task, there are three approac
 #### Modular
 
 ```bash
-mammoth_convert2hf \
+mammoth_export_hf \
   --checkpoint-dir <path> \
   --output-dir <path> \
   --modular
@@ -103,7 +103,7 @@ Only the components the model needs are downloaded. **Limitation:** the wrapper 
 Each task is converted as a standalone model (same structure as single-task above). By default, the script converts all tasks:
 
 ```bash
-mammoth_convert2hf \
+mammoth_export_hf \
   --checkpoint-dir <path> \
   --output-dir <path>
 ```
@@ -135,7 +135,7 @@ hf_multi_task/
 Use the `--task` flag to convert only a specific task:
 
 ```bash
-mammoth_convert2hf \
+mammoth_export_hf \
   --checkpoint-dir <path> \
   --output-dir <path> \
   --task eng-spa
@@ -146,7 +146,7 @@ mammoth_convert2hf \
 All submodels are bundled into one artifact:
 
 ```bash
-mammoth_convert2hf \
+mammoth_export_hf \
   --checkpoint-dir <path> \
   --output-dir <path> \
   --single-artifact
@@ -180,7 +180,7 @@ hf_single_artifact/
 ## Push the Converted Model to Model Hub
 
 ```bash
-mammoth_push2hf \
+mammoth_upload \
   --model-dir <path> \
   --repo-id <org/model-name> \
   [--private] \
@@ -189,7 +189,7 @@ mammoth_push2hf \
 
 This script uploads the entire directory, so it works for single-task, multi-task, single-artifact, and modular models alike.
 
-Every converted directory contains a `README.md` model card, generated from its `config.json`. It is the page users see on the Hub: a self-contained guide listing the trained tasks with ready-to-run commands. The converter cannot know the repo id, so the card uses a `<repo_id>` placeholder; `mammoth_push2hf` fills in `--repo-id` before uploading. Edit the README before pushing if you want to add details such as training data, evaluation scores or a license.
+Every converted directory contains a `README.md` model card, generated from its `config.json`. It is the page users see on the Hub: a self-contained guide listing the trained tasks with ready-to-run commands. The converter cannot know the repo id, so the card uses a `<repo_id>` placeholder; `mammoth_upload` fills in `--repo-id` before uploading. Edit the README before pushing if you want to add details such as training data, evaluation scores or a license.
 
 ## Inference
 
@@ -258,7 +258,7 @@ print(translate(src_tok, tgt_tok, model, ["Helsinki is the capital of Finland."]
 
 ## Download Models for Local Use
 
-By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `model_downloader.py`, which is also shipped in every artifact. If you have MAMMOTH installed, `mammoth_download_hf` takes the same options and needs no separate download.
+By default, Hugging Face Transformers downloads the model to its cache directory. To download the model to a specific path for repeated use, use `model_downloader.py`, which is also shipped in every artifact. If you have MAMMOTH installed, `mammoth_download` takes the same options and needs no separate download.
 
 Without MAMMOTH, fetch the script first:
 

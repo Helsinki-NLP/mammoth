@@ -6,27 +6,28 @@ The script discovers src/tgt language pairs from the checkpoint's stored opts.ta
 users do not pass --src/--tgt. Single-task checkpoints write flat into --output-dir;
 multi-task checkpoints write one subdirectory per task: <output_dir>/<src>-<tgt>/.
 
-Usage:
+Usage (installed as the `mammoth_export_hf` command; without installing, use
+`python -m mammoth.hf_integration.to_hf.convert_mammoth_to_hf` from the repository root):
     # Convert all tasks (default; best checkpoint):
-    python convert_mammoth_to_hf.py \
+    mammoth_export_hf \
         --checkpoint-dir path/to/checkpoint_dir \
         --output-dir path/to/hf_output
 
     # Convert a specific task only:
-    python convert_mammoth_to_hf.py \
+    mammoth_export_hf \
         --checkpoint-dir path/to/checkpoint_dir \
         --task eng-spa \
         --output-dir path/to/hf_output
 
     # Modular export: every component stored once, assembled per task at load time
     # (MammothHub.from_pretrained(dir, task=...) or src=/tgt=/encoder=/decoder=):
-    python convert_mammoth_to_hf.py \
+    mammoth_export_hf \
         --checkpoint-dir path/to/checkpoint_dir \
         --modular \
         --output-dir path/to/hf_output
 
     # Load a specific step instead of the best checkpoint:
-    python convert_mammoth_to_hf.py \
+    mammoth_export_hf \
         --checkpoint-dir path/to/checkpoint_dir \
         --step 500 \
         --output-dir path/to/hf_output

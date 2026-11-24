@@ -130,7 +130,7 @@ mammoth_translate \
 Use the conversion script:
 
 ```bash
-mammoth_convert2hf \
+mammoth_export_hf \
     --checkpoint-dir /path/to/checkpoints \
     --output-dir /path/to/hf_model
 ```
@@ -146,7 +146,7 @@ Yes. Once you convert a model to HuggingFace format, anyone can run inference us
 Use the provided downloader:
 
 ```bash
-mammoth_download_hf \
+mammoth_download \
     --repo-id org/my-model \
     --local-dir ./my_model
 ```
@@ -154,7 +154,7 @@ mammoth_download_hf \
 For multi-task single artifact, you can download just one task to save space (Mammoth model only):
 
 ```bash
-mammoth_download_hf \
+mammoth_download \
     --repo-id org/my-bundle --local-dir ./eng_spa --task eng-spa
 ```
 

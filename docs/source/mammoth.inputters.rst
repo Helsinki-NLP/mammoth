@@ -24,5 +24,8 @@ Data loading
 Vocab
 -----
 
+.. autoclass:: mammoth.inputters.vocab.HFTokenizerVocab
+    :members:
+
 .. autoclass:: mammoth.inputters.vocab.Vocab
     :members:

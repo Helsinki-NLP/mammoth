@@ -48,6 +48,9 @@ jobs:
     - name: Build a binary wheel and a source tarball
       run: |
         python -m build
+    - name: Check that every mammoth_* command runs from the wheel
+      run: |
+        TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu tools/check_wheel_commands.sh dist/*.whl
     - name: Publish release to PyPi
       uses: pypa/gh-action-pypi-publish@release/v1
       with:

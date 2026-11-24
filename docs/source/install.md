@@ -5,7 +5,7 @@ This guide covers installing MAMMOTH on a local machine or a generic GPU server.
 ## Requirements
 
 - Python 3.11 or newer
-- PyTorch 2.8 or newer (the test suite is verified on 2.8.0). A GPU build is needed for real training. CPU-only is fine for tests and small experiments.
+- PyTorch 2.8 or newer (the test suite is verified on 2.8.0). A GPU build is needed for real training. A CPU-only build is enough for inference: Mammoth trains big and runs small. Training a multilingual model needs many GPUs, but translating one direction loads only the encoder and decoder components that direction uses, so a single task runs comfortably on a laptop CPU (see [Running a Translation Server](serving.md)). CPU-only is also fine for tests and small experiments.
 - A Unix-like OS (Linux or macOS)
 
 ## Install from PyPI (recommended)

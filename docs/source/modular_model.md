@@ -39,12 +39,12 @@ Let's break down the key aspects of modularity by design:
     - **Partially Shared Encoder / Decoder**: Within each encoder or decoder, individual layers can be selectively shared or made language-specific. For example, the bottom encoder layers can be shared across languages while the top layers are language-specific, or the encoder can be fully shared while each target language gets its own decoder. Same applies to the decoders.
 
 2. **Groupwise Sharing Schemes**:
-    MAMMOTH supports grouping languages into clusters, where languages in the same cluster share parameters. Clusters are computed using hierarchical clustering (`AgglomerativeClustering` from scikit-learn) on a user-provided **distance matrix**. You can define the distance matrix using any criterion:
+    MAMMOTH supports grouping languages into clusters, where languages in the same cluster share parameters: give every task in a cluster the same `enc_sharing_group` / `dec_sharing_group` id for that layer stack. You choose the clusters, using any criterion, for example:
     - **Phylogenetic**: Distance based on language family trees (languages sharing a common ancestry are closer).
     - **Typological**: Distance based on linguistic features from typological databases (e.g., word order, morphology).
     - **Language Embeddings**: Distance based on language representations in a shared vector space.
 
-    See the [config_config documentation](config_config.md) for how to provide the distance matrix.
+    See [Sharing Schemes](examples/sharing_schemes.md) for example configurations.
 
 
 <!-- ## Bridges and Structures for Sharing

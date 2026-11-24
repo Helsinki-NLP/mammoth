@@ -1,3 +1,5 @@
+# Exporting to Hugging Face
+
 We provide scripts to convert Mammoth pre-trained models to Hugging Face Model Hub compatible format, so users can download Mammoth models from Model Hub for inference without setting up Mammoth.
 
 **This guide covers:** model conversion → pushing to Hub → running inference → downloading locally.

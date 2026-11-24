@@ -47,13 +47,3 @@ KV cache
 
 .. autoclass:: mammoth.modules.transformer.KVCache
     :members:
-
-
-Attention Bridge
-----------------
-
-.. autoclass:: mammoth.modules.attention_bridge.AttentionBridge
-    :members:
-
-.. autoclass:: mammoth.modules.attention_bridge.BaseAttentionBridgeLayer
-    :members:

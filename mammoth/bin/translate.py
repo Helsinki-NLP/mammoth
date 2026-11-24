@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+import copy
+
+import torch
+
 from mammoth.utils.logging import init_logger
 from mammoth.utils.misc import split_corpus
 from mammoth.translate.translator import build_translator
@@ -14,12 +18,64 @@ from mammoth.utils.parse import ArgumentParser
 from mammoth.utils.misc import use_gpu
 
 
+# Per-task input/output keys: tasks.<task_id>.{src,tgt,output} override the top-level options.
+TASK_IO_KEYS = ('src', 'tgt', 'output')
+
+
+def resolve_task_runs(opts):
+    """One copy of opts per requested task id, each with a single task_id and that task's src/tgt/output."""
+    task_ids = opts.task_id if isinstance(opts.task_id, list) else [opts.task_id]
+    unknown = [task_id for task_id in task_ids if task_id not in opts.tasks]
+    if unknown:
+        raise ValueError(f'Unknown task_id {unknown}; the config defines {list(opts.tasks)}')
+    if len(set(task_ids)) != len(task_ids):
+        raise ValueError(f'task_id lists a task more than once: {task_ids}')
+
+    runs = []
+    for task_id in task_ids:
+        task_opts = copy.copy(opts)
+        task_opts.task_id = task_id
+        for key in TASK_IO_KEYS:
+            value = opts.tasks[task_id].get(key)
+            if value is not None:
+                setattr(task_opts, key, value)
+        if not task_opts.src:
+            raise ValueError(f"Task '{task_id}' has no source file: set tasks.{task_id}.src in the config or --src")
+        runs.append(task_opts)
+
+    outputs = [task_opts.output for task_opts in runs]
+    shared = sorted({output for output in outputs if outputs.count(output) > 1})
+    if shared:
+        raise ValueError(f"Several tasks would write to {shared}: set 'output' under each task in the config")
+    return runs
+
+
 def translate(opts):
     ArgumentParser.validate_prepare_opts(opts)
     ArgumentParser.validate_translate_opts(opts)
     ArgumentParser.validate_translate_opts_dynamic(opts)
     logger = init_logger(opts.log_file)
 
+    runs = resolve_task_runs(opts)
+    if len(runs) == 1:
+        translate_task(runs[0], logger)
+        return
+
+    # Several tasks: a failing task does not stop the others; report all failures at the end.
+    failed = []
+    for i, task_opts in enumerate(runs, 1):
+        logger.info(f"Task {i}/{len(runs)}: '{task_opts.task_id}' ({task_opts.src} -> {task_opts.output})")
+        try:
+            translate_task(task_opts, logger)
+        except Exception:
+            logger.exception(f"Task '{task_opts.task_id}' failed")
+            failed.append(task_opts.task_id)
+    if failed:
+        raise RuntimeError(f'{len(failed)} of {len(runs)} tasks failed: {failed}')
+
+
+def translate_task(opts, logger):
+    """Translate opts.src with the single task opts.task_id and write opts.output."""
     corpus_id = opts.task_id
     corpus_opts = opts.tasks[corpus_id]
     src_lang, tgt_lang = corpus_opts['src_tgt'].split('-', 1)
@@ -117,6 +173,11 @@ def translate(opts):
             attn_debug=opts.attn_debug,
             align_debug=opts.align_debug,
         )
+    translator.out_file.close()
+    # Free this task's model before the next task loads its own.
+    del translator
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _get_parser():

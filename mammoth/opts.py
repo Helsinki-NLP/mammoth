@@ -1206,12 +1206,24 @@ def translate_opts(parser, dynamic=False):
         "Necessary for models whose output layers can assign "
         "zero probability.",
     )
-    group.add('--task_id', '-task_id', help="Task id to determine components to load for translation", required=True)
+    group.add(
+        '--task_id',
+        '-task_id',
+        nargs='+',
+        required=True,
+        help="Task id(s) to translate, run one after another. Each task id selects the components to load. "
+        "A task may set its own 'src', 'tgt' and 'output' under 'tasks.<task_id>' in the config; "
+        "otherwise the top-level --src/--tgt/--output are used.",
+    )
 
     group = parser.add_argument_group('Data')
     group.add('--data_type', '-data_type', default="text", help="Type of the source input. Options: [text].")
 
-    group.add('--src', '-src', required=True, help="Source sequence to decode (one line per sequence)")
+    group.add(
+        '--src',
+        '-src',
+        help="Source sequence to decode (one line per sequence). Required unless every task sets 'src' in the config.",
+    )
     group.add(
         "-src_feats",
         "--src_feats",

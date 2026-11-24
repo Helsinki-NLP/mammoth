@@ -1,4 +1,11 @@
 # Task Configuration
+# task_id can also be a list, e.g. [eng-spa, eng-fra]: the tasks are translated one after another.
+# Each task may then set its own src / tgt / output (they win over the top-level ones below), e.g.
+#   eng-fra:
+#     src_tgt: "eng-fra"
+#     ...
+#     src: /scratch/.../eng_Latn.dev
+#     output: /scratch/.../eng-fra.fra
 task_id: eng-spa
 tasks:
   eng-spa:

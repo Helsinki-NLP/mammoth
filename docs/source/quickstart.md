@@ -165,6 +165,49 @@ Translation uses the hardware settings from the config (the GPU, or the CPU if `
 - `--random_sampling_topk 1` switches to greedy decoding (instead of beam search).
 - If you get `CUDA out of memory`, add `--batch_size 50`.
 
+### Several tasks in one run
+
+With several tasks, put the inference settings in their own config and give each task its `src` and `output` (and optionally `tgt`, a reference file):
+
+```yaml
+# inference.yaml
+task_id: [eng-spa, eng-fra]       # translated one after another, in this order
+tasks:
+  eng-spa:
+    src_tgt: eng-spa
+    enc_sharing_group: [eng]
+    dec_sharing_group: [spa]
+    src: data/test.eng
+    output: translations/test.eng-spa.spa
+  eng-fra:
+    src_tgt: eng-fra
+    enc_sharing_group: [eng]
+    dec_sharing_group: [fra]
+    src: data/test.eng
+    output: translations/test.eng-fra.fra
+src_vocab:
+  eng: models/tokenizers/eng/tokenizer.json
+tgt_vocab:
+  spa: models/tokenizers/spa/tokenizer.json
+  fra: models/tokenizers/fra/tokenizer.json
+use_hf_tokenizer: true
+model: models/
+beam_size: 5
+seed: 1
+world_size: 1
+gpu_ranks: [0]
+```
+
+```bash
+mammoth_translate --config inference.yaml
+mammoth_translate --config inference.yaml --task_id eng-fra   # only some of the tasks
+```
+
+- A task's own `src`, `tgt` and `output` win over the top-level ones. A task without them uses the top-level `src` / `tgt` / `output`, so the single-task form above (`--task_id`, `--src`, `--output`) works as before.
+- Every task must end up with its own `output`. Several tasks writing to the same file is an error.
+- If one task fails, the others still run, and `mammoth_translate` exits with an error that lists the failed tasks.
+- Each task loads its model when it starts and frees it when it finishes.
+
 ### Score the output
 
 `sacrebleu` is installed with MAMMOTH's requirements.

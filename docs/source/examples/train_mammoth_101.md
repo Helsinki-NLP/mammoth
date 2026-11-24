@@ -33,10 +33,12 @@ To keep things small we start with two languages next to English (`bg` and `cs`,
 Download Europarl Release v7 (the version of 15 May 2012) from the original website, or use our processed copy. The three-language archive (about 666 MB) covers this walkthrough, and the full archive needs about 30 GB:
 
 ```bash
-wget https://mammoth101.a3s.fi/europarl-3langs.tar.gz   # or europarl.tar.gz for all languages
+wget https://mammoth101.a3s.fi/europarl-3langs.tar.gz
 mkdir europarl_data
 tar -xvzf europarl-3langs.tar.gz -C europarl_data
 ```
+
+For all languages, download `europarl.tar.gz` instead and add `--strip-components=1` to the `tar` command (that archive has an extra top-level `europarl/` folder). Both give the same layout: `europarl_data/bg-en/europarl-v7.bg-en.bg`, and so on.
 
 The next step is to check that source and target are line-aligned, clean the pairs, shuffle, and hold out a validation set. This is done by the `prepare_parallel.py` script from [Preparing your data](../prepare_data.md) (Step 2). Save that script, then run:
 

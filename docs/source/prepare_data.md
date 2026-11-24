@@ -24,7 +24,8 @@ The steps below use the [Europarl](https://www.statmt.org/europarl/) corpus as a
 ```bash
 wget https://mammoth101.a3s.fi/europarl.tar.gz
 mkdir europarl_data
-tar -xvzf europarl.tar.gz -C europarl_data
+# the full archive has an extra top-level europarl/ folder; --strip-components=1 drops it
+tar -xvzf europarl.tar.gz -C europarl_data --strip-components=1
 ```
 Note that the extracted dataset will require around 30GB of disk space. Alternatively, you can only download the data for the three example languages (666M).
 ```bash
@@ -32,6 +33,8 @@ wget https://mammoth101.a3s.fi/europarl-3langs.tar.gz
 mkdir europarl_data
 tar -xvzf europarl-3langs.tar.gz -C europarl_data
 ```
+
+Either way, each language pair ends up in its own folder, e.g. `europarl_data/bg-en/europarl-v7.bg-en.bg` and `europarl_data/bg-en/europarl-v7.bg-en.en`.
 
 ### Step 2: Check, clean and split train/valid
 
@@ -103,8 +106,8 @@ Then run it once per language pair. Here for Bulgarian-English and Czech-English
 ```bash
 for lang in bg cs; do
     python prepare_parallel.py \
-        --src europarl_data/europarl/${lang}-en/europarl-v7.${lang}-en.${lang} \
-        --tgt europarl_data/europarl/${lang}-en/europarl-v7.${lang}-en.en \
+        --src europarl_data/${lang}-en/europarl-v7.${lang}-en.${lang} \
+        --tgt europarl_data/${lang}-en/europarl-v7.${lang}-en.en \
         --src_lang ${lang} --tgt_lang en \
         --out_dir europarl_data/split/${lang}-en \
         --valid_size 1000
@@ -199,7 +202,7 @@ langs = ["bg", "cs"]
 sp_path = 'vocab/opusTC.mul.64k.spm'
 spm = sp.SentencePieceProcessor(model_file=sp_path)
 
-input_dir = 'europarl_data/europarl'
+input_dir = 'europarl_data'
 output_dir = 'europarl_data/encoded'
 
 for lang in tqdm.tqdm(langs):

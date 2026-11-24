@@ -43,8 +43,8 @@ The next step is to check that source and target are line-aligned, clean the pai
 ```bash
 for lang in bg cs; do
     python prepare_parallel.py \
-        --src europarl_data/europarl/${lang}-en/europarl-v7.${lang}-en.${lang} \
-        --tgt europarl_data/europarl/${lang}-en/europarl-v7.${lang}-en.en \
+        --src europarl_data/${lang}-en/europarl-v7.${lang}-en.${lang} \
+        --tgt europarl_data/${lang}-en/europarl-v7.${lang}-en.en \
         --src_lang ${lang} --tgt_lang en \
         --out_dir europarl_data/split/${lang}-en \
         --valid_size 1000
@@ -233,9 +233,65 @@ max_length: 200
 
 ## Step 4: Scale up (more languages, more nodes)
 
+> **Note:** Multi-node training has only been run on the Slurm clusters LUMI and Roihu, using the launch scripts in [Step 5](#several-nodes-with-slurm). The multi-node configs below are written for those clusters (4 GPUs per node). On a single machine, keep `n_nodes: 1`.
+
 Writing the tasks for 20 languages by hand is 60 entries. Because each language follows the same three-task pattern, generate them instead. The script below keeps everything that is not language-specific (model, optimization, ...) in a base file, and fills in the vocabularies, the tasks, and the hardware section.
 
-First save the settings you want to share as `europarl_base.yaml`. It holds the `use_hf_tokenizer: true` line and the Model, Data, Denoising, Optimization and Output sections of the config above. The script adds the `src_vocab`, `tgt_vocab`, `tasks`, `n_nodes`, `world_size` and `gpu_ranks` keys. Then save this as `make_config.py`:
+The config splits into two kinds of settings. Some are the same whatever languages you train (model, data, optimization, output). The rest depend on the languages and GPUs (`src_vocab`, `tgt_vocab`, `tasks`, `n_nodes`, `world_size`, `gpu_ranks`). Put the first kind in a template, `europarl_base.yaml`, and let a script fill in the second.
+
+`europarl_base.yaml` is the config from Step 3 with the Tokenizers, Tasks and Hardware sections removed:
+
+```yaml
+use_hf_tokenizer: true
+
+# ---- Model ----
+model_dim: 512
+heads: 8
+ff_mult: 4
+enc_layers: [6]
+dec_layers: [6]
+rotary_pos_emb: true
+dropout: 0.1
+label_smoothing: 0.1
+
+# ---- Data ----
+batch_size: 4096
+batch_type: tokens
+normalization: tokens
+valid_batch_size: 4096
+src_seq_length_max: 200
+tgt_seq_length_max: 200
+
+# ---- Denoising (used by the xx-xx autoencoder tasks) ----
+mask_ratio: 0.2
+mask_length: span-poisson
+poisson_lambda: 3.0
+replace_length: 1
+denoising_objective: bart
+
+# ---- Optimization ----
+optim: adam
+adam_beta1: 0.9
+adam_beta2: 0.998
+learning_rate: 0.0005
+decay_method: linear_warmup
+warmup_steps: 4000
+max_grad_norm: 1.0
+train_steps: 100000
+valid_steps: 5000
+report_every: 100
+early_stopping: 5
+metric_for_best_model: mean_ppl
+seed: 3435
+
+# ---- Output ----
+save_model: models/europarl
+save_checkpoint_steps: 10000
+keep_checkpoint: 3
+max_length: 200
+```
+
+Then save this script as `make_config.py`. It reads the template, adds the per-language and hardware keys, and writes a complete config:
 
 ```python
 """Write a MAMMOTH config with one en->xx, xx->en and xx->xx (denoising) task per language."""
@@ -335,7 +391,7 @@ Checkpoints are written under `models/`, named from `save_model` and the step nu
 
 ### Several nodes with Slurm
 
-Multi-node training is currently tested only on HPC clusters that use Slurm, such as LUMI and Roihu. Launch it with the script for your cluster:
+Launch multi-node training with the Slurm script for your cluster (LUMI and Roihu are the only clusters it has been run on, see the note in Step 4):
 
 | Cluster | Script |
 |---|---|

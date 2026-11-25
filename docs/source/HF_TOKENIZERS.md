@@ -11,7 +11,7 @@ mammoth_build_vocab --input_file corpus.txt --output_dir tokenizers/en --vocab_s
 | Option | Meaning |
 |---|---|
 | `--input_file` | One or more training text files, one sentence per line. Files with invalid UTF-8 are cleaned first (invalid bytes become `�`) into `<file>.utf8_cleaned`. |
-| `--output_dir` | Where to write `tokenizer.json` (plus `tokenizer_config.json` and `special_tokens_map.json`). Default: the current directory. |
+| `--output_dir` | Where to write `tokenizer.json` (plus `tokenizer_config.json`). Default: the current directory. |
 | `--vocab_size` | Vocabulary size, including the special tokens. Default: 32000. |
 
 The tokenizer it trains:

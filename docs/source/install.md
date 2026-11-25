@@ -100,6 +100,6 @@ If the path still points outside your venv, reinstall in a fresh venv.
 
 ## Next steps
 
-- [Quickstart](quickstart.md): a first training run on synthetic toy data.
+- [Quickstart](quickstart.md): train and translate English→German on Multi30k.
 - [LUMI & Roihu quickstart](CSC_quickstart.md): running on the CSC supercomputers.
 - [Data preparation](prepare_data.md): preparing your own corpora.

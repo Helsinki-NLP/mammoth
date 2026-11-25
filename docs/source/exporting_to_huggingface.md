@@ -34,15 +34,15 @@ hf_single_task_model/
 ├── config.json                   # model architecture hyperparameters (HF format)
 ├── configuration_mammoth.py      # custom HF Config class definition for Mammoth
 ├── generation_config.json        # special token ids (bos/eos/pad/decoder start) for generate()
+├── inference.py                  # command-line / Python inference script (see Inference below)
 ├── model.safetensors             # model weights
+├── model_downloader.py           # download script (see Download Models for Local Use below)
 ├── modeling_mammoth.py           # custom HF Model class (forward pass and generate)
 ├── native_transformer.py         # vendored: self-contained copy of Mammoth's native transformer modules
 ├── src_tokenizer/                # source language tokenizer
-│   ├── special_tokens_map.json   # maps special token names to their string values
 │   ├── tokenizer_config.json     # tokenizer class and settings
 │   └── tokenizer.json            # full vocabulary and tokenization rules
 └── tgt_tokenizer/                # target language tokenizer (same structure as above)
-    ├── special_tokens_map.json
     ├── tokenizer_config.json
     └── tokenizer.json
 ```
@@ -71,7 +71,9 @@ hf_modular/
 ├── README.md                          # model card: trained tasks and usage
 ├── config.json                        # manifest: architecture, components, tokenizers, trained tasks
 ├── configuration_mammoth.py
+├── inference.py
 ├── mammoth_hub.py                     # entry point: assembles a model from components
+├── model_downloader.py
 ├── modeling_mammoth.py
 ├── native_transformer.py
 ├── components/                        # each component stored once, whichever tasks share it
@@ -119,15 +121,15 @@ hf_multi_task/
 │   ├── config.json
 │   ├── configuration_mammoth.py
 │   ├── generation_config.json
+│   ├── inference.py
 │   ├── model.safetensors
+│   ├── model_downloader.py
 │   ├── modeling_mammoth.py
 │   ├── native_transformer.py
 │   ├── src_tokenizer/
-│   │   ├── special_tokens_map.json
 │   │   ├── tokenizer_config.json
 │   │   └── tokenizer.json
 │   └── tgt_tokenizer/
-│       ├── special_tokens_map.json
 │       ├── tokenizer_config.json
 │       └── tokenizer.json
 └── task2/                        # same structure as task1
@@ -161,16 +163,16 @@ hf_single_artifact/
 ├── README.md                         # model card: available tasks and usage
 ├── config.json                       # manifest: per-task architecture config for all tasks
 ├── configuration_mammoth.py
+├── inference.py
 ├── mammoth_hub.py                    # entry point: routes inference to the correct task
+├── model_downloader.py
 ├── modeling_mammoth.py
 ├── native_transformer.py
 ├── bul-eng.safetensors               # weights for bul-eng (one .safetensors per task)
 ├── bul-eng_src_tokenizer/            # source tokenizer for bul-eng
-│   ├── special_tokens_map.json
 │   ├── tokenizer_config.json
 │   └── tokenizer.json
 ├── bul-eng_tgt_tokenizer/            # target tokenizer for bul-eng
-│   ├── special_tokens_map.json
 │   ├── tokenizer_config.json
 │   └── tokenizer.json
 ├── task2.safetensors                 # same pattern repeated for task2

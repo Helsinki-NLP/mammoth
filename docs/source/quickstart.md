@@ -33,7 +33,7 @@ done
 cd ../..
 ```
 
-This gives you `train`, `val` (validation) and `test_2016_flickr` files for each language. The files are gzipped, one sentence per line, and MAMMOTH reads `.gz` files directly.
+On macOS without `wget`, use `curl -LO` instead. This gives you `train`, `val` (validation) and `test_2016_flickr` files for each language. The files are gzipped, one sentence per line, and MAMMOTH reads `.gz` files directly.
 
 ## Step 2: Train the tokenizers
 
@@ -104,6 +104,7 @@ normalization: tokens
 valid_batch_size: 1024
 src_seq_length_max: 256
 tgt_seq_length_max: 256
+max_length: 256           # required; also the longest translation generated
 
 # ---- Optimization ----
 optim: adam
@@ -131,6 +132,7 @@ The keys worth knowing about:
 - **`src_vocab` / `tgt_vocab`**: one tokenizer per language. The tokenizer for a language must be the same one used at translation time.
 - **`gpu_ranks`, `world_size`, `n_nodes`**: these must describe the same hardware. `gpu_ranks: [0]` means one GPU in this node. An empty `gpu_ranks` with `world_size: 0` selects the CPU, and both training and translation then run on CPU.
 - **`src_seq_length_max` / `tgt_seq_length_max`**: used by the `filtertoolong` transform, which drops training pairs longer than this many tokens.
+- **`max_length`**: required. The maximum number of tokens generated per sentence at translation time.
 
 On a small GPU, lower `batch_size`. To check that everything works before a full run (or when using the CPU), set `train_steps: 200` and `save_checkpoint_steps: 200`. A model trained for so few steps will produce poor or empty translations, which is expected.
 

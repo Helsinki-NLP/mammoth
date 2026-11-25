@@ -18,11 +18,7 @@ Or run it without installing anything permanently, using [uv](https://docs.astra
 uvx --from 'mammoth-nlp[server]' mammoth_serve --model <model>
 ```
 
-To pin a version, write `'mammoth-nlp[server]==<version>'`. Until the server is part of a release, install from the `mammoth-server` branch instead:
-
-```bash
-pip install 'mammoth-nlp[server] @ git+https://github.com/Helsinki-NLP/mammoth@mammoth-server'
-```
+To pin a version, write `'mammoth-nlp[server]==<version>'`.
 
 ## Start the server
 

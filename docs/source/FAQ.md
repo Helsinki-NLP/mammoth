@@ -5,7 +5,7 @@
 
 ### What is MAMMOTH?
 
-MAMMOTH (Massively Multilingual Modular Open Translation Toolkit) is an open-source toolkit for training neural machine translation (NMT) models. It is built on top of [OpenNMT-py](https://opennmt.net/OpenNMT-py/) and uses its own native PyTorch transformer implementation as the transformer backend. MAMMOTH is designed for large-scale multilingual training across multiple GPUs and nodes.
+MAMMOTH (Massively Multilingual Modular Open Translation @ Helsinki) is an open-source toolkit for training neural machine translation (NMT) models from modular components: per-language embeddings, and encoder and decoder layer stacks that tasks can share or keep separate. It uses its own transformer implementation built from standard PyTorch modules. MAMMOTH is designed for large-scale multilingual training across multiple GPUs and nodes.
 
 ### What can I use MAMMOTH for?
 
@@ -13,12 +13,13 @@ You can use MAMMOTH to:
 
 - Train translation models from scratch using your own parallel corpora (any language pair)
 - Train massively multilingual models — hundreds of language pairs in a single training run
+- Add a new language to a trained model, training only the new parts ([Extending a Trained Model with a New Language](examples/extending_with_a_new_language.md))
 - Fine-tune from pretrained HuggingFace models (Gemma3)
 - Export trained models to HuggingFace format for easy sharing and inference
 
 ### How does MAMMOTH relate to OpenNMT-py?
 
-MAMMOTH builds on top of OpenNMT-py (the PyTorch version of OpenNMT). It inherits the core training pipeline and extends it with modular architecture, flexible parameter sharing, scalable distributed training, and HuggingFace integration.
+MAMMOTH started as a fork of OpenNMT-py (the PyTorch version of OpenNMT). The model and training code have since been rewritten; parts of the data pipeline and decoding still come from OpenNMT-py. OpenNMT-py checkpoints cannot be loaded by MAMMOTH.
 
 ### How can I contribute?
 
@@ -54,33 +55,36 @@ See the [config_config documentation](config_config.md) for details. -->
 
 ### How do I set up parameter sharing between languages?
 
-MAMMOTH supports dynamic parameter sharing, configured per LayerStack via `enc_sharing_groups` and `dec_sharing_groups`:
-
-You can mix these across layers. For example:
+Each task lists one sharing-group name per layer stack, with `enc_sharing_group` and `dec_sharing_group`. Tasks that use the same name for the same stack share its weights. For example, with two encoder stacks, a per-language stack followed by a shared one:
 
 ```yaml
-enc_sharing_groups: [Language, FULL]   # Language-specific layers + fully shared layers
-dec_sharing_groups: [FULL, Language]  # Fully shared layers + language-specific layers 
 enc_layers: [3, 3]
-dec_layers: [3, 3]
+dec_layers: [6]
+tasks:
+  fin-eng:
+    src_tgt: fin-eng
+    enc_sharing_group: [fin, all]   # fin-only stack, then a stack shared by all tasks
+    dec_sharing_group: [eng]
+  swe-eng:
+    src_tgt: swe-eng
+    enc_sharing_group: [swe, all]
+    dec_sharing_group: [eng]
 ```
 
-See the [sharing schemes example](examples/sharing_schemes.md) for more patterns.
+See [Modular model](modular_model.md) and the [sharing schemes example](examples/sharing_schemes.md) for more patterns.
 
 
 ## Tokenizers and Data
 
-### Should I use HuggingFace tokenizers or SentencePiece?
+### Which tokenizer should I use?
 
-Both work, but we recommend HuggingFace tokenizers for new projects. They are faster (implemented in Rust), working on-the-fly (you don't need to pre-tokenize the data), easier to set up, and integrate smoothly with the HuggingFace ecosystem. See the [HF tokenizers guide](HF_TOKENIZERS.md) for instructions.
-
-SentencePiece is still supported if you prefer it or have existing models.
+HuggingFace tokenizers (`tokenizer.json`, one per language and side). They tokenize on the fly during training, so you do not need to pre-tokenize the data. See the [HF tokenizers guide](HF_TOKENIZERS.md). SentencePiece support is deprecated and will be removed.
 
 ### Can I use pretrained HuggingFace models as a starting point?
 
 Yes. MAMMOTH can convert pretrained HuggingFace models into MAMMOTH checkpoints for fine-tuning:
 
-- **Gemma3** — use as decoder (a new encoder is randomly initialized)
+- **Gemma3 (270M)**: either as a decoder-only model, or as the decoder of an encoder-decoder model with a small new encoder whose cross-attention starts at zero, so the converted model initially behaves exactly like Gemma3. The converters are scripts in the repository (`mammoth/hf_integration/from_hf/gemma3/`), not `mammoth_*` commands.
 
 If you need a model that is not yet supported, please [open an issue](https://github.com/Helsinki-NLP/mammoth/issues) — we also welcome contributions for new model converters.
 
@@ -103,7 +107,7 @@ data/
 
 Your training files can be plain, untokenized text. With a HuggingFace tokenizer (the .json path in your vocab config), MAMMOTH tokenizes on the fly during training, so you don't need to pre-process anything. Use transforms for other on-the-fly steps such as filtertoolong, prefix or denoising.
 
-To tokenize once up front instead, set data_type: indexed. This writes .bin/.idx files next to your text, which removes tokenization cost during training. Transforms don't work with indexed data, so filter your data first. See [INDEXED_DATASET_GUIDE.md](INDEXED_DATASET_GUIDE.md).
+To tokenize once up front instead, set data_type: indexed. This writes .bin/.idx files next to your text, which removes tokenization cost during training. Transforms don't work with indexed data, so filter your data first. See [Indexed datasets](indexed_datasets.md).
 
 See [prepare_data.md](prepare_data.md) for full details.
 
@@ -139,7 +143,7 @@ For multi-task models, you can convert each task separately (per-task) or bundle
 
 ### Can I run inference without installing MAMMOTH?
 
-Yes. Once you convert a model to HuggingFace format, anyone can run inference using standard HuggingFace dependencies plus extra dependencies (`transformers`, `torch`). No MAMMOTH installation needed.
+Yes. Once you convert a model to HuggingFace format, anyone can run inference with only `transformers` and `torch` installed. No MAMMOTH installation needed.
 
 ### How do I download Mammoth (or any) models from HuggingFace Hub?
 

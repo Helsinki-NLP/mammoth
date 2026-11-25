@@ -1,9 +1,8 @@
 # Overview
 
+**MAMMOTH** (Massively Multilingual Modular Open Translation @ Helsinki) is a toolkit for training modular, massively multilingual translation models.
 
-This portal provides a detailed documentation of the **MAMMOTH**: Modular Adaptable Massively Multilingual Open Translation @ Helsinki. 
-
-
+A model is built from **components**: one embedding per language, and encoder and decoder layer stacks that you choose to share between languages, keep per language, or mix (e.g. a per-language stack followed by a shared one). Each translation direction (task) picks its components through the YAML config; see [Modular model](modular_model.md) and [Sharing schemes](examples/sharing_schemes.md). Tasks are spread over many GPUs and nodes, so hundreds of directions can be trained in one run. Translating one direction later loads only the components it uses, which fits on a laptop CPU ([Running a Translation Server](serving.md)).
 
 ## Installation
 

@@ -17,7 +17,7 @@ Each translation task needs:
 
 - **Parallel training data** — one source file and one target file per task (plain text or `.gz`, one sentence per line, line-aligned).
 - **Validation data (Optional)** — a source/target pair per task (the `csc_env` configs use [FLORES-200](https://github.com/openlanguagedata/flores) `dev`).
-- **One HuggingFace tokenizer per language** (`tokenizer.json`). MAMMOTH uses **separate source and target vocabularies**: `src_vocab` tokenizes the input, `tgt_vocab` tokenizes the output. HuggingFace tokenizer is suggested while SentencePiece model is also supported as a legacy option.
+- **One HuggingFace tokenizer per language** (`tokenizer.json`). MAMMOTH uses **separate source and target vocabularies**: `src_vocab` tokenizes the input, `tgt_vocab` tokenizes the output. (SentencePiece is deprecated.)
 
 Language codes are arbitrary strings (such as `eng`, `spa`, `fin`); they are used as keys in `src_vocab`/`tgt_vocab` and inside the sharing groups.
 

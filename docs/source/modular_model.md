@@ -69,16 +69,15 @@ It deals with the task2gpu allocation problem as illustrated below.
 ![task2gpu-allocation](assets/task2gpu-allocations.png)
 
 It allows for custom model parallelism across nodes and GPUs to ensure optimal utilization of resources.
-Modules allocated in more than 1 GPU have to be synced at all times.
+Each GPU holds only the components its tasks use, and a component used on several GPUs is kept identical on all of them by summing its gradients across those GPUs after every step.
 The figure below illustrates the distribution of modules across multiple nodes:
 
 ![multi-model-parallelism](assets/multiple-nodes.png)
 
 
-Custom model parallelism increases parameter sharing versatility, allowing for synchronization of modules in GPUs based on specific criteria. For example:
-- AB layer synced in GPUs 1,3&4
-- Language-specific components synced as needed (e.g., EN-decoder in all GPUs)
-- Language group-specific components also synced as needed (e.g., GER in GPUs 1,2&3)
+Custom model parallelism increases parameter sharing versatility: a component can be placed on any subset of GPUs. For example:
+- Language-specific components on the GPUs whose tasks use them (e.g., EN-decoder in all GPUs)
+- Language group-specific components on the GPUs of that group (e.g., GER in GPUs 1,2&3)
 
 ![Custom model parallelism increases param. sharing versatility](assets/single-node.png)
 
@@ -90,7 +89,6 @@ Custom model parallelism increases inference efficiency:
 ![Custom model parallelism increases inference efficiency](assets/inference.png)
 
 
-At training time, encoder-decoder communication is based on layer stacks.
-Gradients are broadcasted only for modules currently in use, optimizing communication and reducing computational overhead.
+At training time, all gradients are exchanged in one all-reduce over all GPUs per step: each GPU packs the gradients of its components into a shared buffer (zeros for components it does not hold). A single collective avoids the hundreds of overlapping communication groups that per-component synchronization would need at scale.
 
 In conclusion, the custom model parallelism in MAMMOTH is implemented to overcome the task-to-GPU allocation challenge, enhance parameter sharing versatility, and optimize both training and inference efficiency.

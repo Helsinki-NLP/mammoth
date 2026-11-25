@@ -30,7 +30,7 @@ Contents
       :maxdepth: 2
 
       prepare_data.md
-      INDEXED_DATASET_GUIDE.md
+      indexed_datasets.md
       training_tips.md
       freezing_components.md
       counting_parameters.md

@@ -1,9 +1,8 @@
 # 🦣 MAMMOTH: Massively Multilingual Modular Open Translation @ Helsinki
 
-This repository contains the code for 🦣 MAMMOTH, the modular translation toolkit from Helsinki-NLP.
+MAMMOTH is a toolkit from Helsinki-NLP for training modular, massively multilingual translation models.
 
-This library is built on top of OpenNMT-py.
-[OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py) is the [PyTorch](https://github.com/pytorch/pytorch) version of the [OpenNMT](https://opennmt.net) project, an open-source (MIT) neural machine translation framework. It is designed to be research friendly to try out new ideas in translation, summary, morphology, and many other domains. Some companies have proven the code to be production ready.
+A model is built from **components**: one embedding per language, and encoder and decoder layer stacks that you choose to share between languages, keep per language, or mix (e.g. a per-language stack followed by a shared one). Each translation direction (task) picks its components through the YAML config. Tasks are spread over many GPUs and nodes, so hundreds of directions can be trained in one run. Translating one direction later loads only the components it uses, which fits on a laptop CPU.
 
 ## Getting started
 
@@ -11,20 +10,27 @@ This library is built on top of OpenNMT-py.
 pip install mammoth-nlp
 ```
 
-- [Installation guide](docs/source/install.md): install locally or on a specific cluster.
-- [Quickstart](docs/source/quickstart.md): run a first training with synthetic toy data and a small translation model.
-- [Documentation site](https://helsinki-nlp.github.io/mammoth/): the full Mammoth documentation (currently under development).
-  The original ONMT-py documentation is available [here](https://opennmt.net/OpenNMT-py/).
+- [Installation](https://helsinki-nlp.github.io/mammoth/install.html): PyTorch builds, installing from source, troubleshooting.
+- [Quickstart](https://helsinki-nlp.github.io/mammoth/quickstart.html): train and translate with one language pair on one GPU.
+- [MAMMOTH 101](https://helsinki-nlp.github.io/mammoth/examples/train_mammoth_101.html): a multilingual model on Europarl, from one GPU to several nodes.
+- [Documentation site](https://helsinki-nlp.github.io/mammoth/): all guides and the option reference.
 
 ## Guides
-- [LUMI/Roihu quickstart guide](docs/source/CSC_quickstart.md): working on the LUMI/Roihu supercomputer environments.
-- [Exporting Mammoth to Model Hub guide](docs/source/exporting_to_huggingface.md): export pretrained Mammoth model weights to the Hugging Face Model Hub.
-- [Translation server guide](docs/source/serving.md): serve a Mammoth model locally with a web page and an OPUS-MT compatible API (`mammoth_serve`).
-- [HF Tokenizers guide](docs/source/HF_TOKENIZERS.md): we recommend the Hugging Face Tokenizer for training and inferencing in Mammoth.
-- [Indexed dataset guide](docs/source/INDEXED_DATASET_GUIDE.md): tokenize once up front to remove tokenization cost during training.
 
-**Note:** We would greatly appreciate issue reports for this repository and its documentation.
+- [Sharing schemes](https://helsinki-nlp.github.io/mammoth/examples/sharing_schemes.html): fully shared, language-specific and modular encoders and decoders.
+- [LUMI & Roihu quickstart](https://helsinki-nlp.github.io/mammoth/CSC_quickstart.html): running on the CSC supercomputers.
+- [Extending a trained model with a new language](https://helsinki-nlp.github.io/mammoth/examples/extending_with_a_new_language.html) and [freezing components](https://helsinki-nlp.github.io/mammoth/freezing_components.html).
+- [Counting parameters](https://helsinki-nlp.github.io/mammoth/counting_parameters.html): model size in total, per task and per component.
+- [Exporting to Hugging Face](https://helsinki-nlp.github.io/mammoth/exporting_to_huggingface.html): share a model on the Model Hub and run it without MAMMOTH.
+- [Translation server](https://helsinki-nlp.github.io/mammoth/serving.html): serve a model locally with a web page and an OPUS-MT compatible API (`mammoth_serve`).
+- [Upgrading from 0.2](https://helsinki-nlp.github.io/mammoth/upgrading.html): config changes since the x-transformers backend was replaced.
+
+We welcome issue reports for the code and the documentation.
+
+## Citation
+
+If you use MAMMOTH in research, please cite [Mickus et al. (2024)](https://aclanthology.org/2024.eacl-demo.14/). The BibTeX entry is on the [documentation site](https://helsinki-nlp.github.io/mammoth/main.html#citation).
 
 ## Acknowledgements
 
-We thank the NVIDIA AI Technology Center Finland for their help with the multi-gpu/node implementation.
+MAMMOTH started as a fork of [OpenNMT-py](https://github.com/OpenNMT/OpenNMT-py). We thank the NVIDIA AI Technology Center Finland for their help with the multi-GPU/node implementation.

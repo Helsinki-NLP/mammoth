@@ -8,7 +8,7 @@ A MAMMOTH model is made of **components**. A component is one checkpoint file: a
 |---|---|
 | encoder / decoder layer stack | `{encoder,decoder}_{stack}_{xcoder_id}`, e.g. `encoder_0_nordic` |
 | language embedding (with its post-embedding norm) | `{src,tgt}_embeddings_{lang}`, e.g. `src_embeddings_sme` |
-| wrapper (`to_logits`; post-embedding norm in older checkpoints) | `{encoder,decoder}_wrapper_{xcoder_ids}`, e.g. `decoder_wrapper_eng` |
+| wrapper (`to_logits`) | `{encoder,decoder}_wrapper_{xcoder_ids}`, e.g. `decoder_wrapper_eng` |
 | adapter | `{encoder,decoder}_adapter_{stack}_{group}_{sub_id}` |
 | attention bridge | `attention_bridge` |
 
@@ -40,13 +40,13 @@ On the command line, quote the patterns so the shell does not expand them: `--fr
 
 - **Every pattern must match at least one component.** A typo such as `encoder_0_nordc` stops training at startup and prints the available names.
 - **Adapters stay trainable** unless a `freeze_components` pattern contains the word `adapter` (e.g. `'*adapter*'`). With `train_components`, adapters are never frozen.
-- **The older options still work.** `freeze_encoder`, `freeze_decoder`, `freeze_cross_attention`, `freeze_{encoder,decoder}_embeddings`, etc. are applied too, and a parameter is frozen if any option freezes it. Use them for finer control than whole components, e.g. freezing only cross-attention. See the [training options](options/train.rst).
+- **The `freeze_*` options still work.** `freeze_encoder`, `freeze_decoder`, `freeze_cross_attention`, `freeze_{encoder,decoder}_embeddings`, etc. are applied too, and a parameter is frozen if any option freezes it. Use them for finer control than whole components, e.g. freezing only cross-attention. See the [training options](options/train.rst).
 - **Every GPU must have something to train.** If all components on a GPU are frozen, training stops at startup and names that GPU's tasks. Example: with a frozen decoder, an old task such as `eng-swe` whose encoder is also frozen has nothing to learn. Remove it from the config.
 - **All GPUs make the same decision.** Patterns are matched against the full list of components in the config, not only the ones on one GPU, and each GPU then freezes the components it holds.
 
 ## Checking the result
 
-At startup each GPU logs every component it holds as `trainable`, `frozen`, `partial` (partly frozen by one of the older options) or `empty` (no parameters, e.g. an encoder wrapper whose post-embedding norm is stored with the embeddings), together with parameter counts. Check this list before a long run.
+At startup each GPU logs every component it holds as `trainable`, `frozen`, `partial` (partly frozen by one of the `freeze_*` options) or `empty` (no parameters, e.g. an encoder wrapper), together with parameter counts. Check this list before a long run.
 
 ## What happens to frozen components
 

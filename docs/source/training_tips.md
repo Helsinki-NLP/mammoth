@@ -23,7 +23,7 @@ The recommended method is `linear_warmup`,
 which ramps up learning rate linearly for `warmup_steps`, then decays it linearly until `train_steps`.
 
 
-Note that the OpenNMT legacy decay methods have inconsistent scaling of the maximum learning rate.
+Note that the `noam` and `noamwd` methods (inherited from OpenNMT) have inconsistent scaling of the maximum learning rate.
 Changing the decay method also rescales the learning rate in unintuitive ways.
 
 The `rsqrt` method doesn't apply warmup, making it unsuitable for Transformers with SGD or Adam.
@@ -40,20 +40,20 @@ Don't rely on max_grad_norm to save you from too high learning rate:
 as each component is clipped individually (after the gradient sync), renormalization does NOT preserve the direction of the global gradient.
 
 
-## Recommended minimal opts for the native transformer
+## Recommended minimal model options
 
-You can pass through opts to the training config:
+Besides `model_dim`, `enc_layers` and `dec_layers`, set at least:
 
 ```yaml
 heads: 16              # attention heads (model_dim must be divisible by heads)
 ff_activation: swiglu  # choose between "swiglu" and "gelu", "swiglu" by default
 ```
-Note `RMSNorm` is the only normalisation function used by Mammoth for now. 
+All norms are bias-free `RMSNorm`, and positions use rotary embeddings (`rotary_pos_emb: true`). See [Upgrading from 0.2](upgrading.md) for options that no longer exist.
 
 
-## Save storage and speed up config-config by using transforms instead of external preprocessing
+## Save storage by using transforms instead of external preprocessing
 
-There are two approaches to preprocessing (e.g. subword tokenization, prefixing, autoencoder noise, ...)
+There are two approaches to preprocessing (e.g. prefixing, length filtering, autoencoder noise, ...)
 
 1. Pre-apply the transforms using an external tool. Write the results to disk. Point Mammoth at the transformed files.
 2. Apply the transforms at run time using Mammoth. Point Mammoth at the raw original files.
@@ -62,5 +62,7 @@ There are multiple benefits to the latter approach of using Mammoth transforms:
 
 - The transformation is applied online, and the result is not saved to disk. 
   This saves storage, which is especially relevant when using very large corpora and sampling different variations for each minibatch.
-- It is easy to apply sampling of different variations for each minibatch, e.g. subword regularization or denoising autoencoder.
+- It is easy to apply sampling of different variations for each minibatch, e.g. denoising autoencoder noise.
 - It is easy to use the same corpus files symmetrically (e.g. the same files for English->Finnish and Finnish->English) by prefixing the source data with language selection tokens.
+
+Subword tokenization itself also runs at load time with HuggingFace tokenizers. For very large corpora you can instead tokenize once up front with [indexed datasets](indexed_datasets.md), but then transforms are not available.

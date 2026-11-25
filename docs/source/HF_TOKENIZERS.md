@@ -1,131 +1,43 @@
-# HuggingFace Tokenizers Integration
+# HuggingFace Tokenizers
 
-This document describes how to use HuggingFace tokenizers library with MAMMOTH for training from scratch.
+MAMMOTH tokenizes text with HuggingFace [`tokenizers`](https://huggingface.co/docs/tokenizers/index) (installed with MAMMOTH). Each language has its own `tokenizer.json`, and tokenization happens on the fly while the data is loaded, so the training files stay plain text. (SentencePiece is deprecated and will be removed.)
 
-## Overview
-
-MAMMOTH now supports using HuggingFace's `tokenizers` library as an alternative to traditional vocabulary files. This enables:
-
-- **Increasing compatibility**: Now Mammoth interacts more smoothly with HuggingFace models and tokenizers.
-- **Easier implementation**: Users don't have to worry about separate vocab and tokenizing models.
-- **Tokenization algorithms preserved**: BPE, WordPiece, Unigram are still supported.
-- **Faster tokenization**: HuggingFace tokenizers are implemented in Rust for speed
-
-## Installation
-
-Install the HuggingFace tokenizers library:
+## 1. Train a tokenizer
 
 ```bash
-pip install tokenizers
+mammoth_build_vocab --input_file corpus.txt --output_dir tokenizers/en --vocab_size 32000
 ```
 
-## Quick Start
+| Option | Meaning |
+|---|---|
+| `--input_file` | One or more training text files, one sentence per line. Files with invalid UTF-8 are cleaned first (invalid bytes become `�`) into `<file>.utf8_cleaned`. |
+| `--output_dir` | Where to write `tokenizer.json` (plus `tokenizer_config.json` and `special_tokens_map.json`). Default: the current directory. |
+| `--vocab_size` | Vocabulary size, including the special tokens. Default: 32000. |
 
-### 1. Train a Tokenizer
+The tokenizer it trains:
 
-Use the `mammoth_build_vocab` command (installed with the package) to train a tokenizer:
+- **Model**: BPE with byte fallback, so any character can be encoded even if it never appeared in training.
+- **Word boundaries**: Metaspace pre-tokenizer: a word-initial piece starts with `▁` (U+2581), e.g. `"Hello, world!"` → `['▁Hello', ',', '▁world', '!']`. Punctuation is not split off before BPE.
+- **Special tokens**: `</s>`, `<pad>`, `<s>`, `<unk>`, `<mask>`. Do not change them: MAMMOTH looks these tokens up by name.
+- **No BOS/EOS template**: the tokenizer only splits text into subwords. MAMMOTH adds `<s>` and `</s>` itself when it loads the data.
 
-```bash
-mammoth_build_vocab --input_file your_corpus --output_dir your_output_dir --vocab_size 32000
-```
+You can train one tokenizer per language, or one shared tokenizer on all languages and point every language at it.
 
-**Key Configuration:**
-- **Vocabulary size**: 32,000 tokens (configurable via `VOCAB_SIZE`)
-- **Model type**: BPE (Byte Pair Encoding)
-- **Special tokens**: `</s>`, `<pad>`, `<s>`, `<unk>`, `<mask>` (Hard coded for Mammoth by default. Please do not modify unless you know what you are doing.)
-- **Pre-tokenizer**: Metaspace (uses `▁` for word boundaries, inherented from sentencepiece style)
-
-### 2. Use the Tokenizer in Mammoth training and inferencing
-
-Add the `--use_hf_tokenizer` flag to your training configuration:
+## 2. Use it in the config
 
 ```yaml
-# In your training config YAML
 use_hf_tokenizer: true
 
 src_vocab:
-  en: /scratch/project_462000964/members/wangchao/training/hf_models/modernbert/tokenizer.json
-
+  en: tokenizers/en/tokenizer.json
 tgt_vocab:
-  fi: /scratch/project_462000964/shared/hplt_bilingual/fi-en.tmx/tgt_tokenizer/tokenizer.json
+  fi: tokenizers/fi/tokenizer.json
 ```
 
-MAMMOTH will automatically detect the `.json` extension and load it as a HuggingFace tokenizer on the fly.
+MAMMOTH uses **separate source and target vocabularies**: `src_vocab` tokenizes the input of a task, `tgt_vocab` its output. The keys are the language codes used in `tasks.<id>.src_tgt`. Paths ending in `.json` are loaded as HuggingFace tokenizers.
 
-## How It Works
+A copy of each tokenizer is saved in the checkpoint, and translation uses that copy, so a model keeps working if the original `tokenizer.json` files are moved or changed.
 
-### Tokenizer Training
+## Using other tokenizers
 
-The `mammoth_build_vocab` command (source: `mammoth/bin/build_vocab.py`) does the following:
-
-1. **Initialization**: Create a BPE tokenizer with special tokens
-2. **Pre-tokenization**: Configure Metaspace pre-tokenizer for word boundaries
-3. **Training**: Train on your corpus to learn subword vocabulary
-4. **Decoding**: Set up proper decoder for text reconstruction
-5. **Padding**: Enable padding for batch processing
-
-**Important Design Choice:**
-- Non-mammoth native HF models often have their input/output templates, hence the special tokens are added during tokenization encoding.
-- Self-trained tokenizers perform **ONLY** subword tokenization. Special tokens (BOS/EOS) are added by MAMMOTH during data loading.
-- This gives flexibility to experiment with different special token strategies
-
-### Integration with MAMMOTH
-
-The integration happens in several places:
-
-**1. Vocabulary Loading** (`mammoth/inputters/vocab.py`):
-- New `HFTokenizerVocab` class wraps HuggingFace tokenizers
-- Provides the same interface as MAMMOTH's traditional `Vocab` class
-- Factory function `get_vocab()` automatically detects `.json` files
-
-**2. Dataset Processing** (`mammoth/inputters/dataset.py`):
-- Modified to handle both traditional vocabs and HF tokenizers
-- Tokenization happens transparently during data loading
-- Special tokens (BOS/EOS/PAD) are added by MAMMOTH
-
-**3. Translation** (`mammoth/translate/translation.py`):
-- Decoding adapted to use tokenizer's built-in decoder
-- Properly handles BPE merging and special token removal
-- Maintains compatibility with traditional vocab files
-
-**4. Configuration** (`mammoth/opts.py`):
-- New `--use_hf_tokenizer` flag to enable HF tokenizer mode
-- Backward compatible: omit flag to use traditional spm model and vocabs
-
-## Tokenizer Formats
-
-### Sentencepiece-style (Default Example)
-
-Uses `▁` (U+2581 LOWER ONE EIGHTH BLOCK) to mark word boundaries:
-
-```python
-# Input:  "Hello, world!"
-# Tokens: ['▁Hello', ',', '▁world', '!']
-# IDs:    [1234, 45, 5678, 90]
-```
-Note: punctuations are not pretokenized.
-
-### Other Supported Formats
-
-You can customize the tokenizer training script to use:
-
-- **WordPiece**: Used by BERT (`##` prefix for continuations)
-- **Unigram**: SentencePiece unigram model
-- **Character**: Character-level tokenization
-
-See the [HuggingFace tokenizers documentation](https://huggingface.co/docs/tokenizers/index) for more options.
-
-
-### Using Pretrained Tokenizers
-
-Download and use tokenizers from HuggingFace hub:
-
-```python
-from tokenizers import Tokenizer
-
-# Download from hub
-tokenizer = Tokenizer.from_pretrained("bert-base-uncased")
-tokenizer.save("my_tokenizer.json")
-```
-
-Then use `my_tokenizer.json` in your MAMMOTH config.
+Any `tokenizer.json` works if it contains the tokens `<s>`, `</s>`, `<pad>` and `<unk>`. Tokenizers that use other names for them (e.g. BERT's `[CLS]`, `[SEP]`, `[PAD]`) do not work as they are. To use a different algorithm (WordPiece, Unigram, …), write your own training script with the [`tokenizers` library](https://huggingface.co/docs/tokenizers/index), keeping the special tokens above and no post-processor template.

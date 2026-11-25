@@ -75,13 +75,13 @@ hf_modular/
 ├── modeling_mammoth.py
 ├── native_transformer.py
 ├── components/                        # each component stored once, whichever tasks share it
-│   ├── src_emb__eng.safetensors       # source embedding per language
-│   ├── tgt_emb__spa.safetensors       # target embedding per language
+│   ├── src_emb__eng.safetensors       # source embedding per language (+ its post-embedding norm)
+│   ├── tgt_emb__spa.safetensors       # target embedding per language (+ its post-embedding norm)
 │   ├── enc__0__eng.safetensors        # encoder layer stack <index>__<xcoder_id>
 │   ├── enc__1__all.safetensors
 │   ├── dec__0__spa.safetensors        # decoder layer stack <index>__<xcoder_id>
-│   ├── enc_wrapper__eng__all.safetensors   # post_emb_norm for an encoder path
-│   ├── dec_wrapper__spa__all.safetensors   # post_emb_norm + to_logits for a decoder path
+│   ├── enc_wrapper__eng__all.safetensors   # encoder path: no parameters
+│   ├── dec_wrapper__spa__all.safetensors   # decoder path: to_logits
 │   └── ...
 └── tokenizers/
     ├── src/eng/                       # one tokenizer per side and language
@@ -98,7 +98,7 @@ model = MammothHub.from_pretrained("org/repo", src="deu", tgt="fra",
 MammothHub.list_tasks("org/repo"); MammothHub.list_components("org/repo")
 ```
 
-Only the components the model needs are downloaded. **Limitation:** the wrapper modules (`post_emb_norm`, `to_logits`) are trained per complete encoder/decoder path, so an encoder path and a decoder path can only be used if some trained task used them. Any trained encoder path can be combined with any trained decoder path; a path no task trained (e.g. a new mix of layer stacks) is rejected with an error listing the trained paths. Adapters are not exported.
+Only the components the model needs are downloaded. **Limitation:** the wrapper modules (`to_logits`) are trained per complete encoder/decoder path, so an encoder path and a decoder path can only be used if some trained task used them. Any trained encoder path can be combined with any trained decoder path; a path no task trained (e.g. a new mix of layer stacks) is rejected with an error listing the trained paths. Adapters are not exported.
 
 #### Per-Task Standalone
 

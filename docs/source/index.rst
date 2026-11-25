@@ -32,6 +32,8 @@ Contents
       prepare_data.md
       INDEXED_DATASET_GUIDE.md
       training_tips.md
+      freezing_components.md
+      counting_parameters.md
       exporting_to_huggingface.md
       serving.md
 

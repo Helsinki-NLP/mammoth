@@ -404,7 +404,7 @@ Each script finds the master node, writes a small wrapper script, and uses `srun
 
 - `#SBATCH -A`: your project account.
 - `#SBATCH --nodes` and `--ntasks`: set both to the config's `n_nodes` (`5` for `europarl_21langs_5nodes.yaml`). The scripts start one task per node.
-- The virtual environment and MAMMOTH paths in the wrapper.
+- The variables at the top (`VENV`, and on LUMI `PROJECT_DIR` and `CONTAINER`): the venv you created with the cluster's `env_setup.sh` (see the [CSC quickstart](../CSC_quickstart.md)).
 - The `-config` path: point it at `europarl_21langs_5nodes.yaml`.
 
 Create the log directory, then submit the job (on Roihu, the script is `multi-nodes.sh`):

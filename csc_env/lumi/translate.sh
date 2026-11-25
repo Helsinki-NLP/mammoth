@@ -1,15 +1,21 @@
 #!/bin/bash
 
-#SBATCH -A project_
-#SBATCH -J training
-#SBATCH -o ./log/training.%j.out
-#SBATCH -e ./log/training.%j.err
-#SBATCH --partition=dev-g     
+#SBATCH -A project_xxxxxxxxx
+#SBATCH -J translate
+#SBATCH -o ./log/translate.%j.out
+#SBATCH -e ./log/translate.%j.err
+#SBATCH --partition=dev-g
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=24G
 #SBATCH --time=0-00:30:00
-#SBATCH --gres=gpu:1 
+#SBATCH --gres=gpu:1
+
+# ==== EDIT THESE (same as in env_setup.sh) ====
+PROJECT_DIR=/scratch/project_xxxxxxxxx
+VENV=$PROJECT_DIR/$USER/mammoth-venv
+CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif
+# ==============================================
 
 echo "Starting at `date`"
 
@@ -17,12 +23,10 @@ echo "Starting at `date`"
 # (useful if running several commands in the same script)
 set -e
 
-
 singularity exec \
-    -B $your_path_in_lumi:$your_path_in_lumi:rw \
-    /appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif \
-    $your_path_in_lumi/.venv/bin/python $path_to_mammoth/translate.py \
-    -config csc_env/inference.yaml
+    --env PYTHONNOUSERSITE=1 \
+    -B "$PROJECT_DIR:$PROJECT_DIR:rw" \
+    "$CONTAINER" \
+    "$VENV/bin/mammoth_translate" -config inference.yaml
 
 echo "Finishing at `date`"
-

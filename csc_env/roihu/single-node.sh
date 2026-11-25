@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -A project_2017852
+#SBATCH -A project_xxxxxxx
 #SBATCH -J train
 #SBATCH -o ./log/training.%j.out
 #SBATCH -e ./log/training.%j.err
@@ -12,6 +12,9 @@
 #SBATCH --time=01:00:00
 #SBATCH --gres=gpu:gh200:1
 
+# ==== EDIT THIS (same as in env_setup.sh) ====
+VENV=/scratch/project_xxxxxxx/$USER/mammoth-venv
+# =============================================
 
 echo "Starting at `date`"
 
@@ -21,8 +24,9 @@ set -e
 
 module purge
 module load python-pytorch/2.10
+export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
-/scratch/project_2017852/mammoth-shared/.venv/bin/python /scratch/project_2017852/mammoth-shared/mammoth_pytorch/mammoth/train.py -config single_node.yaml
+"$VENV/bin/mammoth_train" -config single_node.yaml
 
 echo "Finishing at `date`"

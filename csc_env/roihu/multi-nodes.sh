@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH -A project_2017852
+#SBATCH -A project_xxxxxxx
 #SBATCH -J 2nodes
 #SBATCH -o ./log/train/%j.out
 #SBATCH -e ./log/train/%j.err
@@ -12,6 +12,9 @@
 #SBATCH --time=4:00:00
 #SBATCH --gres=gpu:gh200:4
 
+# ==== EDIT THIS (same as in env_setup.sh) ====
+VENV=/scratch/project_xxxxxxx/$USER/mammoth-venv
+# =============================================
 
 echo "Starting at `date`"
 
@@ -20,7 +23,7 @@ set -eux
 # Get the master node (first node in the job allocation)
 MASTER_NODE=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
 
-# Generate a random port for distributed training communication
+# Port for distributed training communication
 MASTER_PORT=9973
 
 echo "Master node: ${MASTER_NODE}"
@@ -33,17 +36,12 @@ cat > ./multinode_train_script.sh << 'EOF'
 
 module purge
 module load python-pytorch/2.10
-source /scratch/project_2017852/mammoth-shared/.venv/bin/activate
-
 
 echo "Node ${SLURM_NODEID} starting training"
 echo "Master node: $MASTER_NODE"
 echo "Master port: $MASTER_PORT"
 
-export TOKENIZERS_PARALLELISM=False
-export MAMMOTH_PLATFORM=nvidia
-
-python /scratch/project_2017852/mammoth-shared/mammoth_pytorch/mammoth/train.py \
+"${VENV}/bin/mammoth_train" \
     -config ./multi_nodes.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip $MASTER_NODE \
@@ -52,9 +50,10 @@ EOF
 
 chmod +x ./multinode_train_script.sh
 
-# Execute the training script on each node directly with environment variables
-export MASTER_NODE="${MASTER_NODE}"
-export MASTER_PORT="${MASTER_PORT}"
+# srun passes these environment variables to the script on each node
+export MASTER_NODE MASTER_PORT VENV
+export PYTHONNOUSERSITE=1
+export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 
 srun ./multinode_train_script.sh

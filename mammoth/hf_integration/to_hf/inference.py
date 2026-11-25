@@ -106,6 +106,15 @@ def load_single(model_dir: str, device: str):
 
 def _load_mammoth_hub(model_id: str):
     """Import MammothHub, bootstrapping from the Hub if neither local copy is available."""
+    import importlib.util
+    # A local artifact ships its own mammoth_hub.py, matching its format: prefer it, so this
+    # script also works when it is not inside the artifact directory.
+    _local = os.path.join(model_id, "mammoth_hub.py")
+    if os.path.isfile(_local):
+        _spec = importlib.util.spec_from_file_location("mammoth_hub", _local)
+        _mod = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_mod)
+        return _mod.MammothHub
     try:
         from mammoth_hub import MammothHub  # vendored in the artifact or on sys.path
         return MammothHub
@@ -118,7 +127,6 @@ def _load_mammoth_hub(model_id: str):
         pass
     # Clean environment: fetch mammoth_hub.py directly from the Hub repo
     from huggingface_hub import hf_hub_download
-    import importlib.util
     _path = hf_hub_download(model_id, "mammoth_hub.py")
     _spec = importlib.util.spec_from_file_location("mammoth_hub", _path)
     _mod = importlib.util.module_from_spec(_spec)

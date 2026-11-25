@@ -612,7 +612,8 @@ class Inference(object):
                     gold_score_total += trans.gold_score
                     gold_words_total += len(trans.gold_sent) + 1
 
-                self._log(f"[DEBUG] tgt output tokens: {trans.pred_sents[0]}")
+                if self.verbose:
+                    self._log(f"[DEBUG] tgt output tokens: {trans.pred_sents[0]}")
                 n_best_preds = [" ".join(pred) for pred in trans.pred_sents[: self.n_best]]
                 if self.report_align:
                     align_pharaohs = [build_align_pharaoh(align) for align in trans.word_aligns[: self.n_best]]

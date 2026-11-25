@@ -133,7 +133,8 @@ def _instantiate(config_dict: dict, code_dir: str):
         with open(os.path.join(tmp_dir, "config.json"), "w") as f:
             json.dump(config_dict, f)
         for fname in CODE_FILES:
-            src = os.path.join(code_dir, fname)
+            # absolute: a relative target would resolve against tmp_dir, not the cwd
+            src = os.path.abspath(os.path.join(code_dir, fname))
             if os.path.exists(src):
                 os.symlink(src, os.path.join(tmp_dir, fname))
         config = AutoConfig.from_pretrained(tmp_dir, trust_remote_code=True)

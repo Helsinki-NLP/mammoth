@@ -249,6 +249,18 @@ def test_shipped_inference_load_model(checkpoint, modular_dir, tmp_path):
     assert len(hyps) == 1 and isinstance(hyps[0], str)
 
 
+def test_inference_prefers_artifact_mammoth_hub(modular_dir, tmp_path):
+    """inference.py run from outside the artifact loads the artifact's own mammoth_hub.py."""
+    import importlib.util
+    script = tmp_path / "inference.py"
+    script.write_text((modular_dir / "inference.py").read_text())
+    spec = importlib.util.spec_from_file_location("detached_inference", script)
+    inference = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(inference)
+    hub_cls = inference._load_mammoth_hub(str(modular_dir))
+    assert os.path.samefile(hub_cls.from_pretrained.__code__.co_filename, modular_dir / "mammoth_hub.py")
+
+
 def test_assemble_state_dict_unchanged(checkpoint):
     """The refactored per-task assembly still fills a per-task model exactly."""
     ckpt, opts, _ = checkpoint

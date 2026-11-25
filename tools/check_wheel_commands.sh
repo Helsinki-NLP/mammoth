@@ -21,7 +21,7 @@ venv/bin/python -m pip install --quiet --upgrade pip
 if [[ -n "${TORCH_INDEX_URL:-}" ]]; then
     venv/bin/python -m pip install --quiet torch --index-url "$TORCH_INDEX_URL"
 fi
-venv/bin/python -m pip install --quiet "${wheel}[server,config]"
+venv/bin/python -m pip install --quiet "${wheel}[server]"
 
 venv/bin/python - <<'EOF'
 import os

@@ -24,7 +24,6 @@ echo "Starting at `date`"
 set -e
 
 singularity exec \
-    --env PYTHONNOUSERSITE=1 \
     -B "$PROJECT_DIR:$PROJECT_DIR:rw" \
     "$CONTAINER" \
     "$VENV/bin/mammoth_translate" -config inference.yaml

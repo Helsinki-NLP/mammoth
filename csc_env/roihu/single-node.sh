@@ -24,7 +24,6 @@ set -e
 
 module purge
 module load python-pytorch/2.10
-export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 "$VENV/bin/mammoth_train" -config single_node.yaml

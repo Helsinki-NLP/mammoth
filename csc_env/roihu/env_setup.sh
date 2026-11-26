@@ -24,7 +24,6 @@ MAMMOTH_PKG=mammoth-nlp                            # or e.g. mammoth-nlp==0.3.0;
 REQ_FILE=
 # ====================
 
-export PYTHONNOUSERSITE=1
 module purge
 module load python-pytorch/2.10
 

@@ -88,16 +88,6 @@ In a source checkout, the repository root also has `train.py` and `translate.py`
 | `mammoth_upload` | `python -m mammoth.hf_integration.to_hf.push_to_hub` |
 | `mammoth_download` | `python -m mammoth.hf_integration.to_hf.model_downloader` |
 
-**`ImportError` from `transformers` or another dependency** (for example `cannot import name 'PreTrainedModel' from 'transformers'`) while the traceback shows a path under `~/.local/lib/python3.*/site-packages`. Python also loads packages from your user site directory (`pip install --user`), and those can shadow the versions in your venv or container. This is common on clusters such as LUMI. Turn the user site off:
-
-```bash
-export PYTHONNOUSERSITE=1
-python -c "import transformers; print(transformers.__version__, transformers.__file__)"   # should be >= 5.24, inside your venv
-```
-
-If the path still points outside your venv, reinstall in a fresh venv.
-
-
 ## Next steps
 
 - [Quickstart](quickstart.md): train and translate English→German on Multi30k.

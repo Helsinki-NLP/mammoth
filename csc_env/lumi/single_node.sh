@@ -24,7 +24,6 @@ echo "Starting at `date`"
 set -e
 
 singularity exec \
-    --env PYTHONNOUSERSITE=1 \
     --env FLASH_ATTENTION_TRITON_AMD_ENABLE="TRUE" \
     -B "$PROJECT_DIR:$PROJECT_DIR:rw" \
     "$CONTAINER" \

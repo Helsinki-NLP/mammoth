@@ -9,7 +9,13 @@ Both use SLURM for job scheduling. The main difference is that LUMI runs inside 
 
 On both, you install MAMMOTH with pip into your own virtual environment, on top of the PyTorch that the cluster provides (the container's ROCm build on LUMI, the module's CUDA build on Roihu). The job templates are in [`csc_env/`](https://github.com/Helsinki-NLP/mammoth/tree/main/csc_env). Each template starts with a few variables to edit (project, venv path, container); use the same values in all of them.
 
-Packages installed with `pip install --user` live in `~/.local` and are loaded before those of the container or venv. An old `transformers` there breaks MAMMOTH with errors such as `cannot import name 'PreTrainedModel' from 'transformers'`. The templates set `PYTHONNOUSERSITE=1` to ignore them; do the same in your own scripts (see Troubleshooting in [Installation](install.md)).
+To start, first clone the repository on the cluster, e.g. into your project's scratch directory:
+
+```bash
+cd /scratch/project_xxxxxxxxx/$USER
+git clone https://github.com/Helsinki-NLP/mammoth.git
+cd mammoth
+```
 
 ---
 
@@ -55,7 +61,6 @@ The script runs training inside the container:
 
 ```bash
 singularity exec \
-    --env PYTHONNOUSERSITE=1 \
     -B $PROJECT_DIR:$PROJECT_DIR:rw \
     $CONTAINER \
     $VENV/bin/mammoth_train -config single_node.yaml
@@ -83,7 +88,7 @@ The script finds the master node and starts one process per node with `srun`, in
 MASTER_NODE=$(scontrol show hostnames "${SLURM_JOB_NODELIST}" | head -n 1)
 MASTER_PORT=9973
 
-srun singularity exec --env VENV=$VENV --env PYTHONNOUSERSITE=1 ... $CONTAINER ./two_nodes_wrapper_script.sh
+srun singularity exec --env VENV=$VENV ... $CONTAINER ./two_nodes_wrapper_script.sh
 ```
 
 Inside the wrapper, each node gets its rank from `$SLURM_PROCID`:
@@ -119,7 +124,6 @@ The script runs translation inside the container:
 
 ```bash
 singularity exec \
-    --env PYTHONNOUSERSITE=1 \
     -B $PROJECT_DIR:$PROJECT_DIR:rw \
     $CONTAINER \
     $VENV/bin/mammoth_translate -config inference.yaml
@@ -161,7 +165,6 @@ It does the same as the LUMI setup on top of the module: `python -m venv --syste
 Set these environment variables before any training run (the templates do this):
 
 ```bash
-export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 ```
@@ -233,7 +236,6 @@ Submit as a SLURM job (single GPU is usually enough), for example:
 
 module purge
 module load python-pytorch/2.10
-export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 $VENV/bin/mammoth_translate -config inference.yaml

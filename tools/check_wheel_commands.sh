@@ -3,14 +3,13 @@
 #
 #   python -m build && tools/check_wheel_commands.sh dist/mammoth_nlp-*.whl
 #
-# The venv lives in a temp dir and the commands run from there, so neither the source tree nor
-# ~/.local (PYTHONNOUSERSITE=1) can stand in for what the wheel really installs.
+# The venv lives in a temp dir and the commands run from there, so the source tree cannot stand in for
+# what the wheel really installs.
 # Set TORCH_INDEX_URL (e.g. https://download.pytorch.org/whl/cpu) to pick the torch build.
 set -euo pipefail
 
 wheel=$(realpath "${1:?usage: $0 path/to/mammoth_nlp-*.whl}")
 python=${PYTHON:-python3}
-export PYTHONNOUSERSITE=1
 
 workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT

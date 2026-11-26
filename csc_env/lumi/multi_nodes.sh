@@ -53,7 +53,6 @@ srun /usr/bin/singularity exec \
     --env MASTER_NODE="${MASTER_NODE}" \
     --env MASTER_PORT="${MASTER_PORT}" \
     --env VENV="${VENV}" \
-    --env PYTHONNOUSERSITE=1 \
     -B "$PROJECT_DIR:$PROJECT_DIR:rw" \
     "$CONTAINER" \
     ./two_nodes_wrapper_script.sh

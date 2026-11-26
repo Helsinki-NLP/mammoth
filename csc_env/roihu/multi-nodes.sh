@@ -52,7 +52,6 @@ chmod +x ./multinode_train_script.sh
 
 # srun passes these environment variables to the script on each node
 export MASTER_NODE MASTER_PORT VENV
-export PYTHONNOUSERSITE=1
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 

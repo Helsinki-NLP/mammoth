@@ -18,7 +18,7 @@ set -euo pipefail
 
 # ==== EDIT THESE ====
 PROJECT_DIR=/scratch/project_xxxxxxxxx           # bind-mounted into the container
-VENV=$PROJECT_DIR/$USER/mammoth-venv             # the venv to create (the job scripts use the same path)
+VENV=$PROJECT_DIR/$USER/mammoth-venv             # the venv to create; change as you like, but use the same path in the job scripts
 CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif
 MAMMOTH_PKG=mammoth-nlp                          # or e.g. mammoth-nlp==0.3.0; for development: -e /path/to/mammoth
 # Optional: install MAMMOTH with --no-deps and take the other packages from the container plus this
@@ -30,7 +30,6 @@ echo "Starting setup at $(date)"
 echo "Venv: $VENV"
 
 singularity exec \
-    --env PYTHONNOUSERSITE=1 \
     -B "$PROJECT_DIR:$PROJECT_DIR:rw" \
     "$CONTAINER" \
     bash -c "
@@ -38,41 +37,18 @@ singularity exec \
     if [ ! -d '$VENV' ]; then
         python -m venv --system-site-packages '$VENV'
     fi
-    '$VENV/bin/pip' install --upgrade pip
+
     torch_before=\$('$VENV/bin/python' -c 'import torch; print(torch.__version__)')
 
     if [ -n '$REQ_FILE' ]; then
         '$VENV/bin/pip' install --no-deps $MAMMOTH_PKG
         '$VENV/bin/pip' install -r '$REQ_FILE'
-        # fail if a package MAMMOTH needs is missing or too old (unlike pip check, ignores the container's own conflicts)
-        '$VENV/bin/python' -P - <<'PYEOF'
-import sys
-from importlib.metadata import PackageNotFoundError, distribution, version
-try:
-    from packaging.requirements import Requirement
-except ImportError:  # a bare venv: use the copy vendored in pip
-    from pip._vendor.packaging.requirements import Requirement
-problems = []
-for spec in distribution('mammoth-nlp').requires or []:
-    req = Requirement(spec)
-    if req.marker is not None and not req.marker.evaluate({'extra': ''}):
-        continue  # optional extra, e.g. [server]
-    try:
-        installed = version(req.name)
-    except PackageNotFoundError:
-        problems.append(f'{req}: not installed')
-        continue
-    if not req.specifier.contains(installed, prereleases=True):
-        problems.append(f'{req}: found {installed}')
-if problems:
-    sys.exit('mammoth-nlp requirements not met (add them to REQ_FILE):\\n  ' + '\\n  '.join(problems))
-print('mammoth-nlp requirements OK')
-PYEOF
+        '$VENV/bin/pip' check   # fails if a package MAMMOTH needs is missing or too old
     else
         '$VENV/bin/pip' install $MAMMOTH_PKG
     fi
 
-    '$VENV/bin/python' -P - <<'EOF'
+    '$VENV/bin/python' - <<'EOF'
 import torch, transformers, mammoth
 print('torch       ', torch.__version__, torch.__file__)
 print('GPU         ', torch.cuda.is_available(), torch.version.hip)

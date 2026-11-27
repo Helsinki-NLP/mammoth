@@ -87,30 +87,6 @@ class _ArtifactTask:
         return list(self.config.decoder_sharing_groups or [self.name] * len(self.config.dec_layers))
 
 
-def post_emb_norm_owner(norms: list) -> str:
-    """Which component a side's post-embedding norm belongs to, judged from its weights.
-
-    norms: one (language, path, {key: tensor}) per task. Training keeps one norm either per
-    language ("emb") or per encoder/decoder path ("wrapper"); fused per-task files do not say
-    which, so pick the grouping under which the tasks agree.
-    """
-    def consistent(group: int) -> bool:
-        seen = {}
-        for item in norms:
-            ref = seen.setdefault(item[group], item[2])
-            if ref.keys() != item[2].keys() or not all(torch.equal(ref[k], item[2][k]) for k in ref):
-                return False
-        return True
-
-    if consistent(0):
-        return "emb"
-    if consistent(1):
-        return "wrapper"
-    raise ValueError("Post-embedding norm weights differ between tasks that share both the "
-                     "language and the encoder/decoder path; the artifact cannot be split "
-                     "into components")
-
-
 class ArtifactSource(ModelSource):
     """Per-task HF artifacts, split back into components.
 
@@ -119,33 +95,24 @@ class ArtifactSource(ModelSource):
 
     Each component is named from the task's languages and sharing groups, exactly as in a
     modular repo, and the post-embedding norm goes to the language embedding or to the
-    wrapper as config.json's post_emb_norm_scope says (judged from the weights for exports
-    that predate it), so tasks of a bundle share components in memory and zero-shot directions
-    work. A component found in several task files was exported from the same checkpoint
+    wrapper as config.json's post_emb_norm_scope says, so tasks of a bundle share components
+    in memory and zero-shot directions work. A component found in several task files was exported from the same checkpoint
     shard, so the first task's copy is used.
     """
 
-    def __init__(self, model_id: str, config: Optional[dict] = None, task: Optional[str] = None):
+    def __init__(self, model_id: str, config: Optional[dict] = None):
         self.model_id = model_id
         config = config or _read_manifest(model_id)
         self._weight_paths, self._bin_cache = {}, (None, None)
         model_type = config.get("model_type")
         if model_type == LEGACY_MODEL_TYPE:
-            if task is not None:
-                raise ValueError("task only names the direction of a standalone model")
             self._tasks = [
                 _ArtifactTask(name, t["_src"], t["_tgt"], _config(t),
                               (f"{name}.safetensors", f"{name}.bin"),
                               f"{name}_src_tokenizer", f"{name}_tgt_tokenizer")
                 for name, t in config["tasks"].items()]
         elif model_type == STANDALONE_MODEL_TYPE:
-            src, tgt = config.get("src_lang"), config.get("tgt_lang")
-            if task is not None:
-                src, _, tgt = task.partition("-")
-            if not (src and tgt):
-                raise ValueError(
-                    f"{model_id} does not record its languages (converted before src_lang/"
-                    f"tgt_lang were saved); name the direction, e.g. task='eng-spa'")
+            src, tgt = config["src_lang"], config["tgt_lang"]
             cfg = _config(config)
             self._tasks = [_ArtifactTask(f"{src}-{tgt}", src, tgt, cfg,
                                          ("model.safetensors", "pytorch_model.bin"),
@@ -188,17 +155,11 @@ class ArtifactSource(ModelSource):
 
         self._norm_owner = {}
         if arch["post_emb_norm"]:
-            scopes = {getattr(t.config, "post_emb_norm_scope", None) for t in self._tasks}
+            scopes = {t.config.post_emb_norm_scope for t in self._tasks}
             if len(scopes) > 1:
-                raise ValueError(f"Tasks disagree on post_emb_norm_scope: {sorted(map(str, scopes))}")
-            scope = scopes.pop()
-            for side, key in (("src", "encoder"), ("tgt", "decoder")):
-                if scope is not None:
-                    self._norm_owner[side] = {"language": "emb", "component": "wrapper"}[scope]
-                else:  # exported before the scope was recorded: judge from the weights
-                    self._norm_owner[side] = post_emb_norm_owner([
-                        (getattr(t, side), tuple(getattr(t, key)), self._read(i, f"{key}.post_emb_norm."))
-                        for i, t in enumerate(self._tasks)])
+                raise ValueError(f"Tasks disagree on post_emb_norm_scope: {sorted(scopes)}")
+            owner = {"language": "emb", "component": "wrapper"}[scopes.pop()]
+            self._norm_owner = {"src": owner, "tgt": owner}
         return {"model_type": MODULAR_MODEL_TYPE, "format_version": 1, "architecture": arch,
                 "components": components, "tokenizers": tokenizers, "tasks": tasks}
 
@@ -277,21 +238,16 @@ class CheckpointSource(ModelSource):
         return build_tokenizer(self._vocab[(side, lang)], ids, add_bos_eos=(side == "src"))
 
 
-def open_source(model: str, step: Optional[int] = None, task: Optional[str] = None) -> ModelSource:
+def open_source(model: str, step: Optional[int] = None) -> ModelSource:
     """Open a training checkpoint directory (has *_frame.pt), or an HF repo of any Mammoth format.
 
-    step picks a checkpoint step; task names the direction of a standalone HF model whose
-    config.json does not record its languages.
+    step picks a checkpoint step.
     """
     if os.path.isdir(model) and glob.glob(os.path.join(model, "*_frame.pt")):
-        if task is not None:
-            raise ValueError("task only names the direction of a standalone HF model")
         return CheckpointSource(model, step=step)
     if step is not None:
         raise ValueError("step only applies to training checkpoint directories")
     config = _read_manifest(model)
     if config.get("model_type") == MODULAR_MODEL_TYPE:
-        if task is not None:
-            raise ValueError("task only names the direction of a standalone HF model")
         return HFSource(model, config)
-    return ArtifactSource(model, config, task=task)
+    return ArtifactSource(model, config)

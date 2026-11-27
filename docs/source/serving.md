@@ -30,9 +30,6 @@ mammoth_serve --model path/to/checkpoint_dir
 
 # An HF export, as a local directory or a Hub repo id: modular, --single-artifact bundle or single task
 mammoth_serve --model Helsinki-NLP/<repo> --tasks eng-spa,deu-fra
-
-# A single-task export made before the languages were recorded in config.json: name its direction
-mammoth_serve --model ./old_export --direction eng-spa
 ```
 
 For a checkpoint directory the server uses the best checkpoint (`*_best_frame.pt`), or else the one with the largest step; `--step N` picks a specific step. Hub repos are downloaded into the Hugging Face cache, only the files of the directions you load; for a private repo, log in first with `hf auth login`.

@@ -2,7 +2,6 @@
 
     mammoth_serve --model path/to/checkpoint_dir                 # training checkpoint
     mammoth_serve --model org/mammoth-modular --tasks eng-spa,deu-fra
-    mammoth_serve --model ./standalone_export --direction eng-spa  # export without src_lang/tgt_lang
 
 --model takes a training checkpoint directory or any HF export (modular, --single-artifact
 bundle, standalone; local directory or Hub repo id). Directions not loaded at start can be
@@ -33,8 +32,6 @@ def get_parser() -> argparse.ArgumentParser:
                         "or 'none'")
     p.add_argument("--step", type=int, default=None,
                    help="Checkpoint step to load (training checkpoints; default: best, else latest)")
-    p.add_argument("--direction", default=None,
-                   help="Direction 'src-tgt' of a standalone HF export that does not record its languages")
     p.add_argument("--device", default="auto", help="cpu, cuda, cuda:N or mps; auto = cuda if available, else cpu")
     p.add_argument("--dtype", choices=sorted(DTYPES), default="fp32",
                    help="Weight dtype (default fp32; bf16 halves memory)")
@@ -78,7 +75,7 @@ def build_engine(args) -> TranslationEngine:
     settings = GenerationSettings(
         num_beams=args.num_beams, max_new_tokens=args.max_new_tokens, max_length_factor=args.max_length_factor,
         max_batch_size=args.max_batch_size, max_batch_tokens=args.max_batch_tokens)
-    source = open_source(args.model, step=args.step, task=args.direction)
+    source = open_source(args.model, step=args.step)
     pool = ComponentPool(source, device=resolve_device(args.device), dtype=DTYPES[args.dtype])
     engine = TranslationEngine(pool, settings)
     tasks = startup_tasks(args.tasks, pool.available_tasks())

@@ -18,7 +18,6 @@ from mammoth.hf_integration.to_hf.convert_mammoth_to_hf import convert, convert_
 from mammoth.serving import (
     ArtifactSource, CheckpointSource, ComponentPool, HFSource, default_path, open_source,
 )
-from mammoth.serving.sources import post_emb_norm_owner
 from mammoth.tests.test_hf_modular import (  # noqa: F401  (fixtures)
     PREFIX, TASKS, VOCAB_SIZES, _logits, _reference, checkpoint, modular_dir,
 )
@@ -173,7 +172,7 @@ def test_generate(source):
     assert out.shape[0] == 1 and out.max().item() < VOCAB_SIZES[("tgt", "fra")]
 
 
-def test_standalone_model(checkpoint, standalone_dir, tmp_path):
+def test_standalone_model(checkpoint, standalone_dir):
     """A standalone single-task export serves its one direction, exactly."""
     _, opts, modules = checkpoint
     pool = ComponentPool(open_source(str(standalone_dir)))
@@ -187,21 +186,9 @@ def test_standalone_model(checkpoint, standalone_dir, tmp_path):
     assert json.loads((standalone_dir / "config.json").read_text())["post_emb_norm_scope"] == "component"
     assert open_source(str(standalone_dir))._norm_owner == {"src": "wrapper", "tgt": "wrapper"}
 
-    # Exports made before src_lang/tgt_lang/post_emb_norm_scope were recorded: the direction
-    # must be named, and the norm owner is judged from the weights.
-    old = tmp_path / "old"
-    shutil.copytree(standalone_dir, old)
-    config = json.loads((old / "config.json").read_text())
-    del config["src_lang"], config["tgt_lang"], config["post_emb_norm_scope"]
-    (old / "config.json").write_text(json.dumps(config))
-    with pytest.raises(ValueError, match="task='eng-spa'"):
-        open_source(str(old))
-    loaded = ComponentPool(open_source(str(old), task="eng-spa")).add_task("eng-spa")
-    assert torch.equal(_logits(loaded.model, "eng", "spa"), _logits(ref, "eng", "spa"))
-
 
 def test_recorded_norm_scope_is_used(bundle_dir, tmp_path):
-    """post_emb_norm_scope in config.json decides where the norm goes, not the weights."""
+    """post_emb_norm_scope in config.json decides where the norm goes."""
     assert open_source(str(bundle_dir))._norm_owner == {"src": "wrapper", "tgt": "wrapper"}
     bundle = tmp_path / "bundle"
     shutil.copytree(bundle_dir, bundle)
@@ -219,12 +206,3 @@ def test_recorded_norm_scope_is_used(bundle_dir, tmp_path):
     with pytest.raises(ValueError, match="disagree"):
         open_source(str(bundle))
 
-
-def test_post_emb_norm_owner():
-    a, b = {"weight": torch.ones(2)}, {"weight": torch.zeros(2)}
-    # One norm per language: two languages share the path ["all"] but keep their own norm.
-    assert post_emb_norm_owner([("eng", ("all",), a), ("deu", ("all",), b), ("eng", ("all",), a)]) == "emb"
-    # One norm per path: one language on two paths, each with its own norm.
-    assert post_emb_norm_owner([("eng", ("x",), a), ("eng", ("y",), b), ("deu", ("x",), a)]) == "wrapper"
-    with pytest.raises(ValueError, match="cannot be split"):
-        post_emb_norm_owner([("eng", ("x",), a), ("eng", ("x",), b)])

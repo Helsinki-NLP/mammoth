@@ -40,7 +40,7 @@ echo "Master node: ${MASTER_NODE}"
 echo "Master port: ${MASTER_PORT}"
 
 "${VENV}/bin/mammoth_train" \
-    -config ${SLURM_SUBMIT_DIR}/multi_nodes.yaml \
+    -config ./multi_nodes.yaml \
     --node_rank ${SLURM_PROCID} \
     --master_ip ${MASTER_NODE} \
     --master_port ${MASTER_PORT}

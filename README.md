@@ -23,7 +23,6 @@ pip install mammoth-nlp
 - [Counting parameters](https://helsinki-nlp.github.io/mammoth/counting_parameters.html): model size in total, per task and per component.
 - [Exporting to Hugging Face](https://helsinki-nlp.github.io/mammoth/exporting_to_huggingface.html): share a model on the Model Hub and run it without MAMMOTH.
 - [Translation server](https://helsinki-nlp.github.io/mammoth/serving.html): serve a model locally with a web page and an OPUS-MT compatible API (`mammoth_serve`).
-- [Upgrading from 0.2](https://helsinki-nlp.github.io/mammoth/upgrading.html): config changes since the x-transformers backend was replaced.
 
 We welcome issue reports for the code and the documentation.
 

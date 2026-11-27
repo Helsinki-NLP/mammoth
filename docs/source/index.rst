@@ -9,7 +9,6 @@ Contents
       install.md
       quickstart.md
       CSC_quickstart.md
-      upgrading.md
 
 .. toctree::
       :caption: Concepts

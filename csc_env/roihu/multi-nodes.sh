@@ -35,7 +35,7 @@ cat > ./multinode_train_script.sh << 'EOF'
 #!/bin/bash
 
 module purge
-module load python-pytorch/2.10
+module load python-pytorch
 
 echo "Node ${SLURM_NODEID} starting training"
 echo "Master node: $MASTER_NODE"

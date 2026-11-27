@@ -23,7 +23,7 @@ echo "Starting at `date`"
 set -e
 
 module purge
-module load python-pytorch/2.10
+module load python-pytorch
 export TOKENIZERS_PARALLELISM=False
 export MAMMOTH_PLATFORM=nvidia
 "$VENV/bin/mammoth_train" -config single_node.yaml

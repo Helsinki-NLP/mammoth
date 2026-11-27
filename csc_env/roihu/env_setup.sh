@@ -25,7 +25,7 @@ REQ_FILE=
 # ====================
 
 module purge
-module load python-pytorch/2.10
+module load python-pytorch
 
 echo "Starting setup at $(date)"
 echo "Venv: $VENV"

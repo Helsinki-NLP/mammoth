@@ -63,7 +63,7 @@ The script runs training inside the container:
 singularity exec \
     -B $PROJECT_DIR:$PROJECT_DIR:rw \
     $CONTAINER \
-    $VENV/bin/mammoth_train -config single_node.yaml
+    $VENV/bin/mammoth_train -config single_node.yaml --node_rank 0
 ```
 
 The venv does not need to be activated: `$VENV/bin/mammoth_train` runs with the venv's Python.
@@ -182,7 +182,7 @@ Use `csc_env/roihu/single-node.sh` as a template. Key SLURM options:
 #SBATCH --gres=gpu:gh200:1 # from 1-4
 ```
 
-The script loads the module and runs `$VENV/bin/mammoth_train -config single_node.yaml`. Submit with:
+The script loads the module and runs `$VENV/bin/mammoth_train -config single_node.yaml --node_rank 0`. Submit with:
 
 ```bash
 sbatch csc_env/roihu/single-node.sh

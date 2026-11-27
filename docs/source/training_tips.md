@@ -48,7 +48,7 @@ Besides `model_dim`, `enc_layers` and `dec_layers`, set at least:
 heads: 16              # attention heads (model_dim must be divisible by heads)
 ff_activation: swiglu  # choose between "swiglu" and "gelu", "swiglu" by default
 ```
-All norms are bias-free `RMSNorm`, and positions use rotary embeddings (`rotary_pos_emb: true`). See [Upgrading from 0.2](upgrading.md) for options that no longer exist.
+All norms are bias-free `RMSNorm`, and positions use rotary embeddings (`rotary_pos_emb: true`).
 
 
 ## Save storage by using transforms instead of external preprocessing

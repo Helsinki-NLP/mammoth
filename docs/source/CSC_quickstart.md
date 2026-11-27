@@ -17,6 +17,31 @@ git clone https://github.com/Helsinki-NLP/mammoth.git
 cd mammoth
 ```
 
+### Running other commands (data preparation, tokenizers, scripts)
+
+Do not run heavy work on the login node, and remember that on LUMI, Python only works inside the container. To run any command that needs no GPU, such as `prepare_parallel.py`, `mammoth_build_vocab` or a script of your own, use the CPU job template for your cluster: [`csc_env/lumi/cpu_job.sh`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/lumi/cpu_job.sh) or [`csc_env/roihu/cpu_job.sh`](https://github.com/Helsinki-NLP/mammoth/blob/main/csc_env/roihu/cpu_job.sh). It sets up the environment (container or module, and your venv) and runs whatever command you give it.
+
+Copy it to your working directory (under `/scratch`), edit `#SBATCH -A` and the variables at the top once (the same values as in `env_setup.sh`), then put `sbatch cpu_job.sh` in front of the command:
+
+```bash
+mkdir -p log
+sbatch cpu_job.sh python prepare_parallel.py --src ... --tgt ...
+```
+
+For several commands or a loop, write them into a plain bash file and run that file:
+
+```bash
+sbatch cpu_job.sh bash prepare_all.sh
+```
+
+The template asks for 8 CPUs, 24 GB of memory and 1 hour. Override any of these on the command line, without editing the file:
+
+```bash
+sbatch --time=03:00:00 --mem=64G cpu_job.sh bash prepare_all.sh
+```
+
+The output goes to `log/<jobid>.out` and `log/<jobid>.err`. Check progress with `squeue --me`.
+
 ---
 
 ## LUMI (AMD MI250X)

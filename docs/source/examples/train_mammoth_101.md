@@ -12,6 +12,8 @@ It is the multi-GPU follow-up to the [Quickstart](../quickstart.md), which train
 
 Tokenization uses [Hugging Face tokenizers](../HF_TOKENIZERS.md), and the model is MAMMOTH's native PyTorch Transformer. Run every command from the same working directory, with MAMMOTH installed (`pip install mammoth-nlp`, see the [installation guide](../install.md)) and its environment active.
 
+> **On LUMI or Roihu:** Python runs inside the cluster's container (LUMI) or module (Roihu), and heavy work must not run on the login node. Set up your venv and the CPU job template `cpu_job.sh` as described in the [CSC quickstart](../CSC_quickstart.md), then run each command in Steps 1, 2 and 4 by putting `sbatch cpu_job.sh` in front of it, e.g. `sbatch cpu_job.sh bash prepare.sh` for a loop saved as `prepare.sh`. Keep your working directory under `/scratch`. Training and translation need GPUs and have their own Slurm scripts (Steps 3, 5 and the CSC quickstart).
+
 ## The model you will train
 
 Every language gets its own encoder stack and its own decoder stack. A task such as `bg-en` uses the Bulgarian encoder and the English decoder, so each stack is trained by every task that uses it. The English decoder, for example, learns from all the `xx-en` tasks. This is the "language-specific" sharing scheme described in [Sharing schemes](sharing_schemes.md).
@@ -53,96 +55,7 @@ for lang in bg cs; do
 done
 ```
 
-<details>
-<summary>On LUMI or Roihu: run this step as a Slurm job</summary>
-
-On LUMI and Roihu, run the loop as a batch job instead of on the login node. It needs no GPU, only CPUs. Save the script for your cluster as `prepare_data.sh` in your working directory, edit the lines marked `EDIT`, then submit it:
-
-```bash
-mkdir -p log
-sbatch prepare_data.sh
-```
-
-LUMI (runs inside the container, like the training scripts):
-
-```bash
-#!/bin/bash
-
-#SBATCH -A project_xxxxxxxxx
-#SBATCH -J prepare_data
-#SBATCH -o ./log/%j.out
-#SBATCH -e ./log/%j.err
-#SBATCH --partition=debug
-#SBATCH --nodes=1
-#SBATCH --cpus-per-task=7
-#SBATCH --mem=24G
-#SBATCH --time=00:20:00
-
-# ==== EDIT THESE (same as in env_setup.sh) ====
-PROJECT_DIR=/scratch/project_xxxxxxxxx
-VENV=$PROJECT_DIR/$USER/mammoth-venv
-CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif
-# ==============================================
-
-echo "Starting at `date`"
-set -e
-
-for lang in bg cs; do
-    singularity exec \
-        -B "$PROJECT_DIR:$PROJECT_DIR:rw" \
-        "$CONTAINER" \
-        "$VENV/bin/python" prepare_parallel.py \
-            --src europarl_data/${lang}-en/europarl-v7.${lang}-en.${lang} \
-            --tgt europarl_data/${lang}-en/europarl-v7.${lang}-en.en \
-            --src_lang ${lang} --tgt_lang en \
-            --out_dir europarl_data/split/${lang}-en \
-            --valid_size 1000
-done
-
-echo "Finishing at `date`"
-```
-
-Roihu (uses the `python-pytorch` module, like the training scripts):
-
-```bash
-#!/bin/bash
-
-#SBATCH -A project_xxxxxxx
-#SBATCH -J prepare_data
-#SBATCH -o ./log/%j.out
-#SBATCH -e ./log/%j.err
-#SBATCH --partition=small
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=24G
-#SBATCH --time=00:20:00
-
-# ==== EDIT THIS (same as in env_setup.sh) ====
-VENV=/scratch/project_xxxxxxx/$USER/mammoth-venv
-# =============================================
-
-echo "Starting at `date`"
-set -e
-
-module purge
-module load python-pytorch
-
-for lang in bg cs; do
-    "$VENV/bin/python" prepare_parallel.py \
-        --src europarl_data/${lang}-en/europarl-v7.${lang}-en.${lang} \
-        --tgt europarl_data/${lang}-en/europarl-v7.${lang}-en.en \
-        --src_lang ${lang} --tgt_lang en \
-        --out_dir europarl_data/split/${lang}-en \
-        --valid_size 1000
-done
-
-echo "Finishing at `date`"
-```
-
-Your working directory (with `prepare_parallel.py` and `europarl_data/`) must be under `/scratch`. On LUMI, `PROJECT_DIR` is the only directory the container can see.
-
-</details>
+On LUMI or Roihu, save the loop as `prepare.sh` and submit it with `sbatch cpu_job.sh bash prepare.sh` (see the note at the top).
 
 You end up with `europarl_data/split/bg-en/{train,val}.{bg,en}` and the same for `cs-en`. See [Preparing your data](../prepare_data.md) for details on what the script does.
 
@@ -158,88 +71,7 @@ mammoth_build_vocab \
     --vocab_size 32000
 ```
 
-<details>
-<summary>On LUMI or Roihu: run this step as a Slurm job</summary>
-
-As in Step 1, run this as a batch job instead of on the login node. Save the script for your cluster as `build_vocab.sh` in your working directory, edit the lines marked `EDIT`, then submit it:
-
-```bash
-mkdir -p log
-sbatch build_vocab.sh
-```
-
-LUMI:
-
-```bash
-#!/bin/bash
-
-#SBATCH -A project_xxxxxxxxx
-#SBATCH -J build_vocab
-#SBATCH -o ./log/%j.out
-#SBATCH -e ./log/%j.err
-#SBATCH --partition=debug
-#SBATCH --nodes=1
-#SBATCH --cpus-per-task=7
-#SBATCH --mem=24G
-#SBATCH --time=00:30:00
-
-# ==== EDIT THESE (same as in env_setup.sh) ====
-PROJECT_DIR=/scratch/project_xxxxxxxxx
-VENV=$PROJECT_DIR/$USER/mammoth-venv
-CONTAINER=/appl/local/laifs/containers/lumi-multitorch-u24r64f21m43t29-20260319_153422/lumi-multitorch-full-u24r64f21m43t29-20260319_153422.sif
-# ==============================================
-
-echo "Starting at `date`"
-set -e
-
-singularity exec \
-    -B "$PROJECT_DIR:$PROJECT_DIR:rw" \
-    "$CONTAINER" \
-    "$VENV/bin/mammoth_build_vocab" \
-    --input_file europarl_data/split/bg-en/train.bg europarl_data/split/bg-en/train.en \
-                 europarl_data/split/cs-en/train.cs europarl_data/split/cs-en/train.en \
-    --output_dir tokenizer \
-    --vocab_size 32000
-
-echo "Finishing at `date`"
-```
-
-Roihu:
-
-```bash
-#!/bin/bash
-
-#SBATCH -A project_xxxxxxx
-#SBATCH -J build_vocab
-#SBATCH -o ./log/%j.out
-#SBATCH -e ./log/%j.err
-#SBATCH --partition=small
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=24G
-#SBATCH --time=00:30:00
-
-# ==== EDIT THIS (same as in env_setup.sh) ====
-VENV=/scratch/project_xxxxxxx/$USER/mammoth-venv
-# =============================================
-
-echo "Starting at `date`"
-set -e
-
-module purge
-module load python-pytorch
-
-"$VENV/bin/mammoth_build_vocab" \
-    --input_file europarl_data/split/bg-en/train.bg europarl_data/split/bg-en/train.en \
-                 europarl_data/split/cs-en/train.cs europarl_data/split/cs-en/train.en \
-    --output_dir tokenizer \
-    --vocab_size 32000
-
-echo "Finishing at `date`"
-```
-
-</details>
+On LUMI or Roihu: `sbatch cpu_job.sh mammoth_build_vocab ...` with the same arguments.
 
 The result is `tokenizer/tokenizer.json`. MAMMOTH adds the beginning and end of sequence tokens itself, so the tokenizer only splits text into subwords. For 21 languages, a larger vocabulary such as `--vocab_size 64000` is a better fit. See the [HF tokenizers guide](../HF_TOKENIZERS.md) for details.
 
@@ -549,6 +381,53 @@ python make_config.py --base europarl_base.yaml \
 ```
 
 Before running the full set, you need the data split (Step 1) for every language, and a tokenizer trained on all of them (Step 2, with every language's training files and a larger vocabulary).
+
+<details>
+<summary>Prepare the data and tokenizer for all 21 languages</summary>
+
+First download and unpack the full archive (about 30 GB):
+
+```bash
+wget https://mammoth101.a3s.fi/europarl.tar.gz
+mkdir -p europarl_data
+tar -xvzf europarl.tar.gz -C europarl_data --strip-components=1
+```
+
+Then split the data for all 20 language pairs and train one shared tokenizer. The English side is almost the same text in every pair, so the tokenizer gets one English file (from `bg-en`) instead of 20 copies:
+
+```bash
+LANGS="bg cs da de el es et fi fr hu it lt lv nl pl pt ro sk sl sv"
+
+for lang in $LANGS; do
+    python prepare_parallel.py \
+        --src europarl_data/${lang}-en/europarl-v7.${lang}-en.${lang} \
+        --tgt europarl_data/${lang}-en/europarl-v7.${lang}-en.en \
+        --src_lang ${lang} --tgt_lang en \
+        --out_dir europarl_data/split/${lang}-en \
+        --valid_size 1000
+done
+
+TRAIN_FILES=()
+for lang in $LANGS; do
+    TRAIN_FILES+=(europarl_data/split/${lang}-en/train.${lang})
+done
+TRAIN_FILES+=(europarl_data/split/bg-en/train.en)
+
+mammoth_build_vocab \
+    --input_file "${TRAIN_FILES[@]}" \
+    --output_dir tokenizer \
+    --vocab_size 64000
+```
+
+This overwrites the two-language `tokenizer/tokenizer.json` from Step 2, which is fine: the 21-language config points at the same path.
+
+Save these commands as `prepare_all.sh` and run `bash prepare_all.sh`. On LUMI or Roihu, run the `wget` and `tar` commands on the login node, and submit the rest as a job with more time and memory than the template's default, since 20 pairs take much longer than 2:
+
+```bash
+sbatch --time=03:00:00 --mem=64G cpu_job.sh bash prepare_all.sh
+```
+
+</details>
 
 When there are more languages than GPUs, the script puts several languages on the same GPU, and that GPU samples among its tasks according to `weight`. You can also write `node_gpu` by hand to balance the load differently, for example by giving large corpora a GPU of their own.
 
